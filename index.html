@@ -3,7 +3,2447 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+    <title><!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
     <title>Fracht Tracker (V8.18 - Refactored)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+<style>
+    :root{--primary-color:#5cb85c;--primary-hover:#4cae4c;--secondary-color:#5bc0de;--secondary-hover:#31b0d5;--danger-color:#d9534f;--danger-hover:#c9302c;--warning-color:#f0ad4e;--warning-hover:#ec971f;--info-color:#5bc0de;--info-hover:#31b0d5;--light-bg:#f9f9f9;--border-color:#ddd;--text-color:#333;--cancelled-color:#999;}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;margin:0;padding:0;background-color:#f4f4f4;color:var(--text-color);font-size:16px;-webkit-text-size-adjust:100%;-webkit-touch-callout:none;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;position:relative}
+    input[type="text"],input[type="number"]{-webkit-user-select:text;user-select:text}
+    .container{padding:10px;max-width:100%;box-sizing:border-box}
+    h1,h2{text-align:center;margin-top:15px;margin-bottom:15px} h1{font-size:1.6em} h2{font-size:1.3em}
+    .input-section{margin-bottom:10px;margin-top:10px;padding:15px;border:1px solid var(--border-color);border-radius:8px;background-color:var(--light-bg);display:flex;flex-direction:column;gap:15px}
+    .controls-row{display:flex;flex-wrap:wrap;gap:15px;align-items:center;padding-top:5px}
+    label{display:block;margin-bottom:5px;font-weight:bold}
+    input[type="text"],select,input[type="number"]{width:100%;padding:12px 10px;border:1px solid #ccc;border-radius:5px;box-sizing:border-box;font-size:1em;height:44px}
+    input:disabled{background-color:#eee;cursor:not-allowed}
+    .input-wrapper{position:relative}
+    .clear-input-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:#bbb;color:white;border:none;border-radius:50%;width:24px;height:24px;font-size:16px;line-height:22px;text-align:center;cursor:pointer;display:none;padding:0}
+    .clear-input-btn:hover{background:#999}
+    .input-wrapper input[type="text"]{padding-right:35px}
+    .combo-checkbox-group{display:none;align-items:center;padding:5px 0} .combo-checkbox-group input{width:20px;height:20px;margin-right:8px} .combo-checkbox-group label{margin-bottom:0;font-weight:normal;font-size:1em;cursor:pointer} #comboCheckboxContainer.visible{display:flex}
+    .note-toggle-btn{background-color:#f0f0f0;border:1px solid #ccc;border-radius:5px;padding:5px 8px;font-size:1.2em;line-height:1;cursor:pointer;transition:background-color .2s,border-color .2s,color .2s;margin-left:auto;flex-shrink:0;height:38px;width:45px;display:flex;align-items:center;justify-content:center}
+    .note-toggle-btn:hover{background-color:#e0e0e0}
+    .note-toggle-btn.note-active{background-color:var(--warning-color);border-color:var(--warning-hover);color:white}
+    .note-input-area{display:none;margin-top:10px;padding:10px;border:1px dashed var(--warning-color);border-radius:5px;background-color:#fffaf0}
+    .note-input-area label{font-weight:bold;margin-bottom:5px;display:block}
+    .note-input-area .input-wrapper{position:relative}
+    .note-input-area input[type="text"]{width:100%;padding-right:35px;height:44px;box-sizing:border-box}
+    .clear-note-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:#bbb;color:white;border:none;border-radius:50%;width:24px;height:24px;font-size:16px;line-height:22px;text-align:center;cursor:pointer;padding:0;display:block !important}
+    .clear-note-btn:hover{background:#999}
+    .main-action-button{background-color:var(--primary-color);color:white;padding:12px 15px;border:none;border-radius:5px;cursor:pointer;font-size:1.1em;height:48px;text-align:center;width:100%;transition:background-color .2s} .main-action-button:hover,.main-action-button:active{background-color:var(--primary-hover)}
+    .delete-btn{background-color:var(--danger-color) !important}
+    .delete-btn:hover,.delete-btn:active{background-color:var(--danger-hover) !important}
+    #newTotalSection{display:none;flex-direction:column;gap:10px;border-top:1px solid #ccc;margin-top:15px;padding-top:15px}
+    #newTotalSection.visible{display:flex}
+    #newTotalSection div{display:flex;gap:10px;margin-top:10px}
+    #newTotalSection button{flex-grow:1}
+    #confirmNewTotalBtn{background-color:var(--primary-color)}
+    #confirmNewTotalBtn:hover{background-color:var(--primary-hover)}
+    #skipNewTotalBtn{background-color:var(--secondary-color)}
+    #skipNewTotalBtn:hover{background-color:var(--secondary-hover)}
+    .batch-controls{display:flex;justify-content:flex-end;align-items:center;margin-bottom:5px;padding:8px 10px;background-color:#e9e9e9;border-radius:5px;gap:15px;position:relative;z-index:10}
+    #menu-toggle-btn{background-color:var(--secondary-color);color:white;border:none;border-radius:5px;padding:6px 10px;font-size:1.2em;line-height:1;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.1);order:-1;margin-right:auto}
+    #menu-toggle-btn:hover{background-color:var(--secondary-hover)}
+    .batch-controls label{margin:0}
+    .batch-toggle-switch{position:relative;display:inline-block;width:50px;height:28px;flex-shrink:0}
+    .batch-toggle-switch input{opacity:0;width:0;height:0}
+    .batch-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#ccc;transition:.4s;border-radius:28px}
+    .batch-slider:before{position:absolute;content:"";height:20px;width:20px;left:4px;bottom:4px;background-color:white;transition:.4s;border-radius:50%}
+    input:checked+.batch-slider{background-color:var(--primary-color)}
+    input:checked+.batch-slider:before{transform:translateX(22px)}
+    .batch-status-display{font-size:.9em;color:#555;text-align:right;margin-left:5px}
+    .batch-area{display:none;margin-top:15px;padding:10px;border:1px solid var(--info-color);border-radius:8px;background-color:#f0f8ff} .batch-area.visible{display:block} .batch-area h3{margin-top:0;text-align:center;color:var(--info-color);font-size:1.1em} #batchList{list-style-type:none;padding:0;margin:10px 0;max-height:150px;overflow-y:auto;border:1px solid #eee;background-color:#fff;border-radius:4px} #batchList li{display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border-bottom:1px solid #eee;font-family:monospace;font-size:.95em} #batchList li:last-child{border-bottom:none} .remove-batch-item{background-color:var(--danger-color);color:white;border:none;border-radius:3px;padding:2px 5px;font-size:.8em;cursor:pointer;margin-left:10px} .batch-action-buttons{display:flex;justify-content:space-around;margin-top:10px;gap:10px} .batch-action-buttons button{flex-grow:1;padding:10px;font-size:1em;border-radius:5px;border:none;cursor:pointer;transition:background-color .2s} #saveBatchButton{background-color:var(--primary-color);color:white} #saveBatchButton:hover{background-color:var(--primary-hover)} #clearBatchButton{background-color:var(--warning-color);color:white} #clearBatchButton:hover{background-color:var(--warning-hover)}
+    .error{color:var(--danger-color);font-weight:bold;margin-top:5px;min-height:1.2em;text-align:center;padding:5px}
+    #currentShipmentDetails{margin-top:15px;padding:10px;background-color:#eef;border:1px dashed #aac;border-radius:8px;font-size:.9em;line-height:1.5}
+    #currentShipmentDetails strong{color:#335;display:block;margin-bottom:8px}
+    #currentShipmentDetails ul{margin:5px 0;padding-left:5px;list-style-type:none}
+    #currentShipmentDetails li{margin-bottom:4px;padding-bottom:4px;font-family:monospace;white-space:pre-wrap;position:relative;padding-right:70px;border-bottom:1px dotted #ccc;line-height:1.3}
+    #currentShipmentDetails li .timestamp{color:#557;display:block;font-size:.9em}
+    #currentShipmentDetails li .status{font-weight:bold}
+    #currentShipmentDetails li .combo{font-style:italic;color:#66a;margin-left:5px}
+    #currentShipmentDetails li.cancelled-item{text-decoration:line-through;color:var(--cancelled-color)}
+    #currentShipmentDetails li.cancelled-item .timestamp,#currentShipmentDetails li.cancelled-item .status,#currentShipmentDetails li.cancelled-item .combo,#currentShipmentDetails li.cancelled-item .note-display,#currentShipmentDetails li.cancelled-item .editable-note,#currentShipmentDetails li.cancelled-item .add-note-link{color:var(--cancelled-color) !important;cursor:default;text-decoration:none}
+    #currentShipmentDetails li.cancelled-item .add-note-link{display:none}
+    #currentShipmentDetails li .cancelled-info{font-size:.85em;display:block;text-decoration:none !important;color:#777}
+    .cancel-button{position:absolute;right:5px;top:50%;transform:translateY(-50%);background-color:var(--warning-color);color:white;border:none;border-radius:4px;padding:3px 6px;font-size:.8em;cursor:pointer;transition:background-color .2s}
+    .cancel-button:hover,.cancel-button:active{background-color:var(--warning-hover)}
+
+    #currentShipmentDetails li .editable-note{cursor:pointer;text-decoration-style:dotted;color:#007bff;margin-left:5px;font-size:.9em;font-style:italic}
+    #currentShipmentDetails li .add-note-link{cursor:pointer;color:#007bff;font-size:.9em;text-decoration:none;padding-left:10px;font-style:italic}
+    #currentShipmentDetails li .editable-note:hover,#currentShipmentDetails li .add-note-link:hover{color:#0056b3;text-decoration:underline;text-decoration-style:solid}
+    /* Die Regel ::before wird nicht mehr benötigt und kann gelöscht werden */
+
+
+    #currentShipmentDetails li .note-display{display:inline;padding-left:0;margin-top:0;font-style:italic;color:#448}
+    #currentShipmentDetails li .note-prefix{display:inline;font-size:.9em;color:#448;margin-top:3px;padding-left:10px;font-style:italic}
+    .inline-note-editor{margin-top:5px;margin-bottom:5px;padding:8px;background-color:#fffacd;border:1px solid #f0ad4e;border-radius:4px;display:flex;flex-direction:column;gap:5px;animation:fadeIn .3s ease-in-out}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+    .inline-note-editor input[type="text"]{width:100%;padding:6px 8px;border:1px solid #ccc;border-radius:3px;box-sizing:border-box;font-size:.9em;height:36px}
+    .inline-note-editor-actions{display:flex;gap:8px;justify-content:flex-end}
+    .inline-note-editor-actions button{padding:4px 8px;font-size:.85em;border-radius:3px;border:none;cursor:pointer;color:white}
+    .inline-note-save-btn{background-color:var(--primary-color)}
+    .inline-note-save-btn:hover{background-color:var(--primary-hover)}
+    .inline-note-cancel-btn{background-color:#aaa}
+    .inline-note-cancel-btn:hover{background-color:#888}
+    .editing-note .editable-note, .editing-note .add-note-link { display: none !important; } /* Versteckt "Notiz bearbeiten/hinzufügen" Links während Bearbeitung */
+    #currentShipmentDetails .summary{margin-top:10px;border-top:1px solid #ccc;padding-top:8px;font-weight:bold} #currentShipmentDetails .summary span{display:block;margin-bottom:3px} /* --- DURCH DIESEN BLOCK ERSETZEN --- */
+.summary .ok, .summary-cell .ok {color:green} 
+.summary .mismatch, .summary-cell .mismatch {color:orange} 
+.summary .over, .summary-cell .over {color:red;font-weight:bold}
+    table{width:100%;border-collapse:collapse;margin-top:20px} thead{display:none} tr{display:block;margin-bottom:15px;border:1px solid var(--border-color);border-radius:8px;padding:12px;background-color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.1)} td{display:block;text-align:right;border:none;border-bottom:1px dotted #eee;padding:8px 0;position:relative;padding-left:40%;min-height:24px;font-size:.95em} td:last-child{border-bottom:none} td::before{content:attr(data-label);position:absolute;left:0;width:38%;padding-right:10px;white-space:nowrap;text-align:left;font-weight:bold;color:#555} td.summary-cell span,td.summary-cell strong{display:block} td.actions-cell{text-align:center;padding-left:0;padding-top:10px}
+    td.actions-cell button.edit-btn{background-color:#6c757d} td.actions-cell button.edit-btn:hover{background-color:#5a6268} body.batch-mode-active td.actions-cell button.edit-btn{display:none}
+    td.actions-cell button{background-color:var(--secondary-color);color:white;border:none;padding:8px 10px;border-radius:5px;cursor:pointer;font-size:.9em;margin:3px;transition:background-color .2s;min-width:70px} td.actions-cell button:hover,td.actions-cell button:active{background-color:var(--secondary-hover)}
+    .modal-overlay{display:none;position:fixed;z-index:100;left:0;top:0;width:100%;height:100%;overflow:auto;background-color:rgba(0,0,0,.5);justify-content:center;align-items:center}
+    .modal-overlay.visible{display:flex}
+    .modal-content{background-color:#fefefe;margin:auto;padding:20px;border:1px solid #888;border-radius:8px;width:90%;max-width:450px;box-shadow:0 4px 8px rgba(0,0,0,.2);position:relative}
+    .modal-content h3{margin-top:0;text-align:center}
+    .modal-content .form-group{margin-bottom:15px}
+    .modal-content label{display:block;margin-bottom:5px;font-weight:bold}
+    .modal-content input[type="number"],.modal-content input[type="text"]{font-size:1em}
+    .modal-content input[readonly]{background-color:#eee;cursor:not-allowed}
+    .modal-actions{display:flex;justify-content:space-between;margin-top:20px;gap:10px}
+    .modal-actions button{padding:10px 15px;border-radius:5px;border:none;cursor:pointer;font-size:1em;flex-grow:1}
+    #saveEditButton{background-color:var(--primary-color);color:white}
+    #cancelEditButton{background-color:#aaa;color:white}
+    #confirmBatchNoteButton{background-color:var(--primary-color)}
+    #skipBatchNoteButton{background-color:var(--secondary-color)}
+    .side-menu{position:fixed;top:0;left:0;width:280px;max-width:80%;height:100vh;background-color:#fff;box-shadow:2px 0 5px rgba(0,0,0,.2);transform:translateX(-100%);transition:transform .3s ease-in-out;z-index:1010;padding:20px;box-sizing:border-box;display:flex;flex-direction:column;overflow-y:auto}
+    .side-menu.open{transform:translateX(0)}
+    .side-menu h3{margin-top:0;margin-bottom:25px;text-align:center;color:var(--text-color)}
+    .side-menu #sendToSheetButton{background-color:var(--info-color);width:100%;margin-top:15px}
+    .side-menu #sendToSheetButton:hover{background-color:var(--info-hover)}
+    .side-menu #sheetStatus{margin-top:10px;margin-bottom:15px;min-height:1.2em;font-weight:bold;text-align:center}
+    .side-menu #resetDataButton{margin-top:10px;width:100%}
+    .side-menu #sendSummaryEmailButton{margin-top:10px;width:100%;background-color:var(--warning-color)}
+    .side-menu #sendSummaryEmailButton:hover{background-color:var(--warning-hover)}
+    .menu-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background-color:rgba(0,0,0,.5);opacity:0;visibility:hidden;transition:opacity .3s ease-in-out,visibility .3s ease-in-out;z-index:1000}
+    .menu-overlay.visible{opacity:1;visibility:visible}
+    .status-and-button-container {
+    display: flex;
+    align-items: flex-end; /* Richtet Select und Button an ihrer Unterkante aus */
+    gap: 15px; /* Konsistenter Abstand, wie in .input-section */
+}
+
+.status-select-wrapper {
+    flex-grow: 1; /* Erlaubt dem Select-Wrapper (mit Label), den verfügbaren Platz einzunehmen */
+}
+
+/* Überschreibt die Breite für mainActionButton, wenn er im neuen Container ist */
+/* --- START DER ÄNDERUNG --- */
+
+/* Überschreibt die Breite und Höhe für mainActionButton, wenn er im neuen Container ist */
+.status-and-button-container > #mainActionButton {
+    width: auto; /* Behält die automatische Breitenanpassung bei */
+    flex-shrink: 0; /* Verhindert, dass der Button schrumpft */
+    height: 44px; /* Angleichen an die Höhe des Select-Feldes (war 48px) */
+    padding-top: 10px; /* Vertikales Padding anpassen (war 12px) */
+    padding-bottom: 10px; /* Vertikales Padding anpassen (war 12px) */
+    /* padding-left und padding-right (15px) bleiben unverändert von .main-action-button */
+    line-height: normal; /* Stellt sicher, dass line-height die Zentrierung nicht stört, falls es woanders gesetzt wurde */
+    /* Die Schriftgröße (font-size: 1.1em) wird von .main-action-button geerbt */
+}
+    /* --- START: NEUE STILE FÜR MEHRERE NOTIZEN --- */
+    #currentShipmentDetails .notes-container {
+        margin-top: 5px;
+        padding-left: 15px; /* Einrückung für den gesamten Notiz-Block */
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+    }
+    #currentShipmentDetails .note-item {
+        display: flex;
+        align-items: center;
+        gap: 8px; /* Abstand zwischen Notiztext und Löschen-Button */
+    }
+#currentShipmentDetails .note-item .note-prefix {
+    font-weight: bold;
+    color: #555;
+    margin-right: 4px; /* Kleiner Abstand zum Notiztext */
+}
+    #currentShipmentDetails .note-item .editable-note {
+        flex-grow: 1; /* Notiztext nimmt verfügbaren Platz ein */
+    }
+    #currentShipmentDetails .note-item .delete-note-btn {
+        background-color: #e7e7e7;
+        color: #888;
+        border: 1px solid #ccc;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        font-size: 12px;
+        line-height: 18px;
+        text-align: center;
+        cursor: pointer;
+        padding: 0;
+        flex-shrink: 0;
+        transition: all 0.2s;
+    }
+    #currentShipmentDetails .note-item .delete-note-btn:hover {
+        background-color: var(--danger-color);
+        color: white;
+        border-color: var(--danger-hover);
+    }
+    /* --- ENDE: NEUE STILE FÜR MEHRERE NOTIZEN --- */
+/* --- ENDE DER ÄNDERUNG --- */
+#newTotalSection.warning-existing {
+    background-color: #f2dede; /* Heller Rotton */
+    border-color: #ebccd1;
+    border-style: solid;
+    border-width: 1px;
+}
+#newTotalSection.warning-existing label {
+    color: #a94442; /* Dunkelroter Text */
+    font-weight: bold;
+}
+
+
+    #pendingHuList.partial {
+        border-color: orange; /* Orange für "teilweise bearbeitet" */
+    }
+    #pendingHuList h4 {
+        margin-top: 0;
+        margin-bottom: 8px;
+        font-size: 1em;
+        color: #333;
+    }
+    #pendingHuList ul {
+        list-style-type: none;
+        padding: 0;
+        margin: 0;
+        max-height: 120px; /* Limitiert die Höhe und macht die Liste scrollbar */
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 0.95em;
+    }
+    #pendingHuList li {
+        padding: 2px 4px;
+        border-bottom: 1px dotted #ccc;
+    }
+    #pendingHuList li:last-child {
+        border-bottom: none;
+    }
+    /* --- ENDE: NEUE STILE FÜR OFFENE HU-LISTE --- */
+
+</style>
+</head>
+<body>
+
+<div id="side-menu" class="side-menu">
+    <h3>Optionen</h3>
+    <!-- HIER IST DER NEUE BUTTON -->
+    <button id="importHuListButton" class="main-action-button" style="background-color: var(--warning-color); margin-bottom: 15px;">HU-Liste importieren</button>
+
+    <button id="sendToSheetButton" class="main-action-button">Alle Daten an Google Sheet Senden</button>
+    <div id="sheetStatus"></div>
+    <button id="resetDataButton" class="main-action-button delete-btn">Alles Zurücksetzen</button>
+    <button id="sendSummaryEmailButton" class="main-action-button">Zusammenfassung per E-Mail Senden</button>
+</div>
+<div id="menu-overlay" class="menu-overlay"></div>
+
+<div class="container">
+    <div class="batch-controls">
+        <button id="menu-toggle-btn" title="Menü öffnen/schließen">☰</button>
+        <label for="batchModeToggle">Batch-Modus:</label>
+        <label class="batch-toggle-switch">
+            <input type="checkbox" id="batchModeToggle">
+            <span class="batch-slider"></span>
+        </label>
+        <span id="batchStatusDisplay"></span>
+    </div>
+
+    <div class="input-section">
+        <div>
+            <label for="shipmentNumberInput">HAWB/HU:</label>
+            <div class="input-wrapper">
+                <input type="text" id="shipmentNumberInput" placeholder="Scannen oder eingeben..." autocapitalize="characters" autocomplete="off">
+                <button type="button" id="clearInputButton" class="clear-input-btn" title="Eingabe löschen">×</button>
+            </div>
+        </div>
+    
+        <div class="status-and-button-container"> <!-- Container für Status und Button nebeneinander -->
+            <div class="status-select-wrapper"> <!-- Wrapper für Label und Select -->
+                <label for="securityStatusSelect">Status:</label>
+                <select id="securityStatusSelect">
+                    <option value="XRY">XRY</option><option value="ETD">ETD</option><option value="EDD">EDD</option>
+			<option value="Wareneingang">Wareneingang</option> <!-- NEUE ZEILE -->
+                    <option value="Dunkelalarm">Dunkelalarm</option><option value="Anstehend">Anstehend</option>
+                    <option value="NichtSichern">Nicht Erf.</option><option value="Abgelehnt">Abgelehnt</option>
+                </select>
+            </div>
+            <button id="mainActionButton" class="main-action-button">Hinzufügen</button>
+        </div>
+    
+        <div class="controls-row" id="controlsRow">
+            <div class="combo-checkbox-group" id="comboCheckboxContainer">
+                 <input type="checkbox" id="comboCheckbox"><label for="comboCheckbox" id="comboCheckboxLabel">Kombi-Sicherung</label>
+            </div>
+            <button type="button" id="noteToggleButton" class="note-toggle-btn" title="Notiz hinzufügen/bearbeiten (Einzelscan)">📝</button>
+        </div>
+    
+        <div id="noteInputContainer" class="note-input-area">
+            <label for="noteInput">Notiz (für nächsten Einzelscan):</label>
+            <div class="input-wrapper">
+                <input type="text" id="noteInput" placeholder="Notiz eingeben..." list="noteSuggestions">
+                <button type="button" id="clearNoteButton" class="clear-input-btn clear-note-btn" title="Notiz löschen">×</button>
+                <datalist id="noteSuggestions">
+                    <option value="Abgepackt"><option value="Muss abgepackt werden"><option value="Eingeschweißte Folien">
+                    <option value="Aluverbundfolie"><option value="Flüssigkeit"><option value="Fässer">
+                    <option value="Verklebte Kartons"><option value="Vakuumfolie"><option value="Kanister">
+                    <option value="Eimer"><option value="Säcke"><option value="Wird gesucht!">
+                </datalist>
+            </div>
+        </div>
+    
+        <div id="newTotalSection">
+            <label for="newTotalInput" id="newTotalLabel">Erwartete Gesamtstückzahl für NEUE Sendung:</label>
+            <input type="number" id="newTotalInput" inputmode="numeric" placeholder="Zahl eingeben...">
+            <div>
+                <button id="confirmNewTotalBtn" class="main-action-button">OK</button>
+                <button id="skipNewTotalBtn" class="main-action-button">Überspringen (N/A)</button>
+            </div>
+        </div>
+        <!-- Der Button #mainActionButton war ursprünglich hier und wurde nach oben verschoben -->
+    </div>
+
+    <div id="errorDisplay" class="error"></div>
+
+    <div class="batch-area" id="batchArea">
+        <h3>Aktueller Batch (<span id="batchModeStatusLabel"></span>)</h3>
+        <div id="currentBatchNoteDisplay" style="font-style:italic;margin-bottom:5px;font-size:.9em"></div>
+        <ul id="batchList"></ul>
+        <div id="batchSummary">Anzahl im Batch: <span id="batchItemCount">0</span></div>
+        <div class="batch-action-buttons">
+            <button id="saveBatchButton">Batch Speichern</button>
+            <button id="clearBatchButton">Batch Leeren</button>
+        </div>
+    </div>
+
+    <div id="currentShipmentDetails">Geben Sie eine Sendungsnummer ein...</div>
+
+
+<div id="importHuModal" class="modal-overlay">
+    <div class="modal-content">
+        <h3>HU-Liste Importieren</h3>
+        <div class="form-group">
+            <label for="mainOrderNumberInput">Auftragsnummer (z.B. 9007769889):</label>
+            <!-- HIER die Änderung -->
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <input type="text" id="mainOrderNumberInput" placeholder="Übergeordnete Auftragsnummer eingeben" inputmode="none" style="flex-grow: 1;">
+                <button type="button" id="addAndContinueHuButton" title="Speichern und nächste Liste eingeben" class="main-action-button" style="width: 44px; height: 44px; padding: 0; font-size: 2em; flex-shrink: 0; line-height: 44px;">+</button>
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="huListTextarea">HU Nummern (eine pro Zeile):</label>
+            <!-- UND HIER die Änderung -->
+            <textarea id="huListTextarea" rows="8" style="width: 100%; font-family: monospace; font-size: 1em; padding: 8px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box;" placeholder="HU Nummern hier einfügen..." inputmode="none"></textarea>
+        </div>
+        <div class="modal-actions">
+            <button id="saveHuListButton">Importieren & Speichern</button>
+            <button id="cancelHuImportButton">Abbrechen</button>
+        </div>
+    </div>
+</div>
+<!-- ENDE: NEUE ELEMENTE FÜR HU-LISTEN-IMPORT -->
+    <h2>Erfasste Sendungen</h2>
+    <table>
+        <thead>
+            <tr><th>HAWB.</th><th>Übersicht</th><th>Letzte Änd.</th><th>Aktionen</th></tr>
+        </thead>
+        <tbody id="shipmentTableBody"></tbody>
+    </table>
+
+    <div id="editModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>Sendung Bearbeiten</h3>
+            <input type="hidden" id="editShipmentBaseNumber">
+            <div class="form-group">
+                <label for="editShipmentNumberDisplay">Sendungsnummer:</label>
+                <input type="text" id="editShipmentNumberDisplay" readonly>
+            </div>
+ <div class="form-group">
+                <label for="editGoodsReceiptCount">Manuelle Anzahl Wareneingang:</label>
+                <input type="number" id="editGoodsReceiptCount" inputmode="numeric" placeholder="Leer lassen, um Scans zu nutzen">
+            </div>
+            <div class="form-group">
+                <label for="editTotalPiecesExpected">Erwartete Gesamtstückzahl:</label>
+                <input type="number" id="editTotalPiecesExpected" inputmode="numeric" placeholder="Zahl oder leer">
+            </div>
+            <div class="modal-actions">
+                <button id="saveEditButton">Speichern</button>
+                <button id="cancelEditButton">Abbrechen</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="batchNoteModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>Batch-Notiz Festlegen</h3>
+            <div class="form-group">
+                <label for="batchNoteInput">Notiz für alle Scans in diesem Batch (optional):</label>
+                <input type="text" id="batchNoteInput" placeholder="Notiz eingeben..." list="noteSuggestions">
+            </div>
+            <div class="modal-actions">
+                <button id="confirmBatchNoteButton" class="main-action-button">Übernehmen & Scannen</button>
+                <button id="skipBatchNoteButton" class="main-action-button" style="background-color:var(--secondary-color)">Ohne Notiz Scannen</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const { jsPDF } = window.jspdf;
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // --- DOM Elemente ---
+        const shipmentNumberInputEl = document.getElementById('shipmentNumberInput');
+        const editGoodsReceiptCountInputEl = document.getElementById('editGoodsReceiptCount');
+        const clearInputButtonEl = document.getElementById('clearInputButton');
+        const securityStatusSelectEl = document.getElementById('securityStatusSelect');
+        const comboCheckboxEl = document.getElementById('comboCheckbox');
+        const comboCheckboxContainerEl = document.getElementById('comboCheckboxContainer');
+        const mainActionButtonEl = document.getElementById('mainActionButton');
+        const tableBodyEl = document.getElementById('shipmentTableBody');
+        const currentDetailsDivEl = document.getElementById('currentShipmentDetails');
+        const errorDisplayEl = document.getElementById('errorDisplay');
+        const batchModeToggleEl = document.getElementById('batchModeToggle');
+        const batchStatusDisplayEl = document.getElementById('batchStatusDisplay');
+        const batchAreaEl = document.getElementById('batchArea');
+        const batchModeStatusLabelEl = document.getElementById('batchModeStatusLabel');
+        const batchListEl = document.getElementById('batchList');
+        const batchItemCountEl = document.getElementById('batchItemCount');
+        const saveBatchButtonEl = document.getElementById('saveBatchButton');
+        const clearBatchButtonEl = document.getElementById('clearBatchButton');
+        const editModalEl = document.getElementById('editModal');
+        const editShipmentBaseNumberInputEl = document.getElementById('editShipmentBaseNumber');
+        const editShipmentNumberDisplayEl = document.getElementById('editShipmentNumberDisplay');
+        const editTotalPiecesExpectedInputEl = document.getElementById('editTotalPiecesExpected');
+        const saveEditButtonEl = document.getElementById('saveEditButton');
+        const cancelEditButtonEl = document.getElementById('cancelEditButton');
+        const newTotalSectionEl = document.getElementById('newTotalSection');
+        const newTotalLabelEl = document.getElementById('newTotalLabel');
+        const newTotalInputEl = document.getElementById('newTotalInput');
+        const confirmNewTotalBtnEl = document.getElementById('confirmNewTotalBtn');
+        const skipNewTotalBtnEl = document.getElementById('skipNewTotalBtn');
+        const sendToSheetButtonEl = document.getElementById('sendToSheetButton');
+        const sheetStatusEl = document.getElementById('sheetStatus');
+        const menuToggleBtnEl = document.getElementById('menu-toggle-btn');
+        const sideMenuEl = document.getElementById('side-menu');
+        const menuOverlayEl = document.getElementById('menu-overlay');
+        const resetDataButtonEl = document.getElementById('resetDataButton');
+        const sendSummaryEmailButtonEl = document.getElementById('sendSummaryEmailButton');
+        const noteToggleButtonEl = document.getElementById('noteToggleButton');
+        const noteInputContainerEl = document.getElementById('noteInputContainer');
+        const noteInputEl = document.getElementById('noteInput');
+        const clearNoteButtonEl = document.getElementById('clearNoteButton');
+        const batchNoteModalEl = document.getElementById('batchNoteModal');
+        const batchNoteInputEl = document.getElementById('batchNoteInput');
+        const confirmBatchNoteButtonEl = document.getElementById('confirmBatchNoteButton');
+        const skipBatchNoteButtonEl = document.getElementById('skipBatchNoteButton');
+        const currentBatchNoteDisplayEl = document.getElementById('currentBatchNoteDisplay');
+	 const containerEl = document.querySelector('.container'); // <-- DIESE ZEILE HINZUFÜGEN
+        const importHuListButtonEl = document.getElementById('importHuListButton');
+        const importHuModalEl = document.getElementById('importHuModal');
+        const mainOrderNumberInputEl = document.getElementById('mainOrderNumberInput');
+        const huListTextareaEl = document.getElementById('huListTextarea');
+        const saveHuListButtonEl = document.getElementById('saveHuListButton');
+        const cancelHuImportButtonEl = document.getElementById('cancelHuImportButton');
+	const addAndContinueHuButtonEl = document.getElementById('addAndContinueHuButton');
+
+        // --- Konstanten & Konfiguration ---
+
+        const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbweFC3K1wgksWq3Dd79bJDkbsBdYaORycXSlbIGvQ5JDe6eYj7PtTti3gpBJArRSdp63Q/exec';
+        const LOCAL_STORAGE_KEY = 'frachtSicherungMobile_V8_18_Refactored';
+        const SUFFIX_LENGTH = 4;
+        const MITARBEITER_NAME = "Zakaria Bisbiss";
+        const RAC_NUMMER = "DE/RA/00151-20";
+        const NON_COUNTING_STATUSES = ['Dunkelalarm', 'Anstehend', 'NichtSichern', 'Abgelehnt', 'Wareneingang']; // <-- WARENEINGANG HINZUGEFÜGT
+        const NOTE_ALLOWED_STATUSES = ['XRY', 'Abgelehnt', 'Dunkelalarm', 'ETD', 'EDD'];
+	        // In der Nähe von const NON_COUNTING_STATUSES = ... einfügen
+        const EXCLUSIVE_SECURITY_STATUSES = ['XRY', 'ETD', 'EDD']; // Status, die nur einmal vergeben werden dürfen
+
+        // --- Anwendungsstatus ---
+        let isBatchModeActive = false;
+        let currentBatch = [];
+        let batchStatus = '';
+        let batchIsCombination = false;
+        let pendingScanDataForNewShipment = null;
+let pendingTotalUpdateInfo = null; 
+        let sessionFirstSuffixScans = {}; // Trackt erste Suffix-Scans pro HAWB in der Session
+        let notifiedCompletions = new Set(); // Trackt HAWBs, für die schon eine Abschlussmail gesendet wurde
+        let currentBatchGlobalNote = null;
+        let isBatchNotePromptRequired = true;
+        let pendingFirstBatchScanData = null;
+
+        // --- Hilfsfunktionen: Persistenz ---
+   function loadShipments() {
+            const data = localStorage.getItem(LOCAL_STORAGE_KEY);
+            const shipments = data ? JSON.parse(data) : {};
+
+            // Datenmigration: Konvertiert alte 'note' (string) zu neuer 'notes' (array)
+            Object.values(shipments).forEach(shipment => {
+                if (shipment.scannedItems && Array.isArray(shipment.scannedItems)) {
+                    shipment.scannedItems.forEach(item => {
+                        if (item.hasOwnProperty('note') && !item.hasOwnProperty('notes')) {
+                            item.notes = item.note ? [item.note] : [];
+                            delete item.note;
+                        } else if (!item.hasOwnProperty('notes')) {
+                            item.notes = [];
+                        }
+                    });
+                }
+            });
+            return shipments;
+        }
+// In der Nähe von calculateCurrentCountedPieces einfügen
+
+function calculateGoodsReceiptCount(scannedItems) {
+    if (!Array.isArray(scannedItems)) return 0;
+    // Zählt nur Scans mit dem Status "Wareneingang", die nicht storniert sind
+    return scannedItems.filter(item => item.status === 'Wareneingang' && !item.isCancelled).length;
+}
+
+        // --- START: NEUE HILFSFUNKTION ---
+        function calculateXryKombiCount(scannedItems) {
+            if (!Array.isArray(scannedItems)) return 0;
+            // Zählt nur nicht-stornierte Scans, die explizit als XRY Kombi markiert sind.
+            return scannedItems.filter(item => 
+                item.status === 'XRY' && 
+                item.isCombination && 
+                !item.isCancelled
+            ).length;
+        }
+        // --- ENDE: NEUE HILFSFUNKTION ---
+
+        function saveShipments(shipments) {
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(shipments));
+        }
+
+        // --- Hilfsfunktionen: UI & Fehler ---
+        function clearError() { errorDisplayEl.textContent = ''; }
+        function displayError(message, color = 'red', autoClearTimeout = null) {
+            errorDisplayEl.textContent = message;
+            errorDisplayEl.style.color = color;
+            if (autoClearTimeout) {
+                setTimeout(() => {
+                    if (errorDisplayEl.textContent === message && errorDisplayEl.style.color === color) {
+                        clearError();
+                    }
+                }, autoClearTimeout);
+            }
+        }
+        function escapeHtml(unsafe) {
+            if (unsafe === null || unsafe === undefined) return '';
+            return unsafe.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
+        function focusShipmentInput() {
+            const isModalVisible = (sel) => document.querySelector(sel)?.classList.contains('visible');
+            // ANFORDERUNG 2: Das neue HU-Import-Modal zur Prüfung hinzufügen
+            if (isModalVisible('#editModal') || isModalVisible('#batchNoteModal') || isModalVisible('#importHuModal') ||
+                (sideMenuEl && sideMenuEl.classList.contains('open')) ||
+                (newTotalSectionEl && newTotalSectionEl.classList.contains('visible')) ||
+                document.querySelector('#currentShipmentDetails .inline-note-editor')) {
+                return; // Kein Fokus, wenn ein Modal, Menü oder Editor aktiv ist
+            }
+            if (shipmentNumberInputEl && !shipmentNumberInputEl.disabled) {
+                shipmentNumberInputEl.inputMode = 'none'; // Für Scanner
+                setTimeout(() => shipmentNumberInputEl.focus(), 0);
+            }
+        }
+
+        function processShipmentNumber(rawInput) {
+            if (!rawInput) return { baseNumber: '', suffix: null, isValidFormat: false, raw: '', isSuffixFormat: false };
+            const raw = rawInput.trim().toUpperCase();
+            
+            let baseNumber = '';
+            let suffix = null;
+            let isValidFormat = false;
+            let isSuffixFormat = false; // <-- NEUES FELD
+            
+            const MIN_LENGTH_FOR_IMPLICIT_SUFFIX = 12;
+
+            if (raw.includes('+')) {
+                const parts = raw.split('+');
+                if (parts.length === 2 && parts[0].length > 0 && parts[1].length === SUFFIX_LENGTH && /^\d+$/.test(parts[1])) {
+                    baseNumber = parts[0];
+                    suffix = parts[1];
+                    isValidFormat = true;
+                    isSuffixFormat = true; // <-- SETZEN
+                }
+            } 
+            else if (raw.length >= MIN_LENGTH_FOR_IMPLICIT_SUFFIX && /\d{4}$/.test(raw.slice(-SUFFIX_LENGTH))) {
+                suffix = raw.slice(-SUFFIX_LENGTH);
+                let preSuffixPart = raw.slice(0, -SUFFIX_LENGTH);
+                baseNumber = preSuffixPart.replace(/0+$/, '');
+                if (baseNumber.length > 0) {
+                    isValidFormat = true;
+                    isSuffixFormat = true; // <-- SETZEN
+                }
+            } 
+            else if (raw.length > 0) {
+                baseNumber = raw;
+                suffix = null;
+                isValidFormat = true;
+                isSuffixFormat = false; // <-- SETZEN
+            }
+
+            if (baseNumber.length === 0) {
+                 isValidFormat = false;
+            }
+
+            return { baseNumber, suffix, isValidFormat, raw, isSuffixFormat }; // <-- NEUES FELD ZURÜCKGEBEN
+        }
+        function findShipmentByNoteContent(searchText) {
+            const shipments = loadShipments();
+            const upperSearchText = searchText.trim().toUpperCase();
+            if (!upperSearchText) return null;
+
+            for (const baseNumber in shipments) {
+                if (shipments.hasOwnProperty(baseNumber)) {
+                    const shipment = shipments[baseNumber];
+                    if (shipment.scannedItems && Array.isArray(shipment.scannedItems)) {
+                        for (const item of shipment.scannedItems) {
+                            // *** ÄNDERUNG HIER ***
+                            // Überprüft, ob das 'notes'-Array existiert und durchsucht es.
+                            if (item.notes && Array.isArray(item.notes)) {
+                                for (const note of item.notes) {
+                                    if (note && note.trim().toUpperCase() === upperSearchText) {
+                                        // Treffer gefunden! Gib die HAWB zurück.
+                                        return baseNumber;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return null; // Keine passende Notiz in keiner Sendung gefunden.
+        }
+        function findShipmentByHuNumber(huNumber) {
+            const shipments = loadShipments();
+            const upperHuNumber = huNumber.trim().toUpperCase();
+            if (!upperHuNumber) return null;
+
+            for (const baseNumber in shipments) {
+                const shipment = shipments[baseNumber];
+                // Suche nur in Aufträgen, die als HU-Listen-Auftrag markiert sind!
+                if (shipment.isHuListOrder && shipment.scannedItems && Array.isArray(shipment.scannedItems)) {
+                    const foundItem = shipment.scannedItems.find(item => item.rawInput.toUpperCase() === upperHuNumber);
+                    if (foundItem) {
+                        return baseNumber; // Treffer! Gib die HAWB/Auftragsnummer zurück.
+                    }
+                }
+            }
+            return null; // Keine passende HU in keinem HU-Auftrag gefunden.
+        }
+        function calculateCurrentCountedPieces(scannedItems) {
+            if (!Array.isArray(scannedItems)) return 0;
+            return scannedItems.filter(item => !item.isCombination && !item.isCancelled && !NON_COUNTING_STATUSES.includes(item.status)).length;
+        }
+
+        function calculateStatusSummary(scannedItems) {
+            const summary = {};
+            if (!Array.isArray(scannedItems)) return summary;
+            scannedItems.filter(item => !item.isCombination && !item.isCancelled && !NON_COUNTING_STATUSES.includes(item.status))
+                .forEach(item => { summary[item.status] = (summary[item.status] || 0) + 1; });
+            return summary;
+        }
+
+        // --- UI Update Funktionen ---
+        function updateClearButtonVisibility(inputElement, clearButtonElement) {
+            const el = inputElement || shipmentNumberInputEl;
+            const btn = clearButtonElement || clearInputButtonEl;
+            const hasText = el.value.trim() !== '';
+            btn.style.display = (hasText && !el.disabled) ? 'block' : 'none';
+        }
+
+        function updateNoteAndComboVisibility() {
+            const selectedStatus = securityStatusSelectEl.value;
+            const showCombo = selectedStatus === 'XRY' && !isBatchModeActive;
+            comboCheckboxContainerEl.classList.toggle('visible', showCombo);
+            comboCheckboxContainerEl.style.display = showCombo ? 'flex' : 'none';
+            comboCheckboxEl.disabled = !showCombo;
+            if (!showCombo) comboCheckboxEl.checked = false;
+
+            const showNoteButton = NOTE_ALLOWED_STATUSES.includes(selectedStatus) && !isBatchModeActive;
+            noteToggleButtonEl.style.display = showNoteButton ? 'flex' : 'none';
+            if (!showNoteButton) { // Wenn Button nicht sichtbar, Notizeingabe schließen
+                resetSingleScanNoteInputState();
+            }
+        }
+
+        function resetSingleScanNoteInputState() {
+            noteInputEl.value = '';
+            noteInputContainerEl.style.display = 'none';
+            noteToggleButtonEl.classList.remove('note-active');
+            updateClearButtonVisibility(noteInputEl, clearNoteButtonEl);
+        }
+        
+        function removeActiveInlineNoteEditor() {
+            const activeEditor = currentDetailsDivEl.querySelector('.inline-note-editor');
+            if (activeEditor) {
+                const liElement = activeEditor.closest('li');
+                activeEditor.remove();
+                if (liElement) liElement.classList.remove('editing-note');
+            }
+        }
+
+        // Hilfsfunktion zur Bestimmung der CSS-Klasse für Zähler
+        function getStatusClass(count, expected) {
+            // Wenn keine Erwartung gesetzt ist oder die Zählung 0 ist, keine Farbe (Standard schwarz)
+            if (expected === null || expected === undefined || count === 0) {
+                return ''; 
+            }
+            if (count < expected) {
+                return 'mismatch'; // Orange
+            }
+            if (count === expected) {
+                return 'ok'; // Grün
+            }
+            if (count > expected) {
+                return 'over'; // Rot
+            }
+            return ''; // Fallback
+        }
+
+
+
+
+        // Ersetzen Sie die komplette Funktion mit dieser Version
+        function displayCurrentShipmentDetails(baseNumberToDisplay) {
+            clearError();
+            removeActiveInlineNoteEditor();
+
+            const shipments = loadShipments();
+            const shipment = baseNumberToDisplay ? shipments[baseNumberToDisplay] : null;
+
+            if (!baseNumberToDisplay || !shipment) {
+                currentDetailsDivEl.innerHTML = 'Geben Sie eine Sendungsnummer ein oder wählen Sie eine aus der Liste.';
+                currentDetailsDivEl.style.borderColor = '#aac';
+                return;
+            }
+
+            let detailsHtml = `<strong>Details für ${escapeHtml(baseNumberToDisplay)}:</strong>`;
+
+            // --- START: ANGEPASSTE LOGIK ZUR ANZEIGE OFFENER HUs ---
+            if (shipment.isHuListOrder) {
+                const allScansForHuOrder = shipment.scannedItems || [];
+                const securedStatuses = ['XRY', 'ETD', 'EDD'];
+
+                // 1. Alle einzigartigen HU-Nummern im Auftrag ermitteln
+                const allHuNumbers = [...new Set(allScansForHuOrder.map(item => item.rawInput))];
+
+                // 2. Diejenigen HUs finden, die bereits einen Sicherheitsstatus haben (und nicht storniert sind)
+                const securedHus = new Set(
+                    allScansForHuOrder
+                        .filter(item => securedStatuses.includes(item.status) && !item.isCancelled)
+                        .map(item => item.rawInput)
+                );
+                
+                // 3. Offene HUs sind alle Instanzen mit Status "Anstehend"
+                const pendingHuInstances = allScansForHuOrder.filter(item => item.status === 'Anstehend');
+                const pendingHuNumbers = pendingHuInstances.map(item => item.rawInput);
+                
+                if (pendingHuNumbers.length > 0) {
+                    const totalHus = shipment.totalPiecesExpected || allScansForHuOrder.length;
+                    const securedCount = totalHus - pendingHuNumbers.length;
+                    
+                    const listClass = (securedCount > 0) ? 'partial' : '';
+
+                    detailsHtml += `<div id="pendingHuList" class="${listClass}">`;
+                    detailsHtml += `<h4>Offene HUs (${pendingHuNumbers.length} von ${totalHus}):</h4>`;
+                    detailsHtml += `<ul>`;
+                    pendingHuNumbers.forEach(hu => {
+                        detailsHtml += `<li>${escapeHtml(hu)}</li>`;
+                    });
+                    detailsHtml += `</ul></div>`;
+                }
+            }
+            // --- ENDE: ANGEPASSTE LOGIK ZUR ANZEIGE OFFENER HUs ---
+
+            const expected = shipment.totalPiecesExpected;
+            const allScans = shipment.scannedItems || [];
+            
+            const securityScansCount = calculateCurrentCountedPieces(allScans);
+            const receiptScansCount = calculateGoodsReceiptCount(allScans);
+
+            detailsHtml += `<ul>`;
+
+            allScans
+                .filter(item => item.status !== 'Anstehend') // "Anstehend" (Platzhalter) wird in der Scan-Historie nie angezeigt
+                .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+                .forEach(item => {
+                    const dt = new Date(item.timestamp);
+                    const timeStr = dt.toLocaleTimeString('de-DE');
+                    const dateStr = dt.toLocaleDateString('de-DE');
+                    const timestampPart = `<span class="timestamp">[${dateStr} ${timeStr}]</span>`;
+                    const numberPart = escapeHtml(item.rawInput);
+                    const statusPart = escapeHtml(item.status);
+                    const comboPart = item.isCombination ? ` <span class="combo">(Kombi)</span>` : '';
+                    const isCancelled = item.isCancelled;
+
+                    let notesListHtml = '';
+                    if (!isCancelled && Array.isArray(item.notes)) {
+                        notesListHtml += '<div class="notes-container">';
+                        item.notes.forEach((note, index) => {
+                            notesListHtml += `<div class="note-item">
+                                <span class="note-prefix">Notiz:</span>
+                                <span class="editable-note" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" data-note-index="${index}" title="Notiz bearbeiten">${escapeHtml(note)}</span>
+                                <button class="delete-note-btn" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" data-note-index="${index}" title="Notiz löschen">×</button>
+                            </div>`;
+                        });
+                        notesListHtml += '</div>';
+                    } else if (Array.isArray(item.notes) && item.notes.length > 0) {
+                        notesListHtml += `<div class="notes-container" style="color:var(--cancelled-color);">${item.notes.map(n => `<div>- ${escapeHtml(n)}</div>`).join('')}</div>`;
+                    }
+
+                    detailsHtml += `<li class="${isCancelled ? 'cancelled-item' : ''}">`;
+                    detailsHtml += ` ${timestampPart} ${numberPart} → <span class="status">${statusPart}</span>${comboPart}`;
+
+                    if (!isCancelled) {
+                        detailsHtml += `<button class="cancel-button" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}">Storno</button>`;
+                    } else {
+                        const cancelDt = item.cancelledTimestamp ? new Date(item.cancelledTimestamp) : null;
+                        const cancelTimeStr = cancelDt ? cancelDt.toLocaleString('de-DE') : 'Unbekannt';
+                        detailsHtml += `<span class="cancelled-info"> (storniert am ${cancelTimeStr})</span>`;
+                    }
+                    detailsHtml += notesListHtml;
+                    if (!isCancelled) {
+                        detailsHtml += `<a href="#" class="add-note-link" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" title="Weitere Notiz hinzufügen">Notiz hinzufügen</a>`;
+                    }
+                    detailsHtml += `<div class="inline-note-editor-placeholder"></div>`;
+                    detailsHtml += `</li>`;
+                });
+            detailsHtml += `</ul>`;
+
+            detailsHtml += `<div class="summary">`;
+            let expectedText = (expected !== null && expected !== undefined) ? `${expected} Stk.` : 'N/A';
+            
+            const receiptClass = getStatusClass(receiptScansCount, expected);
+            detailsHtml += `<span>Wareneingang: <span class="${receiptClass}">${receiptScansCount} von ${expectedText}</span></span>`;
+
+            const securityClass = getStatusClass(securityScansCount, expected);
+            detailsHtml += `<span>Sicherung erfasst: <span class="${securityClass}">${securityScansCount} von ${expectedText}</span></span>`;
+            
+            detailsHtml += `</div>`;
+            currentDetailsDivEl.innerHTML = detailsHtml;
+
+            if (expected !== null && expected !== undefined) {
+                if (receiptScansCount > expected) currentDetailsDivEl.style.borderColor = 'red';
+                else if (receiptScansCount < expected) currentDetailsDivEl.style.borderColor = 'orange';
+                else if (receiptScansCount === expected) currentDetailsDivEl.style.borderColor = 'green';
+                else currentDetailsDivEl.style.borderColor = '#aac';
+            } else {
+                currentDetailsDivEl.style.borderColor = '#aac';
+            }
+        }
+ function renderTable() {
+            const shipments = loadShipments();
+            tableBodyEl.innerHTML = '';
+            Object.keys(shipments).sort((a, b) => new Date(shipments[b].lastModified || 0) - new Date(shipments[a].lastModified || 0))
+                .forEach(baseNumber => {
+                    const shipment = shipments[baseNumber];
+                    if (!shipment) return;
+                    const row = tableBodyEl.insertRow();
+                    
+                    const securityCount = calculateCurrentCountedPieces(shipment.scannedItems || []);
+                    const receiptCount = calculateGoodsReceiptCount(shipment.scannedItems || []);
+                    const expected = shipment.totalPiecesExpected;
+                    const expectedText = expected ?? 'N/A';
+
+                    row.insertCell().outerHTML = `<td data-label="HAWB.">${escapeHtml(baseNumber)}</td>`;
+
+                    // Ruft jetzt die globale Hilfsfunktion auf
+                    const receiptClass = getStatusClass(receiptCount, expected);
+                    const securityClass = getStatusClass(securityCount, expected);
+
+                    let summaryHtml = `
+                        <strong class="${receiptClass}">WE: ${receiptCount}/${expectedText}</strong> | 
+                        <strong class="${securityClass}">Sich.: ${securityCount}/${expectedText}</strong>
+                    `;
+                    
+                    row.insertCell().outerHTML = `<td data-label="Übersicht" class="summary-cell">${summaryHtml}</td>`;
+                    
+                    row.insertCell().outerHTML = `<td data-label="Letzte Änd.">${shipment.lastModified ? new Date(shipment.lastModified).toLocaleString('de-DE') : '-'}</td>`;
+                    
+                    const actionsCell = row.insertCell();
+                    actionsCell.setAttribute('data-label', 'Aktionen');
+                    actionsCell.classList.add('actions-cell');
+                    actionsCell.innerHTML = `
+                        <button class="edit-btn" data-basenumber="${escapeHtml(baseNumber)}" title="Sendung ${escapeHtml(baseNumber)} bearbeiten">Edit</button>
+                        <button class="pdf-btn" data-basenumber="${escapeHtml(baseNumber)}">PDF</button>
+                        <button class="delete-btn main-delete-btn" data-basenumber="${escapeHtml(baseNumber)}">Löschen</button>
+                    `;
+                });
+            updateEditButtonVisibilityInTable();
+            filterTable(shipmentNumberInputEl.value);
+        }
+        function updateEditButtonVisibilityInTable() {
+            // Dies wird über CSS body.batch-mode-active td.actions-cell button.edit-btn { display: none; } gesteuert.
+            // Diese Funktion könnte für komplexere Logik dienen, ist hier aber implizit durch CSS.
+             document.body.classList.toggle('batch-mode-active', isBatchModeActive);
+        }
+
+        function filterTable(filterText) {
+            const rows = tableBodyEl.getElementsByTagName('tr');
+            const trimmedFilter = filterText ? filterText.trim().toUpperCase() : "";
+
+            if (isBatchModeActive) { // Im Batch Mode alle Zeilen zeigen
+                for (let row of rows) row.style.display = '';
+                return;
+            }
+            if (trimmedFilter === "") { // Kein Filter, alle Zeilen zeigen
+                for (let row of rows) row.style.display = '';
+                return;
+            }
+
+            const inputParts = trimmedFilter.split('+');
+            const inputBaseNumber = inputParts[0];
+            const inputHasSuffix = inputParts.length > 1 && inputParts[1].length === SUFFIX_LENGTH && /^\d+$/.test(inputParts[1]);
+
+            for (let row of rows) {
+                const cell = row.cells[0];
+                if (cell) {
+                    const fullCellText = (cell.textContent || cell.innerText).toUpperCase();
+                    const cellBaseNumber = fullCellText.split('+')[0].trim();
+                    let showRow = false;
+                    if (inputHasSuffix) { // Bei Suffix genaue Übereinstimmung des Basenumbers
+                        if (cellBaseNumber === inputBaseNumber) showRow = true;
+                    } else { // Ohne Suffix, Präfix-Suche
+                        if (cellBaseNumber.startsWith(inputBaseNumber)) showRow = true;
+                    }
+                    row.style.display = showRow ? '' : 'none';
+                }
+            }
+        }
+
+
+
+
+
+
+        function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFromCheckbox) {
+            const { baseNumber, suffix, isValidFormat, raw: processedRawInput, isSuffixFormat } = processShipmentNumber(rawInputToSave);
+            if (!isValidFormat) { return { success: false, waitingForTotal: false, message: `Ungültiges Format: ${escapeHtml(rawInputToSave)}` }; }
+
+            // --- 1. PRÜFUNG: IST ES EINE BEKANNTE HU-NUMMER IN EINEM HU-AUFTRAG? ---
+            const parentHawb = findShipmentByHuNumber(processedRawInput);
+            if (parentHawb) {
+                // JA, es ist eine HU -> Strenge HU-Regeln anwenden
+                const shipments = loadShipments();
+                const parentShipment = shipments[parentHawb];
+                const isNewScanKombi = (statusToUse === 'XRY' && isCombinationFromCheckbox);
+
+                // --- START DER KORREKTUR ---
+                // Gilt nur, wenn der neue Status ein exklusiver Sicherheitsstatus ist.
+                if (EXCLUSIVE_SECURITY_STATUSES.includes(statusToUse) && !isNewScanKombi) {
+                    // 1. Zähle, wie oft diese HU insgesamt im Auftrag erwartet wird.
+                    const totalAllowedInstances = parentShipment.scannedItems.filter(
+                        item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase()
+                    ).length;
+
+                    // 2. Zähle, wie viele dieser Instanzen bereits einen exklusiven Sicherheitsstatus haben.
+                    const currentSecurityScans = parentShipment.scannedItems.filter(
+                        item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() &&
+                               !item.isCancelled &&
+                               EXCLUSIVE_SECURITY_STATUSES.includes(item.status) &&
+                               !item.isCombination
+                    ).length;
+
+                    // 3. Wenn die Anzahl der bereits gesicherten Instanzen die Gesamtanzahl erreicht, blockiere.
+                    if (currentSecurityScans >= totalAllowedInstances) {
+                        return { success: false, waitingForTotal: false, message: `FEHLER: Alle (${totalAllowedInstances}) Packstücke für HU ${escapeHtml(processedRawInput)} haben bereits einen Sicherheitsstatus.` };
+                    }
+                }
+                // --- ENDE DER KORREKTUR ---
+
+                // Finde den Index des ERSTEN verfügbaren 'Anstehend'-Eintrags für diese HU
+                const anstehendIndex = parentShipment.scannedItems.findIndex(i => 
+                    i.rawInput.toUpperCase() === processedRawInput.toUpperCase() && 
+                    i.status === 'Anstehend'
+                );
+
+                if (anstehendIndex === -1) {
+                    return { success: false, waitingForTotal: false, message: `FEHLER: Alle erwarteten Packstücke für HU ${escapeHtml(processedRawInput)} wurden bereits erfasst.` };
+                }
+
+                // Den gefundenen 'Anstehend'-Eintrag direkt aktualisieren
+                const itemToUpdate = parentShipment.scannedItems[anstehendIndex];
+                const now = new Date();
+                const noteText = noteInputEl.value.trim() || null;
+
+                itemToUpdate.status = statusToUse;
+                itemToUpdate.timestamp = now.toISOString();
+                itemToUpdate.isCombination = isNewScanKombi;
+                itemToUpdate.notes = noteText ? [noteText] : [];
+                itemToUpdate.isCancelled = false;
+                itemToUpdate.cancelledTimestamp = null;
+                
+                parentShipment.lastModified = now.toISOString();
+                saveShipments(shipments);
+                resetSingleScanNoteInputState();
+                setTimeout(() => displayCurrentShipmentDetails(parentHawb), 0);
+                return { success: true, waitingForTotal: false, message: `Vorgang '${statusToUse}' für HU ${escapeHtml(processedRawInput)} erfasst.` };
+            }
+
+            // --- 2. LOGIK: ES IST EINE NORMALE SENDUNG (KEINE BEKANNTE HU) ---
+            const shipments = loadShipments();
+
+            // Sicherheits-Check: Verhindern, dass eine Haupt-Auftragsnummer direkt gescannt wird
+            if (shipments[baseNumber] && shipments[baseNumber].isHuListOrder) {
+                return { success: false, waitingForTotal: false, message: `FEHLER: ${baseNumber} ist ein HU-Auftrag. Bitte scannen Sie eine der zugehörigen HU-Nummern.` };
+            }
+
+            // Normale Logik für neue Sendungen (Stückzahlabfrage)
+            if (!shipments[baseNumber]) {
+                const tempIsCombination = (statusToUse === 'XRY' && !isBatchModeActive && isCombinationFromCheckbox);
+                const tempFinalIsCombination = NON_COUNTING_STATUSES.includes(statusToUse) ? false : tempIsCombination;
+                pendingScanDataForNewShipment = { baseNumber, rawInput: processedRawInput, status: statusToUse, isCombination: tempFinalIsCombination, note: noteInputEl.value.trim() || null, timestamp: new Date().toISOString(), suffix };
+                
+                newTotalLabelEl.textContent = `Erwartete Gesamtstückzahl für NEUE Sendung ${escapeHtml(baseNumber)}:`;
+                newTotalInputEl.value = '';
+                newTotalSectionEl.classList.remove('warning-existing');
+                toggleMainInputControls(false);
+                newTotalInputEl.focus();
+                return { success: false, waitingForTotal: true, message: `Bitte Gesamtstückzahl für ${escapeHtml(baseNumber)} eingeben oder überspringen.` };
+            }
+            
+            // Logik für existierende Standard-Sendungen (Zähllogik bis Limit)
+            const shipment = shipments[baseNumber];
+            const expectedTotal = shipment.totalPiecesExpected;
+            const existingNonCancelled = (shipment.scannedItems || []).filter(item => !item.isCancelled);
+            const isCombination = (statusToUse === 'XRY' && isCombinationFromCheckbox);
+
+            // --- START: NEUE PRÜFUNG FÜR XRY KOMBI LIMIT ---
+            // Gilt nur für normale Sendungen (nicht HU-Listen) mit gesetzter Stückzahl, wenn ein neuer Kombi-Scan hinzukommt.
+            if (isCombination && !shipment.isHuListOrder && expectedTotal !== null) {
+                const xryKombiCount = calculateXryKombiCount(existingNonCancelled);
+                if (xryKombiCount >= expectedTotal) {
+                    return { success: false, waitingForTotal: false, message: `Limit (${expectedTotal}) für XRY Kombi bei ${baseNumber} erreicht.` };
+                }
+            }
+            // --- ENDE: NEUE PRÜFUNG FÜR XRY KOMBI LIMIT ---
+
+            if (statusToUse === 'Wareneingang' && expectedTotal !== null && calculateGoodsReceiptCount(existingNonCancelled) >= expectedTotal) {
+                return { success: false, waitingForTotal: false, message: `Limit (${expectedTotal}) für Wareneingang bei ${baseNumber} erreicht.` };
+            }
+            if (!isCombination && !NON_COUNTING_STATUSES.includes(statusToUse) && expectedTotal !== null && calculateCurrentCountedPieces(existingNonCancelled) >= expectedTotal) {
+                return { success: false, waitingForTotal: false, message: `Limit (${expectedTotal}) für normale Scans bei ${baseNumber} erreicht.` };
+            }
+
+            // Wenn Limit nicht erreicht, neuen Scan-Eintrag hinzufügen
+            const now = new Date();
+            const noteText = noteInputEl.value.trim() || null;
+            const newItem = {
+                rawInput: processedRawInput,
+                status: statusToUse,
+                timestamp: now.toISOString(),
+                isCombination,
+                notes: noteText ? [noteText] : [],
+                isCancelled: false,
+                cancelledTimestamp: null
+            };
+            shipment.scannedItems.push(newItem);
+            shipment.lastModified = now.toISOString();
+            saveShipments(shipments);
+            resetSingleScanNoteInputState();
+
+            // Notification-Logik für abgeschlossene Sendungen
+            const updatedShipment = loadShipments()[baseNumber];
+            if (updatedShipment) {
+                const finalCount = calculateCurrentCountedPieces(updatedShipment.scannedItems);
+                if (updatedShipment.totalPiecesExpected !== null && finalCount === updatedShipment.totalPiecesExpected && !notifiedCompletions.has(baseNumber)) {
+                    notifyShipmentCompletion(updatedShipment);
+                }
+            }
+
+            return { success: true, waitingForTotal: false, message: `${processedRawInput} (${statusToUse}) zu ${baseNumber} hinzugefügt.` };
+        }
+            // --- ANFANG DER ÄNDERUNG FÜR BUTTON-LOGIK ---
+            function resetNewTotalSectionUI() {
+                toggleMainInputControls(true);
+                newTotalSectionEl.classList.remove('warning-existing');
+                shipmentNumberInputEl.value = '';
+                updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
+                focusShipmentInput();
+            }
+            
+            confirmNewTotalBtnEl.addEventListener('click', () => {
+                if (pendingTotalUpdateInfo) {
+                    // Fall: Bestehende Sendung aktualisieren
+                    const baseNumber = pendingTotalUpdateInfo.baseNumber;
+                    const newTotalExpectedStr = newTotalInputEl.value.trim();
+                    let newTotalExpected = null;
+
+                    if (newTotalExpectedStr !== '') {
+                        const parsedNum = parseInt(newTotalExpectedStr, 10);
+                        if (!isNaN(parsedNum) && parsedNum > 0) {
+                            newTotalExpected = parsedNum;
+                        } else {
+                            alert("Ungültige Eingabe für Stückzahl. Bitte eine positive Zahl eingeben oder Feld leer lassen.");
+                            newTotalInputEl.focus();
+                            return;
+                        }
+                    }
+
+                    const shipments = loadShipments();
+                    if (shipments[baseNumber]) {
+                        shipments[baseNumber].totalPiecesExpected = newTotalExpected;
+                        shipments[baseNumber].lastModified = new Date().toISOString();
+                        saveShipments(shipments);
+                        displayError(`Stückzahl für ${escapeHtml(baseNumber)} aktualisiert.`, 'green', 3000);
+                        renderTable();
+                        displayCurrentShipmentDetails(baseNumber);
+                    }
+                    pendingTotalUpdateInfo = null; // Status zurücksetzen
+                    resetNewTotalSectionUI();
+
+                } else {
+                    // Fall: Neue Sendung erstellen (bisherige Logik)
+                    completeNewShipmentSave(newTotalInputEl.value);
+                }
+            });
+
+            skipNewTotalBtnEl.addEventListener('click', () => {
+                if (pendingTotalUpdateInfo) {
+                    // Fall: Aktualisierung einer bestehenden Sendung abbrechen
+                    displayError('Aktualisierung abgebrochen.', 'orange', 2000);
+                    pendingTotalUpdateInfo = null; // Status zurücksetzen
+                    resetNewTotalSectionUI();
+                    displayCurrentShipmentDetails(shipmentNumberInputEl.value); // Zeige Details der ursprünglichen Eingabe
+                } else {
+                    // Fall: Neue Sendung ohne Stückzahl erstellen (bisherige Logik)
+                    completeNewShipmentSave(null);
+                }
+            });
+            // --- ENDE DER ÄNDERUNG FÜR BUTTON-LOGIK ---
+
+            newTotalInputEl.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); confirmNewTotalBtnEl.click(); }});
+        function completeNewShipmentSave(totalValueInput) {
+            if (!pendingScanDataForNewShipment) {
+                toggleMainInputControls(true); return;
+            }
+            let totalExpectedPieces = null;
+            if (totalValueInput !== null && totalValueInput.trim() !== '') {
+                const parsedTotal = parseInt(totalValueInput, 10);
+                if (!isNaN(parsedTotal) && parsedTotal > 0) {
+                    totalExpectedPieces = parsedTotal;
+                } else {
+                    alert("Ungültige Eingabe für Stückzahl. Wird als 'N/A' gespeichert.");
+                }
+            }
+
+            const shipments = loadShipments();
+            const { baseNumber, rawInput, status, isCombination, note, timestamp } = pendingScanDataForNewShipment;
+            
+            shipments[baseNumber] = {
+                hawb: baseNumber,
+                lastModified: timestamp,
+                totalPiecesExpected: totalExpectedPieces,
+                scannedItems: [],
+                mitarbeiter: MITARBEITER_NAME
+            };
+        const newScanItem = {
+            rawInput, status, timestamp, isCombination,
+            notes: note ? [note] : [], // Notiz als Array speichern
+            isCancelled: false, cancelledTimestamp: null
+        };
+            shipments[baseNumber].scannedItems.push(newScanItem);
+            saveShipments(shipments);
+
+            toggleMainInputControls(true);
+            resetSingleScanNoteInputState();
+            shipmentNumberInputEl.value = '';
+            updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
+            renderTable();
+            displayCurrentShipmentDetails(baseNumber);
+            
+            const totalMsgPart = totalExpectedPieces !== null ? ` mit ${totalExpectedPieces} erwarteten Stk.` : '';
+            displayError(`${escapeHtml(rawInput)} hinzugefügt (Sendung ${escapeHtml(baseNumber)} neu erstellt${totalMsgPart}).`, 'green', 3000);
+
+            const finalCount = calculateCurrentCountedPieces(shipments[baseNumber].scannedItems);
+            if (totalExpectedPieces !== null && finalCount === totalExpectedPieces && !notifiedCompletions.has(baseNumber)) {
+                notifyShipmentCompletion(shipments[baseNumber]);
+            }
+            pendingScanDataForNewShipment = null;
+            focusShipmentInput();
+        }
+
+        function toggleMainInputControls(showMain) {
+            const mainControls = [securityStatusSelectEl, comboCheckboxContainerEl, mainActionButtonEl, noteToggleButtonEl];
+            if (showMain) {
+                mainControls.forEach(el => { if(el) el.style.display = '';}); // NoteToggleButton wird durch updateNoteAndComboVisibility gesteuert
+                updateNoteAndComboVisibility(); // Stellt sicher, dass Note-Toggle-Button und Kombi korrekt angezeigt werden
+                newTotalSectionEl.classList.remove('visible');
+                newTotalSectionEl.style.display = 'none';
+                shipmentNumberInputEl.disabled = false;
+            } else { // NewTotal Section wird angezeigt
+                mainControls.forEach(el => { if(el) el.style.display = 'none';});
+                if(noteInputContainerEl) noteInputContainerEl.style.display = 'none'; // Auch das Einzelnotizfeld ausblenden
+                newTotalSectionEl.classList.add('visible');
+                newTotalSectionEl.style.display = 'flex';
+                shipmentNumberInputEl.disabled = true;
+                // shipmentNumberInputEl.value = ''; // Wert nicht unbedingt leeren, da er zur Anzeige in NewTotalLabel verwendet wird
+                updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
+            }
+        }
+
+
+      function showInlineNoteEditor(targetElement) {
+            removeActiveInlineNoteEditor(); // Zuerst bestehenden Editor entfernen
+
+            const liElement = targetElement.closest('li');
+            if (!liElement) return;
+
+            const baseNumber = targetElement.dataset.basenumber;
+            const itemTimestamp = targetElement.dataset.timestamp;
+            const noteIndex = targetElement.dataset.noteIndex; // Kann undefined sein (beim Hinzufügen)
+            const isEditing = noteIndex !== undefined;
+            const currentNote = isEditing ? liElement.querySelector(`.editable-note[data-note-index="${noteIndex}"]`).textContent : '';
+
+            // Editor nach "Notiz hinzufügen" oder nach der Notizliste einfügen
+            const placeholderDiv = liElement.querySelector('.inline-note-editor-placeholder');
+            if (!placeholderDiv) return;
+
+            liElement.classList.add('editing-note'); // Versteckt Links, während editiert wird
+
+            const editorHtml = `
+                <div class="inline-note-editor">
+                    <input type="text" class="inline-note-input" value="${escapeHtml(currentNote)}" placeholder="Notiz eingeben...">
+                    <div class="inline-note-editor-actions">
+                        <button class="inline-note-save-btn" data-basenumber="${escapeHtml(baseNumber)}" data-timestamp="${itemTimestamp}" ${isEditing ? `data-note-index="${noteIndex}"` : ''}>Speichern</button>
+                        <button class="inline-note-cancel-btn">Abbrechen</button>
+                    </div>
+                </div>`;
+            placeholderDiv.innerHTML = editorHtml;
+
+            const inputField = placeholderDiv.querySelector('.inline-note-input');
+            if (inputField) {
+                inputField.focus(); inputField.select();
+                inputField.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); placeholderDiv.querySelector('.inline-note-save-btn')?.click(); }});
+                inputField.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); placeholderDiv.querySelector('.inline-note-cancel-btn')?.click(); }});
+            }
+        }
+
+        function saveOrUpdateNote(baseNumber, itemTimestamp, noteIndex, newNoteValue) {
+            const shipments = loadShipments();
+            const shipment = shipments[baseNumber];
+            if (!shipment || !shipment.scannedItems) return;
+
+            const item = shipment.scannedItems.find(i => i.timestamp === itemTimestamp);
+            if (!item) return;
+
+            const noteText = newNoteValue.trim();
+            const isEditing = noteIndex !== undefined && noteIndex !== null;
+
+            if (isEditing) { // Bearbeiten einer existierenden Notiz
+                if (noteText) {
+                    item.notes[noteIndex] = noteText; // Aktualisieren
+                } else {
+                    item.notes.splice(noteIndex, 1); // Löschen, wenn leer gespeichert wird
+                }
+            } else { // Hinzufügen einer neuen Notiz
+                if (noteText) {
+                    if (!Array.isArray(item.notes)) item.notes = [];
+                    item.notes.push(noteText);
+                }
+            }
+
+            shipment.lastModified = new Date().toISOString();
+            saveShipments(shipments);
+            displayCurrentShipmentDetails(baseNumber); // UI neu zeichnen
+            focusShipmentInput();
+        }
+
+        function requestDeleteNote(baseNumber, itemTimestamp, noteIndex) {
+            const shipments = loadShipments();
+            const noteToDelete = shipments[baseNumber]?.scannedItems?.find(i => i.timestamp === itemTimestamp)?.notes[noteIndex];
+            if(confirm(`Notiz "${noteToDelete}" wirklich löschen?`)) {
+                 const item = shipments[baseNumber].scannedItems.find(i => i.timestamp === itemTimestamp);
+                 item.notes.splice(noteIndex, 1);
+                 shipments[baseNumber].lastModified = new Date().toISOString();
+                 saveShipments(shipments);
+                 displayCurrentShipmentDetails(baseNumber);
+                 focusShipmentInput();
+            }
+        }
+
+        // --- Batch Modus Logik ---
+        function toggleBatchMode(activate) {
+            isBatchModeActive = activate;
+            clearError();
+            resetSingleScanNoteInputState();
+            updateNoteAndComboVisibility(); // Combo und Einzelnotiz-Button aktualisieren
+            document.body.classList.toggle('batch-mode-active', isBatchModeActive);
+
+
+            if (isBatchModeActive) {
+                batchStatus = securityStatusSelectEl.value;
+                // Kombi-Checkbox-Status für Batch bei Aktivierung übernehmen
+                batchIsCombination = (securityStatusSelectEl.value === 'XRY' && comboCheckboxEl.checked);
+                const comboText = batchIsCombination ? ' (Kombi)' : '';
+                const statusLabel = `${batchStatus}${comboText}`;
+
+                batchModeStatusLabelEl.textContent = statusLabel;
+                batchStatusDisplayEl.textContent = `Aktiv (${statusLabel})`;
+                mainActionButtonEl.textContent = 'Zum Batch hinzufügen';
+                batchAreaEl.classList.add('visible');
+                securityStatusSelectEl.disabled = true;
+                comboCheckboxEl.disabled = true; // Auch Kombi-Checkbox im Batch sperren
+                
+                currentBatch = [];
+                currentBatchGlobalNote = null;
+                isBatchNotePromptRequired = true; // Batch-Notiz-Modal soll beim ersten Scan im neuen Batch kommen
+                pendingFirstBatchScanData = null;
+                updateBatchUI();
+                displayCurrentShipmentDetails(''); // Keine Details im Batch Modus anzeigen
+            } else {
+                if (currentBatch.length > 0) {
+                    if (!confirm("Batch-Modus deaktivieren? Nicht gespeicherte Scans im aktuellen Batch gehen verloren!")) {
+                        batchModeToggleEl.checked = true; // Zurücksetzen, wenn User abbricht
+                        isBatchModeActive = true; // Status beibehalten
+                        document.body.classList.toggle('batch-mode-active', true);
+                        return;
+                    }
+                }
+                batchStatusDisplayEl.textContent = 'Inaktiv';
+                mainActionButtonEl.textContent = 'Hinzufügen';
+                batchAreaEl.classList.remove('visible');
+                securityStatusSelectEl.disabled = false;
+                comboCheckboxEl.disabled = securityStatusSelectEl.value !== 'XRY'; // Entsperren, wenn XRY
+                currentBatch = [];
+                updateBatchUI();
+                // Ggf. Details der aktuellen Eingabe wieder anzeigen
+                displayCurrentShipmentDetails(processShipmentNumber(shipmentNumberInputEl.value).baseNumber);
+            }
+            toggleMainInputControls(true); // Generelle UI-Controls (de)aktivieren
+            updateEditButtonVisibilityInTable();
+            filterTable(shipmentNumberInputEl.value);
+            focusShipmentInput();
+        }
+
+        function updateBatchUI() {
+            batchListEl.innerHTML = '';
+            currentBatch.forEach((batchItem, index) => {
+                const li = document.createElement('li');
+                const itemDate = new Date(batchItem.scanTimestamp);
+                let displayText = `${escapeHtml(batchItem.rawInput)} (${itemDate.toLocaleTimeString('de-DE')})`;
+                if (batchItem.note) {
+                    displayText += ` - Notiz: ${escapeHtml(batchItem.note)}`;
+                }
+                li.textContent = displayText;
+                const removeBtn = document.createElement('button');
+                removeBtn.textContent = 'X';
+                removeBtn.classList.add('remove-batch-item');
+                removeBtn.title = `${escapeHtml(batchItem.rawInput)} aus Batch entfernen`;
+                removeBtn.onclick = () => {
+                    currentBatch.splice(index, 1);
+                    updateBatchUI();
+                    if (currentBatch.length === 0) { // Wenn Batch leer wird
+                        isBatchNotePromptRequired = true; // Für nächsten Batch wieder Modal
+                        currentBatchGlobalNote = null;
+                        updateCurrentBatchNoteDisplay();
+                    }
+                };
+                li.appendChild(removeBtn);
+                batchListEl.appendChild(li);
+            });
+            batchItemCountEl.textContent = currentBatch.length;
+            updateCurrentBatchNoteDisplay();
+        }
+        
+        function updateCurrentBatchNoteDisplay() {
+            if (isBatchModeActive && currentBatchGlobalNote) {
+                currentBatchNoteDisplayEl.textContent = `Batch-Notiz: ${escapeHtml(currentBatchGlobalNote)}`;
+                currentBatchNoteDisplayEl.style.display = 'block';
+            } else {
+                currentBatchNoteDisplayEl.textContent = '';
+                currentBatchNoteDisplayEl.style.display = 'none';
+            }
+        }
+
+        function addToBatch() {
+            const rawInputFromField = shipmentNumberInputEl.value.trim();
+            if (!rawInputFromField) { focusShipmentInput(); return; }
+
+            const upperRawInput = rawInputFromField.toUpperCase();
+            // Im Batch wird der Suffix nicht besonders behandelt (kein automatisches Ersetzen durch Basisnummer)
+            // Jeder Scan ist ein separater Eintrag.
+            const { baseNumber, isValidFormat, raw: processedRawInput } = processShipmentNumber(upperRawInput);
+             if (!isValidFormat) { // Basisvalidierung auch für Batch-Eingaben
+                displayError(`Ungültiges Format für Batch-Eingabe: ${escapeHtml(rawInputFromField)}`);
+                focusShipmentInput();
+                return;
+            }
+
+            const scanTimestamp = new Date().toISOString();
+
+            if (isBatchModeActive && currentBatch.length === 0 && isBatchNotePromptRequired) {
+                pendingFirstBatchScanData = { rawInput: processedRawInput, scanTimestamp: scanTimestamp };
+                batchNoteInputEl.value = currentBatchGlobalNote || ''; // Vorbelegen mit letzter Notiz oder leer
+                batchNoteModalEl.classList.add('visible');
+                batchNoteInputEl.focus();
+                return;
+            }
+
+            const batchItem = {
+                rawInput: processedRawInput,
+                scanTimestamp: scanTimestamp,
+                note: currentBatchGlobalNote // Globale Batch-Notiz verwenden
+            };
+            currentBatch.push(batchItem);
+            updateBatchUI();
+            shipmentNumberInputEl.value = '';
+            updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
+            clearError();
+            focusShipmentInput();
+        }
+
+        function confirmAndAddFirstBatchItemWithNote() {
+            currentBatchGlobalNote = batchNoteInputEl.value.trim() || null;
+            isBatchNotePromptRequired = false; // Modal für diesen Batch behandelt
+            batchNoteModalEl.classList.remove('visible');
+            updateCurrentBatchNoteDisplay(); // Anzeige aktualisieren
+
+            if (pendingFirstBatchScanData) {
+                const batchItem = {
+                    rawInput: pendingFirstBatchScanData.rawInput,
+                    scanTimestamp: pendingFirstBatchScanData.scanTimestamp,
+                    note: currentBatchGlobalNote
+                };
+                currentBatch.push(batchItem);
+                pendingFirstBatchScanData = null;
+                updateBatchUI();
+                shipmentNumberInputEl.value = '';
+                updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
+            }
+            clearError();
+            focusShipmentInput();
+        }
+
+        function skipNoteAndAddFirstBatchItem() {
+            currentBatchGlobalNote = null; // Keine Notiz für diesen Batch
+            isBatchNotePromptRequired = false;
+            batchNoteModalEl.classList.remove('visible');
+            updateCurrentBatchNoteDisplay();
+
+            if (pendingFirstBatchScanData) {
+                const batchItem = { ...pendingFirstBatchScanData, note: null };
+                currentBatch.push(batchItem);
+                pendingFirstBatchScanData = null;
+                updateBatchUI();
+                shipmentNumberInputEl.value = '';
+                updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
+            }
+            clearError();
+            focusShipmentInput();
+        }
+
+        function saveBatch() {
+            if (currentBatch.length === 0) { displayError("Batch ist leer."); focusShipmentInput(); return; }
+            
+            let successCount = 0;
+            let errorCount = 0;
+            let errorMessages = [];
+            let newBaseShipments = new Set();
+            let affectedBaseNumbersForNotification = new Set();
+
+            const shipmentsWorkingCopy = JSON.parse(JSON.stringify(loadShipments()));
+
+            currentBatch.forEach(batchItem => {
+                const { rawInput: rawInputFromBatch, scanTimestamp, note: itemNote } = batchItem;
+                
+                // 1. PRÜFUNG: Ist der Scan eine bekannte HU in einem HU-Auftrag?
+                const parentHawb = findShipmentByHuNumber(rawInputFromBatch);
+                if (parentHawb) {
+                    // JA, es ist eine HU.
+                    const parentShipment = shipmentsWorkingCopy[parentHawb];
+                    const isNewScanKombi = (batchStatus === 'XRY' && batchIsCombination);
+
+                    // --- START DER KORREKTUR ---
+                    if (EXCLUSIVE_SECURITY_STATUSES.includes(batchStatus) && !isNewScanKombi) {
+                        const totalAllowedInstances = parentShipment.scannedItems.filter(
+                            item => item.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase()
+                        ).length;
+                        const currentSecurityScans = parentShipment.scannedItems.filter(
+                            item => item.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() &&
+                                   !item.isCancelled &&
+                                   EXCLUSIVE_SECURITY_STATUSES.includes(item.status) &&
+                                   !item.isCombination
+                        ).length;
+
+                        if (currentSecurityScans >= totalAllowedInstances) {
+                            errorCount++;
+                            errorMessages.push(`Alle Packstücke für HU ${rawInputFromBatch} haben bereits einen Sicherheitsstatus.`);
+                            return; // Zum nächsten Batch-Item
+                        }
+                    }
+                    // --- ENDE DER KORREKTUR ---
+
+                    // Finde den Index des ERSTEN verfügbaren 'Anstehend'-Eintrags für diese HU
+                    const anstehendIndex = parentShipment.scannedItems.findIndex(i => 
+                        i.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() && 
+                        i.status === 'Anstehend'
+                    );
+
+                    if (anstehendIndex === -1) {
+                        errorCount++;
+                        errorMessages.push(`Alle Packstücke für HU ${rawInputFromBatch} bereits erfasst.`);
+                        return; // Zum nächsten Batch-Item
+                    }
+                    
+                    // Den gefundenen 'Anstehend'-Eintrag direkt aktualisieren
+                    const itemToUpdate = parentShipment.scannedItems[anstehendIndex];
+                    itemToUpdate.status = batchStatus;
+                    itemToUpdate.timestamp = scanTimestamp;
+                    itemToUpdate.isCombination = isNewScanKombi;
+                    itemToUpdate.notes = itemNote ? [itemNote] : [];
+                    itemToUpdate.isCancelled = false;
+                    itemToUpdate.cancelledTimestamp = null;
+                    
+                    parentShipment.lastModified = scanTimestamp;
+                    
+                    affectedBaseNumbersForNotification.add(parentHawb);
+                    successCount++;
+                    return; // Wichtig: Zum nächsten Batch-Item springen
+                }
+
+                // --- ALTE LOGIK: Wenn es KEINE bekannte HU ist, behandle es als normale Sendung ---
+                const { baseNumber, isValidFormat, raw: processedRawInput } = processShipmentNumber(rawInputFromBatch);
+
+                if (!isValidFormat) {
+                    errorCount++; errorMessages.push(`Ungültiges Format: ${escapeHtml(rawInputFromBatch)}`); return;
+                }
+
+                if (!shipmentsWorkingCopy[baseNumber]) {
+                    newBaseShipments.add(baseNumber);
+                    shipmentsWorkingCopy[baseNumber] = {
+                        hawb: baseNumber, lastModified: scanTimestamp, totalPiecesExpected: null,
+                        scannedItems: [], mitarbeiter: MITARBEITER_NAME
+                    };
+                }
+                
+                const shipmentToUpdate = shipmentsWorkingCopy[baseNumber];
+                const expectedTotal = shipmentToUpdate.totalPiecesExpected;
+                
+                const isCurrentBatchItemCounting = !NON_COUNTING_STATUSES.includes(batchStatus) && !batchIsCombination;
+
+                if (isCurrentBatchItemCounting && expectedTotal !== null) {
+                    const currentCountInWorkingCopy = calculateCurrentCountedPieces(shipmentToUpdate.scannedItems);
+                    if (currentCountInWorkingCopy >= expectedTotal) {
+                        errorCount++; errorMessages.push(`Limit (${expectedTotal}) für ${escapeHtml(baseNumber)} erreicht bei Scan ${escapeHtml(processedRawInput)}`); return;
+                    }
+                }
+                
+                const newScanItem = {
+                    rawInput: processedRawInput, status: batchStatus, timestamp: scanTimestamp,
+                    isCombination: batchIsCombination, notes: itemNote ? [itemNote] : [],
+                    isCancelled: false, cancelledTimestamp: null
+                };
+                
+                shipmentToUpdate.scannedItems.push(newScanItem);
+                shipmentToUpdate.lastModified = scanTimestamp;
+                
+                affectedBaseNumbersForNotification.add(baseNumber);
+                successCount++;
+            });
+
+            // Speichern und UI-Update (dieser Teil bleibt unverändert)
+            saveShipments(shipmentsWorkingCopy);
+            affectedBaseNumbersForNotification.forEach(bn => {
+                const finalShipmentState = shipmentsWorkingCopy[bn];
+                if (finalShipmentState) {
+                    const finalCount = calculateCurrentCountedPieces(finalShipmentState.scannedItems);
+                    const expected = finalShipmentState.totalPiecesExpected;
+                    if (expected !== null && finalCount === expected && !notifiedCompletions.has(bn)) {
+                        notifyShipmentCompletion(finalShipmentState);
+                    }
+                }
+            });
+            
+            let alertMessage = `Batch Verarbeitung:\n- Erfolgreich: ${successCount}\n- Fehler/Übersprungen: ${errorCount}`;
+            if (newBaseShipments.size > 0) {
+                alertMessage += `\n- Neue Sendungen erstellt für: ${[...newBaseShipments].join(', ')}`;
+            }
+            if (errorMessages.length > 0) {
+                alertMessage += `\n\nDetails:\n- ${errorMessages.join('\n- ')}`;
+            }
+            alert(alertMessage);
+
+            renderTable();
+            currentBatch = [];
+            isBatchNotePromptRequired = true;
+            updateBatchUI();
+            displayCurrentShipmentDetails('');
+            focusShipmentInput();
+        }
+
+        // --- Sonstige Aktionen (Löschen, PDF, Edit Modal) ---
+        function deleteShipment(baseNumber) {
+            const shipments = loadShipments();
+            if (shipments[baseNumber]) {
+                delete shipments[baseNumber];
+                saveShipments(shipments);
+                renderTable();
+                const currentInputBase = processShipmentNumber(shipmentNumberInputEl.value).baseNumber;
+                if (currentInputBase === baseNumber) { // Wenn gelöschte Sendung angezeigt wurde
+                    displayCurrentShipmentDetails('');
+                } else {
+                    displayCurrentShipmentDetails(currentInputBase);
+                }
+                clearError();
+            }
+            focusShipmentInput();
+        }
+
+        function requestCancelScanItem(baseNumber, itemTimestamp) {
+            if (confirm(`Soll dieser Scan-Eintrag wirklich storniert werden?\nZeit: ${new Date(itemTimestamp).toLocaleString('de-DE')}`)) {
+                cancelScanItem(baseNumber, itemTimestamp);
+            }
+        }
+        function cancelScanItem(baseNumber, itemTimestamp) {
+            const shipments = loadShipments();
+            const shipment = shipments[baseNumber];
+            if (!shipment || !shipment.scannedItems) return;
+            let itemFound = false;
+            shipment.scannedItems.forEach(item => {
+                if (item.timestamp === itemTimestamp && !item.isCancelled) {
+                    item.isCancelled = true;
+                    item.cancelledTimestamp = new Date().toISOString();
+                    itemFound = true;
+                }
+            });
+            if (itemFound) {
+                shipment.lastModified = new Date().toISOString();
+                saveShipments(shipments);
+                displayCurrentShipmentDetails(baseNumber); // Aktualisiert die Detailansicht
+                renderTable(); // Aktualisiert die Tabelle
+                clearError();
+            } else {
+                displayError("Fehler: Eintrag zum Stornieren nicht gefunden oder bereits storniert.");
+            }
+            focusShipmentInput();
+        }
+        
+         function openEditModal(baseNumber) {
+            removeActiveInlineNoteEditor();
+            const shipments = loadShipments();
+            const shipment = shipments[baseNumber];
+            if (!shipment) { displayError(`Sendung ${escapeHtml(baseNumber)} nicht gefunden.`); return; }
+            
+            editShipmentBaseNumberInputEl.value = baseNumber;
+            editShipmentNumberDisplayEl.value = baseNumber;
+            editTotalPiecesExpectedInputEl.value = shipment.totalPiecesExpected ?? '';
+            
+            // NEU: Das Feld für den manuellen Wareneingang leeren
+            editGoodsReceiptCountInputEl.value = ''; 
+            
+            editModalEl.classList.add('visible');
+            editTotalPiecesExpectedInputEl.focus();
+        }
+        function closeEditModal() {
+            editModalEl.classList.remove('visible');
+            focusShipmentInput();
+        }
+
+        function saveShipmentChangesFromModal() {
+            const baseNumber = editShipmentBaseNumberInputEl.value;
+            const newTotalExpectedStr = editTotalPiecesExpectedInputEl.value.trim();
+            const manualReceiptCountStr = editGoodsReceiptCountInputEl.value.trim();
+
+            let newTotalExpected = null;
+            if (!baseNumber) { displayError("Fehler: Keine Sendungsnummer zum Speichern."); return; }
+
+            if (newTotalExpectedStr !== '') {
+                const parsedNum = parseInt(newTotalExpectedStr, 10);
+                if (!isNaN(parsedNum) && parsedNum > 0) {
+                    newTotalExpected = parsedNum;
+                } else {
+                    alert("Ungültige Eingabe für Stückzahl. Bitte eine positive Zahl eingeben oder Feld leer lassen.");
+                    editTotalPiecesExpectedInputEl.focus(); return;
+                }
+            }
+            
+            const shipments = loadShipments();
+            if (!shipments[baseNumber]) { displayError(`Fehler: Sendung ${escapeHtml(baseNumber)} nicht mehr gefunden.`); closeEditModal(); return; }
+            
+            shipments[baseNumber].totalPiecesExpected = newTotalExpected;
+
+            if (manualReceiptCountStr !== '') {
+                const manualReceiptCount = parseInt(manualReceiptCountStr, 10);
+                if (isNaN(manualReceiptCount) || manualReceiptCount < 0) {
+                    alert("Ungültige Eingabe für Anzahl Wareneingang. Bitte eine positive Zahl eingeben.");
+                    editGoodsReceiptCountInputEl.focus();
+                    return;
+                }
+                
+                shipments[baseNumber].scannedItems = shipments[baseNumber].scannedItems.filter(item => item.status !== 'Wareneingang');
+
+                for (let i = 0; i < manualReceiptCount; i++) {
+                    shipments[baseNumber].scannedItems.push({
+                        // --- ÄNDERUNG HIER ---
+                        rawInput: baseNumber, // Anstatt 'Manuell erfasst' wird die Sendungsnummer verwendet
+                        // --- ENDE DER ÄNDERUNG ---
+                        status: 'Wareneingang',
+                        timestamp: new Date().toISOString(),
+                        isCombination: false,
+                        notes: [],
+                        isCancelled: false,
+                        cancelledTimestamp: null
+                    });
+                }
+            }
+
+            shipments[baseNumber].lastModified = new Date().toISOString();
+            saveShipments(shipments);
+            
+            closeEditModal();
+            renderTable();
+            displayCurrentShipmentDetails(baseNumber);
+            displayError(`Änderungen für ${escapeHtml(baseNumber)} gespeichert.`, 'green', 2500);
+
+            const finalCount = calculateCurrentCountedPieces(shipments[baseNumber].scannedItems);
+            if (newTotalExpected !== null && finalCount === newTotalExpected && !notifiedCompletions.has(baseNumber)) {
+                notifyShipmentCompletion(shipments[baseNumber]);
+            }
+        }
+    function generatePdf(baseNumber) {
+        const shipments = loadShipments();
+        const shipment = shipments[baseNumber];
+        if (!shipment || !shipment.scannedItems || shipment.scannedItems.length === 0) {
+            displayError(`Keine Scans für ${escapeHtml(baseNumber)} für PDF.`); return;
+        }
+        try {
+            const doc = new jsPDF();
+            const expected = shipment.totalPiecesExpected;
+            const securityScansCount = calculateCurrentCountedPieces(shipment.scannedItems);
+            const receiptScansCount = calculateGoodsReceiptCount(shipment.scannedItems);
+
+            doc.setFontSize(18); doc.text(`Sicherheitsprotokoll: ${baseNumber}`, 14, 20);
+            doc.setFontSize(10);
+            doc.text(`Mitarbeiter: ${MITARBEITER_NAME}`, 14, 30);
+            doc.text(`RegB Nummer: ${RAC_NUMMER}`, 14, 35);
+            doc.text(`Gesamtstücke erwartet: ${expected !== null ? expected : 'N/A'}`, 14, 40);
+            
+            // --- NEUE ZEILEN FÜR PDF-HEADER ---
+            doc.text(`Wareneingang erfasst: ${receiptScansCount} von ${expected !== null ? expected : 'N/A'} Stk.`, 14, 45);
+            doc.text(`Sicherheitskontrolle (zählend): ${securityScansCount} von ${expected !== null ? expected : 'N/A'} Stk.`, 14, 50);
+            
+            doc.text(`Letzte Änderung: ${new Date(shipment.lastModified).toLocaleString('de-DE')}`, 14, 55);
+            doc.text(`Generiert am: ${new Date().toLocaleString('de-DE')}`, 14, 60);
+
+            let startY = 70; // Etwas mehr Platz nach oben
+            if (doc.autoTable) {
+                const tableData = shipment.scannedItems
+                    .filter(item => item.status !== 'Anstehend')
+                    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+                    .map(item => {
+                        let statusText = item.status;
+                        if (item.isCombination) statusText += ' (Kombi)';
+                        if (item.isCancelled) statusText += ' (Storniert)';
+                        let noteText = '';
+                        if (item.notes && item.notes.length > 0) {
+                            noteText = `\nNotizen: ${item.notes.join('; ')}`;
+                        }
+                        return [
+                            new Date(item.timestamp).toLocaleString('de-DE'),
+                            item.rawInput, RAC_NUMMER, MITARBEITER_NAME, statusText + noteText
+                        ];
+                    });
+                doc.autoTable({
+                    head: [['Zeitstempel', 'Gescannte Nummer', 'RegB Nummer', 'Mitarbeiter', 'Status/Notiz']],
+                    body: tableData, startY: startY, theme: 'grid',
+                    headStyles: { fillColor: [220, 220, 220], textColor: 0, fontStyle: 'bold' },
+                    styles: { fontSize: 8, cellPadding: 1.5, overflow: 'linebreak' },
+                    columnStyles: { 0:{cellWidth:28}, 1:{cellWidth:'auto'}, 2:{cellWidth:35}, 3:{cellWidth:30}, 4:{cellWidth:'auto'} },
+                    didParseCell: function (data) {
+                         const originalItem = shipment.scannedItems
+                            .filter(item => item.status !== 'Anstehend')
+                            .sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp))[data.row.index];
+                        if (originalItem && originalItem.isCancelled) { data.cell.styles.textColor = [150,150,150]; }
+                    }
+                });
+                startY = doc.autoTable.previous.finalY + 10;
+            } else { alert("PDF AutoTable nicht verfügbar."); return; }
+
+            const finalValidStatuses = [...new Set(shipment.scannedItems.filter(item => !item.isCombination && !item.isCancelled && !NON_COUNTING_STATUSES.includes(item.status)).map(item => item.status))].sort();
+            let summaryString = "Sicherheitsstatus (gültig, zählend): ";
+            if (finalValidStatuses.length > 0) {
+                summaryString += "SPX by " + finalValidStatuses.join(', ');
+            } else { summaryString += "Keine zählende Sicherungsmethode angewendet."; }
+            
+            doc.setFontSize(11); doc.setFont(undefined, 'bold');
+            if (startY > 280) { doc.addPage(); startY = 20; }
+            doc.text(summaryString, 14, startY);
+            doc.output('dataurlnewwindow');
+            clearError();
+        } catch (error) { console.error("PDF Fehler:", error); displayError("Fehler beim Erstellen/Öffnen des PDFs."); }
+        focusShipmentInput();
+    }        
+        // --- Google Sheet & E-Mail Integration ---
+        async function sendDataToSheet() {
+            removeActiveInlineNoteEditor();
+            if (!WEB_APP_URL || WEB_APP_URL.includes('YOUR_DEPLOYED_WEB_APP_URL_HERE')) {
+                sheetStatusEl.textContent = 'Fehler: Web App URL fehlt.'; sheetStatusEl.style.color = 'red';
+                alert("Fehler: Die Web App URL wurde nicht im Skript konfiguriert."); return;
+            }
+            sheetStatusEl.textContent = 'Sende Daten an Google Sheet...'; sheetStatusEl.style.color = '#f0ad4e';
+            sendToSheetButtonEl.disabled = true; clearError();
+            try {
+                const shipmentsData = loadShipments();
+                if (Object.keys(shipmentsData).length === 0) {
+                    sheetStatusEl.textContent = 'Keine Daten zum Senden.'; sheetStatusEl.style.color = 'blue'; return;
+                }
+                const response = await fetch(WEB_APP_URL, {
+                    method: 'POST', mode: 'cors', cache: 'no-cache',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // text/plain für Gas POST
+                    body: JSON.stringify({action: "saveAllData", payload: shipmentsData}) // Struktur für Gas
+                });
+                if (!response.ok) throw new Error(`Server Verbindung: ${response.status} ${response.statusText}`);
+                const result = await response.json();
+                if (result.status === 'success') {
+                    sheetStatusEl.textContent = `Erfolg: ${result.message || 'Daten gesendet.'}`; sheetStatusEl.style.color = 'green';
+                    setTimeout(closeSideMenu, 1500);
+                } else {
+                    throw new Error(`Apps Script Fehler: ${result.message || 'Unbekannt'}`);
+                }
+            } catch (error) {
+                console.error("Fehler beim Senden an Google Sheet:", error);
+                sheetStatusEl.textContent = `Fehler: ${error.message}`; sheetStatusEl.style.color = 'red';
+                alert(`Fehler beim Senden:\n${error.message}`);
+            } finally {
+                sendToSheetButtonEl.disabled = false;
+                setTimeout(() => { if (sheetStatusEl.textContent && !sheetStatusEl.textContent.startsWith('Erfolg')) sheetStatusEl.textContent = ''; }, 7000);
+            }
+        }
+
+        async function notifyShipmentCompletion(shipmentObject) {
+            const baseNumber = shipmentObject.hawb;
+            if (!baseNumber) { console.error("Konnte HAWB für Benachrichtigung nicht ermitteln."); return; }
+            if (!WEB_APP_URL || WEB_APP_URL.includes('YOUR_DEPLOYED_WEB_APP_URL_HERE')) {
+                console.warn("Web App URL fehlt, keine Abschluss-Benachrichtigung."); return;
+            }
+            if (notifiedCompletions.has(baseNumber)) return; // Bereits benachrichtigt
+
+            console.log(`Sende Abschluss-Benachrichtigung für ${baseNumber}...`);
+            notifiedCompletions.add(baseNumber); // Als benachrichtigt markieren
+            
+            const notificationData = { action: 'shipmentComplete', shipmentData: shipmentObject };
+            try {
+                const response = await fetch(WEB_APP_URL, {
+                    method: 'POST', mode: 'cors', cache: 'no-cache',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify(notificationData)
+                });
+                if (!response.ok) throw new Error(`Server Fehler (Mail): ${response.status} ${response.statusText}`);
+                const result = await response.json();
+                if (result.status === 'success') {
+                    console.log(`Abschluss-Benachrichtigung für ${baseNumber} erfolgreich gesendet.`);
+                    displayError(`Sendung ${escapeHtml(baseNumber)} abgeschlossen! Benachrichtigung gesendet.`, 'blue', 4000);
+                } else {
+                    throw new Error(`Apps Script Fehler (Mail): ${result.message || 'Unbekannt'}`);
+                }
+            } catch (error) {
+                console.error(`Fehler beim Senden der Abschluss-Benachrichtigung für ${baseNumber}:`, error);
+                notifiedCompletions.delete(baseNumber); // Bei Fehler wieder freigeben für erneuten Versuch
+                displayError(`Fehler beim Senden der Mail für ${escapeHtml(baseNumber)}.`);
+            }
+        }
+
+        async function sendSummaryEmail() {
+            removeActiveInlineNoteEditor();
+            if (!WEB_APP_URL || WEB_APP_URL.includes('YOUR_DEPLOYED_WEB_APP_URL_HERE')) {
+                 sheetStatusEl.textContent = 'Fehler: Web App URL fehlt.'; sheetStatusEl.style.color = 'red';
+                 alert("Fehler: Web App URL fehlt."); return;
+            }
+            const shipmentsData = loadShipments();
+            if (Object.keys(shipmentsData).length === 0) {
+                sheetStatusEl.textContent = 'Keine Daten für Zusammenfassung.'; sheetStatusEl.style.color = 'blue';
+                setTimeout(() => { if(sheetStatusEl.style.color === 'blue') sheetStatusEl.textContent = ''; }, 3000); return;
+            }
+            sheetStatusEl.textContent = 'Sende E-Mail-Zusammenfassung...'; sheetStatusEl.style.color = '#f0ad4e';
+            sendSummaryEmailButtonEl.disabled = true; clearError();
+            const payload = { action: 'sendSummaryEmail', allShipmentsData: shipmentsData, mitarbeiter: MITARBEITER_NAME };
+            try {
+                const response = await fetch(WEB_APP_URL, {
+                    method: 'POST', mode: 'cors', cache: 'no-cache',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload)
+                });
+                if (!response.ok) throw new Error(`Server Verbindung: ${response.status} ${response.statusText}`);
+                const result = await response.json();
+                if (result.status === 'success') {
+                    sheetStatusEl.textContent = `Erfolg: ${result.message || 'Zusammenfassung gesendet.'}`; sheetStatusEl.style.color = 'green';
+                    setTimeout(closeSideMenu, 1500);
+                } else {
+                    throw new Error(`Apps Script Fehler: ${result.message || 'Unbekannt'}`);
+                }
+            } catch (error) {
+                console.error("Fehler beim Senden der E-Mail:", error);
+                sheetStatusEl.textContent = `Fehler: ${error.message}`; sheetStatusEl.style.color = 'red';
+                alert(`Fehler beim Senden der Zusammenfassung:\n${error.message}`);
+            } finally {
+                sendSummaryEmailButtonEl.disabled = false;
+                setTimeout(() => { if (sheetStatusEl.textContent && !sheetStatusEl.textContent.startsWith('Erfolg')) sheetStatusEl.textContent = ''; }, 7000);
+            }
+        }
+
+            // --- START: Doppelklick-Logik für manuelle Eingabe im HU-Modal ---
+            function enableManualInputOnDoubleClick(event) {
+                const element = event.target;
+                element.removeAttribute('readonly');
+                element.setAttribute('inputmode', 'text');
+                setTimeout(() => {
+                    element.focus();
+                    element.select();
+                }, 50);
+            }
+
+            mainOrderNumberInputEl.addEventListener('dblclick', enableManualInputOnDoubleClick);
+            huListTextareaEl.addEventListener('dblclick', enableManualInputOnDoubleClick);
+            // --- ENDE: Doppelklick-Logik ---
+        // --- Seitenmenü ---
+        function openSideMenu() { removeActiveInlineNoteEditor(); sideMenuEl.classList.add('open'); menuOverlayEl.classList.add('visible'); }
+        function closeSideMenu() { sideMenuEl.classList.remove('open'); menuOverlayEl.classList.remove('visible'); sheetStatusEl.textContent = ''; focusShipmentInput(); }
+            // --- START: Doppelklick-Logik für manuelle Eingabe im HU-Modal ---
+            function enableManualInput(event) {
+                const element = event.target;
+                element.removeAttribute('readonly');
+                element.setAttribute('inputmode', 'text'); // Tastatur anfordern
+                // Kleiner Timeout, damit der Browser die Änderung verarbeiten kann, bevor der Fokus gesetzt wird
+                setTimeout(() => {
+                    element.focus();
+                    element.select(); // Text markieren für einfaches Überschreiben
+                }, 50);
+            }
+
+            mainOrderNumberInputEl.addEventListener('dblclick', enableManualInput);
+            huListTextareaEl.addEventListener('dblclick', enableManualInput);
+
+            // Event Listener für HU-Import
+            importHuListButtonEl.addEventListener('click', () => {
+                sideMenuEl.classList.remove('open');
+                menuOverlayEl.classList.remove('visible');
+
+                // HIER die Zurücksetzung hinzufügen
+                mainOrderNumberInputEl.inputMode = 'none';
+                huListTextareaEl.inputMode = 'none';
+
+                mainOrderNumberInputEl.value = '';
+                huListTextareaEl.value = '';
+                importHuModalEl.classList.add('visible');
+                mainOrderNumberInputEl.focus();
+            });
+            // --- ENDE: Doppelklick-Logik ---
+        // --- Event Listener Setup ---
+        // --- Event Listener Setup ---
+        function setupEventListeners() {
+            mainActionButtonEl.addEventListener('click', () => {
+                clearError();
+                removeActiveInlineNoteEditor();
+                if (isBatchModeActive) {
+                    addToBatch();
+                } else {
+                    if (newTotalSectionEl.classList.contains('visible')) return; // Warten auf Total-Eingabe
+                    const rawInput = shipmentNumberInputEl.value;
+                    const status = securityStatusSelectEl.value;
+                    const isCombination = comboCheckboxEl.checked;
+                    const result = processAndSaveSingleScan(rawInput, status, isCombination);
+                    if (!result.waitingForTotal) {
+                        if (result.success) {
+                            renderTable();
+                            displayCurrentShipmentDetails(processShipmentNumber(rawInput).baseNumber);
+                            shipmentNumberInputEl.value = '';
+                            updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
+                            displayError(result.message, 'green', 2000);
+                        } else {
+                            displayError(result.message);
+                        }
+                        focusShipmentInput();
+                    } else { // Warten auf Gesamtstückzahl
+                        displayError(result.message, 'orange');
+                        // Fokus ist auf newTotalInputEl
+                    }
+                }
+            });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            shipmentNumberInputEl.addEventListener('input', () => {
+                const currentValue = shipmentNumberInputEl.value.trim();
+
+                // --- START: NEUE LOGIK FÜR MULTI-QR-CODE ---
+                if (currentValue.startsWith('FRT_MULTI_V1')) {
+                    if (!confirm("Ein Multi-Auftrags-QR-Code wurde erkannt.\n\nMöchtest du alle darin enthaltenen Aufträge und HUs jetzt importieren?")) {
+                        shipmentNumberInputEl.value = '';
+                        return;
+                    }
+
+                    const parts = currentValue.split(';;;');
+                    parts.shift(); // Entfernt den Header 'FRT_MULTI_V1'
+
+                    const shipments = loadShipments();
+                    const now = new Date().toISOString();
+                    let totalAddedCount = 0;
+                    let totalDuplicateCount = 0;
+                    let processedOrders = [];
+
+                    parts.forEach(orderData => {
+                        const [orderNumber, huData] = orderData.split('|||');
+                        if (!orderNumber || !huData) return;
+
+                        processedOrders.push(orderNumber);
+                        const hus = huData.split(' ');
+                        let addedCount = 0;
+                        let duplicateCount = 0;
+
+                        if (!shipments[orderNumber]) {
+                            shipments[orderNumber] = {
+                                hawb: orderNumber,
+                                lastModified: now,
+                                totalPiecesExpected: hus.length,
+                                scannedItems: [],
+                                mitarbeiter: MITARBEITER_NAME,
+                                isHuListOrder: true
+                            };
+                            hus.forEach(hu => {
+                                shipments[orderNumber].scannedItems.push({ rawInput: hu, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null });
+                                addedCount++;
+                            });
+                        } else {
+                            if (shipments[orderNumber].isHuListOrder) {
+                                hus.forEach(hu => {
+                                    if (!shipments[orderNumber].scannedItems.find(item => item.rawInput.toUpperCase() === hu.toUpperCase())) {
+                                        shipments[orderNumber].scannedItems.push({ rawInput: hu, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null });
+                                        addedCount++;
+                                    } else {
+                                        duplicateCount++;
+                                    }
+                                });
+                                if (addedCount > 0) {
+                                    shipments[orderNumber].lastModified = now;
+                                    shipments[orderNumber].totalPiecesExpected += addedCount;
+                                }
+                            }
+                        }
+                        totalAddedCount += addedCount;
+                        totalDuplicateCount += duplicateCount;
+                    });
+
+                    saveShipments(shipments);
+                    renderTable();
+                    shipmentNumberInputEl.value = '';
+                    updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
+
+                    alert(`Multi-Import abgeschlossen:\n- Verarbeitete Aufträge: ${processedOrders.length}\n- Neue HUs hinzugefügt: ${totalAddedCount}\n- Duplikate übersprungen: ${totalDuplicateCount}`);
+                    return;
+                }
+                // --- ENDE: NEUE LOGIK FÜR MULTI-QR-CODE ---
+
+
+
+
+
+
+
+
+
+                updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
+
+                if (isBatchModeActive) {
+                    if (currentValue.length > 0) mainActionButtonEl.click();
+                    return;
+                }
+
+                // --- START: KORRIGIERTE LOGIK FÜR DIE DETAILANZEIGE ---
+                const shipments = loadShipments();
+                const { baseNumber: processedDirectBase } = processShipmentNumber(currentValue);
+                let baseNumberToShow = null;
+
+                // Priorität 1: Ist die Eingabe eine bekannte HU-Nummer?
+                const parentHawbByHu = findShipmentByHuNumber(currentValue);
+                if (parentHawbByHu) {
+                    baseNumberToShow = parentHawbByHu;
+                    displayError(`HU '${escapeHtml(currentValue)}' gehört zu Auftrag: ${escapeHtml(baseNumberToShow)}`, 'blue', 3500);
+                } 
+                // Priorität 2: Ist die Eingabe eine bekannte HAWB?
+                else if (shipments[processedDirectBase.toUpperCase()]) {
+                    baseNumberToShow = processedDirectBase.toUpperCase();
+                    clearError();
+                } 
+                // Priorität 3: Ist die Eingabe eine Notiz?
+                else if (currentValue.length > 3) {
+                    const parentHawbByNote = findShipmentByNoteContent(currentValue);
+                    if (parentHawbByNote) {
+                        baseNumberToShow = parentHawbByNote;
+                        displayError(`Notiz '${escapeHtml(currentValue)}' gefunden für HAWB: ${escapeHtml(baseNumberToShow)}`, 'blue', 3500);
+                    }
+                }
+
+                // Detailansicht aktualisieren: Entweder mit der gefundenen HAWB oder dem, was getippt wurde (für neue Sendungen)
+                displayCurrentShipmentDetails(baseNumberToShow || processedDirectBase);
+                filterTable(baseNumberToShow || currentValue);
+                // --- ENDE: KORRIGIERTE LOGIK FÜR DIE DETAILANZEIGE ---
+            });
+
+            clearInputButtonEl.addEventListener('click', () => {
+                shipmentNumberInputEl.value = '';
+                updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
+                clearError();
+                displayCurrentShipmentDetails('');
+                filterTable('');
+                resetSingleScanNoteInputState();
+                updateNoteAndComboVisibility();
+                focusShipmentInput();
+            });
+        shipmentNumberInputEl.addEventListener('blur', () => {
+                if (isBatchModeActive) {
+                    setTimeout(focusShipmentInput, 10);
+                }
+            });
+            securityStatusSelectEl.addEventListener('change', () => {
+                updateNoteAndComboVisibility();
+                focusShipmentInput();
+            });
+            comboCheckboxEl.addEventListener('change', focusShipmentInput);
+
+
+            noteToggleButtonEl.addEventListener('click', () => {
+                const isVisible = noteInputContainerEl.style.display === 'block';
+                noteInputContainerEl.style.display = isVisible ? 'none' : 'block';
+                if (!isVisible) noteInputEl.focus(); else focusShipmentInput();
+            });
+        
+            noteInputEl.addEventListener('input', () => {
+                const noteValue = noteInputEl.value.trim();
+                noteToggleButtonEl.classList.toggle('note-active', noteValue !== '');
+                updateClearButtonVisibility(noteInputEl, clearNoteButtonEl);
+
+                const suggestions = document.getElementById('noteSuggestions').options;
+                let isSuggestionSelected = false;
+                for (let i = 0; i < suggestions.length; i++) {
+                    if (suggestions[i].value === noteInputEl.value) {
+                        isSuggestionSelected = true;
+                        break;
+                    }
+                }
+
+                if (isSuggestionSelected) {
+                    focusShipmentInput();
+                }
+            });
+            clearNoteButtonEl.addEventListener('click', () => {
+                resetSingleScanNoteInputState();
+                focusShipmentInput();
+            });
+
+      currentDetailsDivEl.addEventListener('click', (event) => {
+            const target = event.target;
+            event.preventDefault();
+
+            if (target.classList.contains('editable-note') || target.classList.contains('add-note-link')) {
+                showInlineNoteEditor(target);
+            } else if (target.classList.contains('inline-note-save-btn')) {
+                const editorDiv = target.closest('.inline-note-editor');
+                if (editorDiv) {
+                    const inputField = editorDiv.querySelector('.inline-note-input');
+                    const noteIndex = target.dataset.noteIndex;
+                    saveOrUpdateNote(target.dataset.basenumber, target.dataset.timestamp, noteIndex, inputField.value);
+                }
+            } else if (target.classList.contains('inline-note-cancel-btn')) {
+                removeActiveInlineNoteEditor();
+                focusShipmentInput();
+            } else if (target.classList.contains('cancel-button')) {
+                requestCancelScanItem(target.dataset.basenumber, target.dataset.timestamp);
+            } else if (target.classList.contains('delete-note-btn')) {
+                requestDeleteNote(target.dataset.basenumber, target.dataset.timestamp, target.dataset.noteIndex);
+            }
+        });
+
+            tableBodyEl.addEventListener('click', (event) => {
+                const target = event.target;
+                const baseNumber = target.dataset.basenumber;
+                if (!baseNumber) return;
+
+                if (target.classList.contains('edit-btn') && !isBatchModeActive) {
+                    openEditModal(baseNumber);
+                } else if (target.classList.contains('pdf-btn')) {
+                    generatePdf(baseNumber);
+                } else if (target.classList.contains('main-delete-btn')) {
+                    if (confirm(`Sendung ${escapeHtml(baseNumber)} wirklich löschen?`)) {
+                        deleteShipment(baseNumber);
+                    }
+                }
+            });
+            
+            // Modals
+            saveEditButtonEl.addEventListener('click', saveShipmentChangesFromModal);
+            cancelEditButtonEl.addEventListener('click', closeEditModal);
+            editModalEl.addEventListener('click', (e) => { if (e.target === editModalEl) closeEditModal(); });
+
+            confirmNewTotalBtnEl.addEventListener('click', () => completeNewShipmentSave(newTotalInputEl.value));
+            skipNewTotalBtnEl.addEventListener('click', () => completeNewShipmentSave(null));
+            newTotalInputEl.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); confirmNewTotalBtnEl.click(); }});
+
+            // Batch Modus
+            batchModeToggleEl.addEventListener('change', (e) => toggleBatchMode(e.target.checked));
+            saveBatchButtonEl.addEventListener('click', saveBatch);
+            clearBatchButtonEl.addEventListener('click', () => {
+                if (currentBatch.length > 0 && confirm("Aktuellen Batch wirklich leeren?")) {
+                    currentBatch = [];
+                    isBatchNotePromptRequired = true;
+                    updateBatchUI(); clearError(); displayCurrentShipmentDetails('');
+                } else if (currentBatch.length === 0) {
+                    displayError("Batch ist bereits leer.");
+                }
+                focusShipmentInput();
+            });
+            confirmBatchNoteButtonEl.addEventListener('click', confirmAndAddFirstBatchItemWithNote);
+            skipBatchNoteButtonEl.addEventListener('click', skipNoteAndAddFirstBatchItem);
+            batchNoteInputEl.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); confirmBatchNoteButtonEl.click(); }});
+            batchNoteModalEl.addEventListener('click', (e) => { if (e.target === batchNoteModalEl) skipNoteAndAddFirstBatchItem(); });
+
+            // Seitenmenü
+            menuToggleBtnEl.addEventListener('click', (e) => { e.stopPropagation(); sideMenuEl.classList.contains('open') ? closeSideMenu() : openSideMenu(); });
+            menuOverlayEl.addEventListener('click', closeSideMenu);
+            sendToSheetButtonEl.addEventListener('click', sendDataToSheet);
+            resetDataButtonEl.addEventListener('click', () => {
+                removeActiveInlineNoteEditor();
+                if (confirm("WARNUNG!\n\nMöchtest du wirklich ALLE erfassten Sendungsdaten unwiderruflich löschen?")) {
+                    localStorage.removeItem(LOCAL_STORAGE_KEY);
+                    renderTable(); displayCurrentShipmentDetails(''); clearError(); shipmentNumberInputEl.value = '';
+                    resetSingleScanNoteInputState(); updateNoteAndComboVisibility(); updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
+                    if (isBatchModeActive) { currentBatch = []; currentBatchGlobalNote = null; isBatchNotePromptRequired = true; updateBatchUI(); }
+                    sessionFirstSuffixScans = {}; notifiedCompletions = new Set();
+                    sheetStatusEl.textContent = 'Alle Daten zurückgesetzt.'; sheetStatusEl.style.color = 'green';
+                    setTimeout(closeSideMenu, 1500);
+                } else {
+                    sheetStatusEl.textContent = 'Zurücksetzen abgebrochen.'; sheetStatusEl.style.color = 'blue';
+                    setTimeout(() => { if (sheetStatusEl.textContent.includes('abgebrochen')) sheetStatusEl.textContent = ''; }, 3000);
+                }
+            });
+            sendSummaryEmailButtonEl.addEventListener('click', sendSummaryEmail);
+
+            // Double-Click auf Input für manuelle Eingabe (optional)
+            shipmentNumberInputEl.addEventListener('dblclick', () => {
+                 if (!isBatchModeActive && !editModalEl.classList.contains('visible') && !batchNoteModalEl.classList.contains('visible')) {
+                    shipmentNumberInputEl.inputMode = 'text';
+                    setTimeout(() => shipmentNumberInputEl.focus(), 0);
+                 }
+            });
+
+            // --- START: Event Listener für HU-Import (enthält Tastatur-Logik) ---
+            importHuListButtonEl.addEventListener('click', () => {
+                sideMenuEl.classList.remove('open');
+                menuOverlayEl.classList.remove('visible');
+
+                // Inputmode für Scanner zurücksetzen
+                mainOrderNumberInputEl.inputMode = 'none';
+                huListTextareaEl.inputMode = 'none';
+
+                mainOrderNumberInputEl.value = '';
+                huListTextareaEl.value = '';
+                importHuModalEl.classList.add('visible');
+                mainOrderNumberInputEl.focus();
+            });
+
+            mainOrderNumberInputEl.addEventListener('input', (event) => {
+                const scannedText = event.target.value;
+
+                // Fall 1: Der QR-Code mit allen Daten wird gescannt
+                if (scannedText.includes('|||')) {
+                    const parts = scannedText.split('|||');
+                    const orderNumber = parts[0];
+                    const huString = parts[1];
+                    mainOrderNumberInputEl.value = orderNumber;
+                    huListTextareaEl.value = huString;
+                    // Fokus auf die Textarea setzen, damit der User ggf. weiter scannen oder speichern kann
+                    huListTextareaEl.focus();
+                    return; // Wichtig: Verarbeitung hier beenden
+                }
+                
+                // --- START DER NEUEN LOGIK ---
+                // Fall 2: Nur die Auftragsnummer wird gescannt (kein QR-Code)
+                // Wir prüfen, ob der inputmode 'none' ist, um sicherzustellen, dass es ein Scan war
+                // und der Text eine gewisse Länge hat, um Fehlauslösungen zu vermeiden.
+                if (mainOrderNumberInputEl.inputMode === 'none' && scannedText.length > 5) {
+                    // Fokus auf das nächste Feld (die Textarea) setzen
+                    huListTextareaEl.focus();
+                }
+                // --- ENDE DER NEUEN LOGIK ---
+            });
+
+            cancelHuImportButtonEl.addEventListener('click', () => {
+                importHuModalEl.classList.remove('visible');
+                focusShipmentInput();
+            });
+
+
+            // --- Doppelklick-Logik für manuelle Eingabe im HU-Modal ---
+            mainOrderNumberInputEl.addEventListener('dblclick', () => {
+                mainOrderNumberInputEl.inputMode = 'text';
+                mainOrderNumberInputEl.focus();
+            });
+
+            huListTextareaEl.addEventListener('dblclick', () => {
+                huListTextareaEl.inputMode = 'text';
+                huListTextareaEl.focus();
+            });
+
+            // --- HIER IST DER NEUE BLOCK ---
+            // Automatischer Zeilenumbruch beim Scannen in der Textarea
+            huListTextareaEl.addEventListener('input', () => {
+                if (huListTextareaEl.inputMode === 'none') {
+                    huListTextareaEl.value += '\n';
+                    huListTextareaEl.scrollTop = huListTextareaEl.scrollHeight;
+                }
+            });
+            // --- ENDE DES NEUEN BLOCKS ---
+        } // Ende der setupEventListeners Funktion
+                    // Wiederverwendbare Funktion zum Speichern der HU-Liste
+            function saveAndProcessHuListData() {
+                const mainOrderNumber = mainOrderNumberInputEl.value.trim().toUpperCase();
+                const huListText = huListTextareaEl.value.trim();
+
+                if (!mainOrderNumber || !huListText) {
+                    alert("Bitte Auftragsnummer und mindestens eine HU-Nummer eingeben.");
+                    return { success: false };
+                }
+                const hus = huListText.split(/[\s\n\r]+/).map(hu => hu.trim().toUpperCase()).filter(hu => hu.length > 0);
+                if (hus.length === 0) {
+                    alert("Keine gültigen HU-Nummern in der Liste gefunden.");
+                    return { success: false };
+                }
+
+                const shipments = loadShipments();
+                const now = new Date().toISOString();
+                let addedCount = 0;
+                let duplicateCount = 0;
+
+                if (!shipments[mainOrderNumber]) {
+                    shipments[mainOrderNumber] = {
+                        hawb: mainOrderNumber, lastModified: now, totalPiecesExpected: hus.length,
+                        scannedItems: [], mitarbeiter: MITARBEITER_NAME, isHuListOrder: true
+                    };
+                    hus.forEach(hu => {
+                        shipments[mainOrderNumber].scannedItems.push({ rawInput: hu, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null });
+                        addedCount++;
+                    });
+                } else {
+                    if (!shipments[mainOrderNumber].isHuListOrder) {
+                        alert(`FEHLER: ${mainOrderNumber} ist eine normale Sendung. Sie kann nicht mit einer HU-Liste erweitert werden.`);
+                        return { success: false };
+                    }
+                    hus.forEach(hu => {
+                        if (!shipments[mainOrderNumber].scannedItems.find(item => item.rawInput.toUpperCase() === hu)) {
+                            shipments[mainOrderNumber].scannedItems.push({ rawInput: hu, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null });
+                            addedCount++;
+                        } else { duplicateCount++; }
+                    });
+                    if (addedCount > 0) {
+                        shipments[mainOrderNumber].lastModified = now;
+                        shipments[mainOrderNumber].totalPiecesExpected += addedCount;
+                    }
+                }
+
+                saveShipments(shipments);
+                renderTable();
+                
+                let message = '';
+                let messageType = 'green';
+                if (addedCount > 0 && duplicateCount === 0) {
+                    message = `${addedCount} neue HU(s) zum Auftrag ${mainOrderNumber} hinzugefügt.`;
+                } else if (addedCount > 0 && duplicateCount > 0) {
+                    message = `${addedCount} neue HU(s) hinzugefügt, ${duplicateCount} Duplikate übersprungen.`;
+                    messageType = 'orange';
+                } else if (addedCount === 0 && duplicateCount > 0) {
+                    alert(`Import für ${mainOrderNumber}:\n\nKeine neuen HUs gefunden. Alle ${duplicateCount} eingegebenen HUs sind bereits im Auftrag vorhanden.`);
+                }
+                
+                return { success: true, message: message, messageType: messageType, baseNumber: mainOrderNumber };
+            }
+
+            // Listener für den "Importieren & Speichern"-Button (schließt das Modal)
+            saveHuListButtonEl.addEventListener('click', () => {
+                const result = saveAndProcessHuListData();
+                if (result.success) {
+                    displayCurrentShipmentDetails(result.baseNumber);
+                    importHuModalEl.classList.remove('visible');
+                    if (result.message) {
+                        displayError(result.message, result.messageType, 5000);
+                    }
+                    focusShipmentInput();
+                }
+            });
+
+            // Listener für den neuen "+"-Button (speichert und leert die Felder)
+            addAndContinueHuButtonEl.addEventListener('click', () => {
+                const result = saveAndProcessHuListData();
+                if (result.success) {
+                    displayCurrentShipmentDetails(result.baseNumber);
+                    if (result.message) {
+                       displayError(result.message, result.messageType, 5000);
+                    }
+                    // Felder für die nächste Eingabe leeren
+                    mainOrderNumberInputEl.value = '';
+                    huListTextareaEl.value = '';
+                    mainOrderNumberInputEl.focus();
+                }
+            });
+
+        // --- Initialisierung ---
+        function initializeApp() {
+            renderTable();
+            isBatchModeActive = batchModeToggleEl.checked; // Zustand vom Toggle übernehmen
+            sessionFirstSuffixScans = {}; // Reset bei jedem Laden
+            notifiedCompletions = new Set(); // Reset bei jedem Laden
+            
+            resetSingleScanNoteInputState();
+            toggleBatchMode(isBatchModeActive); // Initial Batch Mode anwenden (setzt auch Flags)
+            // displayCurrentShipmentDetails(''); // Start mit leerem Details-Bereich
+            updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
+            updateClearButtonVisibility(noteInputEl, clearNoteButtonEl);
+            updateCurrentBatchNoteDisplay(); // Initial Batch Notiz (leer)
+
+            setupEventListeners();
+            focusShipmentInput();
+            console.log(`Fracht Tracker ${document.title.split('(')[1].split(')')[0]} initialized.`);
+        }
+
+        initializeApp();
+    });
+
+// Screen Orientation Lock (optional, mit geringer Erfolgschance ohne User Interaktion)
+/*
+function attemptLockOrientation() {
+  if (screen.orientation && typeof screen.orientation.lock === 'function') {
+    screen.orientation.lock(screen.orientation.type)
+      .then(() => console.log('Bildschirmausrichtung gesperrt: ' + screen.orientation.type))
+      .catch((error) => console.error('Sperren der Bildschirmausrichtung fehlgeschlagen:', error));
+  } else { console.warn('Screen Orientation Lock API nicht unterstützt.'); }
+}
+// window.addEventListener('load', attemptLockOrientation);
+*/
+</script>
+
+</body>
+</html>Fracht Tracker (V8.18 - Refactored)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
 <style>
