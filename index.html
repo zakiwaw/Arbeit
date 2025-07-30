@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -918,67 +919,76 @@ function calculateGoodsReceiptCount(scannedItems) {
             }
         }
 
-
-
-
-
-
         function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFromCheckbox) {
             const { baseNumber, suffix, isValidFormat, raw: processedRawInput, isSuffixFormat } = processShipmentNumber(rawInputToSave);
             if (!isValidFormat) { return { success: false, waitingForTotal: false, message: `Ungültiges Format: ${escapeHtml(rawInputToSave)}` }; }
 
             // --- 1. PRÜFUNG: IST ES EINE BEKANNTE HU-NUMMER IN EINEM HU-AUFTRAG? ---
+            const shipments = loadShipments();
             const parentHawb = findShipmentByHuNumber(processedRawInput);
             if (parentHawb) {
-                // JA, es ist eine HU -> Strenge HU-Regeln anwenden
-                const shipments = loadShipments();
                 const parentShipment = shipments[parentHawb];
-                const isNewScanKombi = (statusToUse === 'XRY' && isCombinationFromCheckbox);
-
-                // --- START DER KORREKTUR ---
-                // Gilt nur, wenn der neue Status ein exklusiver Sicherheitsstatus ist.
-                if (EXCLUSIVE_SECURITY_STATUSES.includes(statusToUse) && !isNewScanKombi) {
-                    // 1. Zähle, wie oft diese HU insgesamt im Auftrag erwartet wird.
-                    const totalAllowedInstances = parentShipment.scannedItems.filter(
-                        item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase()
-                    ).length;
-
-                    // 2. Zähle, wie viele dieser Instanzen bereits einen exklusiven Sicherheitsstatus haben.
-                    const currentSecurityScans = parentShipment.scannedItems.filter(
-                        item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() &&
-                               !item.isCancelled &&
-                               EXCLUSIVE_SECURITY_STATUSES.includes(item.status) &&
-                               !item.isCombination
-                    ).length;
-
-                    // 3. Wenn die Anzahl der bereits gesicherten Instanzen die Gesamtanzahl erreicht, blockiere.
-                    if (currentSecurityScans >= totalAllowedInstances) {
-                        return { success: false, waitingForTotal: false, message: `FEHLER: Alle (${totalAllowedInstances}) Packstücke für HU ${escapeHtml(processedRawInput)} haben bereits einen Sicherheitsstatus.` };
-                    }
-                }
-                // --- ENDE DER KORREKTUR ---
-
-                // Finde den Index des ERSTEN verfügbaren 'Anstehend'-Eintrags für diese HU
-                const anstehendIndex = parentShipment.scannedItems.findIndex(i => 
-                    i.rawInput.toUpperCase() === processedRawInput.toUpperCase() && 
-                    i.status === 'Anstehend'
-                );
-
-                if (anstehendIndex === -1) {
-                    return { success: false, waitingForTotal: false, message: `FEHLER: Alle erwarteten Packstücke für HU ${escapeHtml(processedRawInput)} wurden bereits erfasst.` };
-                }
-
-                // Den gefundenen 'Anstehend'-Eintrag direkt aktualisieren
-                const itemToUpdate = parentShipment.scannedItems[anstehendIndex];
                 const now = new Date();
                 const noteText = noteInputEl.value.trim() || null;
+                const isNewScanKombi = (statusToUse === 'XRY' && isCombinationFromCheckbox);
+                const isSecurityStatus = EXCLUSIVE_SECURITY_STATUSES.includes(statusToUse);
 
-                itemToUpdate.status = statusToUse;
-                itemToUpdate.timestamp = now.toISOString();
-                itemToUpdate.isCombination = isNewScanKombi;
-                itemToUpdate.notes = noteText ? [noteText] : [];
-                itemToUpdate.isCancelled = false;
-                itemToUpdate.cancelledTimestamp = null;
+                if (isSecurityStatus) {
+                    // LOGIK FÜR SICHERHEITSSTATUS: "Anstehend" wird gesucht und ersetzt.
+                    if (!isNewScanKombi) {
+                        const totalAllowedInstances = parentShipment.scannedItems.filter(item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase()).length;
+                        const currentSecurityScans = parentShipment.scannedItems.filter(
+                            item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() &&
+                                   !item.isCancelled &&
+                                   EXCLUSIVE_SECURITY_STATUSES.includes(item.status) &&
+                                   !item.isCombination
+                        ).length;
+                        if (currentSecurityScans >= totalAllowedInstances) {
+                            return { success: false, waitingForTotal: false, message: `FEHLER: Alle (${totalAllowedInstances}) Packstücke für HU ${escapeHtml(processedRawInput)} haben bereits einen Sicherheitsstatus.` };
+                        }
+                    }
+
+                    const anstehendIndex = parentShipment.scannedItems.findIndex(i => 
+                        i.rawInput.toUpperCase() === processedRawInput.toUpperCase() && 
+                        i.status === 'Anstehend'
+                    );
+
+                    if (anstehendIndex === -1) {
+                        return { success: false, waitingForTotal: false, message: `FEHLER: Alle erwarteten Packstücke für HU ${escapeHtml(processedRawInput)} wurden bereits final erfasst.` };
+                    }
+                    
+                    const itemToUpdate = parentShipment.scannedItems[anstehendIndex];
+                    itemToUpdate.status = statusToUse;
+                    itemToUpdate.timestamp = now.toISOString();
+                    itemToUpdate.isCombination = isNewScanKombi;
+                    itemToUpdate.notes = noteText ? [noteText] : [];
+                    itemToUpdate.isCancelled = false;
+                    itemToUpdate.cancelledTimestamp = null;
+
+                } else {
+                    // LOGIK FÜR INFORMATORISCHE STATUS (z.B. Dunkelalarm): Es wird ein NEUER Eintrag hinzugefügt, ABER MIT LIMIT.
+                    const totalExpectedInstances = parentShipment.scannedItems.filter(
+                        item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() && 
+                               (item.status === 'Anstehend' || EXCLUSIVE_SECURITY_STATUSES.includes(item.status))
+                    ).length;
+
+                    const currentStatusCount = parentShipment.scannedItems.filter(
+                        item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() &&
+                               item.status === statusToUse &&
+                               !item.isCancelled
+                    ).length;
+
+                    if (currentStatusCount >= totalExpectedInstances) {
+                        return { success: false, waitingForTotal: false, message: `Limit erreicht: Status '${escapeHtml(statusToUse)}' kann für HU ${escapeHtml(processedRawInput)} nicht erneut vergeben werden.` };
+                    }
+                    
+                    const newItem = {
+                        rawInput: processedRawInput, status: statusToUse, timestamp: now.toISOString(),
+                        isCombination: isNewScanKombi, notes: noteText ? [noteText] : [],
+                        isCancelled: false, cancelledTimestamp: null
+                    };
+                    parentShipment.scannedItems.push(newItem);
+                }
                 
                 parentShipment.lastModified = now.toISOString();
                 saveShipments(shipments);
@@ -988,8 +998,6 @@ function calculateGoodsReceiptCount(scannedItems) {
             }
 
             // --- 2. LOGIK: ES IST EINE NORMALE SENDUNG (KEINE BEKANNTE HU) ---
-            const shipments = loadShipments();
-
             // Sicherheits-Check: Verhindern, dass eine Haupt-Auftragsnummer direkt gescannt wird
             if (shipments[baseNumber] && shipments[baseNumber].isHuListOrder) {
                 return { success: false, waitingForTotal: false, message: `FEHLER: ${baseNumber} ist ein HU-Auftrag. Bitte scannen Sie eine der zugehörigen HU-Nummern.` };
@@ -1015,15 +1023,12 @@ function calculateGoodsReceiptCount(scannedItems) {
             const existingNonCancelled = (shipment.scannedItems || []).filter(item => !item.isCancelled);
             const isCombination = (statusToUse === 'XRY' && isCombinationFromCheckbox);
 
-            // --- START: NEUE PRÜFUNG FÜR XRY KOMBI LIMIT ---
-            // Gilt nur für normale Sendungen (nicht HU-Listen) mit gesetzter Stückzahl, wenn ein neuer Kombi-Scan hinzukommt.
             if (isCombination && !shipment.isHuListOrder && expectedTotal !== null) {
                 const xryKombiCount = calculateXryKombiCount(existingNonCancelled);
                 if (xryKombiCount >= expectedTotal) {
                     return { success: false, waitingForTotal: false, message: `Limit (${expectedTotal}) für XRY Kombi bei ${baseNumber} erreicht.` };
                 }
             }
-            // --- ENDE: NEUE PRÜFUNG FÜR XRY KOMBI LIMIT ---
 
             if (statusToUse === 'Wareneingang' && expectedTotal !== null && calculateGoodsReceiptCount(existingNonCancelled) >= expectedTotal) {
                 return { success: false, waitingForTotal: false, message: `Limit (${expectedTotal}) für Wareneingang bei ${baseNumber} erreicht.` };
@@ -1032,24 +1037,18 @@ function calculateGoodsReceiptCount(scannedItems) {
                 return { success: false, waitingForTotal: false, message: `Limit (${expectedTotal}) für normale Scans bei ${baseNumber} erreicht.` };
             }
 
-            // Wenn Limit nicht erreicht, neuen Scan-Eintrag hinzufügen
             const now = new Date();
             const noteText = noteInputEl.value.trim() || null;
             const newItem = {
-                rawInput: processedRawInput,
-                status: statusToUse,
-                timestamp: now.toISOString(),
-                isCombination,
-                notes: noteText ? [noteText] : [],
-                isCancelled: false,
-                cancelledTimestamp: null
+                rawInput: processedRawInput, status: statusToUse, timestamp: now.toISOString(),
+                isCombination, notes: noteText ? [noteText] : [],
+                isCancelled: false, cancelledTimestamp: null
             };
             shipment.scannedItems.push(newItem);
             shipment.lastModified = now.toISOString();
             saveShipments(shipments);
             resetSingleScanNoteInputState();
 
-            // Notification-Logik für abgeschlossene Sendungen
             const updatedShipment = loadShipments()[baseNumber];
             if (updatedShipment) {
                 const finalCount = calculateCurrentCountedPieces(updatedShipment.scannedItems);
@@ -1457,56 +1456,76 @@ function calculateGoodsReceiptCount(scannedItems) {
                 // 1. PRÜFUNG: Ist der Scan eine bekannte HU in einem HU-Auftrag?
                 const parentHawb = findShipmentByHuNumber(rawInputFromBatch);
                 if (parentHawb) {
-                    // JA, es ist eine HU.
                     const parentShipment = shipmentsWorkingCopy[parentHawb];
                     const isNewScanKombi = (batchStatus === 'XRY' && batchIsCombination);
+                    const isSecurityStatus = EXCLUSIVE_SECURITY_STATUSES.includes(batchStatus);
 
-                    // --- START DER KORREKTUR ---
-                    if (EXCLUSIVE_SECURITY_STATUSES.includes(batchStatus) && !isNewScanKombi) {
-                        const totalAllowedInstances = parentShipment.scannedItems.filter(
-                            item => item.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase()
-                        ).length;
-                        const currentSecurityScans = parentShipment.scannedItems.filter(
-                            item => item.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() &&
-                                   !item.isCancelled &&
-                                   EXCLUSIVE_SECURITY_STATUSES.includes(item.status) &&
-                                   !item.isCombination
-                        ).length;
-
-                        if (currentSecurityScans >= totalAllowedInstances) {
-                            errorCount++;
-                            errorMessages.push(`Alle Packstücke für HU ${rawInputFromBatch} haben bereits einen Sicherheitsstatus.`);
-                            return; // Zum nächsten Batch-Item
+                    if (isSecurityStatus) {
+                        // LOGIK FÜR SICHERHEITSSTATUS: "Anstehend" wird gesucht und ersetzt.
+                        if (!isNewScanKombi) {
+                            const totalAllowedInstances = parentShipment.scannedItems.filter(item => item.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase()).length;
+                            const currentSecurityScans = parentShipment.scannedItems.filter(
+                                item => item.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() &&
+                                       !item.isCancelled &&
+                                       EXCLUSIVE_SECURITY_STATUSES.includes(item.status) &&
+                                       !item.isCombination
+                            ).length;
+                            if (currentSecurityScans >= totalAllowedInstances) {
+                                errorCount++;
+                                errorMessages.push(`Alle Packstücke für HU ${rawInputFromBatch} haben bereits einen Sicherheitsstatus.`);
+                                return;
+                            }
                         }
-                    }
-                    // --- ENDE DER KORREKTUR ---
 
-                    // Finde den Index des ERSTEN verfügbaren 'Anstehend'-Eintrags für diese HU
-                    const anstehendIndex = parentShipment.scannedItems.findIndex(i => 
-                        i.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() && 
-                        i.status === 'Anstehend'
-                    );
+                        const anstehendIndex = parentShipment.scannedItems.findIndex(i => 
+                            i.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() && 
+                            i.status === 'Anstehend'
+                        );
 
-                    if (anstehendIndex === -1) {
-                        errorCount++;
-                        errorMessages.push(`Alle Packstücke für HU ${rawInputFromBatch} bereits erfasst.`);
-                        return; // Zum nächsten Batch-Item
+                        if (anstehendIndex === -1) {
+                            errorCount++;
+                            errorMessages.push(`Alle Packstücke für HU ${rawInputFromBatch} bereits final erfasst.`);
+                            return;
+                        }
+                        
+                        const itemToUpdate = parentShipment.scannedItems[anstehendIndex];
+                        itemToUpdate.status = batchStatus;
+                        itemToUpdate.timestamp = scanTimestamp;
+                        itemToUpdate.isCombination = isNewScanKombi;
+                        itemToUpdate.notes = itemNote ? [itemNote] : [];
+                        itemToUpdate.isCancelled = false;
+                        itemToUpdate.cancelledTimestamp = null;
+                    } else {
+                        // LOGIK FÜR INFORMATORISCHE STATUS (z.B. Dunkelalarm): Es wird ein NEUER Eintrag hinzugefügt, ABER MIT LIMIT.
+                        const totalExpectedInstances = parentShipment.scannedItems.filter(
+                            item => item.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() &&
+                                   (item.status === 'Anstehend' || EXCLUSIVE_SECURITY_STATUSES.includes(item.status))
+                        ).length;
+
+                        const currentStatusCount = parentShipment.scannedItems.filter(
+                            item => item.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() &&
+                                   item.status === batchStatus &&
+                                   !item.isCancelled
+                        ).length;
+
+                        if (currentStatusCount >= totalExpectedInstances) {
+                            errorCount++;
+                            errorMessages.push(`Limit erreicht: Status '${batchStatus}' kann für HU ${rawInputFromBatch} nicht erneut vergeben werden.`);
+                            return;
+                        }
+
+                        const newScanItem = {
+                            rawInput: rawInputFromBatch, status: batchStatus, timestamp: scanTimestamp,
+                            isCombination: isNewScanKombi, notes: itemNote ? [itemNote] : [],
+                            isCancelled: false, cancelledTimestamp: null
+                        };
+                        parentShipment.scannedItems.push(newScanItem);
                     }
-                    
-                    // Den gefundenen 'Anstehend'-Eintrag direkt aktualisieren
-                    const itemToUpdate = parentShipment.scannedItems[anstehendIndex];
-                    itemToUpdate.status = batchStatus;
-                    itemToUpdate.timestamp = scanTimestamp;
-                    itemToUpdate.isCombination = isNewScanKombi;
-                    itemToUpdate.notes = itemNote ? [itemNote] : [];
-                    itemToUpdate.isCancelled = false;
-                    itemToUpdate.cancelledTimestamp = null;
                     
                     parentShipment.lastModified = scanTimestamp;
-                    
                     affectedBaseNumbersForNotification.add(parentHawb);
                     successCount++;
-                    return; // Wichtig: Zum nächsten Batch-Item springen
+                    return;
                 }
 
                 // --- ALTE LOGIK: Wenn es KEINE bekannte HU ist, behandle es als normale Sendung ---
@@ -1549,7 +1568,6 @@ function calculateGoodsReceiptCount(scannedItems) {
                 successCount++;
             });
 
-            // Speichern und UI-Update (dieser Teil bleibt unverändert)
             saveShipments(shipmentsWorkingCopy);
             affectedBaseNumbersForNotification.forEach(bn => {
                 const finalShipmentState = shipmentsWorkingCopy[bn];
@@ -2439,3 +2457,6 @@ function attemptLockOrientation() {
 
 </body>
 </html>
+
+
+
