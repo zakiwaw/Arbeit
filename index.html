@@ -309,16 +309,29 @@
 
     <div id="errorDisplay" class="error"></div>
 
+
+
     <div class="batch-area" id="batchArea">
         <h3>Aktueller Batch (<span id="batchModeStatusLabel"></span>)</h3>
         <div id="currentBatchNoteDisplay" style="font-style:italic;margin-bottom:5px;font-size:.9em"></div>
         <ul id="batchList"></ul>
         <div id="batchSummary">Anzahl im Batch: <span id="batchItemCount">0</span></div>
+        
+        <!-- HIER IST DER NEUE SWITCH -->
+        <div class="batch-note-toggle-container" style="display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 10px; font-size: 0.9em;">
+            <label for="batchNoteToggle" style="margin-bottom: 0; font-weight: normal;">Notiz-Popup aktivieren:</label>
+            <label class="batch-toggle-switch">
+                <input type="checkbox" id="batchNoteToggle">
+                <span class="batch-slider"></span>
+            </label>
+        </div>
+
         <div class="batch-action-buttons">
             <button id="saveBatchButton">Batch Speichern</button>
             <button id="clearBatchButton">Batch Leeren</button>
         </div>
     </div>
+
 
     <div id="currentShipmentDetails">Geben Sie eine Sendungsnummer ein...</div>
 
@@ -441,6 +454,7 @@
         const batchNoteInputEl = document.getElementById('batchNoteInput');
         const confirmBatchNoteButtonEl = document.getElementById('confirmBatchNoteButton');
         const skipBatchNoteButtonEl = document.getElementById('skipBatchNoteButton');
+const batchNoteToggleEl = document.getElementById('batchNoteToggle'); // <-- DIESE ZEILE HINZUFÜGEN
         const currentBatchNoteDisplayEl = document.getElementById('currentBatchNoteDisplay');
 	 const containerEl = document.querySelector('.container'); // <-- DIESE ZEILE HINZUFÜGEN
         const importHuListButtonEl = document.getElementById('importHuListButton');
@@ -727,40 +741,54 @@ function calculateGoodsReceiptCount(scannedItems) {
 
             let detailsHtml = `<strong>Details für ${escapeHtml(baseNumberToDisplay)}:</strong>`;
 
-            // --- START: ANGEPASSTE LOGIK ZUR ANZEIGE OFFENER HUs ---
-            if (shipment.isHuListOrder) {
-                const allScansForHuOrder = shipment.scannedItems || [];
-                const securedStatuses = ['XRY', 'ETD', 'EDD'];
 
-                // 1. Alle einzigartigen HU-Nummern im Auftrag ermitteln
-                const allHuNumbers = [...new Set(allScansForHuOrder.map(item => item.rawInput))];
 
-                // 2. Diejenigen HUs finden, die bereits einen Sicherheitsstatus haben (und nicht storniert sind)
-                const securedHus = new Set(
-                    allScansForHuOrder
-                        .filter(item => securedStatuses.includes(item.status) && !item.isCancelled)
-                        .map(item => item.rawInput)
-                );
+
+
+
+
+
+
+
+
+
+
+
+
+// --- START: ANGEPASSTE LOGIK ZUR ANZEIGE OFFENER HUs ---
+if (shipment.isHuListOrder) {
+const allScansForHuOrder = shipment.scannedItems || [];
+// Status, die eine HU als "bearbeitet" markieren und sie aus der offenen Liste entfernen.
+const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
+
+// 1. Alle einzigartigen HU-Nummern im Auftrag ermitteln (basierend auf allen Scans)
+            const allUniqueHuNumbers = [...new Set(allScansForHuOrder.map(item => item.rawInput))];
+
+            // 2. Diejenigen HUs finden, die bereits einen bearbeiteten Status haben (und nicht storniert sind)
+            const processedHus = new Set(
+                allScansForHuOrder
+                    .filter(item => processedStatuses.includes(item.status) && !item.isCancelled)
+                    .map(item => item.rawInput)
+            );
+            
+            // 3. Offene HUs sind alle, die NICHT in der Liste der bearbeiteten sind.
+            const pendingHuNumbers = allUniqueHuNumbers.filter(hu => !processedHus.has(hu));
+            
+            if (pendingHuNumbers.length > 0) {
+                const totalHus = shipment.totalPiecesExpected || allUniqueHuNumbers.length;
+                const securedCount = totalHus - pendingHuNumbers.length;
                 
-                // 3. Offene HUs sind alle Instanzen mit Status "Anstehend"
-                const pendingHuInstances = allScansForHuOrder.filter(item => item.status === 'Anstehend');
-                const pendingHuNumbers = pendingHuInstances.map(item => item.rawInput);
-                
-                if (pendingHuNumbers.length > 0) {
-                    const totalHus = shipment.totalPiecesExpected || allScansForHuOrder.length;
-                    const securedCount = totalHus - pendingHuNumbers.length;
-                    
-                    const listClass = (securedCount > 0) ? 'partial' : '';
+                const listClass = (securedCount > 0) ? 'partial' : '';
 
-                    detailsHtml += `<div id="pendingHuList" class="${listClass}">`;
-                    detailsHtml += `<h4>Offene HUs (${pendingHuNumbers.length} von ${totalHus}):</h4>`;
-                    detailsHtml += `<ul>`;
-                    pendingHuNumbers.forEach(hu => {
-                        detailsHtml += `<li>${escapeHtml(hu)}</li>`;
-                    });
-                    detailsHtml += `</ul></div>`;
-                }
+                detailsHtml += `<div id="pendingHuList" class="${listClass}">`;
+                detailsHtml += `<h4>Offene HUs (${pendingHuNumbers.length} von ${totalHus}):</h4>`;
+                detailsHtml += `<ul>`;
+                pendingHuNumbers.forEach(hu => {
+                    detailsHtml += `<li>${escapeHtml(hu)}</li>`;
+                });
+                detailsHtml += `</ul></div>`;
             }
+        }
             // --- ENDE: ANGEPASSTE LOGIK ZUR ANZEIGE OFFENER HUs ---
 
             const expected = shipment.totalPiecesExpected;
@@ -1268,7 +1296,6 @@ function calculateGoodsReceiptCount(scannedItems) {
             }
         }
 
-        // --- Batch Modus Logik ---
         function toggleBatchMode(activate) {
             isBatchModeActive = activate;
             clearError();
@@ -1291,6 +1318,7 @@ function calculateGoodsReceiptCount(scannedItems) {
                 securityStatusSelectEl.disabled = true;
                 comboCheckboxEl.disabled = true; // Auch Kombi-Checkbox im Batch sperren
                 
+                batchNoteToggleEl.checked = false; // <-- HIER IST DIE HINZUGEFÜGTE ZEILE
                 currentBatch = [];
                 currentBatchGlobalNote = null;
                 isBatchNotePromptRequired = true; // Batch-Notiz-Modal soll beim ersten Scan im neuen Batch kommen
@@ -1367,8 +1395,6 @@ function calculateGoodsReceiptCount(scannedItems) {
             if (!rawInputFromField) { focusShipmentInput(); return; }
 
             const upperRawInput = rawInputFromField.toUpperCase();
-            // Im Batch wird der Suffix nicht besonders behandelt (kein automatisches Ersetzen durch Basisnummer)
-            // Jeder Scan ist ein separater Eintrag.
             const { baseNumber, isValidFormat, raw: processedRawInput } = processShipmentNumber(upperRawInput);
              if (!isValidFormat) { // Basisvalidierung auch für Batch-Eingaben
                 displayError(`Ungültiges Format für Batch-Eingabe: ${escapeHtml(rawInputFromField)}`);
@@ -1378,18 +1404,21 @@ function calculateGoodsReceiptCount(scannedItems) {
 
             const scanTimestamp = new Date().toISOString();
 
-            if (isBatchModeActive && currentBatch.length === 0 && isBatchNotePromptRequired) {
+            // Diese Bedingung öffnet das Modal nur für den allerersten Scan, und nur wenn der Schalter an ist.
+            if (isBatchModeActive && currentBatch.length === 0 && isBatchNotePromptRequired && batchNoteToggleEl.checked) {
                 pendingFirstBatchScanData = { rawInput: processedRawInput, scanTimestamp: scanTimestamp };
-                batchNoteInputEl.value = currentBatchGlobalNote || ''; // Vorbelegen mit letzter Notiz oder leer
+                batchNoteInputEl.value = currentBatchGlobalNote || ''; 
                 batchNoteModalEl.classList.add('visible');
                 batchNoteInputEl.focus();
                 return;
             }
 
+            // Für JEDEN Scan (den ersten, wenn das Modal übersprungen wird, und alle folgenden)
+            // wird die aktuell gültige globale Batch-Notiz verwendet.
             const batchItem = {
                 rawInput: processedRawInput,
                 scanTimestamp: scanTimestamp,
-                note: currentBatchGlobalNote // Globale Batch-Notiz verwenden
+                note: currentBatchGlobalNote 
             };
             currentBatch.push(batchItem);
             updateBatchUI();
@@ -1398,13 +1427,25 @@ function calculateGoodsReceiptCount(scannedItems) {
             clearError();
             focusShipmentInput();
         }
+// --- ERSETZEN Sie die alte Funktion durch diese Version ---
 
         function confirmAndAddFirstBatchItemWithNote() {
-            currentBatchGlobalNote = batchNoteInputEl.value.trim() || null;
+            const newNote = batchNoteInputEl.value.trim() || null;
+            currentBatchGlobalNote = newNote; // Die globale Notiz für zukünftige Scans setzen
+
+            // *** DIE WICHTIGE NEUE LOGIK ***
+            // Wende die Notiz auf ALLE bereits vorhandenen Items im Batch an
+            currentBatch.forEach(item => {
+                item.note = newNote;
+            });
+            // *******************************
+
             isBatchNotePromptRequired = false; // Modal für diesen Batch behandelt
             batchNoteModalEl.classList.remove('visible');
-            updateCurrentBatchNoteDisplay(); // Anzeige aktualisieren
+            updateBatchUI(); // UI aktualisieren, um die Notizen bei allen Items anzuzeigen
+            batchNoteToggleEl.checked = false; // Schalter nach Benutzung immer deaktivieren
 
+            // Nur wenn ein Scan auf die Verarbeitung wartet, wird er hinzugefügt.
             if (pendingFirstBatchScanData) {
                 const batchItem = {
                     rawInput: pendingFirstBatchScanData.rawInput,
@@ -1413,7 +1454,7 @@ function calculateGoodsReceiptCount(scannedItems) {
                 };
                 currentBatch.push(batchItem);
                 pendingFirstBatchScanData = null;
-                updateBatchUI();
+                updateBatchUI(); // UI erneut aktualisieren, um das neue Item anzuzeigen
                 shipmentNumberInputEl.value = '';
                 updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
             }
@@ -1421,17 +1462,29 @@ function calculateGoodsReceiptCount(scannedItems) {
             focusShipmentInput();
         }
 
+// --- ERSETZEN Sie die alte Funktion durch diese Version ---
+
         function skipNoteAndAddFirstBatchItem() {
-            currentBatchGlobalNote = null; // Keine Notiz für diesen Batch
+            currentBatchGlobalNote = null; // Globale Notiz für zukünftige Scans entfernen
+
+            // *** DIE WICHTIGE NEUE LOGIK ***
+            // Entferne die Notiz von ALLEN bereits vorhandenen Items im Batch
+            currentBatch.forEach(item => {
+                item.note = null;
+            });
+            // *******************************
+            
             isBatchNotePromptRequired = false;
             batchNoteModalEl.classList.remove('visible');
-            updateCurrentBatchNoteDisplay();
+            updateBatchUI(); // UI aktualisieren, um die entfernten Notizen zu reflektieren
+            batchNoteToggleEl.checked = false; // Schalter nach Benutzung immer deaktivieren
 
+            // Nur wenn ein Scan auf die Verarbeitung wartet, wird er hinzugefügt.
             if (pendingFirstBatchScanData) {
                 const batchItem = { ...pendingFirstBatchScanData, note: null };
                 currentBatch.push(batchItem);
                 pendingFirstBatchScanData = null;
-                updateBatchUI();
+                updateBatchUI(); // UI erneut aktualisieren
                 shipmentNumberInputEl.value = '';
                 updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
             }
@@ -1453,7 +1506,8 @@ function calculateGoodsReceiptCount(scannedItems) {
             currentBatch.forEach(batchItem => {
                 const { rawInput: rawInputFromBatch, scanTimestamp, note: itemNote } = batchItem;
                 
-                // 1. PRÜFUNG: Ist der Scan eine bekannte HU in einem HU-Auftrag?
+                // ... (komplette Logik zum Verarbeiten jedes Batch-Items bleibt unverändert)
+                // START der unveränderten Logik
                 const parentHawb = findShipmentByHuNumber(rawInputFromBatch);
                 if (parentHawb) {
                     const parentShipment = shipmentsWorkingCopy[parentHawb];
@@ -1461,7 +1515,6 @@ function calculateGoodsReceiptCount(scannedItems) {
                     const isSecurityStatus = EXCLUSIVE_SECURITY_STATUSES.includes(batchStatus);
 
                     if (isSecurityStatus) {
-                        // LOGIK FÜR SICHERHEITSSTATUS: "Anstehend" wird gesucht und ersetzt.
                         if (!isNewScanKombi) {
                             const totalAllowedInstances = parentShipment.scannedItems.filter(item => item.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase()).length;
                             const currentSecurityScans = parentShipment.scannedItems.filter(
@@ -1476,18 +1529,15 @@ function calculateGoodsReceiptCount(scannedItems) {
                                 return;
                             }
                         }
-
                         const anstehendIndex = parentShipment.scannedItems.findIndex(i => 
                             i.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() && 
                             i.status === 'Anstehend'
                         );
-
                         if (anstehendIndex === -1) {
                             errorCount++;
                             errorMessages.push(`Alle Packstücke für HU ${rawInputFromBatch} bereits final erfasst.`);
                             return;
                         }
-                        
                         const itemToUpdate = parentShipment.scannedItems[anstehendIndex];
                         itemToUpdate.status = batchStatus;
                         itemToUpdate.timestamp = scanTimestamp;
@@ -1496,24 +1546,20 @@ function calculateGoodsReceiptCount(scannedItems) {
                         itemToUpdate.isCancelled = false;
                         itemToUpdate.cancelledTimestamp = null;
                     } else {
-                        // LOGIK FÜR INFORMATORISCHE STATUS (z.B. Dunkelalarm): Es wird ein NEUER Eintrag hinzugefügt, ABER MIT LIMIT.
                         const totalExpectedInstances = parentShipment.scannedItems.filter(
                             item => item.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() &&
                                    (item.status === 'Anstehend' || EXCLUSIVE_SECURITY_STATUSES.includes(item.status))
                         ).length;
-
                         const currentStatusCount = parentShipment.scannedItems.filter(
                             item => item.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() &&
                                    item.status === batchStatus &&
                                    !item.isCancelled
                         ).length;
-
                         if (currentStatusCount >= totalExpectedInstances) {
                             errorCount++;
                             errorMessages.push(`Limit erreicht: Status '${batchStatus}' kann für HU ${rawInputFromBatch} nicht erneut vergeben werden.`);
                             return;
                         }
-
                         const newScanItem = {
                             rawInput: rawInputFromBatch, status: batchStatus, timestamp: scanTimestamp,
                             isCombination: isNewScanKombi, notes: itemNote ? [itemNote] : [],
@@ -1521,20 +1567,15 @@ function calculateGoodsReceiptCount(scannedItems) {
                         };
                         parentShipment.scannedItems.push(newScanItem);
                     }
-                    
                     parentShipment.lastModified = scanTimestamp;
                     affectedBaseNumbersForNotification.add(parentHawb);
                     successCount++;
                     return;
                 }
-
-                // --- ALTE LOGIK: Wenn es KEINE bekannte HU ist, behandle es als normale Sendung ---
                 const { baseNumber, isValidFormat, raw: processedRawInput } = processShipmentNumber(rawInputFromBatch);
-
                 if (!isValidFormat) {
                     errorCount++; errorMessages.push(`Ungültiges Format: ${escapeHtml(rawInputFromBatch)}`); return;
                 }
-
                 if (!shipmentsWorkingCopy[baseNumber]) {
                     newBaseShipments.add(baseNumber);
                     shipmentsWorkingCopy[baseNumber] = {
@@ -1542,30 +1583,25 @@ function calculateGoodsReceiptCount(scannedItems) {
                         scannedItems: [], mitarbeiter: MITARBEITER_NAME
                     };
                 }
-                
                 const shipmentToUpdate = shipmentsWorkingCopy[baseNumber];
                 const expectedTotal = shipmentToUpdate.totalPiecesExpected;
-                
                 const isCurrentBatchItemCounting = !NON_COUNTING_STATUSES.includes(batchStatus) && !batchIsCombination;
-
                 if (isCurrentBatchItemCounting && expectedTotal !== null) {
                     const currentCountInWorkingCopy = calculateCurrentCountedPieces(shipmentToUpdate.scannedItems);
                     if (currentCountInWorkingCopy >= expectedTotal) {
                         errorCount++; errorMessages.push(`Limit (${expectedTotal}) für ${escapeHtml(baseNumber)} erreicht bei Scan ${escapeHtml(processedRawInput)}`); return;
                     }
                 }
-                
                 const newScanItem = {
                     rawInput: processedRawInput, status: batchStatus, timestamp: scanTimestamp,
                     isCombination: batchIsCombination, notes: itemNote ? [itemNote] : [],
                     isCancelled: false, cancelledTimestamp: null
                 };
-                
                 shipmentToUpdate.scannedItems.push(newScanItem);
                 shipmentToUpdate.lastModified = scanTimestamp;
-                
                 affectedBaseNumbersForNotification.add(baseNumber);
                 successCount++;
+                 // ENDE der unveränderten Logik
             });
 
             saveShipments(shipmentsWorkingCopy);
@@ -1592,6 +1628,8 @@ function calculateGoodsReceiptCount(scannedItems) {
             renderTable();
             currentBatch = [];
             isBatchNotePromptRequired = true;
+            currentBatchGlobalNote = null; // <-- WICHTIGE ÄNDERUNG: Notiz zurücksetzen
+            batchNoteToggleEl.checked = false; 
             updateBatchUI();
             displayCurrentShipmentDetails('');
             focusShipmentInput();
@@ -1985,19 +2023,6 @@ function calculateGoodsReceiptCount(scannedItems) {
                 }
             });
 
-
-
-
-
-
-
-
-
-
-
-
-
-
             shipmentNumberInputEl.addEventListener('input', () => {
                 const currentValue = shipmentNumberInputEl.value.trim();
 
@@ -2069,14 +2094,6 @@ function calculateGoodsReceiptCount(scannedItems) {
                 }
                 // --- ENDE: NEUE LOGIK FÜR MULTI-QR-CODE ---
 
-
-
-
-
-
-
-
-
                 updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
 
                 if (isBatchModeActive) {
@@ -2125,7 +2142,7 @@ function calculateGoodsReceiptCount(scannedItems) {
                 updateNoteAndComboVisibility();
                 focusShipmentInput();
             });
-        shipmentNumberInputEl.addEventListener('blur', () => {
+            shipmentNumberInputEl.addEventListener('blur', () => {
                 if (isBatchModeActive) {
                     setTimeout(focusShipmentInput, 10);
                 }
@@ -2166,28 +2183,28 @@ function calculateGoodsReceiptCount(scannedItems) {
                 focusShipmentInput();
             });
 
-      currentDetailsDivEl.addEventListener('click', (event) => {
-            const target = event.target;
-            event.preventDefault();
+            currentDetailsDivEl.addEventListener('click', (event) => {
+                const target = event.target;
+                event.preventDefault();
 
-            if (target.classList.contains('editable-note') || target.classList.contains('add-note-link')) {
-                showInlineNoteEditor(target);
-            } else if (target.classList.contains('inline-note-save-btn')) {
-                const editorDiv = target.closest('.inline-note-editor');
-                if (editorDiv) {
-                    const inputField = editorDiv.querySelector('.inline-note-input');
-                    const noteIndex = target.dataset.noteIndex;
-                    saveOrUpdateNote(target.dataset.basenumber, target.dataset.timestamp, noteIndex, inputField.value);
+                if (target.classList.contains('editable-note') || target.classList.contains('add-note-link')) {
+                    showInlineNoteEditor(target);
+                } else if (target.classList.contains('inline-note-save-btn')) {
+                    const editorDiv = target.closest('.inline-note-editor');
+                    if (editorDiv) {
+                        const inputField = editorDiv.querySelector('.inline-note-input');
+                        const noteIndex = target.dataset.noteIndex;
+                        saveOrUpdateNote(target.dataset.basenumber, target.dataset.timestamp, noteIndex, inputField.value);
+                    }
+                } else if (target.classList.contains('inline-note-cancel-btn')) {
+                    removeActiveInlineNoteEditor();
+                    focusShipmentInput();
+                } else if (target.classList.contains('cancel-button')) {
+                    requestCancelScanItem(target.dataset.basenumber, target.dataset.timestamp);
+                } else if (target.classList.contains('delete-note-btn')) {
+                    requestDeleteNote(target.dataset.basenumber, target.dataset.timestamp, target.dataset.noteIndex);
                 }
-            } else if (target.classList.contains('inline-note-cancel-btn')) {
-                removeActiveInlineNoteEditor();
-                focusShipmentInput();
-            } else if (target.classList.contains('cancel-button')) {
-                requestCancelScanItem(target.dataset.basenumber, target.dataset.timestamp);
-            } else if (target.classList.contains('delete-note-btn')) {
-                requestDeleteNote(target.dataset.basenumber, target.dataset.timestamp, target.dataset.noteIndex);
-            }
-        });
+            });
 
             tableBodyEl.addEventListener('click', (event) => {
                 const target = event.target;
@@ -2221,12 +2238,27 @@ function calculateGoodsReceiptCount(scannedItems) {
                 if (currentBatch.length > 0 && confirm("Aktuellen Batch wirklich leeren?")) {
                     currentBatch = [];
                     isBatchNotePromptRequired = true;
+                    currentBatchGlobalNote = null; // <-- WICHTIGE ÄNDERUNG: Notiz zurücksetzen
+                    batchNoteToggleEl.checked = false;
                     updateBatchUI(); clearError(); displayCurrentShipmentDetails('');
                 } else if (currentBatch.length === 0) {
                     displayError("Batch ist bereits leer.");
                 }
                 focusShipmentInput();
+            });            
+            // Listener für den Notiz-Schalter, um das Modal auch mitten im Batch zu öffnen
+            batchNoteToggleEl.addEventListener('change', () => {
+                // Nur auslösen, wenn der Schalter EINGESCHALTET wird und der Batch-Modus aktiv ist
+                if (batchNoteToggleEl.checked && isBatchModeActive) {
+                    // Wichtig: Wir setzen hier KEINE pendingFirstBatchScanData.
+                    // Das ist das Signal für die Modal-Funktionen, dass nur eine Notiz geändert wird.
+                    
+                    batchNoteInputEl.value = currentBatchGlobalNote || ''; // Modal mit aktueller Notiz vorbefüllen
+                    batchNoteModalEl.classList.add('visible');
+                    batchNoteInputEl.focus();
+                }
             });
+
             confirmBatchNoteButtonEl.addEventListener('click', confirmAndAddFirstBatchItemWithNote);
             skipBatchNoteButtonEl.addEventListener('click', skipNoteAndAddFirstBatchItem);
             batchNoteInputEl.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); confirmBatchNoteButtonEl.click(); }});
@@ -2329,6 +2361,13 @@ function calculateGoodsReceiptCount(scannedItems) {
             });
             // --- ENDE DES NEUEN BLOCKS ---
         } // Ende der setupEventListeners Funktion
+
+
+
+
+
+
+
                     // Wiederverwendbare Funktion zum Speichern der HU-Liste
             function saveAndProcessHuListData() {
                 const mainOrderNumber = mainOrderNumberInputEl.value.trim().toUpperCase();
@@ -2457,6 +2496,11 @@ function attemptLockOrientation() {
 
 </body>
 </html>
+
+
+
+
+
 
 
 
