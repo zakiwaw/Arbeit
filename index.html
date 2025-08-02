@@ -402,7 +402,7 @@
         <div>
             <label for="shipmentNumberInput">HAWB/HU:</label>
             <div class="input-wrapper">
-                <input type="text" id="shipmentNumberInput" placeholder="Scannen oder eingeben..." autocapitalize="characters" autocomplete="off" enterkeyhint="enter">
+                <input type="text" id="shipmentNumberInput" placeholder="Scannen oder eingeben..." autocapitalize="characters" autocomplete="off">
                 <button type="button" id="clearInputButton" class="clear-input-btn" title="Eingabe löschen">×</button>
             </div>
         </div>
@@ -430,7 +430,7 @@
         <div id="noteInputContainer" class="note-input-area">
             <label for="noteInput">Notiz (für nächsten Einzelscan):</label>
             <div class="input-wrapper">
-                <input type="text" id="noteInput" placeholder="Notiz eingeben..." list="noteSuggestions" enterkeyhint="enter">
+                <input type="text" id="noteInput" placeholder="Notiz eingeben..." list="noteSuggestions">
                 <button type="button" id="clearNoteButton" class="clear-input-btn clear-note-btn" title="Notiz löschen">×</button>
                 <datalist id="noteSuggestions">
                     <option value="Abgepackt"><option value="Muss abgepackt werden"><option value="Eingeschweißte Folien">
@@ -443,7 +443,7 @@
     
         <div id="newTotalSection">
             <label for="newTotalInput" id="newTotalLabel">Erwartete Gesamtstückzahl für NEUE Sendung:</label>
-            <input type="number" id="newTotalInput" inputmode="numeric" placeholder="Zahl eingeben..." enterkeyhint="enter">
+            <input type="number" id="newTotalInput" inputmode="numeric" placeholder="Zahl eingeben...">
             <div>
                 <button id="confirmNewTotalBtn" class="main-action-button">OK</button>
                 <button id="skipNewTotalBtn" class="main-action-button">Überspringen (N/A)</button>
@@ -488,16 +488,14 @@
             <label for="mainOrderNumberInput">Auftragsnummer (z.B. 9007769889):</label>
             <!-- HIER die Änderung -->
             <div style="display: flex; align-items: center; gap: 10px;">
-                <input type="text" id="mainOrderNumberInput" placeholder="Übergeordnete Auftragsnummer eingeben" inputmode="none" style="flex-grow: 1;" enterkeyhint="next">
+                <input type="text" id="mainOrderNumberInput" placeholder="Übergeordnete Auftragsnummer eingeben" inputmode="none" style="flex-grow: 1;">
                 <button type="button" id="addAndContinueHuButton" title="Speichern und nächste Liste eingeben" class="main-action-button" style="width: 44px; height: 44px; padding: 0; font-size: 2em; flex-shrink: 0; line-height: 44px;">+</button>
             </div>
         </div>
         <div class="form-group">
             <label for="huListTextarea">HU Nummern (eine pro Zeile):</label>
             <!-- UND HIER die Änderung -->
-
-<!-- ERSETZEN SIE SIE HIERMIT -->
-<textarea id="huListTextarea" rows="8" style="width: 100%; font-family: monospace; font-size: 1em; padding: 8px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box;" placeholder="HU Nummern hier einfügen..." inputmode="none" enterkeyhint="enter"></textarea>
+            <textarea id="huListTextarea" rows="8" style="width: 100%; font-family: monospace; font-size: 1em; padding: 8px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box;" placeholder="HU Nummern hier einfügen..." inputmode="none"></textarea>
         </div>
         <div class="modal-actions">
             <button id="saveHuListButton">Importieren & Speichern</button>
@@ -524,11 +522,11 @@
             </div>
  <div class="form-group">
                 <label for="editGoodsReceiptCount">Manuelle Anzahl Wareneingang:</label>
-                <input type="number" id="editGoodsReceiptCount" inputmode="numeric" placeholder="Leer lassen, um Scans zu nutzen" enterkeyhint="next">
+                <input type="number" id="editGoodsReceiptCount" inputmode="numeric" placeholder="Leer lassen, um Scans zu nutzen">
             </div>
             <div class="form-group">
                 <label for="editTotalPiecesExpected">Erwartete Gesamtstückzahl:</label>
-                <input type="number" id="editTotalPiecesExpected" inputmode="numeric" placeholder="Zahl oder leer" enterkeyhint="done">
+                <input type="number" id="editTotalPiecesExpected" inputmode="numeric" placeholder="Zahl oder leer">
             </div>
             <div class="modal-actions">
                 <button id="saveEditButton">Speichern</button>
@@ -542,7 +540,7 @@
             <h3>Batch-Notiz Festlegen</h3>
             <div class="form-group">
                 <label for="batchNoteInput">Notiz für alle Scans in diesem Batch (optional):</label>
-                <input type="text" id="batchNoteInput" placeholder="Notiz eingeben..." list="noteSuggestions" enterkeyhint="enter">
+                <input type="text" id="batchNoteInput" placeholder="Notiz eingeben..." list="noteSuggestions">
             </div>
             <div class="modal-actions">
                 <button id="confirmBatchNoteButton" class="main-action-button">Übernehmen & Scannen</button>
@@ -1375,8 +1373,8 @@ const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
             liElement.classList.add('editing-note'); // Versteckt Links, während editiert wird
 
             const editorHtml = `
-<div class="inline-note-editor">
-                    <input type="text" class="inline-note-input" value="${escapeHtml(currentNote)}" placeholder="Notiz eingeben..." enterkeyhint="done">
+                <div class="inline-note-editor">
+                    <input type="text" class="inline-note-input" value="${escapeHtml(currentNote)}" placeholder="Notiz eingeben...">
                     <div class="inline-note-editor-actions">
                         <button class="inline-note-save-btn" data-basenumber="${escapeHtml(baseNumber)}" data-timestamp="${itemTimestamp}" ${isEditing ? `data-note-index="${noteIndex}"` : ''}>Speichern</button>
                         <button class="inline-note-cancel-btn">Abbrechen</button>
@@ -2628,47 +2626,9 @@ const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
                 }
             });
             // ===== ENDE: NEUE EVENT LISTENER =====
-            
-            // --- Enter-Key Funktionalität für bessere mobile Bedienung ---
-            shipmentNumberInputEl.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    // Verhindert doppelte Auslösung, da 'input'-Event bei Scannern auch feuert
-                    if (shipmentNumberInputEl.value.trim().length > 0) {
-                        mainActionButtonEl.click();
-                    }
-                }
-            });
-
-            noteInputEl.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    focusShipmentInput(); // Fokus zurück zum Hauptfeld
-                }
-            });
-
-            editGoodsReceiptCountInputEl.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    editTotalPiecesExpectedInputEl.focus(); // Zum nächsten Feld springen
-                }
-            });
-            
-            editTotalPiecesExpectedInputEl.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    saveEditButtonEl.click(); // Speichern
-                }
-            });
-
-            mainOrderNumberInputEl.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    huListTextareaEl.focus(); // Zum nächsten Feld springen
-                }
-            });
 
         } // Ende der setupEventListeners Funktion
+
 
 
 
@@ -2711,8 +2671,6 @@ function attemptLockOrientation() {
 
 </body>
 </html>
-
-
 
 
 
