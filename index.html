@@ -225,20 +225,165 @@
         border-bottom: none;
     }
     /* --- ENDE: NEUE STILE FÜR OFFENE HU-LISTE --- */
+/* IN DER DATEI DSV_LFS.html, INNERHALB DES <style>-TAGS */
 
+/* --- START: NEUE STILE FÜR OFFENE HU-ZUSAMMENFASSUNG --- */
+#openHusListContainer .hu-order-group {
+    margin-bottom: 15px;
+    border-left: 3px solid var(--info-color);
+    padding-left: 10px;
+}
+#openHusListContainer .hu-order-title {
+    font-size: 1.1em;
+    font-weight: bold;
+    color: var(--text-color);
+    border-bottom: 1px solid #eee;
+    padding-bottom: 5px;
+    margin-bottom: 8px;
+}
+#openHusListContainer .hu-list {
+    list-style-type: none;
+    padding-left: 5px;
+    font-family: monospace;
+}
+#openHusListContainer .hu-list li {
+    padding: 3px 0;
+}
+#openHusListContainer .no-open-hus-message {
+    text-align: center;
+    padding: 20px 0;
+    font-style: italic;
+    color: #555;
+}
+/* --- ENDE: NEUE STILE --- */
+/* IN DER DATEI DSV_LFS.html, INNERHALB DES <style>-TAGS */
+
+/* --- START: NEUES DESIGN FÜR SEITENMENÜ --- */
+.side-menu .side-menu-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 15px 0; /* Abstand nach unten zur Statusmeldung */
+    display: flex;
+    flex-direction: column;
+    gap: 8px; /* Abstand zwischen den Menüpunkten */
+}
+
+.side-menu .menu-action-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 15px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 500; /* Etwas dickere Schrift */
+    color: #333;
+    background-color: transparent;
+    border: 1px solid transparent; /* Platzhalter für den Hover-Effekt */
+    transition: all 0.2s ease-in-out;
+    cursor: pointer;
+}
+
+.side-menu .menu-action-item:hover {
+    background-color: #f4f4f4;
+    border-color: #e0e0e0;
+}
+
+/* Stil für die Icons */
+.side-menu .menu-action-item svg {
+    width: 22px;
+    height: 22px;
+    margin-right: 15px;
+    flex-shrink: 0; /* Verhindert, dass das Icon schrumpft */
+    fill: currentColor; /* Icon nimmt die Textfarbe an */
+}
+
+/* Spezielle Hover-Effekte für bestimmte Aktionen */
+
+/* Primäre Aktion: Senden */
+.side-menu .menu-action-item.action-primary:hover {
+    background-color: #eef8ff;
+    color: var(--secondary-hover);
+    border-color: var(--secondary-color);
+}
+
+/* Wichtige Aktion: Zusammenfassung, Import */
+.side-menu .menu-action-item.action-warning:hover {
+    background-color: #fffaf0;
+    color: var(--warning-hover);
+    border-color: var(--warning-color);
+}
+
+/* Destruktive Aktion: Zurücksetzen */
+.side-menu .menu-action-item.action-reset {
+    /* Kein spezieller Grundzustand, nur der Hover ist anders */
+}
+.side-menu .menu-action-item.action-reset:hover {
+    background-color: #fdf 국내; /* Heller Rotton */
+    color: var(--danger-color);
+    border-color: var(--danger-hover);
+}
+
+/* Die alten Button-Stile im Menü werden nicht mehr gebraucht */
+.side-menu .main-action-button {
+    display: none; /* Versteckt die alten Buttons, falls sie noch da sind */
+}
+
+/* Besserer Stil für die Statusmeldung */
+.side-menu #sheetStatus {
+    margin-top: 10px;
+    padding: 10px;
+    border-radius: 5px;
+    background-color: #f8f9fa;
+    min-height: 1.2em;
+    font-weight: bold;
+    text-align: center;
+    border: 1px solid #eee;
+}
+/* --- ENDE: NEUES DESIGN FÜR SEITENMENÜ --- */
 </style>
 </head>
 <body>
 
+<!-- IN DER DATEI DSV_LFS.html -->
+
+<!-- ERSETZEN SIE DEN KOMPLETTEN INHALT VON <div id="side-menu"> HIERMIT: -->
+
 <div id="side-menu" class="side-menu">
     <h3>Optionen</h3>
-    <!-- HIER IST DER NEUE BUTTON -->
-    <button id="importHuListButton" class="main-action-button" style="background-color: var(--warning-color); margin-bottom: 15px;">HU-Liste importieren</button>
 
-    <button id="sendToSheetButton" class="main-action-button">Alle Daten an Google Sheet Senden</button>
+    <ul class="side-menu-list">
+        <li>
+            <a href="#" id="importHuListButton" class="menu-action-item action-warning">
+                <svg viewBox="0 0 24 24"><path d="M9,16V10H5L12,3L19,10H15V16H9M5,20V18H19V20H5Z" /></svg>
+                <span>HU-Liste importieren</span>
+            </a>
+        </li>
+        <li>
+            <a href="#" id="showOpenHusButton" class="menu-action-item">
+                <svg viewBox="0 0 24 24"><path d="M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z" /></svg>
+                <span>Offene HUs anzeigen</span>
+            </a>
+        </li>
+        <li>
+            <a href="#" id="sendToSheetButton" class="menu-action-item action-primary">
+                <svg viewBox="0 0 24 24"><path d="M17,13L12,18L7,13H10V9H14V13M19.35,10.03C18.67,6.59 15.64,4 12,4C9.11,4 6.6,5.64 5.35,8.03C2.34,8.36 0,10.9 0,14A6,6 0 0,0 6,20H19A5,5 0 0,0 24,15C24,12.36 21.95,10.22 19.35,10.03Z" /></svg>
+                <span>An Google Sheet Senden</span>
+            </a>
+        </li>
+        <li>
+            <a href="#" id="sendSummaryEmailButton" class="menu-action-item action-warning">
+                <svg viewBox="0 0 24 24"><path d="M20,8L12,13L4,8V6L12,11L20,6M20,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V6C22,4.89 21.1,4 20,4Z" /></svg>
+                <span>Zusammenfassung per E-Mail</span>
+            </a>
+        </li>
+        <li>
+            <a href="#" id="resetDataButton" class="menu-action-item action-reset">
+                <svg viewBox="0 0 24 24"><path d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" /></svg>
+                <span>Alles Zurücksetzen</span>
+            </a>
+        </li>
+    </ul>
+
     <div id="sheetStatus"></div>
-    <button id="resetDataButton" class="main-action-button delete-btn">Alles Zurücksetzen</button>
-    <button id="sendSummaryEmailButton" class="main-action-button">Zusammenfassung per E-Mail Senden</button>
 </div>
 <div id="menu-overlay" class="menu-overlay"></div>
 
@@ -257,7 +402,7 @@
         <div>
             <label for="shipmentNumberInput">HAWB/HU:</label>
             <div class="input-wrapper">
-                <input type="text" id="shipmentNumberInput" placeholder="Scannen oder eingeben..." autocapitalize="characters" autocomplete="off">
+                <input type="text" id="shipmentNumberInput" placeholder="Scannen oder eingeben..." autocapitalize="characters" autocomplete="off" enterkeyhint="enter">
                 <button type="button" id="clearInputButton" class="clear-input-btn" title="Eingabe löschen">×</button>
             </div>
         </div>
@@ -285,7 +430,7 @@
         <div id="noteInputContainer" class="note-input-area">
             <label for="noteInput">Notiz (für nächsten Einzelscan):</label>
             <div class="input-wrapper">
-                <input type="text" id="noteInput" placeholder="Notiz eingeben..." list="noteSuggestions">
+                <input type="text" id="noteInput" placeholder="Notiz eingeben..." list="noteSuggestions" enterkeyhint="enter">
                 <button type="button" id="clearNoteButton" class="clear-input-btn clear-note-btn" title="Notiz löschen">×</button>
                 <datalist id="noteSuggestions">
                     <option value="Abgepackt"><option value="Muss abgepackt werden"><option value="Eingeschweißte Folien">
@@ -298,7 +443,7 @@
     
         <div id="newTotalSection">
             <label for="newTotalInput" id="newTotalLabel">Erwartete Gesamtstückzahl für NEUE Sendung:</label>
-            <input type="number" id="newTotalInput" inputmode="numeric" placeholder="Zahl eingeben...">
+            <input type="number" id="newTotalInput" inputmode="numeric" placeholder="Zahl eingeben..." enterkeyhint="enter">
             <div>
                 <button id="confirmNewTotalBtn" class="main-action-button">OK</button>
                 <button id="skipNewTotalBtn" class="main-action-button">Überspringen (N/A)</button>
@@ -343,14 +488,18 @@
             <label for="mainOrderNumberInput">Auftragsnummer (z.B. 9007769889):</label>
             <!-- HIER die Änderung -->
             <div style="display: flex; align-items: center; gap: 10px;">
-                <input type="text" id="mainOrderNumberInput" placeholder="Übergeordnete Auftragsnummer eingeben" inputmode="none" style="flex-grow: 1;">
+                <input type="text" id="mainOrderNumberInput" placeholder="Übergeordnete Auftragsnummer eingeben" inputmode="none" style="flex-grow: 1;" enterkeyhint="next">
                 <button type="button" id="addAndContinueHuButton" title="Speichern und nächste Liste eingeben" class="main-action-button" style="width: 44px; height: 44px; padding: 0; font-size: 2em; flex-shrink: 0; line-height: 44px;">+</button>
             </div>
         </div>
         <div class="form-group">
             <label for="huListTextarea">HU Nummern (eine pro Zeile):</label>
             <!-- UND HIER die Änderung -->
-            <textarea id="huListTextarea" rows="8" style="width: 100%; font-family: monospace; font-size: 1em; padding: 8px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box;" placeholder="HU Nummern hier einfügen..." inputmode="none"></textarea>
+<!-- FINDEN SIE DIESE ZEILE -->
+<textarea id="huListTextarea" rows="8" style="width: 100%; font-family: monospace; font-size: 1em; padding: 8px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box;" placeholder="HU Nummern hier einfügen..." inputmode="none"></textarea>
+
+<!-- ERSETZEN SIE SIE HIERMIT -->
+<textarea id="huListTextarea" rows="8" style="width: 100%; font-family: monospace; font-size: 1em; padding: 8px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box;" placeholder="HU Nummern hier einfügen..." inputmode="none" enterkeyhint="enter"></textarea>
         </div>
         <div class="modal-actions">
             <button id="saveHuListButton">Importieren & Speichern</button>
@@ -377,25 +526,25 @@
             </div>
  <div class="form-group">
                 <label for="editGoodsReceiptCount">Manuelle Anzahl Wareneingang:</label>
-                <input type="number" id="editGoodsReceiptCount" inputmode="numeric" placeholder="Leer lassen, um Scans zu nutzen">
+                <input type="number" id="editGoodsReceiptCount" inputmode="numeric" placeholder="Leer lassen, um Scans zu nutzen" enterkeyhint="next">
             </div>
             <div class="form-group">
                 <label for="editTotalPiecesExpected">Erwartete Gesamtstückzahl:</label>
-                <input type="number" id="editTotalPiecesExpected" inputmode="numeric" placeholder="Zahl oder leer">
+                <input type="number" id="editTotalPiecesExpected" inputmode="numeric" placeholder="Zahl oder leer" enterkeyhint="done">
             </div>
             <div class="modal-actions">
                 <button id="saveEditButton">Speichern</button>
                 <button id="cancelEditButton">Abbrechen</button>
             </div>
         </div>
-    </div>
+
 
     <div id="batchNoteModal" class="modal-overlay">
         <div class="modal-content">
             <h3>Batch-Notiz Festlegen</h3>
             <div class="form-group">
                 <label for="batchNoteInput">Notiz für alle Scans in diesem Batch (optional):</label>
-                <input type="text" id="batchNoteInput" placeholder="Notiz eingeben..." list="noteSuggestions">
+                <input type="text" id="batchNoteInput" placeholder="Notiz eingeben..." list="noteSuggestions" enterkeyhint="enter">
             </div>
             <div class="modal-actions">
                 <button id="confirmBatchNoteButton" class="main-action-button">Übernehmen & Scannen</button>
@@ -404,7 +553,17 @@
         </div>
     </div>
 </div>
-
+<div id="openHusModal" class="modal-overlay">
+    <div class="modal-content">
+        <h3>Zusammenfassung Offener HUs</h3>
+        <div id="openHusListContainer" style="max-height: 60vh; overflow-y: auto; padding-right: 10px;">
+            <!-- Inhalt wird dynamisch per JavaScript generiert -->
+        </div>
+        <div class="modal-actions" style="justify-content: center; margin-top: 20px;">
+            <button id="closeOpenHusModalButton" class="main-action-button" style="width: 50%;">Schließen</button>
+        </div>
+    </div>
+</div>
 <script>
     const { jsPDF } = window.jspdf;
 
@@ -464,7 +623,10 @@ const batchNoteToggleEl = document.getElementById('batchNoteToggle'); // <-- DIE
         const saveHuListButtonEl = document.getElementById('saveHuListButton');
         const cancelHuImportButtonEl = document.getElementById('cancelHuImportButton');
 	const addAndContinueHuButtonEl = document.getElementById('addAndContinueHuButton');
-
+	const showOpenHusButtonEl = document.getElementById('showOpenHusButton');
+const openHusModalEl = document.getElementById('openHusModal');
+const openHusListContainerEl = document.getElementById('openHusListContainer');
+const closeOpenHusModalButtonEl = document.getElementById('closeOpenHusModalButton');
         // --- Konstanten & Konfiguration ---
 
         const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbweFC3K1wgksWq3Dd79bJDkbsBdYaORycXSlbIGvQ5JDe6eYj7PtTti3gpBJArRSdp63Q/exec';
@@ -955,6 +1117,7 @@ const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
             const shipments = loadShipments();
             const parentHawb = findShipmentByHuNumber(processedRawInput);
             if (parentHawb) {
+                // ... (Dieser Block für HU-Listen bleibt unverändert)
                 const parentShipment = shipments[parentHawb];
                 const now = new Date();
                 const noteText = noteInputEl.value.trim() || null;
@@ -962,102 +1125,84 @@ const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
                 const isSecurityStatus = EXCLUSIVE_SECURITY_STATUSES.includes(statusToUse);
 
                 if (isSecurityStatus) {
-                    // LOGIK FÜR SICHERHEITSSTATUS: "Anstehend" wird gesucht und ersetzt.
                     if (!isNewScanKombi) {
                         const totalAllowedInstances = parentShipment.scannedItems.filter(item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase()).length;
-                        const currentSecurityScans = parentShipment.scannedItems.filter(
-                            item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() &&
-                                   !item.isCancelled &&
-                                   EXCLUSIVE_SECURITY_STATUSES.includes(item.status) &&
-                                   !item.isCombination
-                        ).length;
+                        const currentSecurityScans = parentShipment.scannedItems.filter(item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() && !item.isCancelled && EXCLUSIVE_SECURITY_STATUSES.includes(item.status) && !item.isCombination).length;
                         if (currentSecurityScans >= totalAllowedInstances) {
                             return { success: false, waitingForTotal: false, message: `FEHLER: Alle (${totalAllowedInstances}) Packstücke für HU ${escapeHtml(processedRawInput)} haben bereits einen Sicherheitsstatus.` };
                         }
                     }
-
-                    const anstehendIndex = parentShipment.scannedItems.findIndex(i => 
-                        i.rawInput.toUpperCase() === processedRawInput.toUpperCase() && 
-                        i.status === 'Anstehend'
-                    );
-
+                    const anstehendIndex = parentShipment.scannedItems.findIndex(i => i.rawInput.toUpperCase() === processedRawInput.toUpperCase() && i.status === 'Anstehend');
                     if (anstehendIndex === -1) {
                         return { success: false, waitingForTotal: false, message: `FEHLER: Alle erwarteten Packstücke für HU ${escapeHtml(processedRawInput)} wurden bereits final erfasst.` };
                     }
-                    
                     const itemToUpdate = parentShipment.scannedItems[anstehendIndex];
-                    itemToUpdate.status = statusToUse;
-                    itemToUpdate.timestamp = now.toISOString();
-                    itemToUpdate.isCombination = isNewScanKombi;
-                    itemToUpdate.notes = noteText ? [noteText] : [];
-                    itemToUpdate.isCancelled = false;
-                    itemToUpdate.cancelledTimestamp = null;
-
+                    itemToUpdate.status = statusToUse; itemToUpdate.timestamp = now.toISOString(); itemToUpdate.isCombination = isNewScanKombi; itemToUpdate.notes = noteText ? [noteText] : []; itemToUpdate.isCancelled = false; itemToUpdate.cancelledTimestamp = null;
                 } else {
-                    // LOGIK FÜR INFORMATORISCHE STATUS (z.B. Dunkelalarm): Es wird ein NEUER Eintrag hinzugefügt, ABER MIT LIMIT.
-                    const totalExpectedInstances = parentShipment.scannedItems.filter(
-                        item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() && 
-                               (item.status === 'Anstehend' || EXCLUSIVE_SECURITY_STATUSES.includes(item.status))
-                    ).length;
-
-                    const currentStatusCount = parentShipment.scannedItems.filter(
-                        item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() &&
-                               item.status === statusToUse &&
-                               !item.isCancelled
-                    ).length;
-
+                    const totalExpectedInstances = parentShipment.scannedItems.filter(item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() && (item.status === 'Anstehend' || EXCLUSIVE_SECURITY_STATUSES.includes(item.status))).length;
+                    const currentStatusCount = parentShipment.scannedItems.filter(item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() && item.status === statusToUse && !item.isCancelled).length;
                     if (currentStatusCount >= totalExpectedInstances) {
                         return { success: false, waitingForTotal: false, message: `Limit erreicht: Status '${escapeHtml(statusToUse)}' kann für HU ${escapeHtml(processedRawInput)} nicht erneut vergeben werden.` };
                     }
-                    
-                    const newItem = {
-                        rawInput: processedRawInput, status: statusToUse, timestamp: now.toISOString(),
-                        isCombination: isNewScanKombi, notes: noteText ? [noteText] : [],
-                        isCancelled: false, cancelledTimestamp: null
-                    };
+                    const newItem = { rawInput: processedRawInput, status: statusToUse, timestamp: now.toISOString(), isCombination: isNewScanKombi, notes: noteText ? [noteText] : [], isCancelled: false, cancelledTimestamp: null };
                     parentShipment.scannedItems.push(newItem);
                 }
-                
-                parentShipment.lastModified = now.toISOString();
-                saveShipments(shipments);
-                resetSingleScanNoteInputState();
-                setTimeout(() => displayCurrentShipmentDetails(parentHawb), 0);
+                parentShipment.lastModified = now.toISOString(); saveShipments(shipments); resetSingleScanNoteInputState(); setTimeout(() => displayCurrentShipmentDetails(parentHawb), 0);
                 return { success: true, waitingForTotal: false, message: `Vorgang '${statusToUse}' für HU ${escapeHtml(processedRawInput)} erfasst.` };
             }
 
             // --- 2. LOGIK: ES IST EINE NORMALE SENDUNG (KEINE BEKANNTE HU) ---
-            // Sicherheits-Check: Verhindern, dass eine Haupt-Auftragsnummer direkt gescannt wird
             if (shipments[baseNumber] && shipments[baseNumber].isHuListOrder) {
                 return { success: false, waitingForTotal: false, message: `FEHLER: ${baseNumber} ist ein HU-Auftrag. Bitte scannen Sie eine der zugehörigen HU-Nummern.` };
             }
 
-            // Normale Logik für neue Sendungen (Stückzahlabfrage)
             if (!shipments[baseNumber]) {
                 const tempIsCombination = (statusToUse === 'XRY' && !isBatchModeActive && isCombinationFromCheckbox);
                 const tempFinalIsCombination = NON_COUNTING_STATUSES.includes(statusToUse) ? false : tempIsCombination;
                 pendingScanDataForNewShipment = { baseNumber, rawInput: processedRawInput, status: statusToUse, isCombination: tempFinalIsCombination, note: noteInputEl.value.trim() || null, timestamp: new Date().toISOString(), suffix };
-                
-                newTotalLabelEl.textContent = `Erwartete Gesamtstückzahl für NEUE Sendung ${escapeHtml(baseNumber)}:`;
-                newTotalInputEl.value = '';
-                newTotalSectionEl.classList.remove('warning-existing');
-                toggleMainInputControls(false);
-                newTotalInputEl.focus();
+                newTotalLabelEl.textContent = `Erwartete Gesamtstückzahl für NEUE Sendung ${escapeHtml(baseNumber)}:`; newTotalInputEl.value = ''; newTotalSectionEl.classList.remove('warning-existing'); toggleMainInputControls(false); newTotalInputEl.focus();
                 return { success: false, waitingForTotal: true, message: `Bitte Gesamtstückzahl für ${escapeHtml(baseNumber)} eingeben oder überspringen.` };
             }
             
-            // Logik für existierende Standard-Sendungen (Zähllogik bis Limit)
             const shipment = shipments[baseNumber];
+            const isCombination = (statusToUse === 'XRY' && isCombinationFromCheckbox);
+
+            // Einschränkungen für Scans mit Suffix (von letzter Anforderung)
+            if (isSuffixFormat && !shipment.isHuListOrder) {
+                const existingItemsForThisSuffix = shipment.scannedItems.filter(item => !item.isCancelled && item.rawInput.toUpperCase() === processedRawInput.toUpperCase());
+                const isNewScanCounting = EXCLUSIVE_SECURITY_STATUSES.includes(statusToUse) && !isCombination;
+                if (isNewScanCounting) {
+                    const existingCountingScan = existingItemsForThisSuffix.find(item => EXCLUSIVE_SECURITY_STATUSES.includes(item.status) && !item.isCombination);
+                    if (existingCountingScan) { return { success: false, message: `FEHLER: ${escapeHtml(processedRawInput)} hat bereits den zählenden Status '${escapeHtml(existingCountingScan.status)}'.` }; }
+                }
+                if (isCombination) {
+                    const existingKombiScan = existingItemsForThisSuffix.find(item => item.isCombination);
+                    if (existingKombiScan) { return { success: false, message: `FEHLER: ${escapeHtml(processedRawInput)} wurde bereits als Kombi-Sicherung erfasst.` }; }
+                }
+                if (statusToUse === 'Dunkelalarm') {
+                    const existingDunkelalarm = existingItemsForThisSuffix.find(item => item.status === 'Dunkelalarm');
+                    if (existingDunkelalarm) { return { success: false, message: `FEHLER: ${escapeHtml(processedRawInput)} wurde bereits als Dunkelalarm erfasst.` }; }
+                }
+            }
+            
+            // Bisherige Logik zur Zählung bis zum Gesamtlimit (bleibt erhalten)
             const expectedTotal = shipment.totalPiecesExpected;
             const existingNonCancelled = (shipment.scannedItems || []).filter(item => !item.isCancelled);
-            const isCombination = (statusToUse === 'XRY' && isCombinationFromCheckbox);
 
             if (isCombination && !shipment.isHuListOrder && expectedTotal !== null) {
                 const xryKombiCount = calculateXryKombiCount(existingNonCancelled);
-                if (xryKombiCount >= expectedTotal) {
-                    return { success: false, waitingForTotal: false, message: `Limit (${expectedTotal}) für XRY Kombi bei ${baseNumber} erreicht.` };
-                }
+                if (xryKombiCount >= expectedTotal) { return { success: false, waitingForTotal: false, message: `Limit (${expectedTotal}) für XRY Kombi bei ${baseNumber} erreicht.` }; }
             }
 
+            // --- START: NEUE PRÜFUNG FÜR DUNKELALARM BEI SENDUNGEN OHNE SUFFIX ---
+            if (statusToUse === 'Dunkelalarm' && !isSuffixFormat && !shipment.isHuListOrder && expectedTotal !== null) {
+                const dunkelalarmCount = calculateDunkelalarmCount(existingNonCancelled);
+                if (dunkelalarmCount >= expectedTotal) {
+                    return { success: false, waitingForTotal: false, message: `Limit (${expectedTotal}) für Dunkelalarm bei ${baseNumber} erreicht.` };
+                }
+            }
+            // --- ENDE: NEUE PRÜFUNG ---
+            
             if (statusToUse === 'Wareneingang' && expectedTotal !== null && calculateGoodsReceiptCount(existingNonCancelled) >= expectedTotal) {
                 return { success: false, waitingForTotal: false, message: `Limit (${expectedTotal}) für Wareneingang bei ${baseNumber} erreicht.` };
             }
@@ -1067,11 +1212,7 @@ const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
 
             const now = new Date();
             const noteText = noteInputEl.value.trim() || null;
-            const newItem = {
-                rawInput: processedRawInput, status: statusToUse, timestamp: now.toISOString(),
-                isCombination, notes: noteText ? [noteText] : [],
-                isCancelled: false, cancelledTimestamp: null
-            };
+            const newItem = { rawInput: processedRawInput, status: statusToUse, timestamp: now.toISOString(), isCombination, notes: noteText ? [noteText] : [], isCancelled: false, cancelledTimestamp: null };
             shipment.scannedItems.push(newItem);
             shipment.lastModified = now.toISOString();
             saveShipments(shipments);
@@ -1236,8 +1377,8 @@ const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
             liElement.classList.add('editing-note'); // Versteckt Links, während editiert wird
 
             const editorHtml = `
-                <div class="inline-note-editor">
-                    <input type="text" class="inline-note-input" value="${escapeHtml(currentNote)}" placeholder="Notiz eingeben...">
+<div class="inline-note-editor">
+                    <input type="text" class="inline-note-input" value="${escapeHtml(currentNote)}" placeholder="Notiz eingeben..." enterkeyhint="done">
                     <div class="inline-note-editor-actions">
                         <button class="inline-note-save-btn" data-basenumber="${escapeHtml(baseNumber)}" data-timestamp="${itemTimestamp}" ${isEditing ? `data-note-index="${noteIndex}"` : ''}>Speichern</button>
                         <button class="inline-note-cancel-btn">Abbrechen</button>
@@ -1506,10 +1647,10 @@ const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
             currentBatch.forEach(batchItem => {
                 const { rawInput: rawInputFromBatch, scanTimestamp, note: itemNote } = batchItem;
                 
-                // ... (komplette Logik zum Verarbeiten jedes Batch-Items bleibt unverändert)
-                // START der unveränderten Logik
+                // Unveränderte Logik für HU-Listen-Aufträge
                 const parentHawb = findShipmentByHuNumber(rawInputFromBatch);
                 if (parentHawb) {
+                    // ... (Dieser Block bleibt unverändert)
                     const parentShipment = shipmentsWorkingCopy[parentHawb];
                     const isNewScanKombi = (batchStatus === 'XRY' && batchIsCombination);
                     const isSecurityStatus = EXCLUSIVE_SECURITY_STATUSES.includes(batchStatus);
@@ -1524,55 +1665,29 @@ const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
                                        !item.isCombination
                             ).length;
                             if (currentSecurityScans >= totalAllowedInstances) {
-                                errorCount++;
-                                errorMessages.push(`Alle Packstücke für HU ${rawInputFromBatch} haben bereits einen Sicherheitsstatus.`);
-                                return;
+                                errorCount++; errorMessages.push(`Alle Packstücke für HU ${rawInputFromBatch} haben bereits einen Sicherheitsstatus.`); return;
                             }
                         }
-                        const anstehendIndex = parentShipment.scannedItems.findIndex(i => 
-                            i.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() && 
-                            i.status === 'Anstehend'
-                        );
+                        const anstehendIndex = parentShipment.scannedItems.findIndex(i => i.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() && i.status === 'Anstehend');
                         if (anstehendIndex === -1) {
-                            errorCount++;
-                            errorMessages.push(`Alle Packstücke für HU ${rawInputFromBatch} bereits final erfasst.`);
-                            return;
+                            errorCount++; errorMessages.push(`Alle Packstücke für HU ${rawInputFromBatch} bereits final erfasst.`); return;
                         }
                         const itemToUpdate = parentShipment.scannedItems[anstehendIndex];
-                        itemToUpdate.status = batchStatus;
-                        itemToUpdate.timestamp = scanTimestamp;
-                        itemToUpdate.isCombination = isNewScanKombi;
-                        itemToUpdate.notes = itemNote ? [itemNote] : [];
-                        itemToUpdate.isCancelled = false;
-                        itemToUpdate.cancelledTimestamp = null;
+                        itemToUpdate.status = batchStatus; itemToUpdate.timestamp = scanTimestamp; itemToUpdate.isCombination = isNewScanKombi; itemToUpdate.notes = itemNote ? [itemNote] : []; itemToUpdate.isCancelled = false; itemToUpdate.cancelledTimestamp = null;
                     } else {
-                        const totalExpectedInstances = parentShipment.scannedItems.filter(
-                            item => item.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() &&
-                                   (item.status === 'Anstehend' || EXCLUSIVE_SECURITY_STATUSES.includes(item.status))
-                        ).length;
-                        const currentStatusCount = parentShipment.scannedItems.filter(
-                            item => item.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() &&
-                                   item.status === batchStatus &&
-                                   !item.isCancelled
-                        ).length;
+                        const totalExpectedInstances = parentShipment.scannedItems.filter(item => item.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() && (item.status === 'Anstehend' || EXCLUSIVE_SECURITY_STATUSES.includes(item.status))).length;
+                        const currentStatusCount = parentShipment.scannedItems.filter(item => item.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() && item.status === batchStatus && !item.isCancelled).length;
                         if (currentStatusCount >= totalExpectedInstances) {
-                            errorCount++;
-                            errorMessages.push(`Limit erreicht: Status '${batchStatus}' kann für HU ${rawInputFromBatch} nicht erneut vergeben werden.`);
-                            return;
+                            errorCount++; errorMessages.push(`Limit erreicht: Status '${batchStatus}' kann für HU ${rawInputFromBatch} nicht erneut vergeben werden.`); return;
                         }
-                        const newScanItem = {
-                            rawInput: rawInputFromBatch, status: batchStatus, timestamp: scanTimestamp,
-                            isCombination: isNewScanKombi, notes: itemNote ? [itemNote] : [],
-                            isCancelled: false, cancelledTimestamp: null
-                        };
+                        const newScanItem = {rawInput: rawInputFromBatch, status: batchStatus, timestamp: scanTimestamp, isCombination: isNewScanKombi, notes: itemNote ? [itemNote] : [], isCancelled: false, cancelledTimestamp: null};
                         parentShipment.scannedItems.push(newScanItem);
                     }
-                    parentShipment.lastModified = scanTimestamp;
-                    affectedBaseNumbersForNotification.add(parentHawb);
-                    successCount++;
-                    return;
+                    parentShipment.lastModified = scanTimestamp; affectedBaseNumbersForNotification.add(parentHawb); successCount++; return;
                 }
-                const { baseNumber, isValidFormat, raw: processedRawInput } = processShipmentNumber(rawInputFromBatch);
+                
+                // Logik für normale Sendungen (mit den neuen Prüfungen)
+                const { baseNumber, isValidFormat, raw: processedRawInput, isSuffixFormat } = processShipmentNumber(rawInputFromBatch);
                 if (!isValidFormat) {
                     errorCount++; errorMessages.push(`Ungültiges Format: ${escapeHtml(rawInputFromBatch)}`); return;
                 }
@@ -1584,6 +1699,44 @@ const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
                     };
                 }
                 const shipmentToUpdate = shipmentsWorkingCopy[baseNumber];
+
+                // --- START: NEUE EINSCHRÄNKUNGEN FÜR BATCH-SCANS MIT SUFFIX ---
+                if (isSuffixFormat && !shipmentToUpdate.isHuListOrder) {
+                    const existingItemsForThisSuffix = shipmentToUpdate.scannedItems.filter(item => 
+                        !item.isCancelled &&
+                        item.rawInput.toUpperCase() === processedRawInput.toUpperCase()
+                    );
+
+                    // Prüfung 1: Zählende Leistung (XRY, ETD, EDD) nicht-Kombi
+                    const isBatchScanCounting = EXCLUSIVE_SECURITY_STATUSES.includes(batchStatus) && !batchIsCombination;
+                    if (isBatchScanCounting) {
+                        const existingCountingScan = existingItemsForThisSuffix.find(item => 
+                            EXCLUSIVE_SECURITY_STATUSES.includes(item.status) && !item.isCombination
+                        );
+                        if (existingCountingScan) {
+                            errorCount++; errorMessages.push(`${escapeHtml(processedRawInput)}: hat bereits Status '${escapeHtml(existingCountingScan.status)}'`); return;
+                        }
+                    }
+                    
+                    // Prüfung 2: XRY Kombi
+                    const isBatchScanKombi = batchStatus === 'XRY' && batchIsCombination;
+                    if (isBatchScanKombi) {
+                        const existingKombiScan = existingItemsForThisSuffix.find(item => item.isCombination);
+                        if (existingKombiScan) {
+                            errorCount++; errorMessages.push(`${escapeHtml(processedRawInput)}: bereits als Kombi erfasst`); return;
+                        }
+                    }
+
+                    // Prüfung 3: Dunkelalarm
+                    if (batchStatus === 'Dunkelalarm') {
+                        const existingDunkelalarm = existingItemsForThisSuffix.find(item => item.status === 'Dunkelalarm');
+                        if (existingDunkelalarm) {
+                             errorCount++; errorMessages.push(`${escapeHtml(processedRawInput)}: bereits als Dunkelalarm erfasst`); return;
+                        }
+                    }
+                }
+                // --- ENDE: NEUE EINSCHRÄNKUNGEN FÜR BATCH-SCANS MIT SUFFIX ---
+
                 const expectedTotal = shipmentToUpdate.totalPiecesExpected;
                 const isCurrentBatchItemCounting = !NON_COUNTING_STATUSES.includes(batchStatus) && !batchIsCombination;
                 if (isCurrentBatchItemCounting && expectedTotal !== null) {
@@ -1601,7 +1754,6 @@ const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
                 shipmentToUpdate.lastModified = scanTimestamp;
                 affectedBaseNumbersForNotification.add(baseNumber);
                 successCount++;
-                 // ENDE der unveränderten Logik
             });
 
             saveShipments(shipmentsWorkingCopy);
@@ -1628,7 +1780,7 @@ const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
             renderTable();
             currentBatch = [];
             isBatchNotePromptRequired = true;
-            currentBatchGlobalNote = null; // <-- WICHTIGE ÄNDERUNG: Notiz zurücksetzen
+            currentBatchGlobalNote = null; 
             batchNoteToggleEl.checked = false; 
             updateBatchUI();
             displayCurrentShipmentDetails('');
@@ -1652,7 +1804,16 @@ const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
             }
             focusShipmentInput();
         }
-
+        // --- START: NEUE HILFSFUNKTION FÜR DUNKELALARM ---
+        function calculateDunkelalarmCount(scannedItems) {
+            if (!Array.isArray(scannedItems)) return 0;
+            // Zählt nur nicht-stornierte Scans mit dem Status "Dunkelalarm"
+            return scannedItems.filter(item => 
+                item.status === 'Dunkelalarm' && 
+                !item.isCancelled
+            ).length;
+        }
+        // --- ENDE: NEUE HILFSFUNKTION FÜR DUNKELALARM ---
         function requestCancelScanItem(baseNumber, itemTimestamp) {
             if (confirm(`Soll dieser Scan-Eintrag wirklich storniert werden?\nZeit: ${new Date(itemTimestamp).toLocaleString('de-DE')}`)) {
                 cancelScanItem(baseNumber, itemTimestamp);
@@ -1943,7 +2104,65 @@ const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
                 setTimeout(() => { if (sheetStatusEl.textContent && !sheetStatusEl.textContent.startsWith('Erfolg')) sheetStatusEl.textContent = ''; }, 7000);
             }
         }
+  function showOpenHusSummary() {
+        removeActiveInlineNoteEditor();
+        const shipments = loadShipments();
+        const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
+        let allPendingHusByOrder = [];
 
+        // 1. Alle Sendungen durchgehen
+        Object.keys(shipments).forEach(baseNumber => {
+            const shipment = shipments[baseNumber];
+
+            // 2. Nur HU-Listen-Aufträge mit Scans berücksichtigen
+            if (shipment.isHuListOrder && shipment.scannedItems && shipment.scannedItems.length > 0) {
+                
+                // 3. Logik zur Ermittlung offener HUs (wie in displayCurrentShipmentDetails)
+                const allUniqueHuNumbers = [...new Set(shipment.scannedItems.map(item => item.rawInput))];
+                const processedHus = new Set(
+                    shipment.scannedItems
+                        .filter(item => processedStatuses.includes(item.status) && !item.isCancelled)
+                        .map(item => item.rawInput)
+                );
+                const pendingHuNumbers = allUniqueHuNumbers.filter(hu => !processedHus.has(hu));
+
+                // 4. Wenn offene HUs gefunden wurden, das Ergebnis speichern
+                if (pendingHuNumbers.length > 0) {
+                    allPendingHusByOrder.push({
+                        orderNumber: baseNumber,
+                        pendingHus: pendingHuNumbers.sort(), // HUs alphabetisch sortieren
+                        totalHus: allUniqueHuNumbers.length
+                    });
+                }
+            }
+        });
+
+        // 5. HTML für das Modal-Fenster generieren
+        let htmlContent = '';
+        if (allPendingHusByOrder.length > 0) {
+             // Aufträge nach Auftragsnummer sortieren
+             allPendingHusByOrder.sort((a,b) => a.orderNumber.localeCompare(b.orderNumber));
+             
+             allPendingHusByOrder.forEach(order => {
+                 htmlContent += `<div class="hu-order-group">`;
+                 htmlContent += `<div class="hu-order-title">${escapeHtml(order.orderNumber)} (${order.pendingHus.length} von ${order.totalHus} offen)</div>`;
+                 htmlContent += `<ul class="hu-list">`;
+                 order.pendingHus.forEach(hu => {
+                     htmlContent += `<li>${escapeHtml(hu)}</li>`;
+                 });
+                 htmlContent += `</ul></div>`;
+             });
+        } else {
+            htmlContent = '<p class="no-open-hus-message">Glückwunsch! Alle HUs in den erfassten Aufträgen sind vollständig bearbeitet.</p>';
+        }
+
+        openHusListContainerEl.innerHTML = htmlContent;
+
+        // 6. Modal anzeigen und Seitenmenü schließen
+        openHusModalEl.classList.add('visible');
+        closeSideMenu(); 
+    }
+    // ===== ENDE: NEUE FUNKTION =====
             // --- START: Doppelklick-Logik für manuelle Eingabe im HU-Modal ---
             function enableManualInputOnDoubleClick(event) {
                 const element = event.target;
@@ -1993,6 +2212,12 @@ const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
             // --- ENDE: Doppelklick-Logik ---
         // --- Event Listener Setup ---
         // --- Event Listener Setup ---
+
+
+
+
+
+
         function setupEventListeners() {
             mainActionButtonEl.addEventListener('click', () => {
                 clearError();
@@ -2267,8 +2492,14 @@ const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
             // Seitenmenü
             menuToggleBtnEl.addEventListener('click', (e) => { e.stopPropagation(); sideMenuEl.classList.contains('open') ? closeSideMenu() : openSideMenu(); });
             menuOverlayEl.addEventListener('click', closeSideMenu);
-            sendToSheetButtonEl.addEventListener('click', sendDataToSheet);
-            resetDataButtonEl.addEventListener('click', () => {
+            
+            sendToSheetButtonEl.addEventListener('click', (e) => {
+                e.preventDefault();
+                sendDataToSheet();
+            });
+            
+            resetDataButtonEl.addEventListener('click', (e) => {
+                e.preventDefault();
                 removeActiveInlineNoteEditor();
                 if (confirm("WARNUNG!\n\nMöchtest du wirklich ALLE erfassten Sendungsdaten unwiderruflich löschen?")) {
                     localStorage.removeItem(LOCAL_STORAGE_KEY);
@@ -2283,7 +2514,11 @@ const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
                     setTimeout(() => { if (sheetStatusEl.textContent.includes('abgebrochen')) sheetStatusEl.textContent = ''; }, 3000);
                 }
             });
-            sendSummaryEmailButtonEl.addEventListener('click', sendSummaryEmail);
+
+            sendSummaryEmailButtonEl.addEventListener('click', (e) => {
+                e.preventDefault();
+                sendSummaryEmail();
+            });
 
             // Double-Click auf Input für manuelle Eingabe (optional)
             shipmentNumberInputEl.addEventListener('dblclick', () => {
@@ -2294,7 +2529,8 @@ const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
             });
 
             // --- START: Event Listener für HU-Import (enthält Tastatur-Logik) ---
-            importHuListButtonEl.addEventListener('click', () => {
+            importHuListButtonEl.addEventListener('click', (e) => {
+                e.preventDefault();
                 sideMenuEl.classList.remove('open');
                 menuOverlayEl.classList.remove('visible');
 
@@ -2360,91 +2596,8 @@ const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
                 }
             });
             // --- ENDE DES NEUEN BLOCKS ---
-        } // Ende der setupEventListeners Funktion
 
-
-
-
-
-
-
-                    // Wiederverwendbare Funktion zum Speichern der HU-Liste
-            function saveAndProcessHuListData() {
-                const mainOrderNumber = mainOrderNumberInputEl.value.trim().toUpperCase();
-                const huListText = huListTextareaEl.value.trim();
-
-                if (!mainOrderNumber || !huListText) {
-                    alert("Bitte Auftragsnummer und mindestens eine HU-Nummer eingeben.");
-                    return { success: false };
-                }
-                const hus = huListText.split(/[\s\n\r]+/).map(hu => hu.trim().toUpperCase()).filter(hu => hu.length > 0);
-                if (hus.length === 0) {
-                    alert("Keine gültigen HU-Nummern in der Liste gefunden.");
-                    return { success: false };
-                }
-
-                const shipments = loadShipments();
-                const now = new Date().toISOString();
-                let addedCount = 0;
-                let duplicateCount = 0;
-
-                if (!shipments[mainOrderNumber]) {
-                    shipments[mainOrderNumber] = {
-                        hawb: mainOrderNumber, lastModified: now, totalPiecesExpected: hus.length,
-                        scannedItems: [], mitarbeiter: MITARBEITER_NAME, isHuListOrder: true
-                    };
-                    hus.forEach(hu => {
-                        shipments[mainOrderNumber].scannedItems.push({ rawInput: hu, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null });
-                        addedCount++;
-                    });
-                } else {
-                    if (!shipments[mainOrderNumber].isHuListOrder) {
-                        alert(`FEHLER: ${mainOrderNumber} ist eine normale Sendung. Sie kann nicht mit einer HU-Liste erweitert werden.`);
-                        return { success: false };
-                    }
-                    hus.forEach(hu => {
-                        if (!shipments[mainOrderNumber].scannedItems.find(item => item.rawInput.toUpperCase() === hu)) {
-                            shipments[mainOrderNumber].scannedItems.push({ rawInput: hu, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null });
-                            addedCount++;
-                        } else { duplicateCount++; }
-                    });
-                    if (addedCount > 0) {
-                        shipments[mainOrderNumber].lastModified = now;
-                        shipments[mainOrderNumber].totalPiecesExpected += addedCount;
-                    }
-                }
-
-                saveShipments(shipments);
-                renderTable();
-                
-                let message = '';
-                let messageType = 'green';
-                if (addedCount > 0 && duplicateCount === 0) {
-                    message = `${addedCount} neue HU(s) zum Auftrag ${mainOrderNumber} hinzugefügt.`;
-                } else if (addedCount > 0 && duplicateCount > 0) {
-                    message = `${addedCount} neue HU(s) hinzugefügt, ${duplicateCount} Duplikate übersprungen.`;
-                    messageType = 'orange';
-                } else if (addedCount === 0 && duplicateCount > 0) {
-                    alert(`Import für ${mainOrderNumber}:\n\nKeine neuen HUs gefunden. Alle ${duplicateCount} eingegebenen HUs sind bereits im Auftrag vorhanden.`);
-                }
-                
-                return { success: true, message: message, messageType: messageType, baseNumber: mainOrderNumber };
-            }
-
-            // Listener für den "Importieren & Speichern"-Button (schließt das Modal)
-            saveHuListButtonEl.addEventListener('click', () => {
-                const result = saveAndProcessHuListData();
-                if (result.success) {
-                    displayCurrentShipmentDetails(result.baseNumber);
-                    importHuModalEl.classList.remove('visible');
-                    if (result.message) {
-                        displayError(result.message, result.messageType, 5000);
-                    }
-                    focusShipmentInput();
-                }
-            });
-
-            // Listener für den neuen "+"-Button (speichert und leert die Felder)
+            // --- Listener für den "+"-Button (speichert und leert die Felder)
             addAndContinueHuButtonEl.addEventListener('click', () => {
                 const result = saveAndProcessHuListData();
                 if (result.success) {
@@ -2458,6 +2611,70 @@ const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
                     mainOrderNumberInputEl.focus();
                 }
             });
+
+            // ===== START: NEUE EVENT LISTENER FÜR HU-ZUSAMMENFASSUNG =====
+            showOpenHusButtonEl.addEventListener('click', (e) => {
+                e.preventDefault();
+                showOpenHusSummary();
+            });
+            
+            closeOpenHusModalButtonEl.addEventListener('click', () => {
+                openHusModalEl.classList.remove('visible');
+                focusShipmentInput();
+            });
+            
+            openHusModalEl.addEventListener('click', (e) => {
+                if (e.target === openHusModalEl) {
+                    openHusModalEl.classList.remove('visible');
+                    focusShipmentInput();
+                }
+            });
+            // ===== ENDE: NEUE EVENT LISTENER =====
+            
+            // --- Enter-Key Funktionalität für bessere mobile Bedienung ---
+            shipmentNumberInputEl.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    // Verhindert doppelte Auslösung, da 'input'-Event bei Scannern auch feuert
+                    if (shipmentNumberInputEl.value.trim().length > 0) {
+                        mainActionButtonEl.click();
+                    }
+                }
+            });
+
+            noteInputEl.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    focusShipmentInput(); // Fokus zurück zum Hauptfeld
+                }
+            });
+
+            editGoodsReceiptCountInputEl.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    editTotalPiecesExpectedInputEl.focus(); // Zum nächsten Feld springen
+                }
+            });
+            
+            editTotalPiecesExpectedInputEl.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    saveEditButtonEl.click(); // Speichern
+                }
+            });
+
+            mainOrderNumberInputEl.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    huListTextareaEl.focus(); // Zum nächsten Feld springen
+                }
+            });
+
+        } // Ende der setupEventListeners Funktion
+
+
+
+
 
         // --- Initialisierung ---
         function initializeApp() {
@@ -2496,8 +2713,6 @@ function attemptLockOrientation() {
 
 </body>
 </html>
-
-
 
 
 
