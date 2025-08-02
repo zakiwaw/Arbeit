@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -225,165 +224,20 @@
         border-bottom: none;
     }
     /* --- ENDE: NEUE STILE FÜR OFFENE HU-LISTE --- */
-/* IN DER DATEI DSV_LFS.html, INNERHALB DES <style>-TAGS */
 
-/* --- START: NEUE STILE FÜR OFFENE HU-ZUSAMMENFASSUNG --- */
-#openHusListContainer .hu-order-group {
-    margin-bottom: 15px;
-    border-left: 3px solid var(--info-color);
-    padding-left: 10px;
-}
-#openHusListContainer .hu-order-title {
-    font-size: 1.1em;
-    font-weight: bold;
-    color: var(--text-color);
-    border-bottom: 1px solid #eee;
-    padding-bottom: 5px;
-    margin-bottom: 8px;
-}
-#openHusListContainer .hu-list {
-    list-style-type: none;
-    padding-left: 5px;
-    font-family: monospace;
-}
-#openHusListContainer .hu-list li {
-    padding: 3px 0;
-}
-#openHusListContainer .no-open-hus-message {
-    text-align: center;
-    padding: 20px 0;
-    font-style: italic;
-    color: #555;
-}
-/* --- ENDE: NEUE STILE --- */
-/* IN DER DATEI DSV_LFS.html, INNERHALB DES <style>-TAGS */
-
-/* --- START: NEUES DESIGN FÜR SEITENMENÜ --- */
-.side-menu .side-menu-list {
-    list-style: none;
-    padding: 0;
-    margin: 0 0 15px 0; /* Abstand nach unten zur Statusmeldung */
-    display: flex;
-    flex-direction: column;
-    gap: 8px; /* Abstand zwischen den Menüpunkten */
-}
-
-.side-menu .menu-action-item {
-    display: flex;
-    align-items: center;
-    padding: 12px 15px;
-    border-radius: 8px;
-    text-decoration: none;
-    font-weight: 500; /* Etwas dickere Schrift */
-    color: #333;
-    background-color: transparent;
-    border: 1px solid transparent; /* Platzhalter für den Hover-Effekt */
-    transition: all 0.2s ease-in-out;
-    cursor: pointer;
-}
-
-.side-menu .menu-action-item:hover {
-    background-color: #f4f4f4;
-    border-color: #e0e0e0;
-}
-
-/* Stil für die Icons */
-.side-menu .menu-action-item svg {
-    width: 22px;
-    height: 22px;
-    margin-right: 15px;
-    flex-shrink: 0; /* Verhindert, dass das Icon schrumpft */
-    fill: currentColor; /* Icon nimmt die Textfarbe an */
-}
-
-/* Spezielle Hover-Effekte für bestimmte Aktionen */
-
-/* Primäre Aktion: Senden */
-.side-menu .menu-action-item.action-primary:hover {
-    background-color: #eef8ff;
-    color: var(--secondary-hover);
-    border-color: var(--secondary-color);
-}
-
-/* Wichtige Aktion: Zusammenfassung, Import */
-.side-menu .menu-action-item.action-warning:hover {
-    background-color: #fffaf0;
-    color: var(--warning-hover);
-    border-color: var(--warning-color);
-}
-
-/* Destruktive Aktion: Zurücksetzen */
-.side-menu .menu-action-item.action-reset {
-    /* Kein spezieller Grundzustand, nur der Hover ist anders */
-}
-.side-menu .menu-action-item.action-reset:hover {
-    background-color: #fdf 국내; /* Heller Rotton */
-    color: var(--danger-color);
-    border-color: var(--danger-hover);
-}
-
-/* Die alten Button-Stile im Menü werden nicht mehr gebraucht */
-.side-menu .main-action-button {
-    display: none; /* Versteckt die alten Buttons, falls sie noch da sind */
-}
-
-/* Besserer Stil für die Statusmeldung */
-.side-menu #sheetStatus {
-    margin-top: 10px;
-    padding: 10px;
-    border-radius: 5px;
-    background-color: #f8f9fa;
-    min-height: 1.2em;
-    font-weight: bold;
-    text-align: center;
-    border: 1px solid #eee;
-}
-/* --- ENDE: NEUES DESIGN FÜR SEITENMENÜ --- */
 </style>
 </head>
 <body>
 
-<!-- IN DER DATEI DSV_LFS.html -->
-
-<!-- ERSETZEN SIE DEN KOMPLETTEN INHALT VON <div id="side-menu"> HIERMIT: -->
-
 <div id="side-menu" class="side-menu">
     <h3>Optionen</h3>
+    <!-- HIER IST DER NEUE BUTTON -->
+    <button id="importHuListButton" class="main-action-button" style="background-color: var(--warning-color); margin-bottom: 15px;">HU-Liste importieren</button>
 
-    <ul class="side-menu-list">
-        <li>
-            <a href="#" id="importHuListButton" class="menu-action-item action-warning">
-                <svg viewBox="0 0 24 24"><path d="M9,16V10H5L12,3L19,10H15V16H9M5,20V18H19V20H5Z" /></svg>
-                <span>HU-Liste importieren</span>
-            </a>
-        </li>
-        <li>
-            <a href="#" id="showOpenHusButton" class="menu-action-item">
-                <svg viewBox="0 0 24 24"><path d="M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z" /></svg>
-                <span>Offene HUs anzeigen</span>
-            </a>
-        </li>
-        <li>
-            <a href="#" id="sendToSheetButton" class="menu-action-item action-primary">
-                <svg viewBox="0 0 24 24"><path d="M17,13L12,18L7,13H10V9H14V13M19.35,10.03C18.67,6.59 15.64,4 12,4C9.11,4 6.6,5.64 5.35,8.03C2.34,8.36 0,10.9 0,14A6,6 0 0,0 6,20H19A5,5 0 0,0 24,15C24,12.36 21.95,10.22 19.35,10.03Z" /></svg>
-                <span>An Google Sheet Senden</span>
-            </a>
-        </li>
-        <li>
-            <a href="#" id="sendSummaryEmailButton" class="menu-action-item action-warning">
-                <svg viewBox="0 0 24 24"><path d="M20,8L12,13L4,8V6L12,11L20,6M20,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V6C22,4.89 21.1,4 20,4Z" /></svg>
-                <span>Zusammenfassung per E-Mail</span>
-            </a>
-        </li>
-        <li>
-            <a href="#" id="resetDataButton" class="menu-action-item action-reset">
-                <svg viewBox="0 0 24 24"><path d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" /></svg>
-                <span>Alles Zurücksetzen</span>
-            </a>
-        </li>
-    </ul>
-
+    <button id="sendToSheetButton" class="main-action-button">Alle Daten an Google Sheet Senden</button>
     <div id="sheetStatus"></div>
+    <button id="resetDataButton" class="main-action-button delete-btn">Alles Zurücksetzen</button>
+    <button id="sendSummaryEmailButton" class="main-action-button">Zusammenfassung per E-Mail Senden</button>
 </div>
 <div id="menu-overlay" class="menu-overlay"></div>
 
@@ -533,7 +387,7 @@
                 <button id="cancelEditButton">Abbrechen</button>
             </div>
         </div>
-
+    </div>
 
     <div id="batchNoteModal" class="modal-overlay">
         <div class="modal-content">
@@ -549,17 +403,7 @@
         </div>
     </div>
 </div>
-<div id="openHusModal" class="modal-overlay">
-    <div class="modal-content">
-        <h3>Zusammenfassung Offener HUs</h3>
-        <div id="openHusListContainer" style="max-height: 60vh; overflow-y: auto; padding-right: 10px;">
-            <!-- Inhalt wird dynamisch per JavaScript generiert -->
-        </div>
-        <div class="modal-actions" style="justify-content: center; margin-top: 20px;">
-            <button id="closeOpenHusModalButton" class="main-action-button" style="width: 50%;">Schließen</button>
-        </div>
-    </div>
-</div>
+
 <script>
     const { jsPDF } = window.jspdf;
 
@@ -619,10 +463,7 @@ const batchNoteToggleEl = document.getElementById('batchNoteToggle'); // <-- DIE
         const saveHuListButtonEl = document.getElementById('saveHuListButton');
         const cancelHuImportButtonEl = document.getElementById('cancelHuImportButton');
 	const addAndContinueHuButtonEl = document.getElementById('addAndContinueHuButton');
-	const showOpenHusButtonEl = document.getElementById('showOpenHusButton');
-const openHusModalEl = document.getElementById('openHusModal');
-const openHusListContainerEl = document.getElementById('openHusListContainer');
-const closeOpenHusModalButtonEl = document.getElementById('closeOpenHusModalButton');
+
         // --- Konstanten & Konfiguration ---
 
         const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbweFC3K1wgksWq3Dd79bJDkbsBdYaORycXSlbIGvQ5JDe6eYj7PtTti3gpBJArRSdp63Q/exec';
@@ -2100,65 +1941,7 @@ const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
                 setTimeout(() => { if (sheetStatusEl.textContent && !sheetStatusEl.textContent.startsWith('Erfolg')) sheetStatusEl.textContent = ''; }, 7000);
             }
         }
-  function showOpenHusSummary() {
-        removeActiveInlineNoteEditor();
-        const shipments = loadShipments();
-        const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
-        let allPendingHusByOrder = [];
 
-        // 1. Alle Sendungen durchgehen
-        Object.keys(shipments).forEach(baseNumber => {
-            const shipment = shipments[baseNumber];
-
-            // 2. Nur HU-Listen-Aufträge mit Scans berücksichtigen
-            if (shipment.isHuListOrder && shipment.scannedItems && shipment.scannedItems.length > 0) {
-                
-                // 3. Logik zur Ermittlung offener HUs (wie in displayCurrentShipmentDetails)
-                const allUniqueHuNumbers = [...new Set(shipment.scannedItems.map(item => item.rawInput))];
-                const processedHus = new Set(
-                    shipment.scannedItems
-                        .filter(item => processedStatuses.includes(item.status) && !item.isCancelled)
-                        .map(item => item.rawInput)
-                );
-                const pendingHuNumbers = allUniqueHuNumbers.filter(hu => !processedHus.has(hu));
-
-                // 4. Wenn offene HUs gefunden wurden, das Ergebnis speichern
-                if (pendingHuNumbers.length > 0) {
-                    allPendingHusByOrder.push({
-                        orderNumber: baseNumber,
-                        pendingHus: pendingHuNumbers.sort(), // HUs alphabetisch sortieren
-                        totalHus: allUniqueHuNumbers.length
-                    });
-                }
-            }
-        });
-
-        // 5. HTML für das Modal-Fenster generieren
-        let htmlContent = '';
-        if (allPendingHusByOrder.length > 0) {
-             // Aufträge nach Auftragsnummer sortieren
-             allPendingHusByOrder.sort((a,b) => a.orderNumber.localeCompare(b.orderNumber));
-             
-             allPendingHusByOrder.forEach(order => {
-                 htmlContent += `<div class="hu-order-group">`;
-                 htmlContent += `<div class="hu-order-title">${escapeHtml(order.orderNumber)} (${order.pendingHus.length} von ${order.totalHus} offen)</div>`;
-                 htmlContent += `<ul class="hu-list">`;
-                 order.pendingHus.forEach(hu => {
-                     htmlContent += `<li>${escapeHtml(hu)}</li>`;
-                 });
-                 htmlContent += `</ul></div>`;
-             });
-        } else {
-            htmlContent = '<p class="no-open-hus-message">Glückwunsch! Alle HUs in den erfassten Aufträgen sind vollständig bearbeitet.</p>';
-        }
-
-        openHusListContainerEl.innerHTML = htmlContent;
-
-        // 6. Modal anzeigen und Seitenmenü schließen
-        openHusModalEl.classList.add('visible');
-        closeSideMenu(); 
-    }
-    // ===== ENDE: NEUE FUNKTION =====
             // --- START: Doppelklick-Logik für manuelle Eingabe im HU-Modal ---
             function enableManualInputOnDoubleClick(event) {
                 const element = event.target;
@@ -2208,12 +1991,6 @@ const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
             // --- ENDE: Doppelklick-Logik ---
         // --- Event Listener Setup ---
         // --- Event Listener Setup ---
-
-
-
-
-
-
         function setupEventListeners() {
             mainActionButtonEl.addEventListener('click', () => {
                 clearError();
@@ -2488,14 +2265,8 @@ const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
             // Seitenmenü
             menuToggleBtnEl.addEventListener('click', (e) => { e.stopPropagation(); sideMenuEl.classList.contains('open') ? closeSideMenu() : openSideMenu(); });
             menuOverlayEl.addEventListener('click', closeSideMenu);
-            
-            sendToSheetButtonEl.addEventListener('click', (e) => {
-                e.preventDefault();
-                sendDataToSheet();
-            });
-            
-            resetDataButtonEl.addEventListener('click', (e) => {
-                e.preventDefault();
+            sendToSheetButtonEl.addEventListener('click', sendDataToSheet);
+            resetDataButtonEl.addEventListener('click', () => {
                 removeActiveInlineNoteEditor();
                 if (confirm("WARNUNG!\n\nMöchtest du wirklich ALLE erfassten Sendungsdaten unwiderruflich löschen?")) {
                     localStorage.removeItem(LOCAL_STORAGE_KEY);
@@ -2510,11 +2281,7 @@ const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
                     setTimeout(() => { if (sheetStatusEl.textContent.includes('abgebrochen')) sheetStatusEl.textContent = ''; }, 3000);
                 }
             });
-
-            sendSummaryEmailButtonEl.addEventListener('click', (e) => {
-                e.preventDefault();
-                sendSummaryEmail();
-            });
+            sendSummaryEmailButtonEl.addEventListener('click', sendSummaryEmail);
 
             // Double-Click auf Input für manuelle Eingabe (optional)
             shipmentNumberInputEl.addEventListener('dblclick', () => {
@@ -2525,8 +2292,7 @@ const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
             });
 
             // --- START: Event Listener für HU-Import (enthält Tastatur-Logik) ---
-            importHuListButtonEl.addEventListener('click', (e) => {
-                e.preventDefault();
+            importHuListButtonEl.addEventListener('click', () => {
                 sideMenuEl.classList.remove('open');
                 menuOverlayEl.classList.remove('visible');
 
@@ -2592,8 +2358,91 @@ const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
                 }
             });
             // --- ENDE DES NEUEN BLOCKS ---
+        } // Ende der setupEventListeners Funktion
 
-            // --- Listener für den "+"-Button (speichert und leert die Felder)
+
+
+
+
+
+
+                    // Wiederverwendbare Funktion zum Speichern der HU-Liste
+            function saveAndProcessHuListData() {
+                const mainOrderNumber = mainOrderNumberInputEl.value.trim().toUpperCase();
+                const huListText = huListTextareaEl.value.trim();
+
+                if (!mainOrderNumber || !huListText) {
+                    alert("Bitte Auftragsnummer und mindestens eine HU-Nummer eingeben.");
+                    return { success: false };
+                }
+                const hus = huListText.split(/[\s\n\r]+/).map(hu => hu.trim().toUpperCase()).filter(hu => hu.length > 0);
+                if (hus.length === 0) {
+                    alert("Keine gültigen HU-Nummern in der Liste gefunden.");
+                    return { success: false };
+                }
+
+                const shipments = loadShipments();
+                const now = new Date().toISOString();
+                let addedCount = 0;
+                let duplicateCount = 0;
+
+                if (!shipments[mainOrderNumber]) {
+                    shipments[mainOrderNumber] = {
+                        hawb: mainOrderNumber, lastModified: now, totalPiecesExpected: hus.length,
+                        scannedItems: [], mitarbeiter: MITARBEITER_NAME, isHuListOrder: true
+                    };
+                    hus.forEach(hu => {
+                        shipments[mainOrderNumber].scannedItems.push({ rawInput: hu, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null });
+                        addedCount++;
+                    });
+                } else {
+                    if (!shipments[mainOrderNumber].isHuListOrder) {
+                        alert(`FEHLER: ${mainOrderNumber} ist eine normale Sendung. Sie kann nicht mit einer HU-Liste erweitert werden.`);
+                        return { success: false };
+                    }
+                    hus.forEach(hu => {
+                        if (!shipments[mainOrderNumber].scannedItems.find(item => item.rawInput.toUpperCase() === hu)) {
+                            shipments[mainOrderNumber].scannedItems.push({ rawInput: hu, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null });
+                            addedCount++;
+                        } else { duplicateCount++; }
+                    });
+                    if (addedCount > 0) {
+                        shipments[mainOrderNumber].lastModified = now;
+                        shipments[mainOrderNumber].totalPiecesExpected += addedCount;
+                    }
+                }
+
+                saveShipments(shipments);
+                renderTable();
+                
+                let message = '';
+                let messageType = 'green';
+                if (addedCount > 0 && duplicateCount === 0) {
+                    message = `${addedCount} neue HU(s) zum Auftrag ${mainOrderNumber} hinzugefügt.`;
+                } else if (addedCount > 0 && duplicateCount > 0) {
+                    message = `${addedCount} neue HU(s) hinzugefügt, ${duplicateCount} Duplikate übersprungen.`;
+                    messageType = 'orange';
+                } else if (addedCount === 0 && duplicateCount > 0) {
+                    alert(`Import für ${mainOrderNumber}:\n\nKeine neuen HUs gefunden. Alle ${duplicateCount} eingegebenen HUs sind bereits im Auftrag vorhanden.`);
+                }
+                
+                return { success: true, message: message, messageType: messageType, baseNumber: mainOrderNumber };
+            }
+
+            // Listener für den "Importieren & Speichern"-Button (schließt das Modal)
+            saveHuListButtonEl.addEventListener('click', () => {
+                const result = saveAndProcessHuListData();
+                if (result.success) {
+                    displayCurrentShipmentDetails(result.baseNumber);
+                    importHuModalEl.classList.remove('visible');
+                    if (result.message) {
+                        displayError(result.message, result.messageType, 5000);
+                    }
+                    focusShipmentInput();
+                }
+            });
+
+            // Listener für den neuen "+"-Button (speichert und leert die Felder)
             addAndContinueHuButtonEl.addEventListener('click', () => {
                 const result = saveAndProcessHuListData();
                 if (result.success) {
@@ -2607,32 +2456,6 @@ const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
                     mainOrderNumberInputEl.focus();
                 }
             });
-
-            // ===== START: NEUE EVENT LISTENER FÜR HU-ZUSAMMENFASSUNG =====
-            showOpenHusButtonEl.addEventListener('click', (e) => {
-                e.preventDefault();
-                showOpenHusSummary();
-            });
-            
-            closeOpenHusModalButtonEl.addEventListener('click', () => {
-                openHusModalEl.classList.remove('visible');
-                focusShipmentInput();
-            });
-            
-            openHusModalEl.addEventListener('click', (e) => {
-                if (e.target === openHusModalEl) {
-                    openHusModalEl.classList.remove('visible');
-                    focusShipmentInput();
-                }
-            });
-            // ===== ENDE: NEUE EVENT LISTENER =====
-
-        } // Ende der setupEventListeners Funktion
-
-
-
-
-
 
         // --- Initialisierung ---
         function initializeApp() {
@@ -2671,6 +2494,8 @@ function attemptLockOrientation() {
 
 </body>
 </html>
+
+
 
 
 
