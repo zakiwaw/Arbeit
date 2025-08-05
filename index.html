@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -2660,28 +2659,26 @@ function calculateGoodsReceiptCount(scannedItems) {
             });
 
             importHuListButtonEl.addEventListener('click', () => {
-                // NEU: Aktives Schließen der Tastatur, falls sie von der Hauptseite noch offen ist.
-                // Wir entfernen den Fokus vom aktuell aktiven Element.
+                // 1. Zwingt die Tastatur zum Schließen, indem der Fokus vom aktuellen Element genommen wird.
                 if (document.activeElement && typeof document.activeElement.blur === 'function') {
                     document.activeElement.blur();
                 }
 
                 sideMenuEl.classList.remove('open');
                 menuOverlayEl.classList.remove('visible');
-
-                // Setzt den Input-Modus explizit auf 'none', um die Standard-Tastatur zu unterdrücken.
-                // Das ist der "Scanner-Modus".
+                
+                // 2. Setzt Felder in den "Scanner-Modus".
                 mainOrderNumberInputEl.inputMode = 'none';
                 huListTextareaEl.inputMode = 'none';
+                
+                // 3. NEU: Macht die Felder explizit un-fokussierbar, um Android daran zu hindern, die Tastatur zu öffnen.
+                mainOrderNumberInputEl.setAttribute('tabindex', '-1');
+                huListTextareaEl.setAttribute('tabindex', '-1');
 
                 mainOrderNumberInputEl.value = '';
                 huListTextareaEl.value = '';
                 importHuModalEl.classList.add('visible');
                 document.body.classList.add('modal-open');
-
-                // Der .focus()-Aufruf bleibt auskommentiert, um zu verhindern, dass das Feld 
-                // überhaupt einen Fokus erhält, was die Tastatur auslösen könnte.
-                // mainOrderNumberInputEl.focus();
             });
 
             cancelHuImportButtonEl.addEventListener('click', () => {
@@ -2884,6 +2881,9 @@ function attemptLockOrientation() {
 
 </body>
 </html>
+
+
+
 
 
 
