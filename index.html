@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -338,6 +339,35 @@
     border: 1px solid #eee;
 }
 /* --- ENDE: NEUES DESIGN FÜR SEITENMENÜ --- */
+/* --- START: NEUE STILE FÜR MODAL-TABS --- */
+.modal-tabs {
+    display: flex;
+    margin-bottom: 15px;
+    border-bottom: 2px solid #eee;
+}
+.modal-tab-btn {
+    flex: 1;
+    padding: 10px 5px;
+    font-size: 0.95em;
+    font-weight: 500;
+    text-align: center;
+    border: none;
+    background-color: transparent;
+    color: #555;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s ease-in-out;
+}
+.modal-tab-btn:hover {
+    background-color: #f9f9f9;
+    color: var(--primary-color);
+}
+.modal-tab-btn.active {
+    color: var(--primary-color);
+    font-weight: bold;
+    border-bottom-color: var(--primary-color);
+}
+/* --- ENDE: NEUE STILE FÜR MODAL-TABS --- */
 </style>
 </head>
 <body>
@@ -389,10 +419,24 @@
 <div id="menu-overlay" class="menu-overlay"></div>
 <div id="openHusModal" class="modal-overlay">
     <div class="modal-content">
-        <h3>Zusammenfassung Offener HUs</h3>
-        <div id="openHusListContainer" style="max-height: 60vh; overflow-y: auto; padding-right: 10px;">
-            <!-- Inhalt wird dynamisch per JavaScript generiert -->
+
+        
+        <!-- NEUE TAB-BUTTONS -->
+        <div class="modal-tabs">
+            <button id="showOpenSecurityHusBtn" class="modal-tab-btn active">Offene Sicherung</button>
+            <button id="showMissingReceiptHusBtn" class="modal-tab-btn">Fehlende Eingänge</button>
         </div>
+
+        <!-- Container für die erste Ansicht (bestehend) -->
+        <div id="openHusListContainer" style="max-height: 60vh; overflow-y: auto; padding-right: 10px;">
+            <!-- Inhalt für offene Sicherung wird hier generiert -->
+        </div>
+        
+        <!-- NEUER Container für die zweite Ansicht -->
+        <div id="missingReceiptHusListContainer" style="max-height: 60vh; overflow-y: auto; padding-right: 10px; display: none;">
+            <!-- Inhalt für fehlenden Wareneingang wird hier generiert -->
+        </div>
+
         <div class="modal-actions" style="justify-content: center; margin-top: 20px;">
             <button id="closeOpenHusModalButton" class="main-action-button" style="width: 50%;">Schließen</button>
         </div>
@@ -624,6 +668,10 @@ const batchNoteToggleEl = document.getElementById('batchNoteToggle'); // <-- DIE
 const openHusModalEl = document.getElementById('openHusModal');
 const openHusListContainerEl = document.getElementById('openHusListContainer');
 const closeOpenHusModalButtonEl = document.getElementById('closeOpenHusModalButton');
+// In der Nähe der anderen Modal-Variablen einfügen
+const showOpenSecurityHusBtnEl = document.getElementById('showOpenSecurityHusBtn');
+const showMissingReceiptHusBtnEl = document.getElementById('showMissingReceiptHusBtn');
+const missingReceiptHusListContainerEl = document.getElementById('missingReceiptHusListContainer');
 
         // --- Konstanten & Konfiguration ---
 
@@ -677,64 +725,93 @@ function calculateGoodsReceiptCount(scannedItems) {
     // Zählt nur Scans mit dem Status "Wareneingang", die nicht storniert sind
     return scannedItems.filter(item => item.status === 'Wareneingang' && !item.isCancelled).length;
 }
-  function showOpenHusSummary() {
-        removeActiveInlineNoteEditor();
-        const shipments = loadShipments();
-        const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
-        let allPendingHusByOrder = [];
+      function showOpenHusSummary() {
+            removeActiveInlineNoteEditor();
+            const shipments = loadShipments();
+            
+            // --- Logik für "Offene Sicherung" (bestehend) ---
+            const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
+            let openSecurityHusByOrder = [];
 
-        // 1. Alle Sendungen durchgehen
-        Object.keys(shipments).forEach(baseNumber => {
-            const shipment = shipments[baseNumber];
+            // --- Logik für "Fehlender Wareneingang" (NEU) ---
+            let missingReceiptHusByOrder = [];
 
-            // 2. Nur HU-Listen-Aufträge mit Scans berücksichtigen
-            if (shipment.isHuListOrder && shipment.scannedItems && shipment.scannedItems.length > 0) {
-                
-                // 3. Logik zur Ermittlung offener HUs (wie in displayCurrentShipmentDetails)
-                const allUniqueHuNumbers = [...new Set(shipment.scannedItems.map(item => item.rawInput))];
-                const processedHus = new Set(
-                    shipment.scannedItems
-                        .filter(item => processedStatuses.includes(item.status) && !item.isCancelled)
-                        .map(item => item.rawInput)
-                );
-                const pendingHuNumbers = allUniqueHuNumbers.filter(hu => !processedHus.has(hu));
+            Object.keys(shipments).forEach(baseNumber => {
+                const shipment = shipments[baseNumber];
+                if (shipment.isHuListOrder && shipment.scannedItems && shipment.scannedItems.length > 0) {
+                    const allUniqueHuNumbers = [...new Set(shipment.scannedItems.map(item => item.rawInput))];
+                    
+                    // 1. Berechnung für "Offene Sicherung"
+                    const processedHus = new Set(
+                        shipment.scannedItems
+                            .filter(item => processedStatuses.includes(item.status) && !item.isCancelled)
+                            .map(item => item.rawInput)
+                    );
+                    const pendingSecurityHuNumbers = allUniqueHuNumbers.filter(hu => !processedHus.has(hu));
+                    if (pendingSecurityHuNumbers.length > 0) {
+                        openSecurityHusByOrder.push({
+                            orderNumber: baseNumber,
+                            pendingHus: pendingSecurityHuNumbers.sort(),
+                            totalHus: allUniqueHuNumbers.length
+                        });
+                    }
 
-                // 4. Wenn offene HUs gefunden wurden, das Ergebnis speichern
-                if (pendingHuNumbers.length > 0) {
-                    allPendingHusByOrder.push({
-                        orderNumber: baseNumber,
-                        pendingHus: pendingHuNumbers.sort(), // HUs alphabetisch sortieren
-                        totalHus: allUniqueHuNumbers.length
-                    });
+                    // 2. Berechnung für "Fehlender Wareneingang" (NEU)
+                    const receiptHus = new Set(
+                        shipment.scannedItems
+                            .filter(item => item.status === 'Wareneingang' && !item.isCancelled)
+                            .map(item => item.rawInput)
+                    );
+                    const missingReceiptHuNumbers = allUniqueHuNumbers.filter(hu => !receiptHus.has(hu));
+                     if (missingReceiptHuNumbers.length > 0) {
+                        missingReceiptHusByOrder.push({
+                            orderNumber: baseNumber,
+                            pendingHus: missingReceiptHuNumbers.sort(),
+                            totalHus: allUniqueHuNumbers.length,
+                            receiptCount: allUniqueHuNumbers.length - missingReceiptHuNumbers.length
+                        });
+                    }
                 }
-            }
-        });
+            });
 
-        // 5. HTML für das Modal-Fenster generieren
-        let htmlContent = '';
-        if (allPendingHusByOrder.length > 0) {
-             // Aufträge nach Auftragsnummer sortieren
-             allPendingHusByOrder.sort((a,b) => a.orderNumber.localeCompare(b.orderNumber));
-             
-             allPendingHusByOrder.forEach(order => {
-                 htmlContent += `<div class="hu-order-group">`;
-                 htmlContent += `<div class="hu-order-title">${escapeHtml(order.orderNumber)} (${order.pendingHus.length} von ${order.totalHus} offen)</div>`;
-                 htmlContent += `<ul class="hu-list">`;
-                 order.pendingHus.forEach(hu => {
-                     htmlContent += `<li>${escapeHtml(hu)}</li>`;
+            // HTML für "Offene Sicherung" generieren
+            let securityHtmlContent = '';
+            if (openSecurityHusByOrder.length > 0) {
+                 openSecurityHusByOrder.sort((a,b) => a.orderNumber.localeCompare(b.orderNumber));
+                 openSecurityHusByOrder.forEach(order => {
+                     securityHtmlContent += `<div class="hu-order-group">`;
+                     securityHtmlContent += `<div class="hu-order-title">${escapeHtml(order.orderNumber)} (${order.pendingHus.length} von ${order.totalHus} offen)</div>`;
+                     securityHtmlContent += `<ul class="hu-list">${order.pendingHus.map(hu => `<li>${escapeHtml(hu)}</li>`).join('')}</ul></div>`;
                  });
-                 htmlContent += `</ul></div>`;
-             });
-        } else {
-            htmlContent = '<p class="no-open-hus-message">Glückwunsch! Alle HUs in den erfassten Aufträgen sind vollständig bearbeitet.</p>';
+            } else {
+                securityHtmlContent = '<p class="no-open-hus-message">Glückwunsch! Alle HUs sind sicherheitstechnisch bearbeitet.</p>';
+            }
+            openHusListContainerEl.innerHTML = securityHtmlContent;
+
+            // HTML für "Fehlender Wareneingang" generieren (NEU)
+            let receiptHtmlContent = '';
+            if (missingReceiptHusByOrder.length > 0) {
+                 missingReceiptHusByOrder.sort((a,b) => a.orderNumber.localeCompare(b.orderNumber));
+                 missingReceiptHusByOrder.forEach(order => {
+                     receiptHtmlContent += `<div class="hu-order-group">`;
+                     receiptHtmlContent += `<div class="hu-order-title">${escapeHtml(order.orderNumber)} (${order.receiptCount} von ${order.totalHus} erfasst)</div>`;
+                     receiptHtmlContent += `<ul class="hu-list">${order.pendingHus.map(hu => `<li>${escapeHtml(hu)}</li>`).join('')}</ul></div>`;
+                 });
+            } else {
+                receiptHtmlContent = '<p class="no-open-hus-message">Perfekt! Alle HUs wurden im Wareneingang erfasst.</p>';
+            }
+            missingReceiptHusListContainerEl.innerHTML = receiptHtmlContent;
+
+            // Standardansicht beim Öffnen festlegen (Tabs zurücksetzen)
+            showOpenSecurityHusBtnEl.classList.add('active');
+            showMissingReceiptHusBtnEl.classList.remove('active');
+            openHusListContainerEl.style.display = 'block';
+            missingReceiptHusListContainerEl.style.display = 'none';
+
+            // Modal anzeigen
+            openHusModalEl.classList.add('visible');
+            closeSideMenu(); 
         }
-
-        openHusListContainerEl.innerHTML = htmlContent;
-
-        // 6. Modal anzeigen und Seitenmenü schließen
-        openHusModalEl.classList.add('visible');
-        closeSideMenu(); 
-    }
         // --- START: NEUE HILFSFUNKTION ---
         function calculateXryKombiCount(scannedItems) {
             if (!Array.isArray(scannedItems)) return 0;
@@ -1878,19 +1955,35 @@ const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
             const shipments = loadShipments();
             const shipment = shipments[baseNumber];
             if (!shipment || !shipment.scannedItems) return;
-            let itemFound = false;
-            shipment.scannedItems.forEach(item => {
-                if (item.timestamp === itemTimestamp && !item.isCancelled) {
-                    item.isCancelled = true;
-                    item.cancelledTimestamp = new Date().toISOString();
-                    itemFound = true;
+
+            const itemToCancel = shipment.scannedItems.find(item => item.timestamp === itemTimestamp && !item.isCancelled);
+
+            if (itemToCancel) {
+                const now = new Date();
+                itemToCancel.isCancelled = true;
+                itemToCancel.cancelledTimestamp = now.toISOString();
+
+                // *** HIER IST DIE KORREKTUR ***
+                // Wenn es sich um einen HU-Auftrag handelt UND der stornierte Status ein exklusiver Sicherheitsstatus war,
+                // erstellen wir einen neuen "Anstehend"-Platzhalter, um die HU wieder scannbar zu machen.
+                if (shipment.isHuListOrder && EXCLUSIVE_SECURITY_STATUSES.includes(itemToCancel.status)) {
+                    const newPlaceholderItem = {
+                        rawInput: itemToCancel.rawInput, // Die gleiche HU-Nummer
+                        status: 'Anstehend',
+                        timestamp: now.toISOString(), // Neuer Zeitstempel für den Platzhalter
+                        isCombination: false,
+                        notes: [],
+                        isCancelled: false,
+                        cancelledTimestamp: null
+                    };
+                    shipment.scannedItems.push(newPlaceholderItem);
                 }
-            });
-            if (itemFound) {
-                shipment.lastModified = new Date().toISOString();
+                // *** ENDE DER KORREKTUR ***
+
+                shipment.lastModified = now.toISOString();
                 saveShipments(shipments);
-                displayCurrentShipmentDetails(baseNumber); // Aktualisiert die Detailansicht
-                renderTable(); // Aktualisiert die Tabelle
+                displayCurrentShipmentDetails(baseNumber);
+                renderTable();
                 clearError();
             } else {
                 displayError("Fehler: Eintrag zum Stornieren nicht gefunden oder bereits storniert.");
@@ -2208,6 +2301,16 @@ const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
             });
             // --- ENDE: Doppelklick-Logik ---
         // --- Event Listener Setup ---
+
+
+
+
+
+
+
+
+
+
         // --- Event Listener Setup ---
         function setupEventListeners() {
             mainActionButtonEl.addEventListener('click', () => {
@@ -2242,6 +2345,7 @@ const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
             shipmentNumberInputEl.addEventListener('input', () => {
                 const currentValue = shipmentNumberInputEl.value.trim();
 
+                // --- START: NEUE LOGIK FÜR MULTI-QR-CODE ---
                 // --- START: NEUE LOGIK FÜR MULTI-QR-CODE ---
                 if (currentValue.startsWith('FRT_MULTI_V1')) {
                     if (!confirm("Ein Multi-Auftrags-QR-Code wurde erkannt.\n\nMöchtest du alle darin enthaltenen Aufträge und HUs jetzt importieren?")) {
@@ -2299,15 +2403,18 @@ const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
                         totalAddedCount += addedCount;
                         totalDuplicateCount += duplicateCount;
                     });
-
+                    
+                    // Daten speichern
                     saveShipments(shipments);
-                    renderTable();
-                    shipmentNumberInputEl.value = '';
-                    updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
 
+                    // Dem Benutzer Feedback geben
                     alert(`Multi-Import abgeschlossen:\n- Verarbeitete Aufträge: ${processedOrders.length}\n- Neue HUs hinzugefügt: ${totalAddedCount}\n- Duplikate übersprungen: ${totalDuplicateCount}`);
+                    
+                    // NEU: Seite neu laden, nachdem der Benutzer das Alert-Fenster bestätigt hat.
+                    location.reload();
                     return;
                 }
+                // --- ENDE: NEUE LOGIK FÜR MULTI-QR-CODE ---
                 // --- ENDE: NEUE LOGIK FÜR MULTI-QR-CODE ---
 
                 updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
@@ -2487,15 +2594,15 @@ const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
             resetDataButtonEl.addEventListener('click', () => {
                 removeActiveInlineNoteEditor();
                 if (confirm("WARNUNG!\n\nMöchtest du wirklich ALLE erfassten Sendungsdaten unwiderruflich löschen?")) {
+                    // Die Hauptaktion bleibt: Lokalen Speicher leeren
                     localStorage.removeItem(LOCAL_STORAGE_KEY);
-                    renderTable(); displayCurrentShipmentDetails(''); clearError(); shipmentNumberInputEl.value = '';
-                    resetSingleScanNoteInputState(); updateNoteAndComboVisibility(); updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
-                    if (isBatchModeActive) { currentBatch = []; currentBatchGlobalNote = null; isBatchNotePromptRequired = true; updateBatchUI(); }
-                    sessionFirstSuffixScans = {}; notifiedCompletions = new Set();
-                    sheetStatusEl.textContent = 'Alle Daten zurückgesetzt.'; sheetStatusEl.style.color = 'green';
-                    setTimeout(closeSideMenu, 1500);
+                    
+                    // NEU: Seite neu laden, um den Reset abzuschließen.
+                    // Die UI-Updates danach sind nicht mehr nötig, da die Seite von Grund auf neu lädt.
+                    location.reload(); 
                 } else {
-                    sheetStatusEl.textContent = 'Zurücksetzen abgebrochen.'; sheetStatusEl.style.color = 'blue';
+                    sheetStatusEl.textContent = 'Zurücksetzen abgebrochen.';
+                    sheetStatusEl.style.color = 'blue';
                     setTimeout(() => { if (sheetStatusEl.textContent.includes('abgebrochen')) sheetStatusEl.textContent = ''; }, 3000);
                 }
             });
@@ -2593,7 +2700,22 @@ const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
                     focusShipmentInput();
                 }
             });
-            // ===== ENDE: NEUE EVENT LISTENER =====
+            
+            // ===== START: NEUE EVENT LISTENER FÜR HU-MODAL-TABS =====
+            showOpenSecurityHusBtnEl.addEventListener('click', () => {
+                showOpenSecurityHusBtnEl.classList.add('active');
+                showMissingReceiptHusBtnEl.classList.remove('active');
+                openHusListContainerEl.style.display = 'block';
+                missingReceiptHusListContainerEl.style.display = 'none';
+            });
+
+            showMissingReceiptHusBtnEl.addEventListener('click', () => {
+                showMissingReceiptHusBtnEl.classList.add('active');
+                showOpenSecurityHusBtnEl.classList.remove('active');
+                missingReceiptHusListContainerEl.style.display = 'block';
+                openHusListContainerEl.style.display = 'none';
+            });
+            // ===== ENDE: NEUE EVENT LISTENER FÜR HU-MODAL-TABS =====
 
         } // Ende der setupEventListeners Funktion
 
@@ -2732,8 +2854,6 @@ function attemptLockOrientation() {
 
 </body>
 </html>
-
-
 
 
 
