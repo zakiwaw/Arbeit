@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -367,6 +368,52 @@
     border-bottom-color: var(--primary-color);
 }
 /* --- ENDE: NEUE STILE FÜR MODAL-TABS --- */
+/* --- START: NEUE STILE FÜR VOLLBILD-MODAL --- */
+
+/* Diese Klasse wird per JavaScript zum <body> hinzugefügt, wenn ein Modal offen ist */
+body.modal-open {
+    overflow: hidden; /* Verhindert das Scrollen des Hintergrunds */
+}
+
+/* Passt das Aussehen des Modal-Inhalts an, um den Bildschirm auszufüllen */
+.modal-content {
+    width: 100%;
+    height: 100%;
+    max-width: 100%; /* Überschreibt die alte Breitenbegrenzung */
+    margin: 0;
+    border: none;
+    border-radius: 0; /* Entfernt abgerundete Ecken für den Vollbild-Look */
+    box-shadow: none;
+    
+    /* Flexbox-Layout, um Header, Inhalt und Footer besser zu steuern */
+    display: flex;
+    flex-direction: column;
+    padding: 15px; /* Etwas Padding für den Inhalt */
+    box-sizing: border-box;
+}
+
+/* Sorgt dafür, dass der scrollbare Bereich im Modal den verfügbaren Platz einnimmt */
+#openHusListContainer, 
+#missingReceiptHusListContainer,
+#editModal .form-group,
+#importHuModal .form-group:nth-of-type(2) /* Zielt auf den Container der Textarea */ {
+    flex-grow: 1; /* Dieser Bereich dehnt sich aus */
+    overflow-y: auto; /* Nur dieser Bereich wird scrollbar, nicht das ganze Modal */
+    min-height: 0; /* Wichtiger Fix für Flexbox-Scrolling */
+}
+
+/* Stellt sicher, dass die Textarea im Import-Modal den ganzen Platz ausfüllt */
+#huListTextarea {
+    flex-grow: 1;
+    height: 100%;
+}
+
+/* Die Aktions-Buttons am Ende sollen nicht mitwachsen */
+.modal-actions {
+    flex-shrink: 0;
+    margin-top: 15px;
+}
+/* --- ENDE: NEUE STILE FÜR VOLLBILD-MODAL --- */
 </style>
 </head>
 <body>
@@ -809,6 +856,7 @@ function calculateGoodsReceiptCount(scannedItems) {
 
             // Modal anzeigen
             openHusModalEl.classList.add('visible');
+            document.body.classList.add('modal-open'); // NEU
             closeSideMenu(); 
         }
         // --- START: NEUE HILFSFUNKTION ---
@@ -1692,30 +1740,40 @@ function calculateGoodsReceiptCount(scannedItems) {
 
         function confirmAndAddFirstBatchItemWithNote() {
             const newNote = batchNoteInputEl.value.trim() || null;
-            currentBatchGlobalNote = newNote; // Die globale Notiz für zukünftige Scans setzen
-
-            // *** DIE WICHTIGE NEUE LOGIK ***
-            // Wende die Notiz auf ALLE bereits vorhandenen Items im Batch an
-            currentBatch.forEach(item => {
-                item.note = newNote;
-            });
-            // *******************************
-
-            isBatchNotePromptRequired = false; // Modal für diesen Batch behandelt
+            currentBatchGlobalNote = newNote;
+            currentBatch.forEach(item => { item.note = newNote; });
+            isBatchNotePromptRequired = false;
             batchNoteModalEl.classList.remove('visible');
-            updateBatchUI(); // UI aktualisieren, um die Notizen bei allen Items anzuzeigen
-            batchNoteToggleEl.checked = false; // Schalter nach Benutzung immer deaktivieren
+            document.body.classList.remove('modal-open'); // NEU
+            updateBatchUI();
+            batchNoteToggleEl.checked = false;
 
-            // Nur wenn ein Scan auf die Verarbeitung wartet, wird er hinzugefügt.
             if (pendingFirstBatchScanData) {
-                const batchItem = {
-                    rawInput: pendingFirstBatchScanData.rawInput,
-                    scanTimestamp: pendingFirstBatchScanData.scanTimestamp,
-                    note: currentBatchGlobalNote
-                };
+                const batchItem = { ...pendingFirstBatchScanData, note: currentBatchGlobalNote };
                 currentBatch.push(batchItem);
                 pendingFirstBatchScanData = null;
-                updateBatchUI(); // UI erneut aktualisieren, um das neue Item anzuzeigen
+                updateBatchUI();
+                shipmentNumberInputEl.value = '';
+                updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
+            }
+            clearError();
+            focusShipmentInput();
+        }
+
+        function skipNoteAndAddFirstBatchItem() {
+            currentBatchGlobalNote = null;
+            currentBatch.forEach(item => { item.note = null; });
+            isBatchNotePromptRequired = false;
+            batchNoteModalEl.classList.remove('visible');
+            document.body.classList.remove('modal-open'); // NEU
+            updateBatchUI();
+            batchNoteToggleEl.checked = false;
+
+            if (pendingFirstBatchScanData) {
+                const batchItem = { ...pendingFirstBatchScanData, note: null };
+                currentBatch.push(batchItem);
+                pendingFirstBatchScanData = null;
+                updateBatchUI();
                 shipmentNumberInputEl.value = '';
                 updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
             }
@@ -1979,7 +2037,7 @@ function calculateGoodsReceiptCount(scannedItems) {
             focusShipmentInput();
         }
         
-         function openEditModal(baseNumber) {
+        function openEditModal(baseNumber) {
             removeActiveInlineNoteEditor();
             const shipments = loadShipments();
             const shipment = shipments[baseNumber];
@@ -1988,15 +2046,15 @@ function calculateGoodsReceiptCount(scannedItems) {
             editShipmentBaseNumberInputEl.value = baseNumber;
             editShipmentNumberDisplayEl.value = baseNumber;
             editTotalPiecesExpectedInputEl.value = shipment.totalPiecesExpected ?? '';
-            
-            // NEU: Das Feld für den manuellen Wareneingang leeren
             editGoodsReceiptCountInputEl.value = ''; 
             
             editModalEl.classList.add('visible');
+            document.body.classList.add('modal-open'); // NEU
             editTotalPiecesExpectedInputEl.focus();
         }
         function closeEditModal() {
             editModalEl.classList.remove('visible');
+            document.body.classList.remove('modal-open'); // NEU
             focusShipmentInput();
         }
 
@@ -2559,20 +2617,16 @@ function calculateGoodsReceiptCount(scannedItems) {
             });            
             // Listener für den Notiz-Schalter, um das Modal auch mitten im Batch zu öffnen
             batchNoteToggleEl.addEventListener('change', () => {
-                // Nur auslösen, wenn der Schalter EINGESCHALTET wird und der Batch-Modus aktiv ist
                 if (batchNoteToggleEl.checked && isBatchModeActive) {
-                    // Wichtig: Wir setzen hier KEINE pendingFirstBatchScanData.
-                    // Das ist das Signal für die Modal-Funktionen, dass nur eine Notiz geändert wird.
-                    
-                    batchNoteInputEl.value = currentBatchGlobalNote || ''; // Modal mit aktueller Notiz vorbefüllen
+                    batchNoteInputEl.value = currentBatchGlobalNote || '';
                     batchNoteModalEl.classList.add('visible');
+                    document.body.classList.add('modal-open'); // NEU
                     batchNoteInputEl.focus();
                 }
             });
 
-            confirmBatchNoteButtonEl.addEventListener('click', confirmAndAddFirstBatchItemWithNote);
-            skipBatchNoteButtonEl.addEventListener('click', skipNoteAndAddFirstBatchItem);
-            batchNoteInputEl.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); confirmBatchNoteButtonEl.click(); }});
+            confirmBatchNoteButtonEl.addEventListener('click', confirmAndAddFirstBatchItemWithNote); // schließt Modal intern
+            skipBatchNoteButtonEl.addEventListener('click', skipNoteAndAddFirstBatchItem);       // schließt Modal intern
             batchNoteModalEl.addEventListener('click', (e) => { if (e.target === batchNoteModalEl) skipNoteAndAddFirstBatchItem(); });
 
             // Seitenmenü
@@ -2616,6 +2670,7 @@ function calculateGoodsReceiptCount(scannedItems) {
                 mainOrderNumberInputEl.value = '';
                 huListTextareaEl.value = '';
                 importHuModalEl.classList.add('visible');
+		document.body.classList.add('modal-open'); // NEU
                 mainOrderNumberInputEl.focus();
             });
 
@@ -2647,6 +2702,7 @@ function calculateGoodsReceiptCount(scannedItems) {
 
             cancelHuImportButtonEl.addEventListener('click', () => {
                 importHuModalEl.classList.remove('visible');
+		document.body.classList.remove('modal-open'); 
                 focusShipmentInput();
             });
 
@@ -2679,12 +2735,14 @@ function calculateGoodsReceiptCount(scannedItems) {
             
             closeOpenHusModalButtonEl.addEventListener('click', () => {
                 openHusModalEl.classList.remove('visible');
+                document.body.classList.remove('modal-open'); // NEU
                 focusShipmentInput();
             });
             
             openHusModalEl.addEventListener('click', (e) => {
                 if (e.target === openHusModalEl) {
                     openHusModalEl.classList.remove('visible');
+                    document.body.classList.remove('modal-open'); // NEU
                     focusShipmentInput();
                 }
             });
@@ -2842,7 +2900,6 @@ function attemptLockOrientation() {
 
 </body>
 </html>
-
 
 
 
