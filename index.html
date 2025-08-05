@@ -2049,8 +2049,9 @@ function calculateGoodsReceiptCount(scannedItems) {
             editGoodsReceiptCountInputEl.value = ''; 
             
             editModalEl.classList.add('visible');
-            document.body.classList.add('modal-open'); // NEU
-            editTotalPiecesExpectedInputEl.focus();
+            document.body.classList.add('modal-open');
+            // NEU: Diese Zeile auskommentieren, um die Tastatur zu unterdrücken.
+            // editTotalPiecesExpectedInputEl.focus();
         }
         function closeEditModal() {
             editModalEl.classList.remove('visible');
@@ -2331,22 +2332,21 @@ function calculateGoodsReceiptCount(scannedItems) {
             mainOrderNumberInputEl.addEventListener('dblclick', enableManualInput);
             huListTextareaEl.addEventListener('dblclick', enableManualInput);
 
-            // Event Listener für HU-Import
             importHuListButtonEl.addEventListener('click', () => {
                 sideMenuEl.classList.remove('open');
                 menuOverlayEl.classList.remove('visible');
 
-                // HIER die Zurücksetzung hinzufügen
+                // Inputmode für Scanner zurücksetzen
                 mainOrderNumberInputEl.inputMode = 'none';
                 huListTextareaEl.inputMode = 'none';
 
                 mainOrderNumberInputEl.value = '';
                 huListTextareaEl.value = '';
                 importHuModalEl.classList.add('visible');
-                mainOrderNumberInputEl.focus();
+                document.body.classList.add('modal-open');
+                // NEU: Diese Zeile auskommentieren, um das automatische Öffnen der Tastatur zu verhindern.
+                // mainOrderNumberInputEl.focus(); 
             });
-            // --- ENDE: Doppelklick-Logik ---
-        // --- Event Listener Setup ---
 
 
 
@@ -2620,8 +2620,9 @@ function calculateGoodsReceiptCount(scannedItems) {
                 if (batchNoteToggleEl.checked && isBatchModeActive) {
                     batchNoteInputEl.value = currentBatchGlobalNote || '';
                     batchNoteModalEl.classList.add('visible');
-                    document.body.classList.add('modal-open'); // NEU
-                    batchNoteInputEl.focus();
+                    document.body.classList.add('modal-open');
+                    // NEU: Diese Zeile auskommentieren.
+                    // batchNoteInputEl.focus();
                 }
             });
 
@@ -2900,6 +2901,9 @@ function attemptLockOrientation() {
 
 </body>
 </html>
+
+
+
 
 
 
