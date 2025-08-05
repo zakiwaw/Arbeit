@@ -2659,46 +2659,29 @@ function calculateGoodsReceiptCount(scannedItems) {
                  }
             });
 
-            // --- START: Event Listener für HU-Import (enthält Tastatur-Logik) ---
             importHuListButtonEl.addEventListener('click', () => {
+                // NEU: Aktives Schließen der Tastatur, falls sie von der Hauptseite noch offen ist.
+                // Wir entfernen den Fokus vom aktuell aktiven Element.
+                if (document.activeElement && typeof document.activeElement.blur === 'function') {
+                    document.activeElement.blur();
+                }
+
                 sideMenuEl.classList.remove('open');
                 menuOverlayEl.classList.remove('visible');
 
-                // Inputmode für Scanner zurücksetzen
+                // Setzt den Input-Modus explizit auf 'none', um die Standard-Tastatur zu unterdrücken.
+                // Das ist der "Scanner-Modus".
                 mainOrderNumberInputEl.inputMode = 'none';
                 huListTextareaEl.inputMode = 'none';
 
                 mainOrderNumberInputEl.value = '';
                 huListTextareaEl.value = '';
                 importHuModalEl.classList.add('visible');
-		document.body.classList.add('modal-open'); // NEU
-                mainOrderNumberInputEl.focus();
-            });
+                document.body.classList.add('modal-open');
 
-            mainOrderNumberInputEl.addEventListener('input', (event) => {
-                const scannedText = event.target.value;
-
-                // Fall 1: Der QR-Code mit allen Daten wird gescannt
-                if (scannedText.includes('|||')) {
-                    const parts = scannedText.split('|||');
-                    const orderNumber = parts[0];
-                    const huString = parts[1];
-                    mainOrderNumberInputEl.value = orderNumber;
-                    huListTextareaEl.value = huString;
-                    // Fokus auf die Textarea setzen, damit der User ggf. weiter scannen oder speichern kann
-                    huListTextareaEl.focus();
-                    return; // Wichtig: Verarbeitung hier beenden
-                }
-                
-                // --- START DER NEUEN LOGIK ---
-                // Fall 2: Nur die Auftragsnummer wird gescannt (kein QR-Code)
-                // Wir prüfen, ob der inputmode 'none' ist, um sicherzustellen, dass es ein Scan war
-                // und der Text eine gewisse Länge hat, um Fehlauslösungen zu vermeiden.
-                if (mainOrderNumberInputEl.inputMode === 'none' && scannedText.length > 5) {
-                    // Fokus auf das nächste Feld (die Textarea) setzen
-                    huListTextareaEl.focus();
-                }
-                // --- ENDE DER NEUEN LOGIK ---
+                // Der .focus()-Aufruf bleibt auskommentiert, um zu verhindern, dass das Feld 
+                // überhaupt einen Fokus erhält, was die Tastatur auslösen könnte.
+                // mainOrderNumberInputEl.focus();
             });
 
             cancelHuImportButtonEl.addEventListener('click', () => {
