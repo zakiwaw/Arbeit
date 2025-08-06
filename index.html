@@ -343,10 +343,23 @@
     display: flex;
     margin-bottom: 15px;
     border-bottom: 2px solid #eee;
+    
+    /* NEU: Horizontales Scrollen aktivieren, wenn der Inhalt überläuft */
+    overflow-x: auto;
+    /* NEU: Verhindert, dass die Buttons in die nächste Zeile umbrechen */
+    flex-wrap: nowrap;
+
+    /* Optional: Verbessert das Scroll-Gefühl auf iOS */
+    -webkit-overflow-scrolling: touch;
+
+    /* Optional: Gestaltet die Scrollleiste unauffälliger */
+    scrollbar-width: thin;
+    scrollbar-color: #ccc transparent;
 }
 .modal-tab-btn {
-    flex: 1;
-    padding: 10px 5px;
+    /* ÄNDERUNG: 'flex: 1;' wird entfernt, damit die Buttons nicht mehr gezwungen werden, den Platz auszufüllen */
+    
+    padding: 10px 15px; /* Etwas mehr seitliches Padding für besseres Aussehen */
     font-size: 0.95em;
     font-weight: 500;
     text-align: center;
@@ -356,7 +369,20 @@
     cursor: pointer;
     border-bottom: 3px solid transparent;
     transition: all 0.2s ease-in-out;
+
+    /* NEU: Verhindert, dass die Buttons schrumpfen */
+    flex-shrink: 0;
+    /* NEU: Stellt sicher, dass der Text im Button nicht umbricht */
+    white-space: nowrap;
 }
+.modal-tabs::-webkit-scrollbar {
+    height: 4px; /* Höhe der Scrollleiste */
+}
+.modal-tabs::-webkit-scrollbar-thumb {
+    background-color: #ccc; /* Farbe des Scroll-Balkens */
+    border-radius: 4px;
+}
+modal-tabs::-webkit-scrollbar-track
 .modal-tab-btn:hover {
     background-color: #f9f9f9;
     color: var(--primary-color);
@@ -462,14 +488,16 @@ body.modal-open {
     <div id="sheetStatus"></div>
 </div>
 <div id="menu-overlay" class="menu-overlay"></div>
+<!-- --- START DER ÄNDERUNG --- -->
 <div id="openHusModal" class="modal-overlay">
     <div class="modal-content">
 
         
-        <!-- NEUE TAB-BUTTONS -->
+        <!-- TAB-BUTTONS AKTUALISIERT -->
         <div class="modal-tabs">
             <button id="showOpenSecurityHusBtn" class="modal-tab-btn active">Offene Sicherung</button>
             <button id="showMissingReceiptHusBtn" class="modal-tab-btn">Fehlende Eingänge</button>
+            <button id="showDunkelalarmHusBtn" class="modal-tab-btn">Dunkelalarm</button>
         </div>
 
         <!-- Container für die erste Ansicht (bestehend) -->
@@ -477,9 +505,14 @@ body.modal-open {
             <!-- Inhalt für offene Sicherung wird hier generiert -->
         </div>
         
-        <!-- NEUER Container für die zweite Ansicht -->
+        <!-- Container für die zweite Ansicht (bestehend) -->
         <div id="missingReceiptHusListContainer" style="max-height: 60vh; overflow-y: auto; padding-right: 10px; display: none;">
             <!-- Inhalt für fehlenden Wareneingang wird hier generiert -->
+        </div>
+
+        <!-- NEUER Container für die Dunkelalarm-Ansicht -->
+        <div id="dunkelalarmHusListContainer" style="max-height: 60vh; overflow-y: auto; padding-right: 10px; display: none;">
+            <!-- Inhalt für Dunkelalarm-Sendungen wird hier generiert -->
         </div>
 
         <div class="modal-actions" style="justify-content: center; margin-top: 20px;">
@@ -487,6 +520,7 @@ body.modal-open {
         </div>
     </div>
 </div>
+<!-- --- ENDE DER ÄNDERUNG --- -->
 <div class="container">
     <div class="batch-controls">
         <button id="menu-toggle-btn" title="Menü öffnen/schließen">☰</button>
@@ -717,6 +751,8 @@ const closeOpenHusModalButtonEl = document.getElementById('closeOpenHusModalButt
 const showOpenSecurityHusBtnEl = document.getElementById('showOpenSecurityHusBtn');
 const showMissingReceiptHusBtnEl = document.getElementById('showMissingReceiptHusBtn');
 const missingReceiptHusListContainerEl = document.getElementById('missingReceiptHusListContainer');
+const showDunkelalarmHusBtnEl = document.getElementById('showDunkelalarmHusBtn');
+const dunkelalarmHusListContainerEl = document.getElementById('dunkelalarmHusListContainer');
 
         // --- Konstanten & Konfiguration ---
 
@@ -770,6 +806,8 @@ function calculateGoodsReceiptCount(scannedItems) {
     // Zählt nur Scans mit dem Status "Wareneingang", die nicht storniert sind
     return scannedItems.filter(item => item.status === 'Wareneingang' && !item.isCancelled).length;
 }
+// --- START DER ÄNDERUNG: Die gesamte Funktion wird aktualisiert ---
+// --- START DER ÄNDERUNG: Die gesamte Funktion wird mit der präziseren Logik ersetzt ---
       function showOpenHusSummary() {
             removeActiveInlineNoteEditor();
             const shipments = loadShipments();
@@ -778,15 +816,37 @@ function calculateGoodsReceiptCount(scannedItems) {
             const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
             let openSecurityHusByOrder = [];
 
-            // --- Logik für "Fehlender Wareneingang" (NEU) ---
+            // --- Logik für "Fehlender Wareneingang" (bestehend) ---
             let missingReceiptHusByOrder = [];
+
+            // --- NEUE, PRÄZISERE Logik für "Dunkelalarm" ---
+            let dunkelalarmItemsByOrder = {}; // Ein Objekt, um HUs nach Auftrag zu gruppieren
 
             Object.keys(shipments).forEach(baseNumber => {
                 const shipment = shipments[baseNumber];
+                
+                // Durchsuche alle Scans jeder Sendung
+                if (shipment.scannedItems && shipment.scannedItems.length > 0) {
+                    const itemsWithDunkelalarm = shipment.scannedItems.filter(
+                        item => item.status === 'Dunkelalarm' && !item.isCancelled
+                    );
+
+                    // Wenn spezifische "Dunkelalarm"-Einträge gefunden wurden...
+                    if (itemsWithDunkelalarm.length > 0) {
+                        // ...füge ihre gescannten Nummern (rawInput) zur Liste hinzu.
+                        if (!dunkelalarmItemsByOrder[baseNumber]) {
+                            dunkelalarmItemsByOrder[baseNumber] = [];
+                        }
+                        itemsWithDunkelalarm.forEach(item => {
+                            dunkelalarmItemsByOrder[baseNumber].push(item.rawInput);
+                        });
+                    }
+                }
+
+                // Die bestehende Logik für HU-Listen-Aufträge bleibt unverändert
                 if (shipment.isHuListOrder && shipment.scannedItems && shipment.scannedItems.length > 0) {
                     const allUniqueHuNumbers = [...new Set(shipment.scannedItems.map(item => item.rawInput))];
                     
-                    // 1. Berechnung für "Offene Sicherung"
                     const processedHus = new Set(
                         shipment.scannedItems
                             .filter(item => processedStatuses.includes(item.status) && !item.isCancelled)
@@ -801,7 +861,6 @@ function calculateGoodsReceiptCount(scannedItems) {
                         });
                     }
 
-                    // 2. Berechnung für "Fehlender Wareneingang" (NEU)
                     const receiptHus = new Set(
                         shipment.scannedItems
                             .filter(item => item.status === 'Wareneingang' && !item.isCancelled)
@@ -819,7 +878,7 @@ function calculateGoodsReceiptCount(scannedItems) {
                 }
             });
 
-            // HTML für "Offene Sicherung" generieren
+            // HTML für "Offene Sicherung" generieren (unverändert)
             let securityHtmlContent = '';
             if (openSecurityHusByOrder.length > 0) {
                  openSecurityHusByOrder.sort((a,b) => a.orderNumber.localeCompare(b.orderNumber));
@@ -833,7 +892,7 @@ function calculateGoodsReceiptCount(scannedItems) {
             }
             openHusListContainerEl.innerHTML = securityHtmlContent;
 
-            // HTML für "Fehlender Wareneingang" generieren (NEU)
+            // HTML für "Fehlender Wareneingang" generieren (unverändert)
             let receiptHtmlContent = '';
             if (missingReceiptHusByOrder.length > 0) {
                  missingReceiptHusByOrder.sort((a,b) => a.orderNumber.localeCompare(b.orderNumber));
@@ -846,18 +905,41 @@ function calculateGoodsReceiptCount(scannedItems) {
                 receiptHtmlContent = '<p class="no-open-hus-message">Perfekt! Alle HUs wurden im Wareneingang erfasst.</p>';
             }
             missingReceiptHusListContainerEl.innerHTML = receiptHtmlContent;
+            
+            // HTML für "Dunkelalarm" mit der NEUEN Logik generieren
+            let dunkelalarmHtmlContent = '';
+            const dunkelalarmOrderNumbers = Object.keys(dunkelalarmItemsByOrder).sort();
 
-            // Standardansicht beim Öffnen festlegen (Tabs zurücksetzen)
+            if (dunkelalarmOrderNumbers.length > 0) {
+                 dunkelalarmOrderNumbers.forEach(orderNumber => {
+                     const hus = dunkelalarmItemsByOrder[orderNumber].sort();
+                     dunkelalarmHtmlContent += `<div class="hu-order-group">`;
+                     // Zeigt die übergeordnete Sendungsnummer an
+                     dunkelalarmHtmlContent += `<div class="hu-order-title">${escapeHtml(orderNumber)}</div>`;
+                     // Zeigt die Liste der spezifischen Packstücke an
+                     dunkelalarmHtmlContent += `<ul class="hu-list">${hus.map(hu => `<li>${escapeHtml(hu)}</li>`).join('')}</ul>`;
+                     dunkelalarmHtmlContent += `</div>`;
+                 });
+            } else {
+                dunkelalarmHtmlContent = '<p class="no-open-hus-message">Keine Einträge mit Status "Dunkelalarm" gefunden.</p>';
+            }
+            dunkelalarmHusListContainerEl.innerHTML = dunkelalarmHtmlContent;
+
+            // Standardansicht beim Öffnen festlegen (unverändert)
             showOpenSecurityHusBtnEl.classList.add('active');
             showMissingReceiptHusBtnEl.classList.remove('active');
+            showDunkelalarmHusBtnEl.classList.remove('active');
             openHusListContainerEl.style.display = 'block';
             missingReceiptHusListContainerEl.style.display = 'none';
+            dunkelalarmHusListContainerEl.style.display = 'none';
 
-            // Modal anzeigen
+            // Modal anzeigen (unverändert)
             openHusModalEl.classList.add('visible');
-            document.body.classList.add('modal-open'); // NEU
+            document.body.classList.add('modal-open');
             closeSideMenu(); 
         }
+// --- ENDE DER ÄNDERUNG ---
+// --- ENDE DER ÄNDERUNG ---
         // --- START: NEUE HILFSFUNKTION ---
         function calculateXryKombiCount(scannedItems) {
             if (!Array.isArray(scannedItems)) return 0;
@@ -2764,22 +2846,40 @@ function skipNoteAndAddFirstBatchItem() {
                 }
             });
             
-            // ===== START: NEUE EVENT LISTENER FÜR HU-MODAL-TABS =====
+// --- START DER ÄNDERUNG: Die Event-Listener für die Modal-Tabs werden aktualisiert ---
+            // ===== START: EVENT LISTENER FÜR HU-MODAL-TABS =====
             showOpenSecurityHusBtnEl.addEventListener('click', () => {
                 showOpenSecurityHusBtnEl.classList.add('active');
                 showMissingReceiptHusBtnEl.classList.remove('active');
+                showDunkelalarmHusBtnEl.classList.remove('active');
+
                 openHusListContainerEl.style.display = 'block';
                 missingReceiptHusListContainerEl.style.display = 'none';
+                dunkelalarmHusListContainerEl.style.display = 'none';
             });
 
             showMissingReceiptHusBtnEl.addEventListener('click', () => {
                 showMissingReceiptHusBtnEl.classList.add('active');
                 showOpenSecurityHusBtnEl.classList.remove('active');
+                showDunkelalarmHusBtnEl.classList.remove('active');
+
                 missingReceiptHusListContainerEl.style.display = 'block';
                 openHusListContainerEl.style.display = 'none';
+                dunkelalarmHusListContainerEl.style.display = 'none';
             });
-            // ===== ENDE: NEUE EVENT LISTENER FÜR HU-MODAL-TABS =====
 
+            // Neuer Listener für den Dunkelalarm-Tab
+            showDunkelalarmHusBtnEl.addEventListener('click', () => {
+                showDunkelalarmHusBtnEl.classList.add('active');
+                showOpenSecurityHusBtnEl.classList.remove('active');
+                showMissingReceiptHusBtnEl.classList.remove('active');
+
+                dunkelalarmHusListContainerEl.style.display = 'block';
+                openHusListContainerEl.style.display = 'none';
+                missingReceiptHusListContainerEl.style.display = 'none';
+            });
+            // ===== ENDE: EVENT LISTENER FÜR HU-MODAL-TABS =====
+// --- ENDE DER ÄNDERUNG ---
         } // Ende der setupEventListeners Funktion
 
 
@@ -2918,12 +3018,5 @@ function attemptLockOrientation() {
 
 </body>
 </html>
-
-
-
-
-
-
-
 
 
