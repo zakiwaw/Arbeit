@@ -1280,49 +1280,88 @@ function calculateGoodsReceiptCount(scannedItems) {
             const { baseNumber, suffix, isValidFormat, raw: processedRawInput, isSuffixFormat } = processShipmentNumber(rawInputToSave);
             if (!isValidFormat) { return { success: false, waitingForTotal: false, message: `Ungültiges Format: ${escapeHtml(rawInputToSave)}` }; }
 
-            // --- 1. PRÜFUNG: IST ES EINE BEKANNTE HU-NUMMER IN EINEM HU-AUFTRAG? ---
             const shipments = loadShipments();
             const parentHawb = findShipmentByHuNumber(processedRawInput);
             if (parentHawb) {
-                // ... (Dieser Block für HU-Listen bleibt unverändert)
                 const parentShipment = shipments[parentHawb];
                 const now = new Date();
                 const noteText = noteInputEl.value.trim() || null;
                 const isNewScanKombi = (statusToUse === 'XRY' && isCombinationFromCheckbox);
                 const isSecurityStatus = EXCLUSIVE_SECURITY_STATUSES.includes(statusToUse);
 
-                if (isSecurityStatus) {
-                    if (!isNewScanKombi) {
-                        const totalAllowedInstances = parentShipment.scannedItems.filter(item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase()).length;
-                        const currentSecurityScans = parentShipment.scannedItems.filter(item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() && !item.isCancelled && EXCLUSIVE_SECURITY_STATUSES.includes(item.status) && !item.isCombination).length;
-                        if (currentSecurityScans >= totalAllowedInstances) {
-                            return { success: false, waitingForTotal: false, message: `FEHLER: Alle (${totalAllowedInstances}) Packstücke für HU ${escapeHtml(processedRawInput)} haben bereits einen Sicherheitsstatus.` };
-                        }
+                // --- START DER KORREKTUR ---
+                // Bestimmt, wie viele physische Pakete für diese HU existieren.
+                // Dies ist die Summe der "Anstehend"-Platzhalter und der bereits zu einem finalen Status konvertierten Platzhalter.
+                // Diese Zahl bleibt stabil und erhöht sich nicht durch Kombi-Scans.
+                const packageLimit = parentShipment.scannedItems.filter(
+                    item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() &&
+                           (item.status === 'Anstehend' || (EXCLUSIVE_SECURITY_STATUSES.includes(item.status) && !item.isCombination))
+                ).length;
+
+                // Fall 1: Es wird ein XRY Kombi-Scan versucht.
+                if (isNewScanKombi) {
+                    const currentKombiCount = parentShipment.scannedItems.filter(
+                        item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() &&
+                               !item.isCancelled &&
+                               item.isCombination
+                    ).length;
+
+                    if (currentKombiCount >= packageLimit) {
+                        return { success: false, waitingForTotal: false, message: `Limit (${packageLimit}) erreicht: Für HU ${escapeHtml(processedRawInput)} wurde bereits die maximale Anzahl an Kombi-Sicherungen erfasst.` };
                     }
-                    const anstehendIndex = parentShipment.scannedItems.findIndex(i => i.rawInput.toUpperCase() === processedRawInput.toUpperCase() && i.status === 'Anstehend');
+                    
+                    const newItem = {
+                        rawInput: processedRawInput, status: 'XRY', timestamp: now.toISOString(),
+                        isCombination: true, notes: noteText ? [noteText] : [],
+                        isCancelled: false, cancelledTimestamp: null
+                    };
+                    parentShipment.scannedItems.push(newItem);
+                
+                // Fall 2: Es ist ein regulärer (nicht-Kombi) Sicherheits-Scan.
+                } else if (isSecurityStatus) {
+                    const anstehendIndex = parentShipment.scannedItems.findIndex(
+                        i => i.rawInput.toUpperCase() === processedRawInput.toUpperCase() && i.status === 'Anstehend'
+                    );
+
                     if (anstehendIndex === -1) {
-                        return { success: false, waitingForTotal: false, message: `FEHLER: Alle erwarteten Packstücke für HU ${escapeHtml(processedRawInput)} wurden bereits final erfasst.` };
+                        return { success: false, waitingForTotal: false, message: `FEHLER: Alle (${packageLimit}) erwarteten Packstücke für HU ${escapeHtml(processedRawInput)} haben bereits einen finalen Sicherheitsstatus.` };
                     }
+                    
                     const itemToUpdate = parentShipment.scannedItems[anstehendIndex];
-                    itemToUpdate.status = statusToUse; itemToUpdate.timestamp = now.toISOString(); itemToUpdate.isCombination = isNewScanKombi; itemToUpdate.notes = noteText ? [noteText] : []; itemToUpdate.isCancelled = false; itemToUpdate.cancelledTimestamp = null;
+                    itemToUpdate.status = statusToUse; itemToUpdate.timestamp = now.toISOString();
+                    itemToUpdate.isCombination = false; itemToUpdate.notes = noteText ? [noteText] : [];
+                    itemToUpdate.isCancelled = false; itemToUpdate.cancelledTimestamp = null;
+
+                // Fall 3: Es ist ein anderer Status (z.B. Wareneingang).
                 } else {
-                    const totalExpectedInstances = parentShipment.scannedItems.filter(item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() && (item.status === 'Anstehend' || EXCLUSIVE_SECURITY_STATUSES.includes(item.status))).length;
-                    const currentStatusCount = parentShipment.scannedItems.filter(item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() && item.status === statusToUse && !item.isCancelled).length;
-                    if (currentStatusCount >= totalExpectedInstances) {
-                        return { success: false, waitingForTotal: false, message: `Limit erreicht: Status '${escapeHtml(statusToUse)}' kann für HU ${escapeHtml(processedRawInput)} nicht erneut vergeben werden.` };
+                    const currentStatusCount = parentShipment.scannedItems.filter(
+                        item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() && 
+                               item.status === statusToUse && !item.isCancelled
+                    ).length;
+
+                    if (currentStatusCount >= packageLimit) {
+                        return { success: false, waitingForTotal: false, message: `Limit (${packageLimit}) erreicht: Status '${escapeHtml(statusToUse)}' kann für HU ${escapeHtml(processedRawInput)} nicht erneut vergeben werden.` };
                     }
-                    const newItem = { rawInput: processedRawInput, status: statusToUse, timestamp: now.toISOString(), isCombination: isNewScanKombi, notes: noteText ? [noteText] : [], isCancelled: false, cancelledTimestamp: null };
+                    const newItem = {
+                        rawInput: processedRawInput, status: statusToUse, timestamp: now.toISOString(),
+                        isCombination: false, notes: noteText ? [noteText] : [],
+                        isCancelled: false, cancelledTimestamp: null
+                    };
                     parentShipment.scannedItems.push(newItem);
                 }
-                parentShipment.lastModified = now.toISOString(); saveShipments(shipments); resetSingleScanNoteInputState(); setTimeout(() => displayCurrentShipmentDetails(parentHawb), 0);
-                return { success: true, waitingForTotal: false, message: `Vorgang '${statusToUse}' für HU ${escapeHtml(processedRawInput)} erfasst.` };
+                // --- ENDE DER KORREKTUR ---
+
+                parentShipment.lastModified = now.toISOString();
+                saveShipments(shipments);
+                resetSingleScanNoteInputState();
+                setTimeout(() => displayCurrentShipmentDetails(parentHawb), 0); 
+                return { success: true, waitingForTotal: false, message: `Vorgang '${statusToUse}${isNewScanKombi ? ' (Kombi)' : ''}' für HU ${escapeHtml(processedRawInput)} erfasst.` };
             }
 
-            // --- 2. LOGIK: ES IST EINE NORMALE SENDUNG (KEINE BEKANNTE HU) ---
+            // --- Logik für normale Sendungen (unverändert) ---
             if (shipments[baseNumber] && shipments[baseNumber].isHuListOrder) {
                 return { success: false, waitingForTotal: false, message: `FEHLER: ${baseNumber} ist ein HU-Auftrag. Bitte scannen Sie eine der zugehörigen HU-Nummern.` };
             }
-
             if (!shipments[baseNumber]) {
                 const tempIsCombination = (statusToUse === 'XRY' && !isBatchModeActive && isCombinationFromCheckbox);
                 const tempFinalIsCombination = NON_COUNTING_STATUSES.includes(statusToUse) ? false : tempIsCombination;
@@ -1330,11 +1369,8 @@ function calculateGoodsReceiptCount(scannedItems) {
                 newTotalLabelEl.textContent = `Erwartete Gesamtstückzahl für NEUE Sendung ${escapeHtml(baseNumber)}:`; newTotalInputEl.value = ''; newTotalSectionEl.classList.remove('warning-existing'); toggleMainInputControls(false); newTotalInputEl.focus();
                 return { success: false, waitingForTotal: true, message: `Bitte Gesamtstückzahl für ${escapeHtml(baseNumber)} eingeben oder überspringen.` };
             }
-            
             const shipment = shipments[baseNumber];
             const isCombination = (statusToUse === 'XRY' && isCombinationFromCheckbox);
-
-            // Einschränkungen für Scans mit Suffix (von letzter Anforderung)
             if (isSuffixFormat && !shipment.isHuListOrder) {
                 const existingItemsForThisSuffix = shipment.scannedItems.filter(item => !item.isCancelled && item.rawInput.toUpperCase() === processedRawInput.toUpperCase());
                 const isNewScanCounting = EXCLUSIVE_SECURITY_STATUSES.includes(statusToUse) && !isCombination;
@@ -1351,32 +1387,24 @@ function calculateGoodsReceiptCount(scannedItems) {
                     if (existingDunkelalarm) { return { success: false, message: `FEHLER: ${escapeHtml(processedRawInput)} wurde bereits als Dunkelalarm erfasst.` }; }
                 }
             }
-            
-            // Bisherige Logik zur Zählung bis zum Gesamtlimit (bleibt erhalten)
             const expectedTotal = shipment.totalPiecesExpected;
             const existingNonCancelled = (shipment.scannedItems || []).filter(item => !item.isCancelled);
-
             if (isCombination && !shipment.isHuListOrder && expectedTotal !== null) {
                 const xryKombiCount = calculateXryKombiCount(existingNonCancelled);
                 if (xryKombiCount >= expectedTotal) { return { success: false, waitingForTotal: false, message: `Limit (${expectedTotal}) für XRY Kombi bei ${baseNumber} erreicht.` }; }
             }
-
-            // --- START: NEUE PRÜFUNG FÜR DUNKELALARM BEI SENDUNGEN OHNE SUFFIX ---
             if (statusToUse === 'Dunkelalarm' && !isSuffixFormat && !shipment.isHuListOrder && expectedTotal !== null) {
                 const dunkelalarmCount = calculateDunkelalarmCount(existingNonCancelled);
                 if (dunkelalarmCount >= expectedTotal) {
                     return { success: false, waitingForTotal: false, message: `Limit (${expectedTotal}) für Dunkelalarm bei ${baseNumber} erreicht.` };
                 }
             }
-            // --- ENDE: NEUE PRÜFUNG ---
-            
             if (statusToUse === 'Wareneingang' && expectedTotal !== null && calculateGoodsReceiptCount(existingNonCancelled) >= expectedTotal) {
                 return { success: false, waitingForTotal: false, message: `Limit (${expectedTotal}) für Wareneingang bei ${baseNumber} erreicht.` };
             }
             if (!isCombination && !NON_COUNTING_STATUSES.includes(statusToUse) && expectedTotal !== null && calculateCurrentCountedPieces(existingNonCancelled) >= expectedTotal) {
                 return { success: false, waitingForTotal: false, message: `Limit (${expectedTotal}) für normale Scans bei ${baseNumber} erreicht.` };
             }
-
             const now = new Date();
             const noteText = noteInputEl.value.trim() || null;
             const newItem = { rawInput: processedRawInput, status: statusToUse, timestamp: now.toISOString(), isCombination, notes: noteText ? [noteText] : [], isCancelled: false, cancelledTimestamp: null };
@@ -1384,7 +1412,6 @@ function calculateGoodsReceiptCount(scannedItems) {
             shipment.lastModified = now.toISOString();
             saveShipments(shipments);
             resetSingleScanNoteInputState();
-
             const updatedShipment = loadShipments()[baseNumber];
             if (updatedShipment) {
                 const finalCount = calculateCurrentCountedPieces(updatedShipment.scannedItems);
@@ -1392,7 +1419,6 @@ function calculateGoodsReceiptCount(scannedItems) {
                     notifyShipmentCompletion(updatedShipment);
                 }
             }
-
             return { success: true, waitingForTotal: false, message: `${processedRawInput} (${statusToUse}) zu ${baseNumber} hinzugefügt.` };
         }
             // --- ANFANG DER ÄNDERUNG FÜR BUTTON-LOGIK ---
@@ -1704,7 +1730,7 @@ function calculateGoodsReceiptCount(scannedItems) {
 
             const upperRawInput = rawInputFromField.toUpperCase();
             const { baseNumber, isValidFormat, raw: processedRawInput } = processShipmentNumber(upperRawInput);
-             if (!isValidFormat) { // Basisvalidierung auch für Batch-Eingaben
+             if (!isValidFormat) {
                 displayError(`Ungültiges Format für Batch-Eingabe: ${escapeHtml(rawInputFromField)}`);
                 focusShipmentInput();
                 return;
@@ -1712,17 +1738,15 @@ function calculateGoodsReceiptCount(scannedItems) {
 
             const scanTimestamp = new Date().toISOString();
 
-            // Diese Bedingung öffnet das Modal nur für den allerersten Scan, und nur wenn der Schalter an ist.
             if (isBatchModeActive && currentBatch.length === 0 && isBatchNotePromptRequired && batchNoteToggleEl.checked) {
                 pendingFirstBatchScanData = { rawInput: processedRawInput, scanTimestamp: scanTimestamp };
                 batchNoteInputEl.value = currentBatchGlobalNote || ''; 
                 batchNoteModalEl.classList.add('visible');
+                document.body.classList.add('modal-open'); // <-- DIESE ZEILE IST NEU
                 batchNoteInputEl.focus();
                 return;
             }
 
-            // Für JEDEN Scan (den ersten, wenn das Modal übersprungen wird, und alle folgenden)
-            // wird die aktuell gültige globale Batch-Notiz verwendet.
             const batchItem = {
                 rawInput: processedRawInput,
                 scanTimestamp: scanTimestamp,
@@ -1759,12 +1783,14 @@ function calculateGoodsReceiptCount(scannedItems) {
             focusShipmentInput();
         }
 
-        function skipNoteAndAddFirstBatchItem() {
+function skipNoteAndAddFirstBatchItem() {
             currentBatchGlobalNote = null;
             currentBatch.forEach(item => { item.note = null; });
             isBatchNotePromptRequired = false;
+            
             batchNoteModalEl.classList.remove('visible');
-            document.body.classList.remove('modal-open'); // NEU
+            document.body.classList.remove('modal-open'); // <-- DIESE ZEILE IST NEU/KORRIGIERT
+
             updateBatchUI();
             batchNoteToggleEl.checked = false;
 
@@ -1824,46 +1850,68 @@ function calculateGoodsReceiptCount(scannedItems) {
             currentBatch.forEach(batchItem => {
                 const { rawInput: rawInputFromBatch, scanTimestamp, note: itemNote } = batchItem;
                 
-                // Unveränderte Logik für HU-Listen-Aufträge
                 const parentHawb = findShipmentByHuNumber(rawInputFromBatch);
                 if (parentHawb) {
-                    // ... (Dieser Block bleibt unverändert)
                     const parentShipment = shipmentsWorkingCopy[parentHawb];
                     const isNewScanKombi = (batchStatus === 'XRY' && batchIsCombination);
                     const isSecurityStatus = EXCLUSIVE_SECURITY_STATUSES.includes(batchStatus);
+                    
+                    // --- START DER KORREKTUR ---
+                    const packageLimit = parentShipment.scannedItems.filter(
+                        item => item.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() &&
+                               (item.status === 'Anstehend' || (EXCLUSIVE_SECURITY_STATUSES.includes(item.status) && !item.isCombination))
+                    ).length;
 
-                    if (isSecurityStatus) {
-                        if (!isNewScanKombi) {
-                            const totalAllowedInstances = parentShipment.scannedItems.filter(item => item.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase()).length;
-                            const currentSecurityScans = parentShipment.scannedItems.filter(
-                                item => item.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() &&
-                                       !item.isCancelled &&
-                                       EXCLUSIVE_SECURITY_STATUSES.includes(item.status) &&
-                                       !item.isCombination
-                            ).length;
-                            if (currentSecurityScans >= totalAllowedInstances) {
-                                errorCount++; errorMessages.push(`Alle Packstücke für HU ${rawInputFromBatch} haben bereits einen Sicherheitsstatus.`); return;
-                            }
+                    if (isNewScanKombi) {
+                        const currentKombiCount = parentShipment.scannedItems.filter(
+                            item => item.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() &&
+                                   !item.isCancelled && item.isCombination
+                        ).length;
+                        if (currentKombiCount >= packageLimit) {
+                            errorCount++; errorMessages.push(`Kombi-Limit (${packageLimit}) für HU ${rawInputFromBatch} erreicht.`); return;
                         }
-                        const anstehendIndex = parentShipment.scannedItems.findIndex(i => i.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() && i.status === 'Anstehend');
+                        const newScanItem = {
+                            rawInput: rawInputFromBatch, status: batchStatus, timestamp: scanTimestamp,
+                            isCombination: true, notes: itemNote ? [itemNote] : [],
+                            isCancelled: false, cancelledTimestamp: null
+                        };
+                        parentShipment.scannedItems.push(newScanItem);
+
+                    } else if (isSecurityStatus) {
+                        const anstehendIndex = parentShipment.scannedItems.findIndex(
+                            i => i.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() && i.status === 'Anstehend'
+                        );
                         if (anstehendIndex === -1) {
-                            errorCount++; errorMessages.push(`Alle Packstücke für HU ${rawInputFromBatch} bereits final erfasst.`); return;
+                            errorCount++; errorMessages.push(`Alle (${packageLimit}) Packstücke für HU ${rawInputFromBatch} bereits final erfasst.`); return;
                         }
                         const itemToUpdate = parentShipment.scannedItems[anstehendIndex];
-                        itemToUpdate.status = batchStatus; itemToUpdate.timestamp = scanTimestamp; itemToUpdate.isCombination = isNewScanKombi; itemToUpdate.notes = itemNote ? [itemNote] : []; itemToUpdate.isCancelled = false; itemToUpdate.cancelledTimestamp = null;
+                        itemToUpdate.status = batchStatus; itemToUpdate.timestamp = scanTimestamp;
+                        itemToUpdate.isCombination = false; itemToUpdate.notes = itemNote ? [itemNote] : [];
+                        itemToUpdate.isCancelled = false; itemToUpdate.cancelledTimestamp = null;
+                        
                     } else {
-                        const totalExpectedInstances = parentShipment.scannedItems.filter(item => item.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() && (item.status === 'Anstehend' || EXCLUSIVE_SECURITY_STATUSES.includes(item.status))).length;
-                        const currentStatusCount = parentShipment.scannedItems.filter(item => item.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() && item.status === batchStatus && !item.isCancelled).length;
-                        if (currentStatusCount >= totalExpectedInstances) {
-                            errorCount++; errorMessages.push(`Limit erreicht: Status '${batchStatus}' kann für HU ${rawInputFromBatch} nicht erneut vergeben werden.`); return;
+                        const currentStatusCount = parentShipment.scannedItems.filter(
+                            item => item.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() && 
+                                   item.status === batchStatus && !item.isCancelled
+                        ).length;
+                        if (currentStatusCount >= packageLimit) {
+                            errorCount++; errorMessages.push(`Limit (${packageLimit}) für Status '${batchStatus}' bei HU ${rawInputFromBatch} erreicht.`); return;
                         }
-                        const newScanItem = {rawInput: rawInputFromBatch, status: batchStatus, timestamp: scanTimestamp, isCombination: isNewScanKombi, notes: itemNote ? [itemNote] : [], isCancelled: false, cancelledTimestamp: null};
+                        const newScanItem = {
+                            rawInput: rawInputFromBatch, status: batchStatus, timestamp: scanTimestamp,
+                            isCombination: false, notes: itemNote ? [itemNote] : [],
+                            isCancelled: false, cancelledTimestamp: null
+                        };
                         parentShipment.scannedItems.push(newScanItem);
                     }
-                    parentShipment.lastModified = scanTimestamp; affectedBaseNumbersForNotification.add(parentHawb); successCount++; return;
+                    // --- ENDE DER KORREKTUR ---
+                    
+                    parentShipment.lastModified = scanTimestamp;
+                    affectedBaseNumbersForNotification.add(parentHawb);
+                    successCount++;
+                    return;
                 }
                 
-                // Logik für normale Sendungen (mit den neuen Prüfungen)
                 const { baseNumber, isValidFormat, raw: processedRawInput, isSuffixFormat } = processShipmentNumber(rawInputFromBatch);
                 if (!isValidFormat) {
                     errorCount++; errorMessages.push(`Ungültiges Format: ${escapeHtml(rawInputFromBatch)}`); return;
@@ -1876,15 +1924,11 @@ function calculateGoodsReceiptCount(scannedItems) {
                     };
                 }
                 const shipmentToUpdate = shipmentsWorkingCopy[baseNumber];
-
-                // --- START: NEUE EINSCHRÄNKUNGEN FÜR BATCH-SCANS MIT SUFFIX ---
                 if (isSuffixFormat && !shipmentToUpdate.isHuListOrder) {
                     const existingItemsForThisSuffix = shipmentToUpdate.scannedItems.filter(item => 
                         !item.isCancelled &&
                         item.rawInput.toUpperCase() === processedRawInput.toUpperCase()
                     );
-
-                    // Prüfung 1: Zählende Leistung (XRY, ETD, EDD) nicht-Kombi
                     const isBatchScanCounting = EXCLUSIVE_SECURITY_STATUSES.includes(batchStatus) && !batchIsCombination;
                     if (isBatchScanCounting) {
                         const existingCountingScan = existingItemsForThisSuffix.find(item => 
@@ -1894,8 +1938,6 @@ function calculateGoodsReceiptCount(scannedItems) {
                             errorCount++; errorMessages.push(`${escapeHtml(processedRawInput)}: hat bereits Status '${escapeHtml(existingCountingScan.status)}'`); return;
                         }
                     }
-                    
-                    // Prüfung 2: XRY Kombi
                     const isBatchScanKombi = batchStatus === 'XRY' && batchIsCombination;
                     if (isBatchScanKombi) {
                         const existingKombiScan = existingItemsForThisSuffix.find(item => item.isCombination);
@@ -1903,8 +1945,6 @@ function calculateGoodsReceiptCount(scannedItems) {
                             errorCount++; errorMessages.push(`${escapeHtml(processedRawInput)}: bereits als Kombi erfasst`); return;
                         }
                     }
-
-                    // Prüfung 3: Dunkelalarm
                     if (batchStatus === 'Dunkelalarm') {
                         const existingDunkelalarm = existingItemsForThisSuffix.find(item => item.status === 'Dunkelalarm');
                         if (existingDunkelalarm) {
@@ -1912,8 +1952,6 @@ function calculateGoodsReceiptCount(scannedItems) {
                         }
                     }
                 }
-                // --- ENDE: NEUE EINSCHRÄNKUNGEN FÜR BATCH-SCANS MIT SUFFIX ---
-
                 const expectedTotal = shipmentToUpdate.totalPiecesExpected;
                 const isCurrentBatchItemCounting = !NON_COUNTING_STATUSES.includes(batchStatus) && !batchIsCombination;
                 if (isCurrentBatchItemCounting && expectedTotal !== null) {
@@ -1944,7 +1982,6 @@ function calculateGoodsReceiptCount(scannedItems) {
                     }
                 }
             });
-            
             let alertMessage = `Batch Verarbeitung:\n- Erfolgreich: ${successCount}\n- Fehler/Übersprungen: ${errorCount}`;
             if (newBaseShipments.size > 0) {
                 alertMessage += `\n- Neue Sendungen erstellt für: ${[...newBaseShipments].join(', ')}`;
@@ -1953,7 +1990,6 @@ function calculateGoodsReceiptCount(scannedItems) {
                 alertMessage += `\n\nDetails:\n- ${errorMessages.join('\n- ')}`;
             }
             alert(alertMessage);
-
             renderTable();
             currentBatch = [];
             isBatchNotePromptRequired = true;
@@ -2822,6 +2858,7 @@ function calculateGoodsReceiptCount(scannedItems) {
                 if (result.success) {
                     displayCurrentShipmentDetails(result.baseNumber);
                     importHuModalEl.classList.remove('visible');
+                    document.body.classList.remove('modal-open'); // <-- DIESE ZEILE IST NEU
                     if (result.message) {
                         displayError(result.message, result.messageType, 5000);
                     }
@@ -2881,7 +2918,6 @@ function attemptLockOrientation() {
 
 </body>
 </html>
-
 
 
 
