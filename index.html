@@ -1294,7 +1294,7 @@ function calculateGoodsReceiptCount(scannedItems) {
                 currentDetailsDivEl.style.borderColor = '#aac';
             }
         }
- function renderTable() {
+         function renderTable() {
             const shipments = loadShipments();
             tableBodyEl.innerHTML = '';
             Object.keys(shipments).sort((a, b) => new Date(shipments[b].lastModified || 0) - new Date(shipments[a].lastModified || 0))
@@ -1310,9 +1310,26 @@ function calculateGoodsReceiptCount(scannedItems) {
 
                     row.insertCell().outerHTML = `<td data-label="HAWB.">${escapeHtml(baseNumber)}</td>`;
 
-                    // Ruft jetzt die globale Hilfsfunktion auf
+                    // Ruft die globale Hilfsfunktion für den Wareneingang auf
                     const receiptClass = getStatusClass(receiptCount, expected);
-                    const securityClass = getStatusClass(securityCount, expected);
+
+                    // --- START DER NEUEN LOGIK FÜR "Sicherungs"-FARBE ---
+                    
+                    // 1. Zähle die Dunkelalarme für diese Sendung (die Funktion existiert bereits)
+                    const dunkelalarmCount = calculateDunkelalarmCount(shipment.scannedItems || []);
+                    
+                    let securityClass = ''; // Variable für die CSS-Klasse initialisieren
+
+                    // 2. Prüfe die neue Sonderbedingung:
+                    // Wenn die Summe aus zählenden Scans und Dunkelalarmen die Erwartung erfüllt UND es mindestens einen Dunkelalarm gibt...
+                    if (expected !== null && (securityCount + dunkelalarmCount) === expected && dunkelalarmCount > 0) {
+                        // ...dann setze die Farbe auf Rot (Klasse 'over').
+                        securityClass = 'over'; 
+                    } else {
+                        // 3. Wenn die Sonderbedingung nicht zutrifft, verwende die alte, normale Logik.
+                        securityClass = getStatusClass(securityCount, expected);
+                    }
+                    // --- ENDE DER NEUEN LOGIK ---
 
                     let summaryHtml = `
                         <strong class="${receiptClass}">WE: ${receiptCount}/${expectedText}</strong> | 
