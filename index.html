@@ -1148,136 +1148,126 @@ function calculateGoodsReceiptCount(scannedItems) {
 
 
         // Ersetzen Sie die komplette Funktion mit dieser Version
-        function displayCurrentShipmentDetails(baseNumberToDisplay) {
-            clearError();
-            removeActiveInlineNoteEditor();
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+     function displayCurrentShipmentDetails(baseNumberToDisplay) {
+    clearError();
+    removeActiveInlineNoteEditor();
 
-            const shipments = loadShipments();
-            const shipment = baseNumberToDisplay ? shipments[baseNumberToDisplay] : null;
+    const shipments = loadShipments();
+    const shipment = baseNumberToDisplay ? shipments[baseNumberToDisplay] : null;
 
-            if (!baseNumberToDisplay || !shipment) {
-                currentDetailsDivEl.innerHTML = 'Geben Sie eine Sendungsnummer ein oder wählen Sie eine aus der Liste.';
-                currentDetailsDivEl.style.borderColor = '#aac';
-                return;
-            }
+    if (!baseNumberToDisplay || !shipment) {
+        currentDetailsDivEl.innerHTML = 'Geben Sie eine Sendungsnummer ein oder wählen Sie eine aus der Liste.';
+        currentDetailsDivEl.style.borderColor = '#aac';
+        return;
+    }
 
-            let detailsHtml = `<strong>Details für ${escapeHtml(baseNumberToDisplay)}:</strong>`;
+    let detailsHtml = `<strong>Details für ${escapeHtml(baseNumberToDisplay)}:</strong>`;
 
-            // --- START: ANGEPASSTE LOGIK ZUR ANZEIGE OFFENER HUs ---
-            if (shipment.isHuListOrder) {
-                const allScansForHuOrder = shipment.scannedItems || [];
-                
-                // *** HIER IST DIE KORREKTUR ***
-                // Diese Liste legt fest, welche Status eine HU als sicherheitstechnisch "bearbeitet" markieren.
-                // "Wareneingang" ist hier absichtlich NICHT enthalten.
-                const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
+    // --- HU-Liste: Anzeige offener HUs mit Farbcode ---
+    if (shipment.isHuListOrder) {
+        const allScansForHuOrder = shipment.scannedItems || [];
 
-                // 1. Alle einzigartigen HU-Nummern im Auftrag ermitteln (basierend auf allen Scans)
-                const allUniqueHuNumbers = [...new Set(allScansForHuOrder.map(item => item.rawInput))];
+        // Status, die als "gescannt" zählen
+        const finalSecurityStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
 
-                // 2. Diejenigen HUs finden, die bereits einen finalen Sicherheitsstatus haben (und nicht storniert sind)
-                const processedHus = new Set(
-                    allScansForHuOrder
-                        .filter(item => processedStatuses.includes(item.status) && !item.isCancelled)
-                        .map(item => item.rawInput)
-                );
-                
-                // 3. Offene HUs sind alle, die NICHT in der Liste der bearbeiteten sind.
-                const pendingHuNumbers = allUniqueHuNumbers.filter(hu => !processedHus.has(hu));
-                
-                if (pendingHuNumbers.length > 0) {
-                    const totalHus = shipment.totalPiecesExpected || allUniqueHuNumbers.length;
-                    const securedCount = totalHus - pendingHuNumbers.length;
-                    
-                    const listClass = (securedCount > 0) ? 'partial' : '';
+        // Alle HU-Nummern im Auftrag
+        const allUniqueHuNumbers = [...new Set(allScansForHuOrder.map(item => item.rawInput))];
 
-                    detailsHtml += `<div id="pendingHuList" class="${listClass}">`;
-                    detailsHtml += `<h4>Offene HUs (${pendingHuNumbers.length} von ${totalHus}):</h4>`;
-                    detailsHtml += `<ul>`;
-                    pendingHuNumbers.forEach(hu => {
-                        detailsHtml += `<li>${escapeHtml(hu)}</li>`;
-                    });
-                    detailsHtml += `</ul></div>`;
-                }
-            }
-            // --- ENDE: ANGEPASSTE LOGIK ZUR ANZEIGE OFFENER HUs ---
+        // HUs mit finalem Status
+        const processedHus = new Set(
+            allScansForHuOrder
+                .filter(item => finalSecurityStatuses.includes(item.status) && !item.isCancelled)
+                .map(item => item.rawInput)
+        );
 
-            const expected = shipment.totalPiecesExpected;
-            const allScans = shipment.scannedItems || [];
-            
-            const securityScansCount = calculateCurrentCountedPieces(allScans);
-            const receiptScansCount = calculateGoodsReceiptCount(allScans);
+        // HUs mit Dunkelalarm
+        const dunkelalarmHus = new Set(
+            allScansForHuOrder
+                .filter(item => item.status === 'Dunkelalarm' && !item.isCancelled)
+                .map(item => item.rawInput)
+        );
 
-            detailsHtml += `<ul>`;
+        // Offene HUs
+        const pendingHuNumbers = allUniqueHuNumbers.filter(hu => !processedHus.has(hu));
 
-            allScans
-                .filter(item => item.status !== 'Anstehend')
-                .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
-                .forEach(item => {
-                    const dt = new Date(item.timestamp);
-                    const timeStr = dt.toLocaleTimeString('de-DE');
-                    const dateStr = dt.toLocaleDateString('de-DE');
-                    const timestampPart = `<span class="timestamp">[${dateStr} ${timeStr}]</span>`;
-                    const numberPart = escapeHtml(item.rawInput);
-                    const statusPart = escapeHtml(item.status);
-                    const comboPart = item.isCombination ? ` <span class="combo">(Kombi)</span>` : '';
-                    const isCancelled = item.isCancelled;
+        // Gesamtanzahl HUs
+        const totalHus = shipment.totalPiecesExpected || allUniqueHuNumbers.length;
 
-                    let notesListHtml = '';
-                    if (!isCancelled && Array.isArray(item.notes)) {
-                        notesListHtml += '<div class="notes-container">';
-                        item.notes.forEach((note, index) => {
-                            notesListHtml += `<div class="note-item">
-                                <span class="note-prefix">Notiz:</span>
-                                <span class="editable-note" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" data-note-index="${index}" title="Notiz bearbeiten">${escapeHtml(note)}</span>
-                                <button class="delete-note-btn" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" data-note-index="${index}" title="Notiz löschen">×</button>
-                            </div>`;
-                        });
-                        notesListHtml += '</div>';
-                    } else if (Array.isArray(item.notes) && item.notes.length > 0) {
-                        notesListHtml += `<div class="notes-container" style="color:var(--cancelled-color);">${item.notes.map(n => `<div>- ${escapeHtml(n)}</div>`).join('')}</div>`;
-                    }
-
-                    detailsHtml += `<li class="${isCancelled ? 'cancelled-item' : ''}">`;
-                    detailsHtml += ` ${timestampPart} ${numberPart} → <span class="status">${statusPart}</span>${comboPart}`;
-
-                    if (!isCancelled) {
-                        detailsHtml += `<button class="cancel-button" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}">Storno</button>`;
-                    } else {
-                        const cancelDt = item.cancelledTimestamp ? new Date(item.cancelledTimestamp) : null;
-                        const cancelTimeStr = cancelDt ? cancelDt.toLocaleString('de-DE') : 'Unbekannt';
-                        detailsHtml += `<span class="cancelled-info"> (storniert am ${cancelTimeStr})</span>`;
-                    }
-                    detailsHtml += notesListHtml;
-                    if (!isCancelled) {
-                        detailsHtml += `<a href="#" class="add-note-link" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" title="Weitere Notiz hinzufügen">Notiz hinzufügen</a>`;
-                    }
-                    detailsHtml += `<div class="inline-note-editor-placeholder"></div>`;
-                    detailsHtml += `</li>`;
-                });
-            detailsHtml += `</ul>`;
-
-            detailsHtml += `<div class="summary">`;
-            let expectedText = (expected !== null && expected !== undefined) ? `${expected} Stk.` : 'N/A';
-            
-            const receiptClass = getStatusClass(receiptScansCount, expected);
-            detailsHtml += `<span>Wareneingang: <span class="${receiptClass}">${receiptScansCount} von ${expectedText}</span></span>`;
-
-            const securityClass = getStatusClass(securityScansCount, expected);
-            detailsHtml += `<span>Sicherung erfasst: <span class="${securityClass}">${securityScansCount} von ${expectedText}</span></span>`;
-            
-            detailsHtml += `</div>`;
-            currentDetailsDivEl.innerHTML = detailsHtml;
-
-            if (expected !== null && expected !== undefined) {
-                if (receiptScansCount > expected) currentDetailsDivEl.style.borderColor = 'red';
-                else if (receiptScansCount < expected) currentDetailsDivEl.style.borderColor = 'orange';
-                else if (receiptScansCount === expected) currentDetailsDivEl.style.borderColor = 'green';
-                else currentDetailsDivEl.style.borderColor = '#aac';
-            } else {
-                currentDetailsDivEl.style.borderColor = '#aac';
-            }
+        // Farbe festlegen
+        let listClass = '';
+        if (pendingHuNumbers.length > 0) {
+            listClass = 'partial'; // Orange: noch offene HUs
+        } else if (dunkelalarmHus.size > 0) {
+            listClass = 'over';    // Rot: alle gescannt, mind. 1 Dunkelalarm
+        } else {
+            listClass = 'ok';      // Grün: alle gescannt, kein Dunkelalarm
         }
+
+        // HTML erzeugen
+        detailsHtml += `<div id="pendingHuList" class="${listClass}">`;
+        detailsHtml += `<h4>Offene HUs (${pendingHuNumbers.length} von ${totalHus}):</h4>`;
+        if (pendingHuNumbers.length > 0) {
+            detailsHtml += `<ul>${pendingHuNumbers.map(hu => `<li>${escapeHtml(hu)}</li>`).join('')}</ul>`;
+        }
+        detailsHtml += `</div>`;
+    }
+
+    // Erwartete Stückzahl
+    const expected = shipment.totalPiecesExpected;
+    const allScans = shipment.scannedItems || [];
+
+    // Sicherheits-Scans zählen
+    const securityScansCount = calculateCurrentCountedPieces(allScans);
+    const goodsReceiptCount = calculateGoodsReceiptCount(allScans);
+
+    // Zusammenfassung anzeigen
+    const statusSummary = calculateStatusSummary(allScans);
+    detailsHtml += `<div class="summary">`;
+    detailsHtml += `<span>Sicherung: <strong class="${getStatusClass(securityScansCount, expected)}">${securityScansCount}</strong></span>`;
+    detailsHtml += `<span>Wareneingang: <strong>${goodsReceiptCount}</strong></span>`;
+
+    if (Object.keys(statusSummary).length > 0) {
+        detailsHtml += `<span>Status-Übersicht:</span>`;
+        for (const [status, count] of Object.entries(statusSummary)) {
+            detailsHtml += `<span>- ${escapeHtml(status)}: ${count}</span>`;
+        }
+    }
+
+    detailsHtml += `</div>`;
+
+    // Scans im Detail anzeigen
+    detailsHtml += `<ul>`;
+    allScans.forEach((item, index) => {
+        const cancelledClass = item.isCancelled ? 'cancelled-item' : '';
+        detailsHtml += `<li class="${cancelledClass}">${escapeHtml(item.rawInput)} 
+            <span class="status">${escapeHtml(item.status)}</span>`;
+        if (item.notes && item.notes.length > 0) {
+            detailsHtml += `<div class="notes-container">`;
+            item.notes.forEach((note, noteIndex) => {
+                detailsHtml += `<div class="note-item"><span class="note-prefix">Notiz:</span> ${escapeHtml(note)}</div>`;
+            });
+            detailsHtml += `</div>`;
+        }
+        detailsHtml += `</li>`;
+    });
+    detailsHtml += `</ul>`;
+
+    currentDetailsDivEl.innerHTML = detailsHtml;
+}
  function renderTable() {
             const shipments = loadShipments();
             tableBodyEl.innerHTML = '';
