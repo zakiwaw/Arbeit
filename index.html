@@ -812,7 +812,9 @@ function showOpenHusSummary() {
     removeActiveInlineNoteEditor();
     const shipments = loadShipments();
     
-    const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
+    // HIER IST DIE KORREKTUR: 'Dunkelalarm' ist kein finaler Sicherheitsstatus mehr für diese Ansicht.
+    const securityClearanceStatuses = ['XRY', 'ETD', 'EDD'];
+    
     let openSecurityHusByOrder = [];
     let missingReceiptHusByOrder = [];
     let dunkelalarmItemsByOrder = {};
@@ -820,7 +822,7 @@ function showOpenHusSummary() {
     Object.keys(shipments).forEach(baseNumber => {
         const shipment = shipments[baseNumber];
         
-        // 1. Dunkelalarm-Einträge sammeln (sammelt den ganzen Scan-Eintrag)
+        // 1. Dunkelalarm-Einträge sammeln (unverändert)
         if (shipment.scannedItems && shipment.scannedItems.length > 0) {
             const itemsWithDunkelalarm = shipment.scannedItems.filter(
                 item => item.status === 'Dunkelalarm' && !item.isCancelled
@@ -828,7 +830,7 @@ function showOpenHusSummary() {
             if (itemsWithDunkelalarm.length > 0) {
                 if (!dunkelalarmItemsByOrder[baseNumber]) {
                     dunkelalarmItemsByOrder[baseNumber] = {
-                        items: [], // Wir nennen es 'items' für Klarheit
+                        items: [],
                         freightForwarder: shipment.freightForwarder || 'N/A',
                         destinationCountry: shipment.destinationCountry || 'N/A'
                     };
@@ -850,9 +852,10 @@ function showOpenHusSummary() {
                 }
             });
 
+            // Offene SICHERUNG - Verwendet jetzt die korrigierte Statusliste
             const processedHus = new Set(
                 shipment.scannedItems
-                    .filter(item => processedStatuses.includes(item.status) && !item.isCancelled)
+                    .filter(item => securityClearanceStatuses.includes(item.status) && !item.isCancelled)
                     .map(item => item.rawInput)
             );
             const pendingSecurityHus = allUniqueHusWithPos.filter(item => !processedHus.has(item.hu));
@@ -866,6 +869,7 @@ function showOpenHusSummary() {
                 });
             }
 
+            // Fehlender WARENEINGANG (unverändert)
             const receiptHus = new Set(
                 shipment.scannedItems
                     .filter(item => item.status === 'Wareneingang' && !item.isCancelled)
@@ -885,31 +889,29 @@ function showOpenHusSummary() {
         }
     });
 
-    // --- HIER IST DIE NEUE, ZENTRALE HILFSFUNKTION ---
-    // Sie formatiert die Liste für ALLE Tabs korrekt.
+    // Der Rest der Funktion (HTML-Generierung) bleibt exakt gleich,
+    // da er die bereits korrekt gefilterten Daten verwendet.
+
     const generateHuListHtml = (items) => {
         if (!items || items.length === 0) return '';
-        
-        // Sortiert nach Position, falls vorhanden.
         const sortedItems = items.sort((a, b) => (a.position || 9999) - (b.position || 9999));
-        
         const listItems = sortedItems.map(item => {
-            // Greift auf .hu oder .rawInput zu, je nachdem was verfügbar ist
             const huValue = item.hu || item.rawInput; 
-            // Stellt den Präfix nur zusammen, wenn eine Position existiert
             const positionPrefix = item.position ? `${item.position}. ` : '';
             return `<li>${positionPrefix}${escapeHtml(huValue)}</li>`;
         }).join('');
-
         return `<ul class="hu-list">${listItems}</ul>`;
     };
     
-    // --- HTML-Generierung, die jetzt die Hilfsfunktion nutzt ---
-    
     const generateHtmlForOrderGroup = (order, listItemsHtml) => {
-        let countText = order.receiptCount !== undefined ? 
-            `${order.receiptCount} von ${order.totalHus} erfasst` :
-            `${order.totalHus - order.pendingHus.length} von ${order.totalHus} erfasst`;
+        let countText;
+        if (order.receiptCount !== undefined) {
+             countText = `${order.receiptCount} von ${order.totalHus} erfasst`;
+        } else {
+             // Zähler für Sicherheits-Tab
+             const processedCount = order.totalHus - order.pendingHus.length;
+             countText = `${processedCount} von ${order.totalHus} erfasst`;
+        }
 
         return `<div class="hu-order-group">
             <div class="hu-order-title">
