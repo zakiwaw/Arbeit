@@ -820,7 +820,7 @@ function showOpenHusSummary() {
     Object.keys(shipments).forEach(baseNumber => {
         const shipment = shipments[baseNumber];
         
-        // Dunkelalarm-Einträge
+        // Dunkelalarm-Einträge sammeln
         if (shipment.scannedItems && shipment.scannedItems.length > 0) {
             const itemsWithDunkelalarm = shipment.scannedItems.filter(
                 item => item.status === 'Dunkelalarm' && !item.isCancelled
@@ -834,17 +834,18 @@ function showOpenHusSummary() {
                     };
                 }
                 itemsWithDunkelalarm.forEach(item => {
-                    dunkelalarmItemsByOrder[baseNumber].hus.push({ hu: item.rawInput, position: item.position });
+                    // Der 'item' ist der komplette Scan-Eintrag
+                    dunkelalarmItemsByOrder[baseNumber].hus.push(item);
                 });
             }
         }
 
-        // Nur HU-Listen-Aufträge
+        // Nur HU-Listen-Aufträge für offene Sicherung / WE
         if (shipment.isHuListOrder && shipment.scannedItems && shipment.scannedItems.length > 0) {
             const allUniqueHus = [];
             const seenHus = new Set();
             shipment.scannedItems.forEach(item => {
-                if (!seenHus.has(item.rawInput)) {
+                if (item.rawInput && !seenHus.has(item.rawInput)) {
                     allUniqueHus.push({ hu: item.rawInput, position: item.position });
                     seenHus.add(item.rawInput);
                 }
@@ -887,14 +888,13 @@ function showOpenHusSummary() {
         }
     });
 
-    // --- HTML-Generierung mit der Formatänderung ---
+    // --- HTML-Generierung ---
     const generateHtmlForOrder = (order) => {
         let html = `<div class="hu-order-group">`;
         html += `<div class="hu-order-title">
             Rechnung: ${escapeHtml(order.orderNumber)} (${(order.receiptCount ?? (order.totalHus - order.pendingHus.length))} von ${order.totalHus} erfasst)<br>
             <small>Sped.: ${escapeHtml(order.freightForwarder)} / Land: ${escapeHtml(order.destinationCountry)}</small>
          </div>`;
-        // HIER IST DIE ÄNDERUNG: von "Pos. X:" zu "X."
         html += `<ul class="hu-list">${order.pendingHus.map(item => `<li>${item.position}. ${escapeHtml(item.hu)}</li>`).join('')}</ul></div>`;
         return html;
     }
@@ -915,13 +915,19 @@ function showOpenHusSummary() {
                 Rechnung: ${escapeHtml(orderNumber)}<br>
                 <small>Sped.: ${escapeHtml(data.freightForwarder)} / Land: ${escapeHtml(data.destinationCountry)}</small>
             </div>
-            // HIER IST DIE ÄNDERUNG: von "Pos. X:" zu "X."
-            <ul class="hu-list">${data.hus.sort((a,b) => a.position - b.position).map(item => `<li>${item.position}. ${escapeHtml(item.hu)}</li>`).join('')}</ul>
+            <ul class="hu-list">${data.hus
+                .sort((a, b) => (a.position || 0) - (b.position || 0))
+                // HIER IST DIE KORREKTUR:
+                // Wir prüfen, ob 'item.position' existiert, bevor wir es anzeigen.
+                .map(item => {
+                    const positionPrefix = item.position ? `${item.position}. ` : '';
+                    return `<li>${positionPrefix}${escapeHtml(item.rawInput)}</li>`;
+                }).join('')}</ul>
         </div>`;
     });
     dunkelalarmHusListContainerEl.innerHTML = dunkelalarmHtmlContent || '<p class="no-open-hus-message">Keine Einträge mit Status "Dunkelalarm" gefunden.</p>';
 
-    // Der Rest der Funktion bleibt gleich...
+    // Rest der Funktion bleibt gleich...
     showOpenSecurityHusBtnEl.classList.add('active');
     missingReceiptHusListContainerEl.style.display = 'none';
     openHusListContainerEl.style.display = 'block';
@@ -933,7 +939,6 @@ function showOpenHusSummary() {
     document.body.classList.add('modal-open');
     closeSideMenu(); 
 }
-        
         
         
         
