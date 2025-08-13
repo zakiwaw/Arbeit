@@ -808,7 +808,7 @@ function calculateGoodsReceiptCount(scannedItems) {
 }
 // --- START DER ÄNDERUNG: Die gesamte Funktion wird aktualisiert ---
 // --- START DER ÄNDERUNG: Die gesamte Funktion wird mit der präziseren Logik ersetzt ---
-      function showOpenHusSummary() {
+function showOpenHusSummary() {
     removeActiveInlineNoteEditor();
     const shipments = loadShipments();
     
@@ -834,15 +834,13 @@ function calculateGoodsReceiptCount(scannedItems) {
                     };
                 }
                 itemsWithDunkelalarm.forEach(item => {
-                    // NEU: Objekt mit HU und Position speichern
                     dunkelalarmItemsByOrder[baseNumber].hus.push({ hu: item.rawInput, position: item.position });
                 });
             }
         }
 
-        // Nur HU-Listen-Aufträge für offene Posten
+        // Nur HU-Listen-Aufträge
         if (shipment.isHuListOrder && shipment.scannedItems && shipment.scannedItems.length > 0) {
-            // NEU: Wir arbeiten jetzt mit Objekten, die HU und Position enthalten
             const allUniqueHus = [];
             const seenHus = new Set();
             shipment.scannedItems.forEach(item => {
@@ -889,14 +887,14 @@ function calculateGoodsReceiptCount(scannedItems) {
         }
     });
 
-    // --- HTML-Generierung mit Positionsnummer ---
+    // --- HTML-Generierung mit der Formatänderung ---
     const generateHtmlForOrder = (order) => {
         let html = `<div class="hu-order-group">`;
         html += `<div class="hu-order-title">
             Rechnung: ${escapeHtml(order.orderNumber)} (${(order.receiptCount ?? (order.totalHus - order.pendingHus.length))} von ${order.totalHus} erfasst)<br>
             <small>Sped.: ${escapeHtml(order.freightForwarder)} / Land: ${escapeHtml(order.destinationCountry)}</small>
          </div>`;
-        // NEU: Zeigt jetzt "Pos. X: HU-NUMMER" an
+        // HIER IST DIE ÄNDERUNG: von "Pos. X:" zu "X."
         html += `<ul class="hu-list">${order.pendingHus.map(item => `<li>${item.position}. ${escapeHtml(item.hu)}</li>`).join('')}</ul></div>`;
         return html;
     }
@@ -917,12 +915,13 @@ function calculateGoodsReceiptCount(scannedItems) {
                 Rechnung: ${escapeHtml(orderNumber)}<br>
                 <small>Sped.: ${escapeHtml(data.freightForwarder)} / Land: ${escapeHtml(data.destinationCountry)}</small>
             </div>
-            <ul class="hu-list">${data.hus.sort((a,b) => a.position - b.position).map(item => `<li>Pos. ${item.position}: ${escapeHtml(item.hu)}</li>`).join('')}</ul>
+            // HIER IST DIE ÄNDERUNG: von "Pos. X:" zu "X."
+            <ul class="hu-list">${data.hus.sort((a,b) => a.position - b.position).map(item => `<li>${item.position}. ${escapeHtml(item.hu)}</li>`).join('')}</ul>
         </div>`;
     });
     dunkelalarmHusListContainerEl.innerHTML = dunkelalarmHtmlContent || '<p class="no-open-hus-message">Keine Einträge mit Status "Dunkelalarm" gefunden.</p>';
 
-    // Standardansicht beim Öffnen
+    // Der Rest der Funktion bleibt gleich...
     showOpenSecurityHusBtnEl.classList.add('active');
     missingReceiptHusListContainerEl.style.display = 'none';
     openHusListContainerEl.style.display = 'block';
