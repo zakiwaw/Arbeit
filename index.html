@@ -1427,6 +1427,7 @@ function showOpenHusSummary() {
         
         
       // ERSETZEN SIE DIESE GESAMTE FUNKTION
+// ERSETZEN SIE DIESE GESAMTE FUNKTION
 function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFromCheckbox) {
     const { baseNumber, suffix, isValidFormat, raw: processedRawInput, isSuffixFormat } = processShipmentNumber(rawInputToSave);
     if (!isValidFormat) { return { success: false, waitingForTotal: false, message: `Ungültiges Format: ${escapeHtml(rawInputToSave)}` }; }
@@ -1434,68 +1435,77 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
     const shipments = loadShipments();
     const parentHawb = findShipmentByHuNumber(processedRawInput);
 
-    // --- START DER KORREKTUR FÜR HU-LISTEN ---
+    // --- START: Überarbeitete Logik für HU-Listen-Aufträge ---
     if (parentHawb) {
         const parentShipment = shipments[parentHawb];
         const now = new Date();
         const noteText = noteInputEl.value.trim() || null;
         const isNewScanKombi = (statusToUse === 'XRY' && isCombinationFromCheckbox);
         const isSecurityStatus = EXCLUSIVE_SECURITY_STATUSES.includes(statusToUse);
+        
+        // Ist dieser Scan der finale, zählende Abschluss?
+        const isFinalClearanceScan = isSecurityStatus && !isNewScanKombi;
 
-        // Finde den ersten passenden "Anstehend"-Platzhalter
-        const anstehendIndex = parentShipment.scannedItems.findIndex(
-            i => i.rawInput.toUpperCase() === processedRawInput.toUpperCase() && i.status === 'Anstehend' && !i.isCancelled
-        );
+        if (isFinalClearanceScan) {
+            // FALL 1: ZÄHLENDER SCAN (XRY, ETD, EDD) - Schließt die Sicherung ab
+            // Finde den 'Anstehend'-Platzhalter, um ihn zu verbrauchen.
+            const anstehendIndex = parentShipment.scannedItems.findIndex(
+                i => i.rawInput.toUpperCase() === processedRawInput.toUpperCase() && i.status === 'Anstehend' && !i.isCancelled
+            );
 
-        // Finde irgendeinen existierenden (nicht-stornierten) Eintrag für diese HU
-        const existingItemIndex = parentShipment.scannedItems.findIndex(
-            i => i.rawInput.toUpperCase() === processedRawInput.toUpperCase() && !i.isCancelled
-        );
-
-        if (isSecurityStatus) {
             if (anstehendIndex === -1) {
-                return { success: false, waitingForTotal: false, message: `FEHLER: Für HU ${escapeHtml(processedRawInput)} ist keine offene Sicherung mehr möglich.` };
+                return { success: false, waitingForTotal: false, message: `FEHLER: Für HU ${escapeHtml(processedRawInput)} ist keine offene Sicherung mehr möglich (bereits abgeschlossen).` };
             }
-            // Wir aktualisieren den "Anstehend"-Eintrag
+
+            // Aktualisiere den Platzhalter zum finalen Status.
             const itemToUpdate = parentShipment.scannedItems[anstehendIndex];
             itemToUpdate.status = statusToUse;
             itemToUpdate.timestamp = now.toISOString();
-            itemToUpdate.isCombination = isNewScanKombi;
+            itemToUpdate.isCombination = false; // Ist per Definition nicht-kombi
             if (noteText) itemToUpdate.notes.push(noteText);
 
-        } else { // Für andere Status wie 'Wareneingang', 'Dunkelalarm' etc.
+        } else {
+            // FALL 2: NICHT-ZÄHLENDER SCAN (XRY (Kombi), Dunkelalarm, Wareneingang) - Fügt nur Infos hinzu
+            // Finde irgendeinen existierenden Eintrag für diese HU, um die Positionsnummer zu erben.
+            const existingItemIndex = parentShipment.scannedItems.findIndex(
+                i => i.rawInput.toUpperCase() === processedRawInput.toUpperCase()
+            );
+            
             if (existingItemIndex === -1) {
-                // Dies sollte nicht passieren, wenn die HU aus einer Liste stammt
+                // Sicherheitsnetz, sollte bei korrekten Daten nicht eintreten
                 return { success: false, waitingForTotal: false, message: `FEHLER: HU ${escapeHtml(processedRawInput)} nicht im Auftrag ${parentHawb} gefunden.` };
             }
-            // Wir erstellen einen NEUEN Scan-Eintrag, aber kopieren die Position vom Original.
+            
             const originalItem = parentShipment.scannedItems[existingItemIndex];
+
+            // Erstelle einen NEUEN Scan-Eintrag. Der "Anstehend"-Platzhalter bleibt unberührt.
             const newItem = {
                 rawInput: processedRawInput,
                 status: statusToUse,
                 timestamp: now.toISOString(),
-                isCombination: false, // Nicht-Sicherheitsstatus können keine Kombis sein
+                isCombination: isNewScanKombi, // true für Kombi, sonst false
                 notes: noteText ? [noteText] : [],
                 isCancelled: false,
                 cancelledTimestamp: null,
-                position: originalItem.position // <<-- HIER IST DIE MAGIE: Position wird vererbt!
+                position: originalItem.position // Position wird vererbt
             };
             parentShipment.scannedItems.push(newItem);
         }
 
+        // Gemeinsame Logik zum Speichern und UI aktualisieren
         parentShipment.lastModified = now.toISOString();
         saveShipments(shipments);
         resetSingleScanNoteInputState();
         setTimeout(() => displayCurrentShipmentDetails(parentHawb), 0);
-        return { success: true, waitingForTotal: false, message: `Vorgang '${statusToUse}' für HU ${escapeHtml(processedRawInput)} erfasst.` };
+        return { success: true, waitingForTotal: false, message: `Vorgang '${statusToUse}${isNewScanKombi ? ' (Kombi)' : ''}' für HU ${escapeHtml(processedRawInput)} erfasst.` };
     }
-    // --- ENDE DER KORREKTUR FÜR HU-LISTEN ---
-
+    // --- ENDE: Überarbeitete Logik für HU-Listen-Aufträge ---
 
     // Die Logik für normale Sendungen (nicht aus HU-Listen) bleibt unverändert.
     if (shipments[baseNumber] && shipments[baseNumber].isHuListOrder) {
         return { success: false, waitingForTotal: false, message: `FEHLER: ${baseNumber} ist ein HU-Auftrag. Bitte scannen Sie eine der zugehörigen HU-Nummern.` };
     }
+    //... (der Rest der Funktion bleibt unverändert) ...
     if (!shipments[baseNumber]) {
         const tempIsCombination = (statusToUse === 'XRY' && !isBatchModeActive && isCombinationFromCheckbox);
         const tempFinalIsCombination = NON_COUNTING_STATUSES.includes(statusToUse) ? false : tempIsCombination;
