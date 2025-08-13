@@ -820,7 +820,7 @@ function showOpenHusSummary() {
     Object.keys(shipments).forEach(baseNumber => {
         const shipment = shipments[baseNumber];
         
-        // Dunkelalarm-Einträge sammeln
+        // 1. Dunkelalarm-Einträge sammeln (sammelt den ganzen Scan-Eintrag)
         if (shipment.scannedItems && shipment.scannedItems.length > 0) {
             const itemsWithDunkelalarm = shipment.scannedItems.filter(
                 item => item.status === 'Dunkelalarm' && !item.isCancelled
@@ -828,59 +828,56 @@ function showOpenHusSummary() {
             if (itemsWithDunkelalarm.length > 0) {
                 if (!dunkelalarmItemsByOrder[baseNumber]) {
                     dunkelalarmItemsByOrder[baseNumber] = {
-                        hus: [],
+                        items: [], // Wir nennen es 'items' für Klarheit
                         freightForwarder: shipment.freightForwarder || 'N/A',
                         destinationCountry: shipment.destinationCountry || 'N/A'
                     };
                 }
                 itemsWithDunkelalarm.forEach(item => {
-                    // Der 'item' ist der komplette Scan-Eintrag
-                    dunkelalarmItemsByOrder[baseNumber].hus.push(item);
+                    dunkelalarmItemsByOrder[baseNumber].items.push(item);
                 });
             }
         }
 
-        // Nur HU-Listen-Aufträge für offene Sicherung / WE
+        // 2. Nur HU-Listen-Aufträge für offene Sicherung / WE
         if (shipment.isHuListOrder && shipment.scannedItems && shipment.scannedItems.length > 0) {
-            const allUniqueHus = [];
+            const allUniqueHusWithPos = [];
             const seenHus = new Set();
             shipment.scannedItems.forEach(item => {
                 if (item.rawInput && !seenHus.has(item.rawInput)) {
-                    allUniqueHus.push({ hu: item.rawInput, position: item.position });
+                    allUniqueHusWithPos.push({ hu: item.rawInput, position: item.position });
                     seenHus.add(item.rawInput);
                 }
             });
 
-            // Offene SICHERUNG
             const processedHus = new Set(
                 shipment.scannedItems
                     .filter(item => processedStatuses.includes(item.status) && !item.isCancelled)
                     .map(item => item.rawInput)
             );
-            const pendingSecurityHus = allUniqueHus.filter(item => !processedHus.has(item.hu));
+            const pendingSecurityHus = allUniqueHusWithPos.filter(item => !processedHus.has(item.hu));
             if (pendingSecurityHus.length > 0) {
                 openSecurityHusByOrder.push({
                     orderNumber: baseNumber,
-                    pendingHus: pendingSecurityHus.sort((a,b) => a.position - b.position),
-                    totalHus: allUniqueHus.length,
+                    pendingHus: pendingSecurityHus,
+                    totalHus: allUniqueHusWithPos.length,
                     freightForwarder: shipment.freightForwarder || 'N/A',
                     destinationCountry: shipment.destinationCountry || 'N/A'
                 });
             }
 
-            // Fehlender WARENEINGANG
             const receiptHus = new Set(
                 shipment.scannedItems
                     .filter(item => item.status === 'Wareneingang' && !item.isCancelled)
                     .map(item => item.rawInput)
             );
-            const missingReceiptHus = allUniqueHus.filter(item => !receiptHus.has(item.hu));
+            const missingReceiptHus = allUniqueHusWithPos.filter(item => !receiptHus.has(item.hu));
              if (missingReceiptHus.length > 0) {
                 missingReceiptHusByOrder.push({
                     orderNumber: baseNumber,
-                    pendingHus: missingReceiptHus.sort((a,b) => a.position - b.position),
-                    totalHus: allUniqueHus.length,
-                    receiptCount: allUniqueHus.length - missingReceiptHus.length,
+                    pendingHus: missingReceiptHus,
+                    totalHus: allUniqueHusWithPos.length,
+                    receiptCount: allUniqueHusWithPos.length - missingReceiptHus.length,
                     freightForwarder: shipment.freightForwarder || 'N/A',
                     destinationCountry: shipment.destinationCountry || 'N/A'
                 });
@@ -888,23 +885,49 @@ function showOpenHusSummary() {
         }
     });
 
-    // --- HTML-Generierung ---
-    const generateHtmlForOrder = (order) => {
-        let html = `<div class="hu-order-group">`;
-        html += `<div class="hu-order-title">
-            Rechnung: ${escapeHtml(order.orderNumber)} (${(order.receiptCount ?? (order.totalHus - order.pendingHus.length))} von ${order.totalHus} erfasst)<br>
-            <small>Sped.: ${escapeHtml(order.freightForwarder)} / Land: ${escapeHtml(order.destinationCountry)}</small>
-         </div>`;
-        html += `<ul class="hu-list">${order.pendingHus.map(item => `<li>${item.position}. ${escapeHtml(item.hu)}</li>`).join('')}</ul></div>`;
-        return html;
-    }
+    // --- HIER IST DIE NEUE, ZENTRALE HILFSFUNKTION ---
+    // Sie formatiert die Liste für ALLE Tabs korrekt.
+    const generateHuListHtml = (items) => {
+        if (!items || items.length === 0) return '';
+        
+        // Sortiert nach Position, falls vorhanden.
+        const sortedItems = items.sort((a, b) => (a.position || 9999) - (b.position || 9999));
+        
+        const listItems = sortedItems.map(item => {
+            // Greift auf .hu oder .rawInput zu, je nachdem was verfügbar ist
+            const huValue = item.hu || item.rawInput; 
+            // Stellt den Präfix nur zusammen, wenn eine Position existiert
+            const positionPrefix = item.position ? `${item.position}. ` : '';
+            return `<li>${positionPrefix}${escapeHtml(huValue)}</li>`;
+        }).join('');
+
+        return `<ul class="hu-list">${listItems}</ul>`;
+    };
     
+    // --- HTML-Generierung, die jetzt die Hilfsfunktion nutzt ---
+    
+    const generateHtmlForOrderGroup = (order, listItemsHtml) => {
+        let countText = order.receiptCount !== undefined ? 
+            `${order.receiptCount} von ${order.totalHus} erfasst` :
+            `${order.totalHus - order.pendingHus.length} von ${order.totalHus} erfasst`;
+
+        return `<div class="hu-order-group">
+            <div class="hu-order-title">
+                Rechnung: ${escapeHtml(order.orderNumber)} (${countText})<br>
+                <small>Sped.: ${escapeHtml(order.freightForwarder)} / Land: ${escapeHtml(order.destinationCountry)}</small>
+            </div>
+            ${listItemsHtml}
+        </div>`;
+    };
+
     openHusListContainerEl.innerHTML = openSecurityHusByOrder.length > 0 ?
-        openSecurityHusByOrder.sort((a,b) => a.orderNumber.localeCompare(b.orderNumber)).map(generateHtmlForOrder).join('') :
+        openSecurityHusByOrder.sort((a,b) => a.orderNumber.localeCompare(b.orderNumber))
+        .map(order => generateHtmlForOrderGroup(order, generateHuListHtml(order.pendingHus))).join('') :
         '<p class="no-open-hus-message">Glückwunsch! Alle HUs sind sicherheitstechnisch bearbeitet.</p>';
 
     missingReceiptHusListContainerEl.innerHTML = missingReceiptHusByOrder.length > 0 ?
-        missingReceiptHusByOrder.sort((a,b) => a.orderNumber.localeCompare(b.orderNumber)).map(generateHtmlForOrder).join('') :
+        missingReceiptHusByOrder.sort((a,b) => a.orderNumber.localeCompare(b.orderNumber))
+        .map(order => generateHtmlForOrderGroup(order, generateHuListHtml(order.pendingHus))).join('') :
         '<p class="no-open-hus-message">Perfekt! Alle HUs wurden im Wareneingang erfasst.</p>';
     
     let dunkelalarmHtmlContent = '';
@@ -915,14 +938,7 @@ function showOpenHusSummary() {
                 Rechnung: ${escapeHtml(orderNumber)}<br>
                 <small>Sped.: ${escapeHtml(data.freightForwarder)} / Land: ${escapeHtml(data.destinationCountry)}</small>
             </div>
-            <ul class="hu-list">${data.hus
-                .sort((a, b) => (a.position || 0) - (b.position || 0))
-                // HIER IST DIE KORREKTUR:
-                // Wir prüfen, ob 'item.position' existiert, bevor wir es anzeigen.
-                .map(item => {
-                    const positionPrefix = item.position ? `${item.position}. ` : '';
-                    return `<li>${positionPrefix}${escapeHtml(item.rawInput)}</li>`;
-                }).join('')}</ul>
+            ${generateHuListHtml(data.items)}
         </div>`;
     });
     dunkelalarmHusListContainerEl.innerHTML = dunkelalarmHtmlContent || '<p class="no-open-hus-message">Keine Einträge mit Status "Dunkelalarm" gefunden.</p>';
