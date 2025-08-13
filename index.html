@@ -800,6 +800,95 @@ let pendingTotalUpdateInfo = null;
             return shipments;
         }
 // In der Nähe von calculateCurrentCountedPieces einfügen
+// --- NEU: Funktion zur Verarbeitung des MAN LFS Imports ---
+function processManLfsImport(qrCodeData) {
+    const lines = qrCodeData.split('\n');
+    lines.shift(); // Entfernt 'MAN_LFS_V1'
+
+    let rechnung = '', spediteur = '', land = '';
+    let isHuSection = false;
+    let hus = [];
+
+    for (const line of lines) {
+        const trimmedLine = line.trim();
+        if (trimmedLine === '---') {
+            isHuSection = true;
+            continue;
+        }
+
+        if (isHuSection) {
+            const match = trimmedLine.match(/^(\d+)\s+(.+)$/);
+            if (match) {
+                hus.push({
+                    originalNumber: parseInt(match[1], 10),
+                    hu: match[2].trim().toUpperCase()
+                });
+            }
+        } else {
+            if (trimmedLine.startsWith('RECHNUNG:')) rechnung = trimmedLine.substring('RECHNUNG:'.length).trim();
+            if (trimmedLine.startsWith('SPEDITEUR:')) spediteur = trimmedLine.substring('SPEDITEUR:'.length).trim();
+            if (trimmedLine.startsWith('LAND:')) land = trimmedLine.substring('LAND:'.length).trim();
+        }
+    }
+
+    if (!rechnung || hus.length === 0) {
+        displayError("Fehler im MAN QR-Code: Rechnungsnummer oder HUs fehlen.", 'red');
+        return;
+    }
+
+    const shipments = loadShipments();
+    const now = new Date().toISOString();
+
+    if (!shipments[rechnung]) {
+        shipments[rechnung] = {
+            hawb: rechnung,
+            lastModified: now,
+            totalPiecesExpected: hus.length,
+            scannedItems: [],
+            mitarbeiter: MITARBEITER_NAME,
+            isManLfsOrder: true, // NEUER FLAG
+            spediteur: spediteur, // NEUES FELD
+            land: land // NEUES FELD
+        };
+    } else {
+        // Optional: Logik, um bestehende MAN-Aufträge zu aktualisieren
+        shipments[rechnung].spediteur = spediteur;
+        shipments[rechnung].land = land;
+    }
+
+
+    let addedCount = 0;
+    hus.forEach(huItem => {
+        const existingHu = shipments[rechnung].scannedItems.find(item => item.rawInput === huItem.hu);
+        if (!existingHu) {
+            shipments[rechnung].scannedItems.push({
+                rawInput: huItem.hu,
+                status: 'Anstehend',
+                timestamp: now,
+                isCombination: false,
+                notes: [],
+                isCancelled: false,
+                cancelledTimestamp: null,
+                originalNumber: huItem.originalNumber // NEUES FELD
+            });
+            addedCount++;
+        }
+    });
+    
+    if(addedCount > 0){
+         shipments[rechnung].lastModified = now;
+         // Aktualisiere die erwartete Gesamtstückzahl basierend auf der aktuellen Liste der "Anstehend"-Items.
+         const anstehendItems = shipments[rechnung].scannedItems.filter(i => i.status === 'Anstehend');
+         shipments[rechnung].totalPiecesExpected = anstehendItems.length;
+    }
+
+    saveShipments(shipments);
+    shipmentNumberInputEl.value = '';
+    updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
+    renderTable();
+    displayCurrentShipmentDetails(rechnung);
+    displayError(`MAN Auftrag ${rechnung} (${addedCount > 0 ? addedCount + ' neue' : 'keine neuen'}) HUs importiert/aktualisiert.`, 'green', 4000);
+}
 
 function calculateGoodsReceiptCount(scannedItems) {
     if (!Array.isArray(scannedItems)) return 0;
@@ -808,136 +897,94 @@ function calculateGoodsReceiptCount(scannedItems) {
 }
 // --- START DER ÄNDERUNG: Die gesamte Funktion wird aktualisiert ---
 // --- START DER ÄNDERUNG: Die gesamte Funktion wird mit der präziseren Logik ersetzt ---
-      function showOpenHusSummary() {
-            removeActiveInlineNoteEditor();
-            const shipments = loadShipments();
+      // --- GEÄNDERT: Komplett neue Funktion für die Modal-Anzeige ---
+function showOpenHusSummary() {
+    removeActiveInlineNoteEditor();
+    const shipments = loadShipments();
+    
+    const openManOrdersByCountry = {};
+    const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
+    
+    // Schritt 1: Alle MAN LFS Aufträge sammeln und nach Land gruppieren
+    Object.keys(shipments).forEach(baseNumber => {
+        const shipment = shipments[baseNumber];
+        
+        if (shipment.isManLfsOrder && shipment.scannedItems && shipment.scannedItems.length > 0) {
             
-            // --- Logik für "Offene Sicherung" (bestehend) ---
-            const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
-            let openSecurityHusByOrder = [];
-
-            // --- Logik für "Fehlender Wareneingang" (bestehend) ---
-            let missingReceiptHusByOrder = [];
-
-            // --- NEUE, PRÄZISERE Logik für "Dunkelalarm" ---
-            let dunkelalarmItemsByOrder = {}; // Ein Objekt, um HUs nach Auftrag zu gruppieren
-
-            Object.keys(shipments).forEach(baseNumber => {
-                const shipment = shipments[baseNumber];
-                
-                // Durchsuche alle Scans jeder Sendung
-                if (shipment.scannedItems && shipment.scannedItems.length > 0) {
-                    const itemsWithDunkelalarm = shipment.scannedItems.filter(
-                        item => item.status === 'Dunkelalarm' && !item.isCancelled
-                    );
-
-                    // Wenn spezifische "Dunkelalarm"-Einträge gefunden wurden...
-                    if (itemsWithDunkelalarm.length > 0) {
-                        // ...füge ihre gescannten Nummern (rawInput) zur Liste hinzu.
-                        if (!dunkelalarmItemsByOrder[baseNumber]) {
-                            dunkelalarmItemsByOrder[baseNumber] = [];
-                        }
-                        itemsWithDunkelalarm.forEach(item => {
-                            dunkelalarmItemsByOrder[baseNumber].push(item.rawInput);
-                        });
-                    }
-                }
-
-                // Die bestehende Logik für HU-Listen-Aufträge bleibt unverändert
-                if (shipment.isHuListOrder && shipment.scannedItems && shipment.scannedItems.length > 0) {
-                    const allUniqueHuNumbers = [...new Set(shipment.scannedItems.map(item => item.rawInput))];
-                    
-                    const processedHus = new Set(
-                        shipment.scannedItems
-                            .filter(item => processedStatuses.includes(item.status) && !item.isCancelled)
-                            .map(item => item.rawInput)
-                    );
-                    const pendingSecurityHuNumbers = allUniqueHuNumbers.filter(hu => !processedHus.has(hu));
-                    if (pendingSecurityHuNumbers.length > 0) {
-                        openSecurityHusByOrder.push({
-                            orderNumber: baseNumber,
-                            pendingHus: pendingSecurityHuNumbers.sort(),
-                            totalHus: allUniqueHuNumbers.length
-                        });
-                    }
-
-                    const receiptHus = new Set(
-                        shipment.scannedItems
-                            .filter(item => item.status === 'Wareneingang' && !item.isCancelled)
-                            .map(item => item.rawInput)
-                    );
-                    const missingReceiptHuNumbers = allUniqueHuNumbers.filter(hu => !receiptHus.has(hu));
-                     if (missingReceiptHuNumbers.length > 0) {
-                        missingReceiptHusByOrder.push({
-                            orderNumber: baseNumber,
-                            pendingHus: missingReceiptHuNumbers.sort(),
-                            totalHus: allUniqueHuNumbers.length,
-                            receiptCount: allUniqueHuNumbers.length - missingReceiptHuNumbers.length
-                        });
-                    }
-                }
-            });
-
-            // HTML für "Offene Sicherung" generieren (unverändert)
-            let securityHtmlContent = '';
-            if (openSecurityHusByOrder.length > 0) {
-                 openSecurityHusByOrder.sort((a,b) => a.orderNumber.localeCompare(b.orderNumber));
-                 openSecurityHusByOrder.forEach(order => {
-                     securityHtmlContent += `<div class="hu-order-group">`;
-                     securityHtmlContent += `<div class="hu-order-title">${escapeHtml(order.orderNumber)} (${order.pendingHus.length} von ${order.totalHus} offen)</div>`;
-                     securityHtmlContent += `<ul class="hu-list">${order.pendingHus.map(hu => `<li>${escapeHtml(hu)}</li>`).join('')}</ul></div>`;
-                 });
-            } else {
-                securityHtmlContent = '<p class="no-open-hus-message">Glückwunsch! Alle HUs sind sicherheitstechnisch bearbeitet.</p>';
-            }
-            openHusListContainerEl.innerHTML = securityHtmlContent;
-
-            // HTML für "Fehlender Wareneingang" generieren (unverändert)
-            let receiptHtmlContent = '';
-            if (missingReceiptHusByOrder.length > 0) {
-                 missingReceiptHusByOrder.sort((a,b) => a.orderNumber.localeCompare(b.orderNumber));
-                 missingReceiptHusByOrder.forEach(order => {
-                     receiptHtmlContent += `<div class="hu-order-group">`;
-                     receiptHtmlContent += `<div class="hu-order-title">${escapeHtml(order.orderNumber)} (${order.receiptCount} von ${order.totalHus} erfasst)</div>`;
-                     receiptHtmlContent += `<ul class="hu-list">${order.pendingHus.map(hu => `<li>${escapeHtml(hu)}</li>`).join('')}</ul></div>`;
-                 });
-            } else {
-                receiptHtmlContent = '<p class="no-open-hus-message">Perfekt! Alle HUs wurden im Wareneingang erfasst.</p>';
-            }
-            missingReceiptHusListContainerEl.innerHTML = receiptHtmlContent;
+            const processedHusSet = new Set(
+                shipment.scannedItems
+                    .filter(item => processedStatuses.includes(item.status) && !item.isCancelled)
+                    .map(item => item.rawInput)
+            );
             
-            // HTML für "Dunkelalarm" mit der NEUEN Logik generieren
-            let dunkelalarmHtmlContent = '';
-            const dunkelalarmOrderNumbers = Object.keys(dunkelalarmItemsByOrder).sort();
+            // Finde nur die HUs, die noch nicht final bearbeitet wurden
+            const pendingHuItems = shipment.scannedItems.filter(item => 
+                !processedHusSet.has(item.rawInput) &&
+                // Stelle sicher, dass wir nur den "Anstehend"-Platzhalter zählen
+                shipment.scannedItems.some(i => i.rawInput === item.rawInput && i.status === 'Anstehend')
+            );
+            
+            // Filtere Duplikate, falls mehrere Scans pro HU existieren
+            const uniquePendingHus = Array.from(new Map(pendingHuItems.map(item => [item.rawInput, item])).values());
 
-            if (dunkelalarmOrderNumbers.length > 0) {
-                 dunkelalarmOrderNumbers.forEach(orderNumber => {
-                     const hus = dunkelalarmItemsByOrder[orderNumber].sort();
-                     dunkelalarmHtmlContent += `<div class="hu-order-group">`;
-                     // Zeigt die übergeordnete Sendungsnummer an
-                     dunkelalarmHtmlContent += `<div class="hu-order-title">${escapeHtml(orderNumber)}</div>`;
-                     // Zeigt die Liste der spezifischen Packstücke an
-                     dunkelalarmHtmlContent += `<ul class="hu-list">${hus.map(hu => `<li>${escapeHtml(hu)}</li>`).join('')}</ul>`;
-                     dunkelalarmHtmlContent += `</div>`;
-                 });
-            } else {
-                dunkelalarmHtmlContent = '<p class="no-open-hus-message">Keine Einträge mit Status "Dunkelalarm" gefunden.</p>';
+
+            if (uniquePendingHus.length > 0) {
+                const land = shipment.land || 'Unbekannt';
+                if (!openManOrdersByCountry[land]) {
+                    openManOrdersByCountry[land] = [];
+                }
+                openManOrdersByCountry[land].push({
+                    orderNumber: baseNumber,
+                    spediteur: shipment.spediteur || 'N/A',
+                    pendingHus: uniquePendingHus.map(item => ({ rawInput: item.rawInput, originalNumber: item.originalNumber })),
+                    totalHus: shipment.totalPiecesExpected || new Set(shipment.scannedItems.map(i => i.rawInput)).size
+                });
             }
-            dunkelalarmHusListContainerEl.innerHTML = dunkelalarmHtmlContent;
-
-            // Standardansicht beim Öffnen festlegen (unverändert)
-            showOpenSecurityHusBtnEl.classList.add('active');
-            showMissingReceiptHusBtnEl.classList.remove('active');
-            showDunkelalarmHusBtnEl.classList.remove('active');
-            openHusListContainerEl.style.display = 'block';
-            missingReceiptHusListContainerEl.style.display = 'none';
-            dunkelalarmHusListContainerEl.style.display = 'none';
-
-            // Modal anzeigen (unverändert)
-            openHusModalEl.classList.add('visible');
-            document.body.classList.add('modal-open');
-            closeSideMenu(); 
         }
+    });
+
+    // Schritt 2: HTML generieren
+    let htmlContent = '';
+    const sortedCountries = Object.keys(openManOrdersByCountry).sort();
+
+    if (sortedCountries.length > 0) {
+        sortedCountries.forEach(country => {
+            htmlContent += `<h2 style="text-align:left; margin-top:15px; margin-bottom:10px; border-bottom: 2px solid #ccc; padding-bottom:5px;">${escapeHtml(country)}</h2>`;
+            
+            const ordersInCountry = openManOrdersByCountry[country].sort((a,b) => a.orderNumber.localeCompare(b.orderNumber));
+
+            ordersInCountry.forEach(order => {
+                const openCount = order.pendingHus.length;
+                htmlContent += `<div class="hu-order-group">`;
+                htmlContent += `<div class="hu-order-title">${escapeHtml(order.orderNumber)} (${openCount} von ${order.totalHus} offen) → ${escapeHtml(order.spediteur)}</div>`;
+                
+                const sortedPendingHus = order.pendingHus.sort((a,b) => a.originalNumber - b.originalNumber);
+                
+                htmlContent += `<ul class="hu-list">${sortedPendingHus.map(hu => `<li>${hu.originalNumber}. ${escapeHtml(hu.rawInput)}</li>`).join('')}</ul></div>`;
+            });
+        });
+    } else {
+        htmlContent = '<p class="no-open-hus-message">Glückwunsch! Alle HUs von MAN-Aufträgen sind sicherheitstechnisch bearbeitet.</p>';
+    }
+    
+    // Bestehende Ansichten leeren und die neue Logik anwenden
+    openHusListContainerEl.innerHTML = htmlContent;
+    missingReceiptHusListContainerEl.innerHTML = '<p class="no-open-hus-message">Diese Ansicht ist für MAN LFS Aufträge derzeit nicht implementiert.</p>';
+    dunkelalarmHusListContainerEl.innerHTML = '<p class="no-open-hus-message">Diese Ansicht ist für MAN LFS Aufträge derzeit nicht implementiert.</p>';
+
+    // Standardansicht beim Öffnen festlegen
+    showOpenSecurityHusBtnEl.classList.add('active');
+    showMissingReceiptHusBtnEl.classList.remove('active');
+    showDunkelalarmHusBtnEl.classList.remove('active');
+    openHusListContainerEl.style.display = 'block';
+    missingReceiptHusListContainerEl.style.display = 'none';
+    dunkelalarmHusListContainerEl.style.display = 'none';
+
+    // Modal anzeigen
+    openHusModalEl.classList.add('visible');
+    document.body.classList.add('modal-open');
+    closeSideMenu(); 
+}
 // --- ENDE DER ÄNDERUNG ---
 // --- ENDE DER ÄNDERUNG ---
         // --- START: NEUE HILFSFUNKTION ---
@@ -1058,22 +1105,22 @@ function calculateGoodsReceiptCount(scannedItems) {
             return null; // Keine passende Notiz in keiner Sendung gefunden.
         }
         function findShipmentByHuNumber(huNumber) {
-            const shipments = loadShipments();
-            const upperHuNumber = huNumber.trim().toUpperCase();
-            if (!upperHuNumber) return null;
+    const shipments = loadShipments();
+    const upperHuNumber = huNumber.trim().toUpperCase();
+    if (!upperHuNumber) return null;
 
-            for (const baseNumber in shipments) {
-                const shipment = shipments[baseNumber];
-                // Suche nur in Aufträgen, die als HU-Listen-Auftrag markiert sind!
-                if (shipment.isHuListOrder && shipment.scannedItems && Array.isArray(shipment.scannedItems)) {
-                    const foundItem = shipment.scannedItems.find(item => item.rawInput.toUpperCase() === upperHuNumber);
-                    if (foundItem) {
-                        return baseNumber; // Treffer! Gib die HAWB/Auftragsnummer zurück.
-                    }
-                }
+    for (const baseNumber in shipments) {
+        const shipment = shipments[baseNumber];
+        // GEÄNDERT: Prüft auf beide HU-Listen-Typen
+        if ((shipment.isHuListOrder || shipment.isManLfsOrder) && shipment.scannedItems && Array.isArray(shipment.scannedItems)) {
+            const foundItem = shipment.scannedItems.find(item => item.rawInput.toUpperCase() === upperHuNumber);
+            if (foundItem) {
+                return baseNumber;
             }
-            return null; // Keine passende HU in keinem HU-Auftrag gefunden.
         }
+    }
+    return null;
+}
         function calculateCurrentCountedPieces(scannedItems) {
             if (!Array.isArray(scannedItems)) return 0;
             return scannedItems.filter(item => !item.isCombination && !item.isCancelled && !NON_COUNTING_STATUSES.includes(item.status)).length;
@@ -1165,135 +1212,93 @@ function calculateGoodsReceiptCount(scannedItems) {
         
         
         function displayCurrentShipmentDetails(baseNumberToDisplay) {
-            clearError();
-            removeActiveInlineNoteEditor();
+    clearError();
+    removeActiveInlineNoteEditor();
+    const shipments = loadShipments();
+    const shipment = baseNumberToDisplay ? shipments[baseNumberToDisplay] : null;
 
-            const shipments = loadShipments();
-            const shipment = baseNumberToDisplay ? shipments[baseNumberToDisplay] : null;
+    if (!baseNumberToDisplay || !shipment) {
+        currentDetailsDivEl.innerHTML = 'Geben Sie eine Sendungsnummer ein oder wählen Sie eine aus der Liste.';
+        currentDetailsDivEl.style.borderColor = '#aac';
+        return;
+    }
 
-            if (!baseNumberToDisplay || !shipment) {
-                currentDetailsDivEl.innerHTML = 'Geben Sie eine Sendungsnummer ein oder wählen Sie eine aus der Liste.';
-                currentDetailsDivEl.style.borderColor = '#aac';
-                return;
-            }
+    let detailsHtml = `<strong>Details für ${escapeHtml(baseNumberToDisplay)}:</strong>`;
+    
+    // NEU: Zusatzinfos für MAN LFS anzeigen
+    if (shipment.isManLfsOrder) {
+        detailsHtml += `<div style="font-size:0.9em; color:#555; margin-bottom:8px;">Land: <strong>${escapeHtml(shipment.land)}</strong>, Spediteur: <strong>${escapeHtml(shipment.spediteur)}</strong></div>`;
+    }
 
-            let detailsHtml = `<strong>Details für ${escapeHtml(baseNumberToDisplay)}:</strong>`;
-
-            // --- START: ANGEPASSTE LOGIK ZUR ANZEIGE OFFENER HUs ---
-            if (shipment.isHuListOrder) {
-                const allScansForHuOrder = shipment.scannedItems || [];
-                
-                // *** HIER IST DIE KORREKTUR ***
-                // Diese Liste legt fest, welche Status eine HU als sicherheitstechnisch "bearbeitet" markieren.
-                // "Wareneingang" ist hier absichtlich NICHT enthalten.
-                const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
-
-                // 1. Alle einzigartigen HU-Nummern im Auftrag ermitteln (basierend auf allen Scans)
-                const allUniqueHuNumbers = [...new Set(allScansForHuOrder.map(item => item.rawInput))];
-
-                // 2. Diejenigen HUs finden, die bereits einen finalen Sicherheitsstatus haben (und nicht storniert sind)
-                const processedHus = new Set(
-                    allScansForHuOrder
-                        .filter(item => processedStatuses.includes(item.status) && !item.isCancelled)
-                        .map(item => item.rawInput)
-                );
-                
-                // 3. Offene HUs sind alle, die NICHT in der Liste der bearbeiteten sind.
-                const pendingHuNumbers = allUniqueHuNumbers.filter(hu => !processedHus.has(hu));
-                
-                if (pendingHuNumbers.length > 0) {
-                    const totalHus = shipment.totalPiecesExpected || allUniqueHuNumbers.length;
-                    const securedCount = totalHus - pendingHuNumbers.length;
-                    
-                    const listClass = (securedCount > 0) ? 'partial' : '';
-
-                    detailsHtml += `<div id="pendingHuList" class="${listClass}">`;
-                    detailsHtml += `<h4>Offene HUs (${pendingHuNumbers.length} von ${totalHus}):</h4>`;
-                    detailsHtml += `<ul>`;
-                    pendingHuNumbers.forEach(hu => {
-                        detailsHtml += `<li>${escapeHtml(hu)}</li>`;
-                    });
-                    detailsHtml += `</ul></div>`;
-                }
-            }
-            // --- ENDE: ANGEPASSTE LOGIK ZUR ANZEIGE OFFENER HUs ---
-
-            const expected = shipment.totalPiecesExpected;
-            const allScans = shipment.scannedItems || [];
+    const allScans = shipment.scannedItems || [];
+    detailsHtml += `<ul>`;
+    allScans
+        .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+        .forEach(item => {
+            const dt = new Date(item.timestamp);
+            const timeStr = dt.toLocaleTimeString('de-DE');
+            const dateStr = dt.toLocaleDateString('de-DE');
+            const timestampPart = `<span class="timestamp">[${dateStr} ${timeStr}]</span>`;
             
-            const securityScansCount = calculateCurrentCountedPieces(allScans);
-            const receiptScansCount = calculateGoodsReceiptCount(allScans);
+            // GEÄNDERT: Anzeige der originalen Nummer für MAN LFS
+            const numberPrefix = shipment.isManLfsOrder && item.originalNumber ? `${item.originalNumber}. ` : '';
+            
+            const numberPart = escapeHtml(item.rawInput);
+            const statusPart = escapeHtml(item.status);
+            const comboPart = item.isCombination ? ` <span class="combo">(Kombi)</span>` : '';
+            const isCancelled = item.isCancelled;
 
-            detailsHtml += `<ul>`;
-
-            allScans
-                .filter(item => item.status !== 'Anstehend')
-                .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
-                .forEach(item => {
-                    const dt = new Date(item.timestamp);
-                    const timeStr = dt.toLocaleTimeString('de-DE');
-                    const dateStr = dt.toLocaleDateString('de-DE');
-                    const timestampPart = `<span class="timestamp">[${dateStr} ${timeStr}]</span>`;
-                    const numberPart = escapeHtml(item.rawInput);
-                    const statusPart = escapeHtml(item.status);
-                    const comboPart = item.isCombination ? ` <span class="combo">(Kombi)</span>` : '';
-                    const isCancelled = item.isCancelled;
-
-                    let notesListHtml = '';
-                    if (!isCancelled && Array.isArray(item.notes)) {
-                        notesListHtml += '<div class="notes-container">';
-                        item.notes.forEach((note, index) => {
-                            notesListHtml += `<div class="note-item">
-                                <span class="note-prefix">Notiz:</span>
-                                <span class="editable-note" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" data-note-index="${index}" title="Notiz bearbeiten">${escapeHtml(note)}</span>
-                                <button class="delete-note-btn" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" data-note-index="${index}" title="Notiz löschen">×</button>
-                            </div>`;
-                        });
-                        notesListHtml += '</div>';
-                    } else if (Array.isArray(item.notes) && item.notes.length > 0) {
-                        notesListHtml += `<div class="notes-container" style="color:var(--cancelled-color);">${item.notes.map(n => `<div>- ${escapeHtml(n)}</div>`).join('')}</div>`;
-                    }
-
-                    detailsHtml += `<li class="${isCancelled ? 'cancelled-item' : ''}">`;
-                    detailsHtml += ` ${timestampPart} ${numberPart} → <span class="status">${statusPart}</span>${comboPart}`;
-
-                    if (!isCancelled) {
-                        detailsHtml += `<button class="cancel-button" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}">Storno</button>`;
-                    } else {
-                        const cancelDt = item.cancelledTimestamp ? new Date(item.cancelledTimestamp) : null;
-                        const cancelTimeStr = cancelDt ? cancelDt.toLocaleString('de-DE') : 'Unbekannt';
-                        detailsHtml += `<span class="cancelled-info"> (storniert am ${cancelTimeStr})</span>`;
-                    }
-                    detailsHtml += notesListHtml;
-                    if (!isCancelled) {
-                        detailsHtml += `<a href="#" class="add-note-link" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" title="Weitere Notiz hinzufügen">Notiz hinzufügen</a>`;
-                    }
-                    detailsHtml += `<div class="inline-note-editor-placeholder"></div>`;
-                    detailsHtml += `</li>`;
+            let notesListHtml = '';
+            if (!isCancelled && Array.isArray(item.notes) && item.notes.length > 0) {
+                notesListHtml += '<div class="notes-container">';
+                item.notes.forEach((note, index) => {
+                    notesListHtml += `<div class="note-item"><span class="note-prefix">Notiz:</span><span class="editable-note" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" data-note-index="${index}" title="Notiz bearbeiten">${escapeHtml(note)}</span><button class="delete-note-btn" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" data-note-index="${index}" title="Notiz löschen">×</button></div>`;
                 });
-            detailsHtml += `</ul>`;
-
-            detailsHtml += `<div class="summary">`;
-            let expectedText = (expected !== null && expected !== undefined) ? `${expected} Stk.` : 'N/A';
-            
-            const receiptClass = getStatusClass(receiptScansCount, expected);
-            detailsHtml += `<span>Wareneingang: <span class="${receiptClass}">${receiptScansCount} von ${expectedText}</span></span>`;
-
-            const securityClass = getStatusClass(securityScansCount, expected);
-            detailsHtml += `<span>Sicherung erfasst: <span class="${securityClass}">${securityScansCount} von ${expectedText}</span></span>`;
-            
-            detailsHtml += `</div>`;
-            currentDetailsDivEl.innerHTML = detailsHtml;
-
-            if (expected !== null && expected !== undefined) {
-                if (receiptScansCount > expected) currentDetailsDivEl.style.borderColor = 'red';
-                else if (receiptScansCount < expected) currentDetailsDivEl.style.borderColor = 'orange';
-                else if (receiptScansCount === expected) currentDetailsDivEl.style.borderColor = 'green';
-                else currentDetailsDivEl.style.borderColor = '#aac';
-            } else {
-                currentDetailsDivEl.style.borderColor = '#aac';
+                notesListHtml += '</div>';
+            } else if (Array.isArray(item.notes) && item.notes.length > 0) {
+                notesListHtml += `<div class="notes-container" style="color:var(--cancelled-color);">${item.notes.map(n => `<div>- ${escapeHtml(n)}</div>`).join('')}</div>`;
             }
-        }
+
+            detailsHtml += `<li class="${isCancelled ? 'cancelled-item' : ''}">`;
+            detailsHtml += ` ${timestampPart} <strong>${numberPrefix}${numberPart}</strong> → <span class="status">${statusPart}</span>${comboPart}`;
+
+            if (!isCancelled) {
+                detailsHtml += `<button class="cancel-button" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}">Storno</button>`;
+            } else {
+                const cancelDt = item.cancelledTimestamp ? new Date(item.cancelledTimestamp) : null;
+                const cancelTimeStr = cancelDt ? cancelDt.toLocaleString('de-DE') : 'Unbekannt';
+                detailsHtml += `<span class="cancelled-info"> (storniert am ${cancelTimeStr})</span>`;
+            }
+            detailsHtml += notesListHtml;
+            if (!isCancelled) {
+                detailsHtml += `<a href="#" class="add-note-link" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" title="Weitere Notiz hinzufügen">Notiz hinzufügen</a>`;
+            }
+            detailsHtml += `<div class="inline-note-editor-placeholder"></div>`;
+            detailsHtml += `</li>`;
+        });
+    detailsHtml += `</ul>`;
+
+    // Summary am Ende
+    const expected = shipment.totalPiecesExpected;
+    const securityScansCount = calculateCurrentCountedPieces(allScans);
+    const receiptScansCount = calculateGoodsReceiptCount(allScans);
+    const expectedText = (expected !== null && expected !== undefined) ? `${expected} Stk.` : 'N/A';
+    const receiptClass = getStatusClass(receiptScansCount, expected);
+    const securityClass = getStatusClass(securityCount, expected);
+    detailsHtml += `<div class="summary"><span>Wareneingang: <span class="${receiptClass}">${receiptScansCount} von ${expectedText}</span></span><span>Sicherung erfasst: <span class="${securityClass}">${securityCount} von ${expectedText}</span></span></div>`;
+    
+    currentDetailsDivEl.innerHTML = detailsHtml;
+
+    if (expected !== null && expected !== undefined) {
+        const isComplete = receiptScansCount >= expected && securityScansCount >= expected;
+        if (receiptScansCount > expected || securityScansCount > expected) currentDetailsDivEl.style.borderColor = 'red';
+        else if (isComplete) currentDetailsDivEl.style.borderColor = 'green';
+        else if (receiptScansCount < expected || securityScansCount < expected) currentDetailsDivEl.style.borderColor = 'orange';
+        else currentDetailsDivEl.style.borderColor = '#aac';
+    } else {
+        currentDetailsDivEl.style.borderColor = '#aac';
+    }
+}
          function renderTable() {
             const shipments = loadShipments();
             tableBodyEl.innerHTML = '';
@@ -2538,78 +2543,81 @@ function skipNoteAndAddFirstBatchItem() {
                 }
             });
 
-            shipmentNumberInputEl.addEventListener('input', () => {
-                const currentValue = shipmentNumberInputEl.value.trim();
+            // INNERHALB DES 'input' EVENT LISTENERS FÜR shipmentNumberInputEl
+if (currentValue.startsWith('FRT_MULTI_V1')) {
+    if (!confirm("Ein Multi-Auftrags-QR-Code (MAN-Format) wurde erkannt.\n\nMöchtest du alle darin enthaltenen Aufträge jetzt importieren?")) {
+        shipmentNumberInputEl.value = '';
+        return;
+    }
 
-                // --- START: NEUE LOGIK FÜR MULTI-QR-CODE ---
-                // --- START: NEUE LOGIK FÜR MULTI-QR-CODE ---
-                if (currentValue.startsWith('FRT_MULTI_V1')) {
-                    if (!confirm("Ein Multi-Auftrags-QR-Code wurde erkannt.\n\nMöchtest du alle darin enthaltenen Aufträge und HUs jetzt importieren?")) {
-                        shipmentNumberInputEl.value = '';
-                        return;
+    const parts = currentValue.split(';;;');
+    parts.shift(); // Entfernt den Header 'FRT_MULTI_V1'
+
+    const shipments = loadShipments();
+    const now = new Date().toISOString();
+    let totalAddedCount = 0;
+    let totalDuplicateCount = 0;
+    let processedOrders = [];
+
+    parts.forEach(orderData => {
+        const [metaAndOrder, huData] = orderData.split('|||');
+        if (!metaAndOrder || !huData) return;
+
+        // NEU: Metadaten extrahieren
+        const metaParts = metaAndOrder.split('|');
+        const orderNumber = metaParts[0];
+        const spediteur = metaParts[1] || "UNBEKANNT";
+        const land = metaParts[2] || "UNBEKANNT";
+
+        processedOrders.push(orderNumber);
+        const hus = huData.split(' ').filter(hu => hu);
+        let addedCount = 0;
+        let duplicateCount = 0;
+
+        if (!shipments[orderNumber]) {
+            shipments[orderNumber] = {
+                hawb: orderNumber,
+                lastModified: now,
+                totalPiecesExpected: hus.length,
+                scannedItems: [],
+                mitarbeiter: MITARBEITER_NAME,
+                isHuListOrder: true,
+                // NEU: Zusätzliche Daten speichern
+                freightForwarder: spediteur,
+                destinationCountry: land
+            };
+            hus.forEach(hu => {
+                shipments[orderNumber].scannedItems.push({ rawInput: hu, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null });
+                addedCount++;
+            });
+        } else {
+            // Logik zum Hinzufügen zu bestehenden Aufträgen bleibt gleich
+            if (shipments[orderNumber].isHuListOrder) {
+                hus.forEach(hu => {
+                    if (!shipments[orderNumber].scannedItems.find(item => item.rawInput.toUpperCase() === hu.toUpperCase())) {
+                        shipments[orderNumber].scannedItems.push({ rawInput: hu, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null });
+                        addedCount++;
+                    } else {
+                        duplicateCount++;
                     }
-
-                    const parts = currentValue.split(';;;');
-                    parts.shift(); // Entfernt den Header 'FRT_MULTI_V1'
-
-                    const shipments = loadShipments();
-                    const now = new Date().toISOString();
-                    let totalAddedCount = 0;
-                    let totalDuplicateCount = 0;
-                    let processedOrders = [];
-
-                    parts.forEach(orderData => {
-                        const [orderNumber, huData] = orderData.split('|||');
-                        if (!orderNumber || !huData) return;
-
-                        processedOrders.push(orderNumber);
-                        const hus = huData.split(' ');
-                        let addedCount = 0;
-                        let duplicateCount = 0;
-
-                        if (!shipments[orderNumber]) {
-                            shipments[orderNumber] = {
-                                hawb: orderNumber,
-                                lastModified: now,
-                                totalPiecesExpected: hus.length,
-                                scannedItems: [],
-                                mitarbeiter: MITARBEITER_NAME,
-                                isHuListOrder: true
-                            };
-                            hus.forEach(hu => {
-                                shipments[orderNumber].scannedItems.push({ rawInput: hu, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null });
-                                addedCount++;
-                            });
-                        } else {
-                            if (shipments[orderNumber].isHuListOrder) {
-                                hus.forEach(hu => {
-                                    if (!shipments[orderNumber].scannedItems.find(item => item.rawInput.toUpperCase() === hu.toUpperCase())) {
-                                        shipments[orderNumber].scannedItems.push({ rawInput: hu, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null });
-                                        addedCount++;
-                                    } else {
-                                        duplicateCount++;
-                                    }
-                                });
-                                if (addedCount > 0) {
-                                    shipments[orderNumber].lastModified = now;
-                                    shipments[orderNumber].totalPiecesExpected += addedCount;
-                                }
-                            }
-                        }
-                        totalAddedCount += addedCount;
-                        totalDuplicateCount += duplicateCount;
-                    });
-                    
-                    // Daten speichern
-                    saveShipments(shipments);
-
-                    // Dem Benutzer Feedback geben
-                    alert(`Multi-Import abgeschlossen:\n- Verarbeitete Aufträge: ${processedOrders.length}\n- Neue HUs hinzugefügt: ${totalAddedCount}\n- Duplikate übersprungen: ${totalDuplicateCount}`);
-                    
-                    // NEU: Seite neu laden, nachdem der Benutzer das Alert-Fenster bestätigt hat.
-                    location.reload();
-                    return;
+                });
+                if (addedCount > 0) {
+                    shipments[orderNumber].lastModified = now;
+                    shipments[orderNumber].totalPiecesExpected += addedCount;
                 }
+            }
+        }
+        totalAddedCount += addedCount;
+        totalDuplicateCount += duplicateCount;
+    });
+    
+    saveShipments(shipments);
+
+    alert(`Multi-Import abgeschlossen:\n- Verarbeitete Rechnungen: ${processedOrders.length}\n- Neue HUs hinzugefügt: ${totalAddedCount}\n- Duplikate übersprungen: ${totalDuplicateCount}`);
+    
+    location.reload();
+    return;
+}
                 // --- ENDE: NEUE LOGIK FÜR MULTI-QR-CODE ---
                 // --- ENDE: NEUE LOGIK FÜR MULTI-QR-CODE ---
 
