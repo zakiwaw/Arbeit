@@ -809,155 +809,135 @@ function calculateGoodsReceiptCount(scannedItems) {
 // --- START DER ÄNDERUNG: Die gesamte Funktion wird aktualisiert ---
 // --- START DER ÄNDERUNG: Die gesamte Funktion wird mit der präziseren Logik ersetzt ---
       function showOpenHusSummary() {
-    removeActiveInlineNoteEditor();
-    const shipments = loadShipments();
-    
-    // Logik für "Offene Sicherung"
-    const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
-    let openSecurityHusByOrder = [];
-
-    // Logik für "Fehlender Wareneingang"
-    let missingReceiptHusByOrder = [];
-
-    // Logik für "Dunkelalarm"
-    let dunkelalarmItemsByOrder = {};
-
-    Object.keys(shipments).forEach(baseNumber => { // baseNumber ist hier die Rechnungsnummer
-        const shipment = shipments[baseNumber];
-        
-        // Sammle Dunkelalarm-Einträge
-        if (shipment.scannedItems && shipment.scannedItems.length > 0) {
-            const itemsWithDunkelalarm = shipment.scannedItems.filter(
-                item => item.status === 'Dunkelalarm' && !item.isCancelled
-            );
-            if (itemsWithDunkelalarm.length > 0) {
-                if (!dunkelalarmItemsByOrder[baseNumber]) {
-                    dunkelalarmItemsByOrder[baseNumber] = {
-                        hus: [],
-                        // NEU: Spediteur und Land für die Anzeige mitgeben
-                        freightForwarder: shipment.freightForwarder || 'N/A',
-                        destinationCountry: shipment.destinationCountry || 'N/A'
-                    };
-                }
-                itemsWithDunkelalarm.forEach(item => {
-                    dunkelalarmItemsByOrder[baseNumber].hus.push(item.rawInput);
-                });
-            }
-        }
-
-        // Verarbeite nur HU-Listen-Aufträge für offene Posten
-        if (shipment.isHuListOrder && shipment.scannedItems && shipment.scannedItems.length > 0) {
-            const allUniqueHuNumbers = [...new Set(shipment.scannedItems.map(item => item.rawInput))];
+            removeActiveInlineNoteEditor();
+            const shipments = loadShipments();
             
-            // Offene SICHERUNG
-            const processedHus = new Set(
-                shipment.scannedItems
-                    .filter(item => processedStatuses.includes(item.status) && !item.isCancelled)
-                    .map(item => item.rawInput)
-            );
-            const pendingSecurityHuNumbers = allUniqueHuNumbers.filter(hu => !processedHus.has(hu));
-            if (pendingSecurityHuNumbers.length > 0) {
-                openSecurityHusByOrder.push({
-                    orderNumber: baseNumber, // Rechnungsnummer
-                    pendingHus: pendingSecurityHuNumbers.sort(),
-                    totalHus: allUniqueHuNumbers.length,
-                    // NEU: Spediteur und Land mitgeben
-                    freightForwarder: shipment.freightForwarder || 'N/A',
-                    destinationCountry: shipment.destinationCountry || 'N/A'
-                });
-            }
+            // --- Logik für "Offene Sicherung" (bestehend) ---
+            const processedStatuses = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
+            let openSecurityHusByOrder = [];
 
-            // Fehlender WARENEINGANG
-            const receiptHus = new Set(
-                shipment.scannedItems
-                    .filter(item => item.status === 'Wareneingang' && !item.isCancelled)
-                    .map(item => item.rawInput)
-            );
-            const missingReceiptHuNumbers = allUniqueHuNumbers.filter(hu => !receiptHus.has(hu));
-             if (missingReceiptHuNumbers.length > 0) {
-                missingReceiptHusByOrder.push({
-                    orderNumber: baseNumber, // Rechnungsnummer
-                    pendingHus: missingReceiptHuNumbers.sort(),
-                    totalHus: allUniqueHuNumbers.length,
-                    receiptCount: allUniqueHuNumbers.length - missingReceiptHuNumbers.length,
-                    // NEU: Spediteur und Land mitgeben
-                    freightForwarder: shipment.freightForwarder || 'N/A',
-                    destinationCountry: shipment.destinationCountry || 'N/A'
-                });
+            // --- Logik für "Fehlender Wareneingang" (bestehend) ---
+            let missingReceiptHusByOrder = [];
+
+            // --- NEUE, PRÄZISERE Logik für "Dunkelalarm" ---
+            let dunkelalarmItemsByOrder = {}; // Ein Objekt, um HUs nach Auftrag zu gruppieren
+
+            Object.keys(shipments).forEach(baseNumber => {
+                const shipment = shipments[baseNumber];
+                
+                // Durchsuche alle Scans jeder Sendung
+                if (shipment.scannedItems && shipment.scannedItems.length > 0) {
+                    const itemsWithDunkelalarm = shipment.scannedItems.filter(
+                        item => item.status === 'Dunkelalarm' && !item.isCancelled
+                    );
+
+                    // Wenn spezifische "Dunkelalarm"-Einträge gefunden wurden...
+                    if (itemsWithDunkelalarm.length > 0) {
+                        // ...füge ihre gescannten Nummern (rawInput) zur Liste hinzu.
+                        if (!dunkelalarmItemsByOrder[baseNumber]) {
+                            dunkelalarmItemsByOrder[baseNumber] = [];
+                        }
+                        itemsWithDunkelalarm.forEach(item => {
+                            dunkelalarmItemsByOrder[baseNumber].push(item.rawInput);
+                        });
+                    }
+                }
+
+                // Die bestehende Logik für HU-Listen-Aufträge bleibt unverändert
+                if (shipment.isHuListOrder && shipment.scannedItems && shipment.scannedItems.length > 0) {
+                    const allUniqueHuNumbers = [...new Set(shipment.scannedItems.map(item => item.rawInput))];
+                    
+                    const processedHus = new Set(
+                        shipment.scannedItems
+                            .filter(item => processedStatuses.includes(item.status) && !item.isCancelled)
+                            .map(item => item.rawInput)
+                    );
+                    const pendingSecurityHuNumbers = allUniqueHuNumbers.filter(hu => !processedHus.has(hu));
+                    if (pendingSecurityHuNumbers.length > 0) {
+                        openSecurityHusByOrder.push({
+                            orderNumber: baseNumber,
+                            pendingHus: pendingSecurityHuNumbers.sort(),
+                            totalHus: allUniqueHuNumbers.length
+                        });
+                    }
+
+                    const receiptHus = new Set(
+                        shipment.scannedItems
+                            .filter(item => item.status === 'Wareneingang' && !item.isCancelled)
+                            .map(item => item.rawInput)
+                    );
+                    const missingReceiptHuNumbers = allUniqueHuNumbers.filter(hu => !receiptHus.has(hu));
+                     if (missingReceiptHuNumbers.length > 0) {
+                        missingReceiptHusByOrder.push({
+                            orderNumber: baseNumber,
+                            pendingHus: missingReceiptHuNumbers.sort(),
+                            totalHus: allUniqueHuNumbers.length,
+                            receiptCount: allUniqueHuNumbers.length - missingReceiptHuNumbers.length
+                        });
+                    }
+                }
+            });
+
+            // HTML für "Offene Sicherung" generieren (unverändert)
+            let securityHtmlContent = '';
+            if (openSecurityHusByOrder.length > 0) {
+                 openSecurityHusByOrder.sort((a,b) => a.orderNumber.localeCompare(b.orderNumber));
+                 openSecurityHusByOrder.forEach(order => {
+                     securityHtmlContent += `<div class="hu-order-group">`;
+                     securityHtmlContent += `<div class="hu-order-title">${escapeHtml(order.orderNumber)} (${order.pendingHus.length} von ${order.totalHus} offen)</div>`;
+                     securityHtmlContent += `<ul class="hu-list">${order.pendingHus.map(hu => `<li>${escapeHtml(hu)}</li>`).join('')}</ul></div>`;
+                 });
+            } else {
+                securityHtmlContent = '<p class="no-open-hus-message">Glückwunsch! Alle HUs sind sicherheitstechnisch bearbeitet.</p>';
             }
+            openHusListContainerEl.innerHTML = securityHtmlContent;
+
+            // HTML für "Fehlender Wareneingang" generieren (unverändert)
+            let receiptHtmlContent = '';
+            if (missingReceiptHusByOrder.length > 0) {
+                 missingReceiptHusByOrder.sort((a,b) => a.orderNumber.localeCompare(b.orderNumber));
+                 missingReceiptHusByOrder.forEach(order => {
+                     receiptHtmlContent += `<div class="hu-order-group">`;
+                     receiptHtmlContent += `<div class="hu-order-title">${escapeHtml(order.orderNumber)} (${order.receiptCount} von ${order.totalHus} erfasst)</div>`;
+                     receiptHtmlContent += `<ul class="hu-list">${order.pendingHus.map(hu => `<li>${escapeHtml(hu)}</li>`).join('')}</ul></div>`;
+                 });
+            } else {
+                receiptHtmlContent = '<p class="no-open-hus-message">Perfekt! Alle HUs wurden im Wareneingang erfasst.</p>';
+            }
+            missingReceiptHusListContainerEl.innerHTML = receiptHtmlContent;
+            
+            // HTML für "Dunkelalarm" mit der NEUEN Logik generieren
+            let dunkelalarmHtmlContent = '';
+            const dunkelalarmOrderNumbers = Object.keys(dunkelalarmItemsByOrder).sort();
+
+            if (dunkelalarmOrderNumbers.length > 0) {
+                 dunkelalarmOrderNumbers.forEach(orderNumber => {
+                     const hus = dunkelalarmItemsByOrder[orderNumber].sort();
+                     dunkelalarmHtmlContent += `<div class="hu-order-group">`;
+                     // Zeigt die übergeordnete Sendungsnummer an
+                     dunkelalarmHtmlContent += `<div class="hu-order-title">${escapeHtml(orderNumber)}</div>`;
+                     // Zeigt die Liste der spezifischen Packstücke an
+                     dunkelalarmHtmlContent += `<ul class="hu-list">${hus.map(hu => `<li>${escapeHtml(hu)}</li>`).join('')}</ul>`;
+                     dunkelalarmHtmlContent += `</div>`;
+                 });
+            } else {
+                dunkelalarmHtmlContent = '<p class="no-open-hus-message">Keine Einträge mit Status "Dunkelalarm" gefunden.</p>';
+            }
+            dunkelalarmHusListContainerEl.innerHTML = dunkelalarmHtmlContent;
+
+            // Standardansicht beim Öffnen festlegen (unverändert)
+            showOpenSecurityHusBtnEl.classList.add('active');
+            showMissingReceiptHusBtnEl.classList.remove('active');
+            showDunkelalarmHusBtnEl.classList.remove('active');
+            openHusListContainerEl.style.display = 'block';
+            missingReceiptHusListContainerEl.style.display = 'none';
+            dunkelalarmHusListContainerEl.style.display = 'none';
+
+            // Modal anzeigen (unverändert)
+            openHusModalEl.classList.add('visible');
+            document.body.classList.add('modal-open');
+            closeSideMenu(); 
         }
-    });
-
-    // --- HTML-Generierung mit den neuen Daten ---
-    
-    // HTML für "Offene Sicherung"
-    let securityHtmlContent = '';
-    if (openSecurityHusByOrder.length > 0) {
-         openSecurityHusByOrder.sort((a,b) => a.orderNumber.localeCompare(b.orderNumber));
-         openSecurityHusByOrder.forEach(order => {
-             securityHtmlContent += `<div class="hu-order-group">`;
-             // NEU: Titel mit allen Informationen
-             securityHtmlContent += `<div class="hu-order-title">
-                Rechnung: ${escapeHtml(order.orderNumber)} (${order.pendingHus.length} von ${order.totalHus} offen)<br>
-                <small>Sped.: ${escapeHtml(order.freightForwarder)} / Land: ${escapeHtml(order.destinationCountry)}</small>
-             </div>`;
-             securityHtmlContent += `<ul class="hu-list">${order.pendingHus.map(hu => `<li>${escapeHtml(hu)}</li>`).join('')}</ul></div>`;
-         });
-    } else {
-        securityHtmlContent = '<p class="no-open-hus-message">Glückwunsch! Alle HUs sind sicherheitstechnisch bearbeitet.</p>';
-    }
-    openHusListContainerEl.innerHTML = securityHtmlContent;
-
-    // HTML für "Fehlender Wareneingang"
-    let receiptHtmlContent = '';
-    if (missingReceiptHusByOrder.length > 0) {
-         missingReceiptHusByOrder.sort((a,b) => a.orderNumber.localeCompare(b.orderNumber));
-         missingReceiptHusByOrder.forEach(order => {
-             receiptHtmlContent += `<div class="hu-order-group">`;
-             // NEU: Titel mit allen Informationen
-             receiptHtmlContent += `<div class="hu-order-title">
-                Rechnung: ${escapeHtml(order.orderNumber)} (${order.receiptCount} von ${order.totalHus} erfasst)<br>
-                <small>Sped.: ${escapeHtml(order.freightForwarder)} / Land: ${escapeHtml(order.destinationCountry)}</small>
-             </div>`;
-             receiptHtmlContent += `<ul class="hu-list">${order.pendingHus.map(hu => `<li>${escapeHtml(hu)}</li>`).join('')}</ul></div>`;
-         });
-    } else {
-        receiptHtmlContent = '<p class="no-open-hus-message">Perfekt! Alle HUs wurden im Wareneingang erfasst.</p>';
-    }
-    missingReceiptHusListContainerEl.innerHTML = receiptHtmlContent;
-    
-    // HTML für "Dunkelalarm"
-    let dunkelalarmHtmlContent = '';
-    const dunkelalarmOrderNumbers = Object.keys(dunkelalarmItemsByOrder).sort();
-    if (dunkelalarmOrderNumbers.length > 0) {
-         dunkelalarmOrderNumbers.forEach(orderNumber => {
-             const data = dunkelalarmItemsByOrder[orderNumber];
-             dunkelalarmHtmlContent += `<div class="hu-order-group">`;
-             // NEU: Titel mit allen Informationen
-             dunkelalarmHtmlContent += `<div class="hu-order-title">
-                Rechnung: ${escapeHtml(orderNumber)}<br>
-                <small>Sped.: ${escapeHtml(data.freightForwarder)} / Land: ${escapeHtml(data.destinationCountry)}</small>
-             </div>`;
-             dunkelalarmHtmlContent += `<ul class="hu-list">${data.hus.sort().map(hu => `<li>${escapeHtml(hu)}</li>`).join('')}</ul>`;
-             dunkelalarmHtmlContent += `</div>`;
-         });
-    } else {
-        dunkelalarmHtmlContent = '<p class="no-open-hus-message">Keine Einträge mit Status "Dunkelalarm" gefunden.</p>';
-    }
-    dunkelalarmHusListContainerEl.innerHTML = dunkelalarmHtmlContent;
-
-    // Standardansicht beim Öffnen festlegen
-    showOpenSecurityHusBtnEl.classList.add('active');
-    showMissingReceiptHusBtnEl.classList.remove('active');
-    showDunkelalarmHusBtnEl.classList.remove('active');
-    openHusListContainerEl.style.display = 'block';
-    missingReceiptHusListContainerEl.style.display = 'none';
-    dunkelalarmHusListContainerEl.style.display = 'none';
-
-    openHusModalEl.classList.add('visible');
-    document.body.classList.add('modal-open');
-    closeSideMenu(); 
-}
 // --- ENDE DER ÄNDERUNG ---
 // --- ENDE DER ÄNDERUNG ---
         // --- START: NEUE HILFSFUNKTION ---
@@ -2558,81 +2538,78 @@ function skipNoteAndAddFirstBatchItem() {
                 }
             });
 
-            // INNERHALB DES 'input' EVENT LISTENERS FÜR shipmentNumberInputEl
-if (currentValue.startsWith('FRT_MULTI_V1')) {
-    if (!confirm("Ein Multi-Auftrags-QR-Code (MAN-Format) wurde erkannt.\n\nMöchtest du alle darin enthaltenen Aufträge jetzt importieren?")) {
-        shipmentNumberInputEl.value = '';
-        return;
-    }
+            shipmentNumberInputEl.addEventListener('input', () => {
+                const currentValue = shipmentNumberInputEl.value.trim();
 
-    const parts = currentValue.split(';;;');
-    parts.shift(); // Entfernt den Header 'FRT_MULTI_V1'
-
-    const shipments = loadShipments();
-    const now = new Date().toISOString();
-    let totalAddedCount = 0;
-    let totalDuplicateCount = 0;
-    let processedOrders = [];
-
-    parts.forEach(orderData => {
-        const [metaAndOrder, huData] = orderData.split('|||');
-        if (!metaAndOrder || !huData) return;
-
-        // NEU: Metadaten extrahieren
-        const metaParts = metaAndOrder.split('|');
-        const orderNumber = metaParts[0];
-        const spediteur = metaParts[1] || "UNBEKANNT";
-        const land = metaParts[2] || "UNBEKANNT";
-
-        processedOrders.push(orderNumber);
-        const hus = huData.split(' ').filter(hu => hu);
-        let addedCount = 0;
-        let duplicateCount = 0;
-
-        if (!shipments[orderNumber]) {
-            shipments[orderNumber] = {
-                hawb: orderNumber,
-                lastModified: now,
-                totalPiecesExpected: hus.length,
-                scannedItems: [],
-                mitarbeiter: MITARBEITER_NAME,
-                isHuListOrder: true,
-                // NEU: Zusätzliche Daten speichern
-                freightForwarder: spediteur,
-                destinationCountry: land
-            };
-            hus.forEach(hu => {
-                shipments[orderNumber].scannedItems.push({ rawInput: hu, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null });
-                addedCount++;
-            });
-        } else {
-            // Logik zum Hinzufügen zu bestehenden Aufträgen bleibt gleich
-            if (shipments[orderNumber].isHuListOrder) {
-                hus.forEach(hu => {
-                    if (!shipments[orderNumber].scannedItems.find(item => item.rawInput.toUpperCase() === hu.toUpperCase())) {
-                        shipments[orderNumber].scannedItems.push({ rawInput: hu, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null });
-                        addedCount++;
-                    } else {
-                        duplicateCount++;
+                // --- START: NEUE LOGIK FÜR MULTI-QR-CODE ---
+                // --- START: NEUE LOGIK FÜR MULTI-QR-CODE ---
+                if (currentValue.startsWith('FRT_MULTI_V1')) {
+                    if (!confirm("Ein Multi-Auftrags-QR-Code wurde erkannt.\n\nMöchtest du alle darin enthaltenen Aufträge und HUs jetzt importieren?")) {
+                        shipmentNumberInputEl.value = '';
+                        return;
                     }
-                });
-                if (addedCount > 0) {
-                    shipments[orderNumber].lastModified = now;
-                    shipments[orderNumber].totalPiecesExpected += addedCount;
-                }
-            }
-        }
-        totalAddedCount += addedCount;
-        totalDuplicateCount += duplicateCount;
-    });
-    
-    saveShipments(shipments);
 
-    alert(`Multi-Import abgeschlossen:\n- Verarbeitete Rechnungen: ${processedOrders.length}\n- Neue HUs hinzugefügt: ${totalAddedCount}\n- Duplikate übersprungen: ${totalDuplicateCount}`);
-    
-    location.reload();
-    return;
-}
+                    const parts = currentValue.split(';;;');
+                    parts.shift(); // Entfernt den Header 'FRT_MULTI_V1'
+
+                    const shipments = loadShipments();
+                    const now = new Date().toISOString();
+                    let totalAddedCount = 0;
+                    let totalDuplicateCount = 0;
+                    let processedOrders = [];
+
+                    parts.forEach(orderData => {
+                        const [orderNumber, huData] = orderData.split('|||');
+                        if (!orderNumber || !huData) return;
+
+                        processedOrders.push(orderNumber);
+                        const hus = huData.split(' ');
+                        let addedCount = 0;
+                        let duplicateCount = 0;
+
+                        if (!shipments[orderNumber]) {
+                            shipments[orderNumber] = {
+                                hawb: orderNumber,
+                                lastModified: now,
+                                totalPiecesExpected: hus.length,
+                                scannedItems: [],
+                                mitarbeiter: MITARBEITER_NAME,
+                                isHuListOrder: true
+                            };
+                            hus.forEach(hu => {
+                                shipments[orderNumber].scannedItems.push({ rawInput: hu, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null });
+                                addedCount++;
+                            });
+                        } else {
+                            if (shipments[orderNumber].isHuListOrder) {
+                                hus.forEach(hu => {
+                                    if (!shipments[orderNumber].scannedItems.find(item => item.rawInput.toUpperCase() === hu.toUpperCase())) {
+                                        shipments[orderNumber].scannedItems.push({ rawInput: hu, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null });
+                                        addedCount++;
+                                    } else {
+                                        duplicateCount++;
+                                    }
+                                });
+                                if (addedCount > 0) {
+                                    shipments[orderNumber].lastModified = now;
+                                    shipments[orderNumber].totalPiecesExpected += addedCount;
+                                }
+                            }
+                        }
+                        totalAddedCount += addedCount;
+                        totalDuplicateCount += duplicateCount;
+                    });
+                    
+                    // Daten speichern
+                    saveShipments(shipments);
+
+                    // Dem Benutzer Feedback geben
+                    alert(`Multi-Import abgeschlossen:\n- Verarbeitete Aufträge: ${processedOrders.length}\n- Neue HUs hinzugefügt: ${totalAddedCount}\n- Duplikate übersprungen: ${totalDuplicateCount}`);
+                    
+                    // NEU: Seite neu laden, nachdem der Benutzer das Alert-Fenster bestätigt hat.
+                    location.reload();
+                    return;
+                }
                 // --- ENDE: NEUE LOGIK FÜR MULTI-QR-CODE ---
                 // --- ENDE: NEUE LOGIK FÜR MULTI-QR-CODE ---
 
