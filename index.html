@@ -1428,6 +1428,7 @@ function showOpenHusSummary() {
         
       // ERSETZEN SIE DIESE GESAMTE FUNKTION
 // ERSETZEN SIE DIESE GESAMTE FUNKTION
+// ERSETZEN SIE DIESE GESAMTE FUNKTION
 function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFromCheckbox) {
     const { baseNumber, suffix, isValidFormat, raw: processedRawInput, isSuffixFormat } = processShipmentNumber(rawInputToSave);
     if (!isValidFormat) { return { success: false, waitingForTotal: false, message: `Ungültiges Format: ${escapeHtml(rawInputToSave)}` }; }
@@ -1443,56 +1444,74 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
         const isNewScanKombi = (statusToUse === 'XRY' && isCombinationFromCheckbox);
         const isSecurityStatus = EXCLUSIVE_SECURITY_STATUSES.includes(statusToUse);
         
-        // Ist dieser Scan der finale, zählende Abschluss?
         const isFinalClearanceScan = isSecurityStatus && !isNewScanKombi;
 
         if (isFinalClearanceScan) {
-            // FALL 1: ZÄHLENDER SCAN (XRY, ETD, EDD) - Schließt die Sicherung ab
-            // Finde den 'Anstehend'-Platzhalter, um ihn zu verbrauchen.
+            // FALL 1: ZÄHLENDER SCAN (XRY, ETD, EDD)
             const anstehendIndex = parentShipment.scannedItems.findIndex(
                 i => i.rawInput.toUpperCase() === processedRawInput.toUpperCase() && i.status === 'Anstehend' && !i.isCancelled
             );
 
             if (anstehendIndex === -1) {
-                return { success: false, waitingForTotal: false, message: `FEHLER: Für HU ${escapeHtml(processedRawInput)} ist keine offene Sicherung mehr möglich (bereits abgeschlossen).` };
+                return { success: false, waitingForTotal: false, message: `FEHLER: Für HU ${escapeHtml(processedRawInput)} ist keine offene Sicherung mehr möglich.` };
             }
 
-            // Aktualisiere den Platzhalter zum finalen Status.
             const itemToUpdate = parentShipment.scannedItems[anstehendIndex];
             itemToUpdate.status = statusToUse;
             itemToUpdate.timestamp = now.toISOString();
-            itemToUpdate.isCombination = false; // Ist per Definition nicht-kombi
+            itemToUpdate.isCombination = false;
             if (noteText) itemToUpdate.notes.push(noteText);
 
         } else {
-            // FALL 2: NICHT-ZÄHLENDER SCAN (XRY (Kombi), Dunkelalarm, Wareneingang) - Fügt nur Infos hinzu
-            // Finde irgendeinen existierenden Eintrag für diese HU, um die Positionsnummer zu erben.
+            // FALL 2: NICHT-ZÄHLENDER SCAN (XRY (Kombi), Dunkelalarm, etc.)
             const existingItemIndex = parentShipment.scannedItems.findIndex(
                 i => i.rawInput.toUpperCase() === processedRawInput.toUpperCase()
             );
             
             if (existingItemIndex === -1) {
-                // Sicherheitsnetz, sollte bei korrekten Daten nicht eintreten
                 return { success: false, waitingForTotal: false, message: `FEHLER: HU ${escapeHtml(processedRawInput)} nicht im Auftrag ${parentHawb} gefunden.` };
             }
             
+            // --- PRÜFUNG 1: Verhindert doppelte Kombi-Scans ---
+            if (isNewScanKombi) {
+                const hasExistingKombi = parentShipment.scannedItems.some(
+                    item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() &&
+                           item.isCombination &&
+                           !item.isCancelled
+                );
+                if (hasExistingKombi) {
+                    return { success: false, waitingForTotal: false, message: `FEHLER: Für HU ${escapeHtml(processedRawInput)} wurde bereits eine Kombi-Sicherung erfasst.` };
+                }
+            }
+            
+            // --- NEUE PRÜFUNG 2: Verhindert doppelten Dunkelalarm ---
+            if (statusToUse === 'Dunkelalarm') {
+                const hasExistingDunkelalarm = parentShipment.scannedItems.some(
+                    item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() &&
+                           item.status === 'Dunkelalarm' &&
+                           !item.isCancelled
+                );
+                if (hasExistingDunkelalarm) {
+                    return { success: false, waitingForTotal: false, message: `FEHLER: Für HU ${escapeHtml(processedRawInput)} wurde bereits ein Dunkelalarm erfasst.` };
+                }
+            }
+            // --- ENDE DER NEUEN PRÜFUNG ---
+            
             const originalItem = parentShipment.scannedItems[existingItemIndex];
 
-            // Erstelle einen NEUEN Scan-Eintrag. Der "Anstehend"-Platzhalter bleibt unberührt.
             const newItem = {
                 rawInput: processedRawInput,
                 status: statusToUse,
                 timestamp: now.toISOString(),
-                isCombination: isNewScanKombi, // true für Kombi, sonst false
+                isCombination: isNewScanKombi,
                 notes: noteText ? [noteText] : [],
                 isCancelled: false,
                 cancelledTimestamp: null,
-                position: originalItem.position // Position wird vererbt
+                position: originalItem.position
             };
             parentShipment.scannedItems.push(newItem);
         }
 
-        // Gemeinsame Logik zum Speichern und UI aktualisieren
         parentShipment.lastModified = now.toISOString();
         saveShipments(shipments);
         resetSingleScanNoteInputState();
@@ -1501,7 +1520,7 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
     }
     // --- ENDE: Überarbeitete Logik für HU-Listen-Aufträge ---
 
-    // Die Logik für normale Sendungen (nicht aus HU-Listen) bleibt unverändert.
+    // Die Logik für normale Sendungen (die nicht Teil einer HU-Liste sind) bleibt unverändert.
     if (shipments[baseNumber] && shipments[baseNumber].isHuListOrder) {
         return { success: false, waitingForTotal: false, message: `FEHLER: ${baseNumber} ist ein HU-Auftrag. Bitte scannen Sie eine der zugehörigen HU-Nummern.` };
     }
