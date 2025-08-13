@@ -897,7 +897,7 @@ function calculateGoodsReceiptCount(scannedItems) {
             <small>Sped.: ${escapeHtml(order.freightForwarder)} / Land: ${escapeHtml(order.destinationCountry)}</small>
          </div>`;
         // NEU: Zeigt jetzt "Pos. X: HU-NUMMER" an
-        html += `<ul class="hu-list">${order.pendingHus.map(item => `<li>Pos. ${item.position}: ${escapeHtml(item.hu)}</li>`).join('')}</ul></div>`;
+        html += `<ul class="hu-list">${order.pendingHus.map(item => `<li>${item.position}. ${escapeHtml(item.hu)}</li>`).join('')}</ul></div>`;
         return html;
     }
     
