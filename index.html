@@ -439,6 +439,25 @@ body.modal-open {
     margin-top: 15px;
 }
 /* --- ENDE: NEUE STILE FÜR VOLLBILD-MODAL --- */
+/* --- NEU: Styling für perfekt ausgerichtete Listen im Modal --- */
+#openHusListContainer .hu-list li,
+#missingReceiptHusListContainer .hu-list li,
+#dunkelalarmHusListContainer .hu-list li {
+    display: flex;
+    align-items: flex-start; /* Stellt sicher, dass die Zeilen oben beginnen */
+    padding: 3px 0; /* Etwas mehr vertikaler Abstand */
+}
+
+#openHusListContainer .hu-list .position-number,
+#missingReceiptHusListContainer .hu-list .position-number,
+#dunkelalarmHusListContainer .hu-list .position-number {
+    min-width: 2.5em;      /* Gibt der Nummer einen festen Platz */
+    text-align: right;     /* Richtet die Nummer rechtsbündig aus (Punkte untereinander) */
+    padding-right: 0.75em; /* Abstand zwischen Nummer und HU-ID */
+    flex-shrink: 0;        /* Verhindert, dass die Nummer kleiner wird */
+    color: #888;          /* Macht die Nummer etwas unauffälliger */
+}
+/* --- Ende des neuen CSS-Blocks --- */
 
 </style>
 </head>
@@ -808,16 +827,19 @@ function calculateGoodsReceiptCount(scannedItems) {
     return scannedItems.filter(item => item.status === 'Wareneingang' && !item.isCancelled).length;
 }
 // --- START DER ÄNDERUNG: Die gesamte Funktion wird aktualisiert ---
-// --- START DER ÄNDERUNG: Die gesamte Funktion wird mit der präziseren Logik ersetzt ---
 function showOpenHusSummary() {
     removeActiveInlineNoteEditor();
     const shipments = loadShipments();
+    
     const securityClearanceStatuses = ['XRY', 'ETD', 'EDD'];
-    let openSecurityHusByOrder = [], missingReceiptHusByOrder = [], dunkelalarmItemsByOrder = {};
+    
+    let openSecurityHusByOrder = [];
+    let missingReceiptHusByOrder = [];
+    let dunkelalarmItemsByOrder = {};
 
     Object.keys(shipments).forEach(baseNumber => {
         const shipment = shipments[baseNumber];
-        // Datensammel-Logik bleibt gleich...
+        
         if (shipment.scannedItems && shipment.scannedItems.length > 0) {
             const itemsWithDunkelalarm = shipment.scannedItems.filter(item => item.status === 'Dunkelalarm' && !item.isCancelled);
             if (itemsWithDunkelalarm.length > 0) {
@@ -826,7 +848,7 @@ function showOpenHusSummary() {
             }
         }
         if (shipment.isHuListOrder && shipment.scannedItems && shipment.scannedItems.length > 0) {
-            const allUniqueHusWithPos = Array.from(new Map(shipment.scannedItems.map(item => [item.rawInput, { hu: item.rawInput, position: item.position }])).values());
+            const allUniqueHusWithPos = Array.from(new Map(shipment.scannedItems.filter(i => i.rawInput).map(item => [item.rawInput, { hu: item.rawInput, position: item.position }])).values());
             const processedHus = new Set(shipment.scannedItems.filter(item => securityClearanceStatuses.includes(item.status) && !item.isCancelled).map(item => item.rawInput));
             const pendingSecurityHus = allUniqueHusWithPos.filter(item => !processedHus.has(item.hu));
             if (pendingSecurityHus.length > 0) openSecurityHusByOrder.push({ ...shipment, orderNumber: baseNumber, pendingHus: pendingSecurityHus, totalHus: allUniqueHusWithPos.length });
@@ -836,13 +858,35 @@ function showOpenHusSummary() {
         }
     });
 
-    const sortByCountryAndOrder = (a, b) => (a.destinationCountry || 'zz').localeCompare(b.destinationCountry || 'zz') || a.orderNumber.localeCompare(b.orderNumber);
-    const generateHuListHtml = items => `<ul class="hu-list">${items.sort((a, b) => (a.position || 9999) - (b.position || 9999)).map(item => `<li>${item.position ? `${item.position}. ` : ''}${escapeHtml(item.hu || item.rawInput)}</li>`).join('')}</ul>`;
+    const sortByCountryAndOrder = (a, b) => (a.destinationCountry || 'zz').localeCompare(b.destinationCountry || 'zz') || (a.orderNumber || a.hawb).localeCompare(b.orderNumber || b.hawb);
 
-    const generateHtmlForOrderGroup = (order, listItemsHtml, forDunkelalarm = false) => {
-        let countText = forDunkelalarm ? '' : (order.receiptCount !== undefined ? `(${order.receiptCount} von ${order.totalHus} erfasst)` : `(${(order.totalHus - order.pendingHus.length)} von ${order.totalHus} erfasst)`);
+    // --- HIER IST DIE GEÄNDERTE HILFSFUNKTION ---
+    const generateHuListHtml = (items) => {
+        if (!items || items.length === 0) return '';
+        const sortedItems = items.sort((a, b) => (a.position || 9999) - (b.position || 9999));
         
-        // NEU: PLSO und Sped/Land werden bedingt angezeigt
+        // Erzeugt jetzt die neue HTML-Struktur mit <span>-Tags und Klassen
+        const listItems = sortedItems.map(item => {
+            const huValue = item.hu || item.rawInput;
+            const positionHtml = item.position 
+                ? `<span class="position-number">${item.position}.</span>` 
+                : `<span class="position-number">&bull;</span>`; // Zeigt einen Punkt, wenn keine Nummer da ist
+            
+            return `<li>${positionHtml}<span class="hu-value">${escapeHtml(huValue)}</span></li>`;
+        }).join('');
+
+        return `<ul class="hu-list">${listItems}</ul>`;
+    };
+    
+    const generateHtmlForOrderGroup = (order, listItemsHtml, forDunkelalarm = false) => {
+        const orderNumber = order.orderNumber || order.hawb;
+        let countText = '';
+        if (!forDunkelalarm) {
+             countText = order.receiptCount !== undefined ?
+                `(${order.receiptCount} von ${order.totalHus} erfasst)`:
+                `(${(order.totalHus - order.pendingHus.length)} von ${order.totalHus} erfasst)`;
+        }
+        
         let metaLineHtml = '';
         if (order.plsoNumber && order.plsoNumber !== 'N/A') {
             metaLineHtml += `<br><small>PLSO: ${escapeHtml(order.plsoNumber)}</small>`;
@@ -851,16 +895,16 @@ function showOpenHusSummary() {
             metaLineHtml += `<br><small>Sped.: ${escapeHtml(order.freightForwarder)} / Land: ${escapeHtml(order.destinationCountry)}</small>`;
         }
 
-        return `<div class="hu-order-group"><div class="hu-order-title">Rechnung: ${escapeHtml(order.orderNumber)} ${countText}${metaLineHtml}</div>${listItemsHtml}</div>`;
+        return `<div class="hu-order-group"><div class="hu-order-title">Rechnung: ${escapeHtml(orderNumber)} ${countText}${metaLineHtml}</div>${listItemsHtml}</div>`;
     };
-
+    
     openSecurityHusByOrder.sort(sortByCountryAndOrder);
     missingReceiptHusByOrder.sort(sortByCountryAndOrder);
     const dunkelalarmArray = Object.values(dunkelalarmItemsByOrder).sort(sortByCountryAndOrder);
 
     openHusListContainerEl.innerHTML = openSecurityHusByOrder.map(order => generateHtmlForOrderGroup(order, generateHuListHtml(order.pendingHus))).join('') || '<p class="no-open-hus-message">Glückwunsch! Alle HUs sind sicherheitstechnisch bearbeitet.</p>';
     missingReceiptHusListContainerEl.innerHTML = missingReceiptHusByOrder.map(order => generateHtmlForOrderGroup(order, generateHuListHtml(order.pendingHus))).join('') || '<p class="no-open-hus-message">Perfekt! Alle HUs wurden im Wareneingang erfasst.</p>';
-    dunkelalarmHusListContainerEl.innerHTML = dunkelalarmArray.map(data => generateHtmlForOrderGroup({ ...data, orderNumber: data.hawb }, generateHuListHtml(data.items), true)).join('') || '<p class="no-open-hus-message">Keine Einträge mit Status "Dunkelalarm" gefunden.</p>';
+    dunkelalarmHusListContainerEl.innerHTML = dunkelalarmArray.map(data => generateHtmlForOrderGroup(data, generateHuListHtml(data.items), true)).join('') || '<p class="no-open-hus-message">Keine Einträge mit Status "Dunkelalarm" gefunden.</p>';
 
     // Rest der Funktion bleibt unverändert
     showOpenSecurityHusBtnEl.classList.add('active');
