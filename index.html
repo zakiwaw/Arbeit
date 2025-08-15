@@ -964,25 +964,44 @@ function showOpenHusSummary() {
         }
 /**
  * Prüft, ob eine HU-Nummer in irgendeinem HU-Listen-Auftrag existiert.
+ * Spielt nur einen Ton, wenn überhaupt HU-Listen-Aufträge existieren.
  * @param {string} huNumber Die zu prüfende HU-Nummer.
  * @returns {boolean} True, wenn die HU erwartet wird, sonst false.
  */
 function isHuExpected(huNumber) {
     const upperHu = huNumber.trim().toUpperCase();
-    if (!upperHu) return true; // Leere Eingaben lösen keinen Alarm aus
+    if (!upperHu) return true;
 
     const shipments = loadShipments();
+    let hasAnyHuListOrder = false; // Flag, um zu prüfen, ob es überhaupt Listen gibt
+
+    // Zuerst prüfen, ob es überhaupt HU-Listen-Aufträge gibt
+    for (const baseNumber in shipments) {
+        if (shipments[baseNumber].isHuListOrder) {
+            hasAnyHuListOrder = true;
+            break; // Sobald einer gefunden wurde, können wir die Schleife verlassen
+        }
+    }
+
+    // --- HIER IST DIE NEUE LOGIK ---
+    // Wenn es keine HU-Listen gibt, ist JEDE HU quasi "erwartet" (löst keinen Fehler aus)
+    if (!hasAnyHuListOrder) {
+        return true;
+    }
+    // --- ENDE DER NEUEN LOGIK ---
+
+    // Wenn es HU-Listen gibt, prüfen wir jetzt, ob die HU auf einer davon steht
     for (const baseNumber in shipments) {
         const shipment = shipments[baseNumber];
-        // Prüfe nur Aufträge, die explizit als HU-Listen importiert wurden
         if (shipment.isHuListOrder && shipment.scannedItems) {
-            // .some ist effizient und stoppt, sobald ein Treffer gefunden wird
             if (shipment.scannedItems.some(item => item.rawInput.toUpperCase() === upperHu)) {
                 return true; // Gefunden! HU wird erwartet.
             }
         }
     }
-    return false; // In keiner HU-Liste gefunden. HU ist überzählig.
+    
+    // Die HU wurde in keiner der existierenden Listen gefunden. Sie ist "unerwartet".
+    return false;
 }
         // --- Hilfsfunktionen: UI & Fehler ---
         function clearError() { errorDisplayEl.textContent = ''; }
