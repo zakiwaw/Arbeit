@@ -1914,7 +1914,7 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
 
         function addToBatch() {
     const rawInputFromField = shipmentNumberInputEl.value.trim();
-    if (!rawInputFromField) { focusShipmentInput(); return; }
+    if (!rawInputFromField) { focusShip-mentInput(); return; }
 
     const upperRawInput = rawInputFromField.toUpperCase();
     const { isValidFormat, raw: processedRawInput } = processShipmentNumber(upperRawInput);
@@ -1926,16 +1926,13 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
 
     const scanTimestamp = new Date().toISOString();
 
-    // --- NEUE LOGIK FÜR ÜBERZÄHLIG-TON ---
     if (unexpectedHuSoundToggleEl && unexpectedHuSoundToggleEl.checked) {
         if (!isHuExpected(processedRawInput)) {
             if(errorSoundEl) {
-                // Spielt den Ton ab. .catch() verhindert Fehler, falls der Browser es blockiert.
                 errorSoundEl.play().catch(e => console.warn("Audio playback failed:", e));
             }
         }
     }
-    // --- ENDE DER NEUEN LOGIK ---
 
     if (isBatchModeActive && currentBatch.length === 0 && isBatchNotePromptRequired && batchNoteToggleEl.checked) {
         pendingFirstBatchScanData = { rawInput: processedRawInput, scanTimestamp: scanTimestamp };
@@ -1951,7 +1948,12 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
         scanTimestamp: scanTimestamp,
         note: currentBatchGlobalNote 
     };
-    currentBatch.push(batchItem);
+    
+    // --- HIER IST DIE EINZIGE ÄNDERUNG ---
+    // Anstatt .push() verwenden wir .unshift(), um das Element am Anfang hinzuzufügen.
+    currentBatch.unshift(batchItem);
+    // --- ENDE DER ÄNDERUNG ---
+    
     updateBatchUI();
     shipmentNumberInputEl.value = '';
     updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
