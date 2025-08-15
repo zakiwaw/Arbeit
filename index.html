@@ -458,7 +458,20 @@ body.modal-open {
     color: #888;          /* Macht die Nummer etwas unauffälliger */
 }
 /* --- Ende des neuen CSS-Blocks --- */
-
+/* --- NEU: Styling für den Überzählig-Ton-Switch --- */
+.batch-sound-toggle-container {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+    margin-top: 15px; /* Etwas Abstand nach oben */
+    font-size: 0.9em;
+}
+.batch-sound-toggle-container label {
+    margin-bottom: 0;
+    font-weight: normal;
+    cursor: pointer;
+}
 </style>
 </head>
 <body>
@@ -609,28 +622,35 @@ body.modal-open {
     <div id="errorDisplay" class="error"></div>
 
 
-
-    <div class="batch-area" id="batchArea">
-        <h3>Aktueller Batch (<span id="batchModeStatusLabel"></span>)</h3>
-        <div id="currentBatchNoteDisplay" style="font-style:italic;margin-bottom:5px;font-size:.9em"></div>
-        <ul id="batchList"></ul>
-        <div id="batchSummary">Anzahl im Batch: <span id="batchItemCount">0</span></div>
-        
-        <!-- HIER IST DER NEUE SWITCH -->
-        <div class="batch-note-toggle-container" style="display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 10px; font-size: 0.9em;">
-            <label for="batchNoteToggle" style="margin-bottom: 0; font-weight: normal;">Notiz-Popup aktivieren:</label>
-            <label class="batch-toggle-switch">
-                <input type="checkbox" id="batchNoteToggle">
-                <span class="batch-slider"></span>
-            </label>
-        </div>
-
-        <div class="batch-action-buttons">
-            <button id="saveBatchButton">Batch Speichern</button>
-            <button id="clearBatchButton">Batch Leeren</button>
-        </div>
+<div class="batch-area" id="batchArea">
+    <h3>Aktueller Batch (<span id="batchModeStatusLabel"></span>)</h3>
+    <div id="currentBatchNoteDisplay" style="font-style:italic;margin-bottom:5px;font-size:.9em"></div>
+    <ul id="batchList"></ul>
+    <div id="batchSummary">Anzahl im Batch: <span id="batchItemCount">0</span></div>
+    
+    <div class="batch-note-toggle-container" style="display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 10px; font-size: 0.9em;">
+        <label for="batchNoteToggle" style="margin-bottom: 0; font-weight: normal;">Notiz-Popup aktivieren:</label>
+        <label class="batch-toggle-switch">
+            <input type="checkbox" id="batchNoteToggle">
+            <span class="batch-slider"></span>
+        </label>
     </div>
 
+    <!-- HIER IST DER NEUE SWITCH FÜR DEN ÜBERZÄHLIG-TON -->
+    <div class="batch-sound-toggle-container">
+        <label for="unexpectedHuSoundToggle" title="Ton abspielen, wenn eine HU auf keiner Liste steht">🔊 Überzählig-Ton</label>
+        <label class="batch-toggle-switch">
+            <input type="checkbox" id="unexpectedHuSoundToggle" checked>
+            <span class="batch-slider"></span>
+        </label>
+    </div>
+    <!-- ENDE DES NEUEN SWITCHES -->
+
+    <div class="batch-action-buttons">
+        <button id="saveBatchButton">Batch Speichern</button>
+        <button id="clearBatchButton">Batch Leeren</button>
+    </div>
+</div>
 
     <div id="currentShipmentDetails">Geben Sie eine Sendungsnummer ein...</div>
 
@@ -773,6 +793,8 @@ const showMissingReceiptHusBtnEl = document.getElementById('showMissingReceiptHu
 const missingReceiptHusListContainerEl = document.getElementById('missingReceiptHusListContainer');
 const showDunkelalarmHusBtnEl = document.getElementById('showDunkelalarmHusBtn');
 const dunkelalarmHusListContainerEl = document.getElementById('dunkelalarmHusListContainer');
+const errorSoundEl = document.getElementById('errorSound');
+const unexpectedHuSoundToggleEl = document.getElementById('unexpectedHuSoundToggle');
 
         // --- Konstanten & Konfiguration ---
 
@@ -940,7 +962,28 @@ function showOpenHusSummary() {
         function saveShipments(shipments) {
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(shipments));
         }
+/**
+ * Prüft, ob eine HU-Nummer in irgendeinem HU-Listen-Auftrag existiert.
+ * @param {string} huNumber Die zu prüfende HU-Nummer.
+ * @returns {boolean} True, wenn die HU erwartet wird, sonst false.
+ */
+function isHuExpected(huNumber) {
+    const upperHu = huNumber.trim().toUpperCase();
+    if (!upperHu) return true; // Leere Eingaben lösen keinen Alarm aus
 
+    const shipments = loadShipments();
+    for (const baseNumber in shipments) {
+        const shipment = shipments[baseNumber];
+        // Prüfe nur Aufträge, die explizit als HU-Listen importiert wurden
+        if (shipment.isHuListOrder && shipment.scannedItems) {
+            // .some ist effizient und stoppt, sobald ein Treffer gefunden wird
+            if (shipment.scannedItems.some(item => item.rawInput.toUpperCase() === upperHu)) {
+                return true; // Gefunden! HU wird erwartet.
+            }
+        }
+    }
+    return false; // In keiner HU-Liste gefunden. HU ist überzählig.
+}
         // --- Hilfsfunktionen: UI & Fehler ---
         function clearError() { errorDisplayEl.textContent = ''; }
         function displayError(message, color = 'red', autoClearTimeout = null) {
@@ -1851,40 +1894,51 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
         }
 
         function addToBatch() {
-            const rawInputFromField = shipmentNumberInputEl.value.trim();
-            if (!rawInputFromField) { focusShipmentInput(); return; }
+    const rawInputFromField = shipmentNumberInputEl.value.trim();
+    if (!rawInputFromField) { focusShipmentInput(); return; }
 
-            const upperRawInput = rawInputFromField.toUpperCase();
-            const { baseNumber, isValidFormat, raw: processedRawInput } = processShipmentNumber(upperRawInput);
-             if (!isValidFormat) {
-                displayError(`Ungültiges Format für Batch-Eingabe: ${escapeHtml(rawInputFromField)}`);
-                focusShipmentInput();
-                return;
+    const upperRawInput = rawInputFromField.toUpperCase();
+    const { isValidFormat, raw: processedRawInput } = processShipmentNumber(upperRawInput);
+    if (!isValidFormat) {
+        displayError(`Ungültiges Format für Batch-Eingabe: ${escapeHtml(rawInputFromField)}`);
+        focusShipmentInput();
+        return;
+    }
+
+    const scanTimestamp = new Date().toISOString();
+
+    // --- NEUE LOGIK FÜR ÜBERZÄHLIG-TON ---
+    if (unexpectedHuSoundToggleEl && unexpectedHuSoundToggleEl.checked) {
+        if (!isHuExpected(processedRawInput)) {
+            if(errorSoundEl) {
+                // Spielt den Ton ab. .catch() verhindert Fehler, falls der Browser es blockiert.
+                errorSoundEl.play().catch(e => console.warn("Audio playback failed:", e));
             }
-
-            const scanTimestamp = new Date().toISOString();
-
-            if (isBatchModeActive && currentBatch.length === 0 && isBatchNotePromptRequired && batchNoteToggleEl.checked) {
-                pendingFirstBatchScanData = { rawInput: processedRawInput, scanTimestamp: scanTimestamp };
-                batchNoteInputEl.value = currentBatchGlobalNote || ''; 
-                batchNoteModalEl.classList.add('visible');
-                document.body.classList.add('modal-open'); // <-- DIESE ZEILE IST NEU
-                batchNoteInputEl.focus();
-                return;
-            }
-
-            const batchItem = {
-                rawInput: processedRawInput,
-                scanTimestamp: scanTimestamp,
-                note: currentBatchGlobalNote 
-            };
-            currentBatch.push(batchItem);
-            updateBatchUI();
-            shipmentNumberInputEl.value = '';
-            updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
-            clearError();
-            focusShipmentInput();
         }
+    }
+    // --- ENDE DER NEUEN LOGIK ---
+
+    if (isBatchModeActive && currentBatch.length === 0 && isBatchNotePromptRequired && batchNoteToggleEl.checked) {
+        pendingFirstBatchScanData = { rawInput: processedRawInput, scanTimestamp: scanTimestamp };
+        batchNoteInputEl.value = currentBatchGlobalNote || ''; 
+        batchNoteModalEl.classList.add('visible');
+        document.body.classList.add('modal-open');
+        batchNoteInputEl.focus();
+        return;
+    }
+
+    const batchItem = {
+        rawInput: processedRawInput,
+        scanTimestamp: scanTimestamp,
+        note: currentBatchGlobalNote 
+    };
+    currentBatch.push(batchItem);
+    updateBatchUI();
+    shipmentNumberInputEl.value = '';
+    updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
+    clearError();
+    focusShipmentInput();
+}
 // --- ERSETZEN Sie die alte Funktion durch diese Version ---
 
         function confirmAndAddFirstBatchItemWithNote() {
@@ -3040,6 +3094,7 @@ function attemptLockOrientation() {
 // window.addEventListener('load', attemptLockOrientation);
 */
 </script>
+<audio id="errorSound" src="https://cdn.pixabay.com/download/audio/2022/12/13/audio_34d1e8985e.mp3?filename=error-call-to-attention-129258.mp3" preload="auto"></audio>
 
 </body>
 </html>
