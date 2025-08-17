@@ -852,11 +852,16 @@ function calculateGoodsReceiptCount(scannedItems) {
 function showOpenHusSummary() {
     removeActiveInlineNoteEditor();
     const shipments = loadShipments();
+    
     const securityClearanceStatuses = ['XRY', 'ETD', 'EDD'];
-    let openSecurityHusByOrder = [], missingReceiptHusByOrder = [], dunkelalarmItemsByOrder = {};
+    
+    let openSecurityHusByOrder = [];
+    let missingReceiptHusByOrder = [];
+    let dunkelalarmItemsByOrder = {};
 
     Object.keys(shipments).forEach(baseNumber => {
         const shipment = shipments[baseNumber];
+        
         if (shipment.scannedItems && shipment.scannedItems.length > 0) {
             const itemsWithDunkelalarm = shipment.scannedItems.filter(item => item.status === 'Dunkelalarm' && !item.isCancelled);
             if (itemsWithDunkelalarm.length > 0) {
@@ -880,11 +885,9 @@ function showOpenHusSummary() {
     const generateHuListHtml = (items) => {
         if (!items || items.length === 0) return '';
         const sortedItems = items.sort((a, b) => (a.position || 9999) - (b.position || 9999));
-        // Wichtige Korrektur hier, um 'isManOrder' korrekt zu bestimmen
-        const isManOrderContext = items.length > 0 && (shipments[items[0].orderNumber] ? shipments[items[0].orderNumber].freightForwarder : false);
         const listItems = sortedItems.map(item => {
-            const huValue = item.hu || item.rawInput;
-            const positionHtml = isManOrderContext && item.position ? `<span class="position-number">${item.position}.</span>` : `<span class="position-number"></span>`;
+            const huValue = item.hu || item.rawInput; 
+            const positionHtml = item.position ? `<span class="position-number">${item.position}.</span>` : `<span class="position-number">&bull;</span>`;
             return `<li>${positionHtml}<span class="hu-value">${escapeHtml(huValue)}</span></li>`;
         }).join('');
         return `<ul class="hu-list">${listItems}</ul>`;
@@ -894,20 +897,26 @@ function showOpenHusSummary() {
         const orderNumber = order.orderNumber || order.hawb;
         let countText = '';
         if (!forDunkelalarm) {
-             countText = order.receiptCount !== undefined ? `(${order.receiptCount} von ${order.totalHus} erfasst)`: `(${(order.totalHus - order.pendingHus.length)} von ${order.totalHus} erfasst)`;
+             countText = order.receiptCount !== undefined ?
+                `(${order.receiptCount} von ${order.totalHus} erfasst)`:
+                `(${(order.totalHus - order.pendingHus.length)} von ${order.totalHus} erfasst)`;
         }
         
+        // --- HIER IST DIE NEUE LOGIK ---
+        // Prüft, ob es ein "reicher" MAN-Auftrag ist.
         const isManOrder = order.freightForwarder && order.destinationCountry;
+        
+        // Der Präfix wird nur für MAN-Aufträge gesetzt.
         const titlePrefix = isManOrder ? 'Rechnung: ' : '';
+        
         let metaLineHtml = '';
         if (order.plsoNumber && order.plsoNumber !== 'N/A') {
             metaLineHtml += `<br><small>PLSO: ${escapeHtml(order.plsoNumber)}</small>`;
         }
         if (isManOrder) {
-            // --- HIER WIRD DIE KÜRZUNGS-FUNKTION JETZT AUCH FÜR DAS MODAL VERWENDET ---
-            const shortForwarderName = shortenForwarderName(order.freightForwarder);
-            metaLineHtml += `<br><small>Sped.: ${escapeHtml(shortForwarderName)} / Land: ${escapeHtml(order.destinationCountry)}</small>`;
+            metaLineHtml += `<br><small>Sped.: ${escapeHtml(order.freightForwarder)} / Land: ${escapeHtml(order.destinationCountry)}</small>`;
         }
+        // --- ENDE DER NEUEN LOGIK ---
 
         return `<div class="hu-order-group"><div class="hu-order-title">${titlePrefix}${escapeHtml(orderNumber)} ${countText}${metaLineHtml}</div>${listItemsHtml}</div>`;
     };
@@ -994,30 +1003,6 @@ function isHuExpected(huNumber) {
     
     // Die HU wurde in keiner der existierenden Listen gefunden. Sie ist "unerwartet".
     return false;
-}
-/**
- * Kürzt lange Spediteurnamen für eine saubere Anzeige basierend auf vordefinierten Regeln.
- * @param {string} fullName Der vollständige Name des Spediteurs.
- * @returns {string} Der gekürzte Name oder der Originalname, falls keine Regel zutrifft.
- */
-function shortenForwarderName(fullName) {
-    if (!fullName) return ''; // Leere Eingaben abfangen
-
-    const lowerCaseName = fullName.toLowerCase();
-
-    if (lowerCaseName.includes('kühne + nagel')) return 'Kühne + Nagel';
-    if (lowerCaseName.includes('dhl global forwarding')) return 'DHL';
-    if (lowerCaseName.includes('ups')) return 'UPS';
-    if (lowerCaseName.includes('maersk') && lowerCaseName.includes('senator')) return 'Maersk/Senator';
-    if (lowerCaseName.includes('freight consol')) return 'Freight Consol';
-    if (lowerCaseName.includes('logwin')) return 'Logwin';
-    if (lowerCaseName.includes('hartrodt')) return 'Hartrodt';
-    if (lowerCaseName.includes('db schenker')) return 'DB Schenker';
-    if (lowerCaseName.includes('ait worldwide')) return 'AIT Worldwide';
-    if (lowerCaseName.includes('dachser')) return 'Dachser';
-
-    // Wenn keine Regel zutrifft, den Originalnamen zurückgeben
-    return fullName;
 }
         // --- Hilfsfunktionen: UI & Fehler ---
         function clearError() { errorDisplayEl.textContent = ''; }
@@ -1226,6 +1211,7 @@ function shortenForwarderName(fullName) {
         
         
         
+        
 function displayCurrentShipmentDetails(baseNumberToDisplay) {
     clearError();
     removeActiveInlineNoteEditor();
@@ -1238,28 +1224,38 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
         currentDetailsDivEl.style.borderColor = '#aac';
         return;
     }
-    
-    const isManOrder = shipment.freightForwarder && shipment.destinationCountry;
+
+    // --- HIER BEGINNT DIE NEUE, ERWEITERTE LOGIK ---
     let detailsHtml = '';
     
+    // Prüfen, ob es ein HU-Listen-Auftrag ist, um die Kopfzeile zu formatieren
     if (shipment.isHuListOrder) {
+        const isManOrder = shipment.freightForwarder && shipment.destinationCountry;
         const titlePrefix = isManOrder ? 'Rechnung: ' : '';
+        
+        // Haupttitel
         detailsHtml += `<strong>${titlePrefix}${escapeHtml(baseNumberToDisplay)}</strong>`;
 
+        // PLSO-Nummer, falls vorhanden
         if (shipment.plsoNumber && shipment.plsoNumber !== 'N/A') {
             detailsHtml += `<div style="font-size: 0.9em; color: #555;">PLSO: ${escapeHtml(shipment.plsoNumber)}</div>`;
         }
+        // Spediteur und Land, falls vorhanden
         if (isManOrder) {
-            // --- HIER WIRD DIE NEUE FUNKTION AUFGERUFEN ---
-            const shortForwarderName = shortenForwarderName(shipment.freightForwarder);
-            detailsHtml += `<div style="font-size: 0.9em; color: #555;">Sped.: ${escapeHtml(shortForwarderName)} / Land: ${escapeHtml(shipment.destinationCountry)}</div>`;
+            detailsHtml += `<div style="font-size: 0.9em; color: #555;">Sped.: ${escapeHtml(shipment.freightForwarder)} / Land: ${escapeHtml(shipment.destinationCountry)}</div>`;
         }
+        // Trennlinie für die Übersichtlichkeit
         detailsHtml += `<hr style="border: none; border-top: 1px dotted #ccc; margin: 8px 0;">`;
 
     } else {
+        // Fallback für normale, nicht-HU-Listen-Aufträge (das alte Verhalten)
         detailsHtml = `<strong>Details für ${escapeHtml(baseNumberToDisplay)}:</strong>`;
     }
+    // --- ENDE DER NEUEN LOGIK ---
 
+
+    // Der Rest der Funktion, der die Listen anhängt, bleibt fast identisch
+    // ...
     if (shipment.isHuListOrder) {
         const securityClearanceStatuses = ['XRY', 'ETD', 'EDD'];
         const allUniqueHusWithPos = Array.from(new Map(shipment.scannedItems.filter(i => i.rawInput).map(item => [item.rawInput, { hu: item.rawInput, position: item.position }])).values());
@@ -1271,53 +1267,56 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
             const listClass = (totalHus - pendingHuNumbers.length > 0) ? 'partial' : '';
             detailsHtml += `<div id="pendingHuList" class="${listClass}">`;
             detailsHtml += `<h4>Offene HUs (${pendingHuNumbers.length} von ${totalHus}):</h4>`;
-            const listItemsHtml = pendingHuNumbers.sort((a,b) => (a.position || 9999) - (b.position || 9999)).map(item => {
-                const positionHtml = isManOrder && item.position ? `<span class="position-number">${item.position}.</span>` : `<span class="position-number"></span>`;
-                return `<li>${positionHtml}<span class="hu-value">${escapeHtml(item.hu)}</span></li>`;
-            }).join('');
-            detailsHtml += `<ul class="hu-list">${listItemsHtml}</ul>`;
+            detailsHtml += `<ul class="hu-list">${pendingHuNumbers.sort((a,b) => (a.position || 9999) - (b.position || 9999)).map(item => `<li><span class="position-number">${item.position ? `${item.position}.` : '&bull;'}</span><span class="hu-value">${escapeHtml(item.hu)}</span></li>`).join('')}</ul>`;
             detailsHtml += `</div>`;
         }
     }
     
-    // Der Rest der Funktion bleibt unverändert...
     detailsHtml += `<ul>`;
-    (shipment.scannedItems || []).filter(item => item.status !== 'Anstehend').sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)).forEach(item => {
-        const dt = new Date(item.timestamp);
-        const timeStr = dt.toLocaleTimeString('de-DE');
-        const dateStr = dt.toLocaleDateString('de-DE');
-        const timestampPart = `<span class="timestamp">[${dateStr} ${timeStr}]</span>`;
-        const numberPart = escapeHtml(item.rawInput);
-        const statusPart = escapeHtml(item.status);
-        const comboPart = item.isCombination ? ` <span class="combo">(Kombi)</span>` : '';
-        const isCancelled = item.isCancelled;
-        let notesListHtml = '';
-        if (!isCancelled && Array.isArray(item.notes) && item.notes.length > 0) {
-            notesListHtml += '<div class="notes-container">';
-            item.notes.forEach((note, index) => {
-                notesListHtml += `<div class="note-item"><span class="note-prefix">Notiz:</span><span class="editable-note" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" data-note-index="${index}" title="Notiz bearbeiten">${escapeHtml(note)}</span><button class="delete-note-btn" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" data-note-index="${index}" title="Notiz löschen">×</button></div>`;
-            });
-            notesListHtml += '</div>';
-        } else if (Array.isArray(item.notes) && item.notes.length > 0) {
-            notesListHtml += `<div class="notes-container" style="color:var(--cancelled-color);">${item.notes.map(n => `<div>- ${escapeHtml(n)}</div>`).join('')}</div>`;
-        }
-        detailsHtml += `<li class="${isCancelled ? 'cancelled-item' : ''}"> ${timestampPart} ${numberPart} → <span class="status">${statusPart}</span>${comboPart}`;
-        if (!isCancelled) {
-            detailsHtml += `<button class="cancel-button" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}">Storno</button>`;
-        } else {
-            const cancelDt = item.cancelledTimestamp ? new Date(item.cancelledTimestamp) : null;
-            detailsHtml += `<span class="cancelled-info"> (storniert am ${cancelDt ? cancelDt.toLocaleString('de-DE') : 'Unbekannt'})</span>`;
-        }
-        detailsHtml += notesListHtml;
-        if (!isCancelled) {
-            detailsHtml += `<a href="#" class="add-note-link" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" title="Weitere Notiz hinzufügen">Notiz hinzufügen</a>`;
-        }
-        detailsHtml += `<div class="inline-note-editor-placeholder"></div></li>`;
-    });
+
+    (shipment.scannedItems || [])
+        .filter(item => item.status !== 'Anstehend')
+        .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+        .forEach(item => {
+            const dt = new Date(item.timestamp);
+            const timeStr = dt.toLocaleTimeString('de-DE');
+            const dateStr = dt.toLocaleDateString('de-DE');
+            const timestampPart = `<span class="timestamp">[${dateStr} ${timeStr}]</span>`;
+            const numberPart = escapeHtml(item.rawInput);
+            const statusPart = escapeHtml(item.status);
+            const comboPart = item.isCombination ? ` <span class="combo">(Kombi)</span>` : '';
+            const isCancelled = item.isCancelled;
+
+            let notesListHtml = '';
+            if (!isCancelled && Array.isArray(item.notes) && item.notes.length > 0) {
+                notesListHtml += '<div class="notes-container">';
+                item.notes.forEach((note, index) => {
+                    notesListHtml += `<div class="note-item"><span class="note-prefix">Notiz:</span><span class="editable-note" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" data-note-index="${index}" title="Notiz bearbeiten">${escapeHtml(note)}</span><button class="delete-note-btn" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" data-note-index="${index}" title="Notiz löschen">×</button></div>`;
+                });
+                notesListHtml += '</div>';
+            } else if (Array.isArray(item.notes) && item.notes.length > 0) {
+                notesListHtml += `<div class="notes-container" style="color:var(--cancelled-color);">${item.notes.map(n => `<div>- ${escapeHtml(n)}</div>`).join('')}</div>`;
+            }
+
+            detailsHtml += `<li class="${isCancelled ? 'cancelled-item' : ''}"> ${timestampPart} ${numberPart} → <span class="status">${statusPart}</span>${comboPart}`;
+            if (!isCancelled) {
+                detailsHtml += `<button class="cancel-button" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}">Storno</button>`;
+            } else {
+                const cancelDt = item.cancelledTimestamp ? new Date(item.cancelledTimestamp) : null;
+                detailsHtml += `<span class="cancelled-info"> (storniert am ${cancelDt ? cancelDt.toLocaleString('de-DE') : 'Unbekannt'})</span>`;
+            }
+            detailsHtml += notesListHtml;
+            if (!isCancelled) {
+                detailsHtml += `<a href="#" class="add-note-link" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" title="Weitere Notiz hinzufügen">Notiz hinzufügen</a>`;
+            }
+            detailsHtml += `<div class="inline-note-editor-placeholder"></div></li>`;
+        });
     detailsHtml += `</ul>`;
+
     const expected = shipment.totalPiecesExpected;
     const securityScansCount = calculateCurrentCountedPieces(shipment.scannedItems || []);
     const receiptScansCount = calculateGoodsReceiptCount(shipment.scannedItems || []);
+    
     detailsHtml += `<div class="summary">`;
     let expectedText = (expected !== null && expected !== undefined) ? `${expected} Stk.` : 'N/A';
     const receiptClass = getStatusClass(receiptScansCount, expected);
@@ -1325,9 +1324,10 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
     const securityClass = getStatusClass(securityScansCount, expected);
     detailsHtml += `<span>Sicherung erfasst: <span class="${securityClass}">${securityScansCount} von ${expectedText}</span></span>`;
     detailsHtml += `</div>`;
+    
     currentDetailsDivEl.innerHTML = detailsHtml;
+
     if (expected !== null && expected !== undefined) {
-        const totalScans = securityScansCount + receiptScansCount;
         if (receiptScansCount > expected || securityScansCount > expected) currentDetailsDivEl.style.borderColor = 'red';
         else if (receiptScansCount < expected || securityScansCount < expected) currentDetailsDivEl.style.borderColor = 'orange';
         else if (receiptScansCount === expected && securityScansCount === expected) currentDetailsDivEl.style.borderColor = 'green';
