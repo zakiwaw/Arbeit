@@ -448,17 +448,34 @@ body.modal-open {
     padding: 3px 0; /* Etwas mehr vertikaler Abstand */
 }
 
+/* --- Styling für perfekt ausgerichtete Listen --- */
+/* Gilt für Modal UND Detailansicht */
+#openHusListContainer .hu-list li,
+#missingReceiptHusListContainer .hu-list li,
+#dunkelalarmHusListContainer .hu-list li,
+#pendingHuList .hu-list li {
+    display: flex;
+    align-items: flex-start;
+    padding: 3px 0;
+}
+
+/* Basis-Styling für die Positionsnummer */
 #openHusListContainer .hu-list .position-number,
 #missingReceiptHusListContainer .hu-list .position-number,
-#dunkelalarmHusListContainer .hu-list .position-number {
-    min-width: 2.5em;      /* Gibt der Nummer einen festen Platz */
-    text-align: right;     /* Richtet die Nummer rechtsbündig aus (Punkte untereinander) */
-    padding-right: 0.75em; /* Abstand zwischen Nummer und HU-ID */
-    flex-shrink: 0;        /* Verhindert, dass die Nummer kleiner wird */
-    color: #888;          /* Macht die Nummer etwas unauffälliger */
+#dunkelalarmHusListContainer .hu-list .position-number,
+#pendingHuList .hu-list .position-number {
+    min-width: 2.5em;
+    text-align: right;
+    padding-right: 0.75em; /* Standard-Abstand */
+    flex-shrink: 0;
+    color: #888;
 }
-/* --- Ende des neuen CSS-Blocks --- */
-/* --- NEU: Styling für den Überzählig-Ton-Switch --- */
+
+/* --- HIER IST DIE SPEZIFISCHE ÜBERSCHREIBUNG --- */
+/* Diese Regel erhöht den Abstand NUR für die pendingHuList in der Detailansicht */
+#pendingHuList .hu-list .position-number {
+    padding-right: 1.5em; /* Größerer Abstand */
+}
 .batch-sound-toggle-container {
     display: flex;
     justify-content: flex-end;
@@ -471,6 +488,27 @@ body.modal-open {
     margin-bottom: 0;
     font-weight: normal;
     cursor: pointer;
+}
+/* --- NEU: Layout für zweizeilige Scan-Einträge --- */
+#currentShipmentDetails li {
+    display: flex;
+    flex-wrap: wrap; /* Erlaubt den Zeilenumbruch */
+    align-items: center;
+    position: relative;
+    padding-right: 70px; /* Platz für den Storno-Button */
+}
+
+#currentShipmentDetails .scan-main-info {
+    flex-grow: 1; /* Nimmt den verfügbaren Platz in der ersten Zeile ein */
+    white-space: nowrap; /* Verhindert Zeilenumbruch innerhalb dieser Zeile */
+    overflow: hidden;
+    text-overflow: ellipsis; /* ... falls es doch zu lang wird */
+}
+
+#currentShipmentDetails .scan-actions-and-notes {
+    flex-basis: 100%; /* Erzwingt, dass dieser Block immer eine neue Zeile beginnt */
+    padding-left: 1.5em; /* Kleine Einrückung für die Notizen */
+    padding-top: 4px; /* Etwas Abstand nach oben */
 }
 </style>
 </head>
@@ -1004,6 +1042,30 @@ function isHuExpected(huNumber) {
     // Die HU wurde in keiner der existierenden Listen gefunden. Sie ist "unerwartet".
     return false;
 }
+/**
+ * Kürzt lange Spediteurnamen für eine saubere Anzeige basierend auf vordefinierten Regeln.
+ * @param {string} fullName Der vollständige Name des Spediteurs.
+ * @returns {string} Der gekürzte Name oder der Originalname, falls keine Regel zutrifft.
+ */
+function shortenForwarderName(fullName) {
+    if (!fullName) return ''; // Leere Eingaben abfangen
+
+    const lowerCaseName = fullName.toLowerCase();
+
+    if (lowerCaseName.includes('kühne + nagel')) return 'Kühne + Nagel';
+    if (lowerCaseName.includes('dhl global forwarding')) return 'DHL';
+    if (lowerCaseName.includes('ups')) return 'UPS';
+    if (lowerCaseName.includes('maersk') && lowerCaseName.includes('senator')) return 'Maersk/Senator';
+    if (lowerCaseName.includes('freight consol')) return 'Freight Consol';
+    if (lowerCaseName.includes('logwin')) return 'Logwin';
+    if (lowerCaseName.includes('hartrodt')) return 'Hartrodt';
+    if (lowerCaseName.includes('db schenker')) return 'DB Schenker';
+    if (lowerCaseName.includes('ait worldwide')) return 'AIT Worldwide';
+    if (lowerCaseName.includes('dachser')) return 'Dachser';
+
+    // Wenn keine Regel zutrifft, den Originalnamen zurückgeben
+    return fullName;
+}
         // --- Hilfsfunktionen: UI & Fehler ---
         function clearError() { errorDisplayEl.textContent = ''; }
         function displayError(message, color = 'red', autoClearTimeout = null) {
@@ -1209,9 +1271,6 @@ function isHuExpected(huNumber) {
         
         
         
-        
-        
-        
 function displayCurrentShipmentDetails(baseNumberToDisplay) {
     clearError();
     removeActiveInlineNoteEditor();
@@ -1224,99 +1283,97 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
         currentDetailsDivEl.style.borderColor = '#aac';
         return;
     }
-
-    // --- HIER BEGINNT DIE NEUE, ERWEITERTE LOGIK ---
+    
+    const isManOrder = shipment.freightForwarder && shipment.destinationCountry;
     let detailsHtml = '';
     
-    // Prüfen, ob es ein HU-Listen-Auftrag ist, um die Kopfzeile zu formatieren
     if (shipment.isHuListOrder) {
-        const isManOrder = shipment.freightForwarder && shipment.destinationCountry;
         const titlePrefix = isManOrder ? 'Rechnung: ' : '';
-        
-        // Haupttitel
         detailsHtml += `<strong>${titlePrefix}${escapeHtml(baseNumberToDisplay)}</strong>`;
-
-        // PLSO-Nummer, falls vorhanden
         if (shipment.plsoNumber && shipment.plsoNumber !== 'N/A') {
             detailsHtml += `<div style="font-size: 0.9em; color: #555;">PLSO: ${escapeHtml(shipment.plsoNumber)}</div>`;
         }
-        // Spediteur und Land, falls vorhanden
         if (isManOrder) {
-            detailsHtml += `<div style="font-size: 0.9em; color: #555;">Sped.: ${escapeHtml(shipment.freightForwarder)} / Land: ${escapeHtml(shipment.destinationCountry)}</div>`;
+            const shortForwarderName = shortenForwarderName(shipment.freightForwarder);
+            detailsHtml += `<div style="font-size: 0.9em; color: #555;">Sped.: ${escapeHtml(shortForwarderName)} / Land: ${escapeHtml(shipment.destinationCountry)}</div>`;
         }
-        // Trennlinie für die Übersichtlichkeit
         detailsHtml += `<hr style="border: none; border-top: 1px dotted #ccc; margin: 8px 0;">`;
-
     } else {
-        // Fallback für normale, nicht-HU-Listen-Aufträge (das alte Verhalten)
         detailsHtml = `<strong>Details für ${escapeHtml(baseNumberToDisplay)}:</strong>`;
     }
-    // --- ENDE DER NEUEN LOGIK ---
 
-
-    // Der Rest der Funktion, der die Listen anhängt, bleibt fast identisch
-    // ...
     if (shipment.isHuListOrder) {
         const securityClearanceStatuses = ['XRY', 'ETD', 'EDD'];
         const allUniqueHusWithPos = Array.from(new Map(shipment.scannedItems.filter(i => i.rawInput).map(item => [item.rawInput, { hu: item.rawInput, position: item.position }])).values());
         const processedHus = new Set(shipment.scannedItems.filter(item => securityClearanceStatuses.includes(item.status) && !item.isCancelled).map(item => item.rawInput));
         const pendingHuNumbers = allUniqueHusWithPos.filter(item => !processedHus.has(item.hu));
-        
         if (pendingHuNumbers.length > 0) {
             const totalHus = allUniqueHusWithPos.length;
             const listClass = (totalHus - pendingHuNumbers.length > 0) ? 'partial' : '';
-            detailsHtml += `<div id="pendingHuList" class="${listClass}">`;
-            detailsHtml += `<h4>Offene HUs (${pendingHuNumbers.length} von ${totalHus}):</h4>`;
-            detailsHtml += `<ul class="hu-list">${pendingHuNumbers.sort((a,b) => (a.position || 9999) - (b.position || 9999)).map(item => `<li><span class="position-number">${item.position ? `${item.position}.` : '&bull;'}</span><span class="hu-value">${escapeHtml(item.hu)}</span></li>`).join('')}</ul>`;
-            detailsHtml += `</div>`;
+            detailsHtml += `<div id="pendingHuList" class="${listClass}"><h4>Offene HUs (${pendingHuNumbers.length} von ${totalHus}):</h4>`;
+            const listItemsHtml = pendingHuNumbers.sort((a,b) => (a.position || 9999) - (b.position || 9999)).map(item => {
+                const positionHtml = isManOrder && item.position ? `<span class="position-number">${item.position}.</span>` : `<span class="position-number"></span>`;
+                return `<li>${positionHtml}<span class="hu-value">${escapeHtml(item.hu)}</span></li>`;
+            }).join('');
+            detailsHtml += `<ul class="hu-list">${listItemsHtml}</ul></div>`;
         }
     }
     
     detailsHtml += `<ul>`;
+    (shipment.scannedItems || []).filter(item => item.status !== 'Anstehend').sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)).forEach(item => {
+        const dt = new Date(item.timestamp);
+        const timeStr = dt.toLocaleTimeString('de-DE');
+        const dateStr = dt.toLocaleDateString('de-DE');
+        const isCancelled = item.isCancelled;
 
-    (shipment.scannedItems || [])
-        .filter(item => item.status !== 'Anstehend')
-        .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
-        .forEach(item => {
-            const dt = new Date(item.timestamp);
-            const timeStr = dt.toLocaleTimeString('de-DE');
-            const dateStr = dt.toLocaleDateString('de-DE');
-            const timestampPart = `<span class="timestamp">[${dateStr} ${timeStr}]</span>`;
-            const numberPart = escapeHtml(item.rawInput);
-            const statusPart = escapeHtml(item.status);
-            const comboPart = item.isCombination ? ` <span class="combo">(Kombi)</span>` : '';
-            const isCancelled = item.isCancelled;
+        // --- HIER IST DIE NEUE HTML-STRUKTUR ---
+        detailsHtml += `<li class="${isCancelled ? 'cancelled-item' : ''}">`;
+        
+        // Block 1: Hauptinformationen (erste Zeile)
+        detailsHtml += `<div class="scan-main-info">`;
+        detailsHtml += `<span class="timestamp">[${dateStr} ${timeStr}]</span> `;
+        let numberPart = isManOrder && item.position ? `<span class="position-number">${item.position}.</span> ` : '';
+        detailsHtml += `${numberPart}<span class="hu-value">${escapeHtml(item.rawInput)}</span> → <span class="status">${escapeHtml(item.status)}</span>${item.isCombination ? ` <span class="combo">(Kombi)</span>` : ''}`;
+        if (isCancelled) {
+            const cancelDt = item.cancelledTimestamp ? new Date(item.cancelledTimestamp) : null;
+            detailsHtml += `<span class="cancelled-info"> (storniert am ${cancelDt ? cancelDt.toLocaleString('de-DE') : 'Unbekannt'})</span>`;
+        }
+        detailsHtml += `</div>`; // Ende scan-main-info
 
-            let notesListHtml = '';
-            if (!isCancelled && Array.isArray(item.notes) && item.notes.length > 0) {
-                notesListHtml += '<div class="notes-container">';
-                item.notes.forEach((note, index) => {
+        // Storno-Button bleibt außerhalb, damit er absolut positioniert werden kann
+        if (!isCancelled) {
+            detailsHtml += `<button class="cancel-button" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}">Storno</button>`;
+        }
+        
+        // Block 2: Notizen und Aktionen (zweite Zeile)
+        detailsHtml += `<div class="scan-actions-and-notes">`;
+        if (Array.isArray(item.notes) && item.notes.length > 0) {
+            let notesListHtml = '<div class="notes-container">';
+            item.notes.forEach((note, index) => {
+                if (isCancelled) {
+                    notesListHtml += `<div class="note-item" style="color:var(--cancelled-color);">- ${escapeHtml(note)}</div>`;
+                } else {
                     notesListHtml += `<div class="note-item"><span class="note-prefix">Notiz:</span><span class="editable-note" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" data-note-index="${index}" title="Notiz bearbeiten">${escapeHtml(note)}</span><button class="delete-note-btn" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" data-note-index="${index}" title="Notiz löschen">×</button></div>`;
-                });
-                notesListHtml += '</div>';
-            } else if (Array.isArray(item.notes) && item.notes.length > 0) {
-                notesListHtml += `<div class="notes-container" style="color:var(--cancelled-color);">${item.notes.map(n => `<div>- ${escapeHtml(n)}</div>`).join('')}</div>`;
-            }
-
-            detailsHtml += `<li class="${isCancelled ? 'cancelled-item' : ''}"> ${timestampPart} ${numberPart} → <span class="status">${statusPart}</span>${comboPart}`;
-            if (!isCancelled) {
-                detailsHtml += `<button class="cancel-button" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}">Storno</button>`;
-            } else {
-                const cancelDt = item.cancelledTimestamp ? new Date(item.cancelledTimestamp) : null;
-                detailsHtml += `<span class="cancelled-info"> (storniert am ${cancelDt ? cancelDt.toLocaleString('de-DE') : 'Unbekannt'})</span>`;
-            }
+                }
+            });
+            notesListHtml += '</div>';
             detailsHtml += notesListHtml;
-            if (!isCancelled) {
-                detailsHtml += `<a href="#" class="add-note-link" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" title="Weitere Notiz hinzufügen">Notiz hinzufügen</a>`;
-            }
-            detailsHtml += `<div class="inline-note-editor-placeholder"></div></li>`;
-        });
+        }
+        if (!isCancelled) {
+            detailsHtml += `<a href="#" class="add-note-link" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" title="Weitere Notiz hinzufügen">Notiz hinzufügen</a>`;
+        }
+        detailsHtml += `<div class="inline-note-editor-placeholder"></div>`;
+        detailsHtml += `</div>`; // Ende scan-actions-and-notes
+        
+        detailsHtml += `</li>`;
+        // --- ENDE DER NEUEN HTML-STRUKTUR ---
+    });
     detailsHtml += `</ul>`;
 
+    // Der Summary-Teil bleibt unverändert
     const expected = shipment.totalPiecesExpected;
     const securityScansCount = calculateCurrentCountedPieces(shipment.scannedItems || []);
     const receiptScansCount = calculateGoodsReceiptCount(shipment.scannedItems || []);
-    
     detailsHtml += `<div class="summary">`;
     let expectedText = (expected !== null && expected !== undefined) ? `${expected} Stk.` : 'N/A';
     const receiptClass = getStatusClass(receiptScansCount, expected);
@@ -1327,6 +1384,7 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
     
     currentDetailsDivEl.innerHTML = detailsHtml;
 
+    // Die Logik für die Border-Farbe bleibt unverändert
     if (expected !== null && expected !== undefined) {
         if (receiptScansCount > expected || securityScansCount > expected) currentDetailsDivEl.style.borderColor = 'red';
         else if (receiptScansCount < expected || securityScansCount < expected) currentDetailsDivEl.style.borderColor = 'orange';
@@ -1477,7 +1535,7 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
             if (noteText) itemToUpdate.notes.push(noteText);
 
         } else {
-            // FALL 2: NICHT-ZÄHLENDER SCAN (XRY (Kombi), Dunkelalarm, etc.)
+            // FALL 2: NICHT-ZÄHLENDER SCAN (XRY (Kombi), Dunkelalarm, Wareneingang etc.)
             const existingItemIndex = parentShipment.scannedItems.findIndex(
                 i => i.rawInput.toUpperCase() === processedRawInput.toUpperCase()
             );
@@ -1486,27 +1544,36 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
                 return { success: false, waitingForTotal: false, message: `FEHLER: HU ${escapeHtml(processedRawInput)} nicht im Auftrag ${parentHawb} gefunden.` };
             }
             
-            // --- PRÜFUNG 1: Verhindert doppelte Kombi-Scans ---
+            // PRÜFUNG 1: Verhindert doppelte Kombi-Scans
             if (isNewScanKombi) {
                 const hasExistingKombi = parentShipment.scannedItems.some(
                     item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() &&
-                           item.isCombination &&
-                           !item.isCancelled
+                           item.isCombination && !item.isCancelled
                 );
                 if (hasExistingKombi) {
                     return { success: false, waitingForTotal: false, message: `FEHLER: Für HU ${escapeHtml(processedRawInput)} wurde bereits eine Kombi-Sicherung erfasst.` };
                 }
             }
             
-            // --- NEUE PRÜFUNG 2: Verhindert doppelten Dunkelalarm ---
+            // PRÜFUNG 2: Verhindert doppelten Dunkelalarm
             if (statusToUse === 'Dunkelalarm') {
                 const hasExistingDunkelalarm = parentShipment.scannedItems.some(
                     item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() &&
-                           item.status === 'Dunkelalarm' &&
-                           !item.isCancelled
+                           item.status === 'Dunkelalarm' && !item.isCancelled
                 );
                 if (hasExistingDunkelalarm) {
                     return { success: false, waitingForTotal: false, message: `FEHLER: Für HU ${escapeHtml(processedRawInput)} wurde bereits ein Dunkelalarm erfasst.` };
+                }
+            }
+
+            // --- NEUE PRÜFUNG 3: Verhindert doppelten Wareneingang ---
+            if (statusToUse === 'Wareneingang') {
+                const hasExistingReceipt = parentShipment.scannedItems.some(
+                    item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() &&
+                           item.status === 'Wareneingang' && !item.isCancelled
+                );
+                if (hasExistingReceipt) {
+                    return { success: false, waitingForTotal: false, message: `FEHLER: Für HU ${escapeHtml(processedRawInput)} wurde bereits der Wareneingang erfasst.` };
                 }
             }
             // --- ENDE DER NEUEN PRÜFUNG ---
@@ -1534,7 +1601,7 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
     }
     // --- ENDE: Überarbeitete Logik für HU-Listen-Aufträge ---
 
-    // Die Logik für normale Sendungen (die nicht Teil einer HU-Liste sind) bleibt unverändert.
+    // Die Logik für normale Sendungen (nicht aus HU-Listen) bleibt unverändert.
     if (shipments[baseNumber] && shipments[baseNumber].isHuListOrder) {
         return { success: false, waitingForTotal: false, message: `FEHLER: ${baseNumber} ist ein HU-Auftrag. Bitte scannen Sie eine der zugehörigen HU-Nummern.` };
     }
