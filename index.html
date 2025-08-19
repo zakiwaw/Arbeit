@@ -896,90 +896,110 @@ function calculateGoodsReceiptCount(scannedItems) {
 function showOpenHusSummary() {
     removeActiveInlineNoteEditor();
     const shipments = loadShipments();
-    
     const securityClearanceStatuses = ['XRY', 'ETD', 'EDD'];
-    
-    let openSecurityHusByOrder = [];
-    let missingReceiptHusByOrder = [];
-    let dunkelalarmItemsByOrder = {};
+    let openSecurityHusByOrder = [], missingReceiptHusByOrder = [], dunkelalarmItemsByOrder = {};
 
     Object.keys(shipments).forEach(baseNumber => {
         const shipment = shipments[baseNumber];
         
+        // Dunkelalarm-Logik bleibt unverändert
         if (shipment.scannedItems && shipment.scannedItems.length > 0) {
             const itemsWithDunkelalarm = shipment.scannedItems.filter(item => item.status === 'Dunkelalarm' && !item.isCancelled);
             if (itemsWithDunkelalarm.length > 0) {
                 if (!dunkelalarmItemsByOrder[baseNumber]) dunkelalarmItemsByOrder[baseNumber] = { items: [], ...shipment };
-                itemsWithDunkelalarm.forEach(item => dunkelalarmItemsByOrder[baseNumber].items.push(item));
+                itemsWithDunkelalarm.forEach(item => {
+                    const enhancedItem = {...item, orderNumber: baseNumber};
+                    dunkelalarmItemsByOrder[baseNumber].items.push(enhancedItem);
+                });
             }
         }
+
+        // --- HIER BEGINNT DIE NEUE LOGIK FÜR DUPLIKATE ---
         if (shipment.isHuListOrder && shipment.scannedItems && shipment.scannedItems.length > 0) {
-            const allUniqueHusWithPos = Array.from(new Map(shipment.scannedItems.filter(i => i.rawInput).map(item => [item.rawInput, { hu: item.rawInput, position: item.position }])).values());
-            const processedHus = new Set(shipment.scannedItems.filter(item => securityClearanceStatuses.includes(item.status) && !item.isCancelled).map(item => item.rawInput));
-            const pendingSecurityHus = allUniqueHusWithPos.filter(item => !processedHus.has(item.hu));
-            if (pendingSecurityHus.length > 0) openSecurityHusByOrder.push({ ...shipment, orderNumber: baseNumber, pendingHus: pendingSecurityHus, totalHus: allUniqueHusWithPos.length });
-            const receiptHus = new Set(shipment.scannedItems.filter(item => item.status === 'Wareneingang' && !item.isCancelled).map(item => item.rawInput));
-            const missingReceiptHus = allUniqueHusWithPos.filter(item => !receiptHus.has(item.hu));
-            if (missingReceiptHus.length > 0) missingReceiptHusByOrder.push({ ...shipment, orderNumber: baseNumber, pendingHus: missingReceiptHus, totalHus: allUniqueHusWithPos.length, receiptCount: allUniqueHusWithPos.length - missingReceiptHus.length });
+            // Schritt 1: Identifiziere alle "physischen Slots" aus dem ursprünglichen Import.
+            // Das sind alle Einträge, die entweder noch 'Anstehend' sind oder bereits einen finalen Sicherheitsstatus haben.
+            // Dies ist unsere Quelle der Wahrheit für die Gesamtzahl, inkl. Duplikate.
+            const manifestSlots = shipment.scannedItems.filter(item => 
+                item.status === 'Anstehend' || securityClearanceStatuses.includes(item.status)
+            );
+
+            // Offene Sicherung: Das sind einfach alle Slots, die noch den Status 'Anstehend' haben.
+            const pendingSecurityHus = manifestSlots.filter(item => item.status === 'Anstehend');
+            if (pendingSecurityHus.length > 0) {
+                openSecurityHusByOrder.push({ 
+                    ...shipment, 
+                    orderNumber: baseNumber, 
+                    pendingHus: pendingSecurityHus, 
+                    totalHus: manifestSlots.length // Die Gesamtzahl basiert auf allen physischen Slots
+                });
+            }
+
+            // Fehlender Wareneingang: Diese Logik muss jetzt auch Duplikate berücksichtigen.
+            const receiptCounts = shipment.scannedItems
+                .filter(item => item.status === 'Wareneingang' && !item.isCancelled)
+                .reduce((acc, item) => {
+                    acc[item.rawInput] = (acc[item.rawInput] || 0) + 1;
+                    return acc;
+                }, {});
+            
+            const tempReceiptCounts = {...receiptCounts}; // Eine Kopie, die wir verändern können
+            
+            const missingReceiptHus = manifestSlots.filter(slot => {
+                const hu = slot.rawInput;
+                if (tempReceiptCounts[hu] && tempReceiptCounts[hu] > 0) {
+                    tempReceiptCounts[hu]--; // Ein Wareneingang-Scan wurde für diesen Slot "verbraucht"
+                    return false; // Dieser Slot ist nicht mehr "fehlend"
+                }
+                return true; // Für diesen Slot gibt es keinen verfügbaren Wareneingang-Scan
+            });
+
+            if (missingReceiptHus.length > 0) {
+                missingReceiptHusByOrder.push({ 
+                    ...shipment, 
+                    orderNumber: baseNumber, 
+                    pendingHus: missingReceiptHus, 
+                    totalHus: manifestSlots.length, 
+                    receiptCount: manifestSlots.length - missingReceiptHus.length 
+                });
+            }
         }
+        // --- ENDE DER NEUEN LOGIK FÜR DUPLIKATE ---
     });
 
     const sortByCountryAndOrder = (a, b) => (a.destinationCountry || 'zz').localeCompare(b.destinationCountry || 'zz') || (a.orderNumber || a.hawb).localeCompare(b.orderNumber || b.hawb);
     
+    // Die HTML-Generierungsfunktionen bleiben unverändert, da sie die korrekten Daten jetzt erhalten.
     const generateHuListHtml = (items) => {
         if (!items || items.length === 0) return '';
         const sortedItems = items.sort((a, b) => (a.position || 9999) - (b.position || 9999));
         const listItems = sortedItems.map(item => {
-            const huValue = item.hu || item.rawInput; 
-
-         const parentOrder = shipments[item.orderNumber] || shipments[Object.keys(shipments).find(key => shipments[key].scannedItems && shipments[key].scannedItems.some(i => i.rawInput === huValue))];
-        const isManOrderContext = parentOrder && parentOrder.freightForwarder;
-        
-        // Prüfe, ob für diese HU ein Dunkelalarm existiert
-        const hasDunkelalarm = parentOrder && parentOrder.scannedItems.some(
-            scan => scan.rawInput === huValue && scan.status === 'Dunkelalarm' && !scan.isCancelled
-        );
-        
-        // Wende die rote Farbe an, falls ein Dunkelalarm existiert
-        const huValueClass = hasDunkelalarm ? 'hu-value has-dunkelalarm' : 'hu-value';
-        
-        const positionHtml = isManOrderContext && item.position 
-            ? `<span class="position-number">${item.position}.</span>` 
-            : `<span class="position-number"></span>`;
-
-        return `<li>${positionHtml}<span class="${huValueClass}">${escapeHtml(huValue)}</span></li>`;
-        // --- ENDE DER NEUEN LOGIK ---
-    }).join('');
+            const huValue = item.hu || item.rawInput;
+            const parentOrder = shipments[item.orderNumber] || shipments[Object.keys(shipments).find(key => shipments[key].scannedItems && shipments[key].scannedItems.some(i => i.rawInput === huValue))];
+            const isManOrderContext = parentOrder && parentOrder.freightForwarder;
+            const positionHtml = isManOrderContext && item.position ? `<span class="position-number">${item.position}.</span>` : `<span class="position-number"></span>`;
+            return `<li>${positionHtml}<span class="hu-value">${escapeHtml(huValue)}</span></li>`;
+        }).join('');
+        return `<ul class="hu-list">${listItems}</ul>`;
+    };
     
-    return `<ul class="hu-list">${listItems}</ul>`;
-};
-    
-// INNERHALB der showOpenHusSummary Funktion
-
-const generateHtmlForOrderGroup = (order, listItemsHtml, forDunkelalarm = false) => {
-    const orderNumber = order.orderNumber || order.hawb;
-    let countText = '';
-    if (!forDunkelalarm) {
-         countText = order.receiptCount !== undefined ? `(${order.receiptCount} von ${order.totalHus} erfasst)`: `(${(order.totalHus - order.pendingHus.length)} von ${order.totalHus} erfasst)`;
-    }
-    
-    const isManOrder = order.freightForwarder && order.destinationCountry;
-    const titlePrefix = isManOrder ? 'Rechnung: ' : '';
-    let metaLineHtml = '';
-    
-    if (order.plsoNumber && order.plsoNumber !== 'N/A') {
-        metaLineHtml += `<br><small>PLSO: ${escapeHtml(order.plsoNumber)}</small>`;
-    }
-    if (isManOrder) {
-        // --- HIER IST DIE ÄNDERUNG ---
-        // Die Kürzungs-Funktion wird jetzt auch hier aufgerufen
-        const shortForwarderName = shortenForwarderName(order.freightForwarder);
-        metaLineHtml += `<br><small>Sped.: ${escapeHtml(shortForwarderName)} / Land: ${escapeHtml(order.destinationCountry)}</small>`;
-        // --- ENDE DER ÄNDERUNG ---
-    }
-
-    return `<div class="hu-order-group"><div class="hu-order-title">${titlePrefix}${escapeHtml(orderNumber)} ${countText}${metaLineHtml}</div>${listItemsHtml}</div>`;
-};
+    const generateHtmlForOrderGroup = (order, listItemsHtml, forDunkelalarm = false) => {
+        const orderNumber = order.orderNumber || order.hawb;
+        let countText = '';
+        if (!forDunkelalarm) {
+             countText = order.receiptCount !== undefined ? `(${order.receiptCount} von ${order.totalHus} erfasst)`: `(${(order.totalHus - order.pendingHus.length)} von ${order.totalHus} erfasst)`;
+        }
+        const isManOrder = order.freightForwarder && order.destinationCountry;
+        const titlePrefix = isManOrder ? 'Rechnung: ' : '';
+        let metaLineHtml = '';
+        if (order.plsoNumber && order.plsoNumber !== 'N/A') {
+            metaLineHtml += `<br><small>PLSO: ${escapeHtml(order.plsoNumber)}</small>`;
+        }
+        if (isManOrder) {
+            const shortForwarderName = shortenForwarderName(order.freightForwarder);
+            metaLineHtml += `<br><small>Sped.: ${escapeHtml(shortForwarderName)} / Land: ${escapeHtml(order.destinationCountry)}</small>`;
+        }
+        return `<div class="hu-order-group"><div class="hu-order-title">${titlePrefix}${escapeHtml(orderNumber)} ${countText}${metaLineHtml}</div>${listItemsHtml}</div>`;
+    };
     
     openSecurityHusByOrder.sort(sortByCountryAndOrder);
     missingReceiptHusByOrder.sort(sortByCountryAndOrder);
@@ -989,7 +1009,6 @@ const generateHtmlForOrderGroup = (order, listItemsHtml, forDunkelalarm = false)
     missingReceiptHusListContainerEl.innerHTML = missingReceiptHusByOrder.map(order => generateHtmlForOrderGroup(order, generateHuListHtml(order.pendingHus))).join('') || '<p class="no-open-hus-message">Perfekt! Alle HUs wurden im Wareneingang erfasst.</p>';
     dunkelalarmHusListContainerEl.innerHTML = dunkelalarmArray.map(data => generateHtmlForOrderGroup(data, generateHuListHtml(data.items), true)).join('') || '<p class="no-open-hus-message">Keine Einträge mit Status "Dunkelalarm" gefunden.</p>';
 
-    // Rest der Funktion bleibt unverändert
     showOpenSecurityHusBtnEl.classList.add('active');
     missingReceiptHusListContainerEl.style.display = 'none';
     openHusListContainerEl.style.display = 'block';
@@ -999,7 +1018,7 @@ const generateHtmlForOrderGroup = (order, listItemsHtml, forDunkelalarm = false)
     openHusModalEl.classList.add('visible');
     document.body.classList.add('modal-open');
     closeSideMenu(); 
-}        
+}       
         
         
         
