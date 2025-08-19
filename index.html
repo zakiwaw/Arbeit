@@ -510,6 +510,12 @@ body.modal-open {
     padding-left: 1.5em; /* Kleine Einrückung für die Notizen */
     padding-top: 4px; /* Etwas Abstand nach oben */
 }
+/* INNERHALB des <style> Tags */
+
+.hu-value.has-dunkelalarm {
+    color: red;
+    font-weight: bold;
+}
 </style>
 </head>
 <body>
@@ -925,39 +931,55 @@ function showOpenHusSummary() {
         const sortedItems = items.sort((a, b) => (a.position || 9999) - (b.position || 9999));
         const listItems = sortedItems.map(item => {
             const huValue = item.hu || item.rawInput; 
-            const positionHtml = item.position ? `<span class="position-number">${item.position}.</span>` : `<span class="position-number">&bull;</span>`;
-            return `<li>${positionHtml}<span class="hu-value">${escapeHtml(huValue)}</span></li>`;
-        }).join('');
-        return `<ul class="hu-list">${listItems}</ul>`;
-    };
-    
-    const generateHtmlForOrderGroup = (order, listItemsHtml, forDunkelalarm = false) => {
-        const orderNumber = order.orderNumber || order.hawb;
-        let countText = '';
-        if (!forDunkelalarm) {
-             countText = order.receiptCount !== undefined ?
-                `(${order.receiptCount} von ${order.totalHus} erfasst)`:
-                `(${(order.totalHus - order.pendingHus.length)} von ${order.totalHus} erfasst)`;
-        }
-        
-        // --- HIER IST DIE NEUE LOGIK ---
-        // Prüft, ob es ein "reicher" MAN-Auftrag ist.
-        const isManOrder = order.freightForwarder && order.destinationCountry;
-        
-        // Der Präfix wird nur für MAN-Aufträge gesetzt.
-        const titlePrefix = isManOrder ? 'Rechnung: ' : '';
-        
-        let metaLineHtml = '';
-        if (order.plsoNumber && order.plsoNumber !== 'N/A') {
-            metaLineHtml += `<br><small>PLSO: ${escapeHtml(order.plsoNumber)}</small>`;
-        }
-        if (isManOrder) {
-            metaLineHtml += `<br><small>Sped.: ${escapeHtml(order.freightForwarder)} / Land: ${escapeHtml(order.destinationCountry)}</small>`;
-        }
-        // --- ENDE DER NEUEN LOGIK ---
 
-        return `<div class="hu-order-group"><div class="hu-order-title">${titlePrefix}${escapeHtml(orderNumber)} ${countText}${metaLineHtml}</div>${listItemsHtml}</div>`;
-    };
+         const parentOrder = shipments[item.orderNumber] || shipments[Object.keys(shipments).find(key => shipments[key].scannedItems && shipments[key].scannedItems.some(i => i.rawInput === huValue))];
+        const isManOrderContext = parentOrder && parentOrder.freightForwarder;
+        
+        // Prüfe, ob für diese HU ein Dunkelalarm existiert
+        const hasDunkelalarm = parentOrder && parentOrder.scannedItems.some(
+            scan => scan.rawInput === huValue && scan.status === 'Dunkelalarm' && !scan.isCancelled
+        );
+        
+        // Wende die rote Farbe an, falls ein Dunkelalarm existiert
+        const huValueClass = hasDunkelalarm ? 'hu-value has-dunkelalarm' : 'hu-value';
+        
+        const positionHtml = isManOrderContext && item.position 
+            ? `<span class="position-number">${item.position}.</span>` 
+            : `<span class="position-number"></span>`;
+
+        return `<li>${positionHtml}<span class="${huValueClass}">${escapeHtml(huValue)}</span></li>`;
+        // --- ENDE DER NEUEN LOGIK ---
+    }).join('');
+    
+    return `<ul class="hu-list">${listItems}</ul>`;
+};
+    
+// INNERHALB der showOpenHusSummary Funktion
+
+const generateHtmlForOrderGroup = (order, listItemsHtml, forDunkelalarm = false) => {
+    const orderNumber = order.orderNumber || order.hawb;
+    let countText = '';
+    if (!forDunkelalarm) {
+         countText = order.receiptCount !== undefined ? `(${order.receiptCount} von ${order.totalHus} erfasst)`: `(${(order.totalHus - order.pendingHus.length)} von ${order.totalHus} erfasst)`;
+    }
+    
+    const isManOrder = order.freightForwarder && order.destinationCountry;
+    const titlePrefix = isManOrder ? 'Rechnung: ' : '';
+    let metaLineHtml = '';
+    
+    if (order.plsoNumber && order.plsoNumber !== 'N/A') {
+        metaLineHtml += `<br><small>PLSO: ${escapeHtml(order.plsoNumber)}</small>`;
+    }
+    if (isManOrder) {
+        // --- HIER IST DIE ÄNDERUNG ---
+        // Die Kürzungs-Funktion wird jetzt auch hier aufgerufen
+        const shortForwarderName = shortenForwarderName(order.freightForwarder);
+        metaLineHtml += `<br><small>Sped.: ${escapeHtml(shortForwarderName)} / Land: ${escapeHtml(order.destinationCountry)}</small>`;
+        // --- ENDE DER ÄNDERUNG ---
+    }
+
+    return `<div class="hu-order-group"><div class="hu-order-title">${titlePrefix}${escapeHtml(orderNumber)} ${countText}${metaLineHtml}</div>${listItemsHtml}</div>`;
+};
     
     openSecurityHusByOrder.sort(sortByCountryAndOrder);
     missingReceiptHusByOrder.sort(sortByCountryAndOrder);
@@ -1062,6 +1084,9 @@ function shortenForwarderName(fullName) {
     if (lowerCaseName.includes('db schenker')) return 'DB Schenker';
     if (lowerCaseName.includes('ait worldwide')) return 'AIT Worldwide';
     if (lowerCaseName.includes('dachser')) return 'Dachser';
+	if (lowerCaseName.includes('dsv')) return 'DSV';
+    if (lowerCaseName.includes('hermes')) return 'HERMES';
+    if (lowerCaseName.includes('wws freight')) return 'WWS';
 
     // Wenn keine Regel zutrifft, den Originalnamen zurückgeben
     return fullName;
@@ -2438,7 +2463,7 @@ function skipNoteAndAddFirstBatchItem() {
             
             // --- NEUE ZEILEN FÜR PDF-HEADER ---
             doc.text(`Wareneingang erfasst: ${receiptScansCount} von ${expected !== null ? expected : 'N/A'} Stk.`, 14, 45);
-            doc.text(`Sicherheitskontrolle (zählend): ${securityScansCount} von ${expected !== null ? expected : 'N/A'} Stk.`, 14, 50);
+            doc.text(`Sicherheitskontrolle: ${securityScansCount} von ${expected !== null ? expected : 'N/A'} Stk.`, 14, 50);
             
             doc.text(`Letzte Änderung: ${new Date(shipment.lastModified).toLocaleString('de-DE')}`, 14, 55);
             doc.text(`Generiert am: ${new Date().toLocaleString('de-DE')}`, 14, 60);
@@ -2477,11 +2502,37 @@ function skipNoteAndAddFirstBatchItem() {
                 startY = doc.autoTable.previous.finalY + 10;
             } else { alert("PDF AutoTable nicht verfügbar."); return; }
 
-            const finalValidStatuses = [...new Set(shipment.scannedItems.filter(item => !item.isCombination && !item.isCancelled && !NON_COUNTING_STATUSES.includes(item.status)).map(item => item.status))].sort();
-            let summaryString = "Sicherheitsstatus (gültig, zählend): ";
-            if (finalValidStatuses.length > 0) {
-                summaryString += "SPX by " + finalValidStatuses.join(', ');
-            } else { summaryString += "Keine zählende Sicherungsmethode angewendet."; }
+// --- NEUER, INTELLIGENTER CODE-BLOCK ---
+const validScans = shipment.scannedItems.filter(item => 
+    !item.isCombination && 
+    !item.isCancelled && 
+    !NON_COUNTING_STATUSES.includes(item.status)
+);
+
+let summaryString = "Sicherheitsstatus: ";
+
+if (validScans.length > 0) {
+    const statusCounts = validScans.reduce((acc, item) => {
+        acc[item.status] = (acc[item.status] || 0) + 1;
+        return acc;
+    }, {});
+
+    const uniqueMethods = Object.keys(statusCounts);
+
+    if (uniqueMethods.length === 1) {
+        // Fall 1: Nur eine Methode wurde verwendet
+        summaryString += "SPX by " + uniqueMethods[0];
+    } else {
+        // Fall 2: Mehrere Methoden wurden verwendet, mit Zählung
+        const summaryParts = uniqueMethods.sort().map(status => {
+            return `${status} (${statusCounts[status]}x)`;
+        });
+        summaryString += "SPX by " + summaryParts.join(', ');
+    }
+} else {
+    summaryString += "Keine zählende Sicherungsmethode angewendet.";
+}
+// --- ENDE DES NEUEN BLOCKS ---
             
             doc.setFontSize(11); doc.setFont(undefined, 'bold');
             if (startY > 280) { doc.addPage(); startY = 20; }
