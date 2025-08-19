@@ -1526,6 +1526,7 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
       // ERSETZEN SIE DIESE GESAMTE FUNKTION
 // ERSETZEN SIE DIESE GESAMTE FUNKTION
 // ERSETZEN SIE DIESE GESAMTE FUNKTION
+// ERSETZEN SIE DIESE GESAMTE FUNKTION
 function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFromCheckbox) {
     const { baseNumber, suffix, isValidFormat, raw: processedRawInput, isSuffixFormat } = processShipmentNumber(rawInputToSave);
     if (!isValidFormat) { return { success: false, waitingForTotal: false, message: `Ungültiges Format: ${escapeHtml(rawInputToSave)}` }; }
@@ -1540,19 +1541,25 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
         const noteText = noteInputEl.value.trim() || null;
         const isNewScanKombi = (statusToUse === 'XRY' && isCombinationFromCheckbox);
         const isSecurityStatus = EXCLUSIVE_SECURITY_STATUSES.includes(statusToUse);
-        
         const isFinalClearanceScan = isSecurityStatus && !isNewScanKombi;
 
+        // --- HIER IST DIE NEUE, ZENTRALE LOGIK ---
+        // Zähle, wie viele physische Packstücke für diese HU ursprünglich importiert wurden.
+        // Das ist die Summe der verbleibenden 'Anstehend'-Slots und der bereits verbrauchten Slots.
+        const expectedCountForThisHu = parentShipment.scannedItems.filter(
+            item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() &&
+                   (item.status === 'Anstehend' || EXCLUSIVE_SECURITY_STATUSES.includes(item.status))
+        ).length;
+        // --- ENDE DER NEUEN, ZENTRALEN LOGIK ---
+
         if (isFinalClearanceScan) {
-            // FALL 1: ZÄHLENDER SCAN (XRY, ETD, EDD)
+            // FALL 1: ZÄHLENDER SCAN (verbraucht einen 'Anstehend'-Slot)
             const anstehendIndex = parentShipment.scannedItems.findIndex(
                 i => i.rawInput.toUpperCase() === processedRawInput.toUpperCase() && i.status === 'Anstehend' && !i.isCancelled
             );
-
             if (anstehendIndex === -1) {
                 return { success: false, waitingForTotal: false, message: `FEHLER: Für HU ${escapeHtml(processedRawInput)} ist keine offene Sicherung mehr möglich.` };
             }
-
             const itemToUpdate = parentShipment.scannedItems[anstehendIndex];
             itemToUpdate.status = statusToUse;
             itemToUpdate.timestamp = now.toISOString();
@@ -1560,60 +1567,52 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
             if (noteText) itemToUpdate.notes.push(noteText);
 
         } else {
-            // FALL 2: NICHT-ZÄHLENDER SCAN (XRY (Kombi), Dunkelalarm, Wareneingang etc.)
+            // FALL 2: NICHT-ZÄHLENDER SCAN (fügt einen neuen Eintrag hinzu, prüft aber gegen das Limit)
             const existingItemIndex = parentShipment.scannedItems.findIndex(
                 i => i.rawInput.toUpperCase() === processedRawInput.toUpperCase()
             );
-            
             if (existingItemIndex === -1) {
                 return { success: false, waitingForTotal: false, message: `FEHLER: HU ${escapeHtml(processedRawInput)} nicht im Auftrag ${parentHawb} gefunden.` };
             }
             
-            // PRÜFUNG 1: Verhindert doppelte Kombi-Scans
+            // Prüfung 1: Kombi-Scan
             if (isNewScanKombi) {
-                const hasExistingKombi = parentShipment.scannedItems.some(
+                const currentKombiCount = parentShipment.scannedItems.filter(
                     item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() &&
                            item.isCombination && !item.isCancelled
-                );
-                if (hasExistingKombi) {
-                    return { success: false, waitingForTotal: false, message: `FEHLER: Für HU ${escapeHtml(processedRawInput)} wurde bereits eine Kombi-Sicherung erfasst.` };
+                ).length;
+                if (currentKombiCount >= expectedCountForThisHu) {
+                    return { success: false, waitingForTotal: false, message: `FEHLER: Limit (${expectedCountForThisHu}) für Kombi-Sicherung bei HU ${escapeHtml(processedRawInput)} erreicht.` };
                 }
             }
             
-            // PRÜFUNG 2: Verhindert doppelten Dunkelalarm
+            // Prüfung 2: Dunkelalarm
             if (statusToUse === 'Dunkelalarm') {
-                const hasExistingDunkelalarm = parentShipment.scannedItems.some(
+                const currentDunkelalarmCount = parentShipment.scannedItems.filter(
                     item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() &&
                            item.status === 'Dunkelalarm' && !item.isCancelled
-                );
-                if (hasExistingDunkelalarm) {
-                    return { success: false, waitingForTotal: false, message: `FEHLER: Für HU ${escapeHtml(processedRawInput)} wurde bereits ein Dunkelalarm erfasst.` };
+                ).length;
+                if (currentDunkelalarmCount >= expectedCountForThisHu) {
+                    return { success: false, waitingForTotal: false, message: `FEHLER: Limit (${expectedCountForThisHu}) für Dunkelalarm bei HU ${escapeHtml(processedRawInput)} erreicht.` };
                 }
             }
 
-            // --- NEUE PRÜFUNG 3: Verhindert doppelten Wareneingang ---
+            // Prüfung 3: Wareneingang
             if (statusToUse === 'Wareneingang') {
-                const hasExistingReceipt = parentShipment.scannedItems.some(
+                const currentReceiptCount = parentShipment.scannedItems.filter(
                     item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() &&
                            item.status === 'Wareneingang' && !item.isCancelled
-                );
-                if (hasExistingReceipt) {
-                    return { success: false, waitingForTotal: false, message: `FEHLER: Für HU ${escapeHtml(processedRawInput)} wurde bereits der Wareneingang erfasst.` };
+                ).length;
+                if (currentReceiptCount >= expectedCountForThisHu) {
+                    return { success: false, waitingForTotal: false, message: `FEHLER: Limit (${expectedCountForThisHu}) für Wareneingang bei HU ${escapeHtml(processedRawInput)} erreicht.` };
                 }
             }
-            // --- ENDE DER NEUEN PRÜFUNG ---
             
             const originalItem = parentShipment.scannedItems[existingItemIndex];
-
             const newItem = {
-                rawInput: processedRawInput,
-                status: statusToUse,
-                timestamp: now.toISOString(),
-                isCombination: isNewScanKombi,
-                notes: noteText ? [noteText] : [],
-                isCancelled: false,
-                cancelledTimestamp: null,
-                position: originalItem.position
+                rawInput: processedRawInput, status: statusToUse, timestamp: now.toISOString(),
+                isCombination: isNewScanKombi, notes: noteText ? [noteText] : [],
+                isCancelled: false, cancelledTimestamp: null, position: originalItem.position
             };
             parentShipment.scannedItems.push(newItem);
         }
