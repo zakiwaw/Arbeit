@@ -123,6 +123,12 @@ function calculateGoodsReceiptCount(scannedItems) {
     return scannedItems.filter(item => item.status === 'Wareneingang' && !item.isCancelled).length;
 }
 // --- START DER ÄNDERUNG: Die gesamte Funktion wird aktualisiert ---
+// --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESEM CODE ---
+
+// --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESEM CODE ---
+
+// --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESER FINALEN KORREKTUR ---
+
 function showOpenHusSummary() {
     removeActiveInlineNoteEditor();
     const shipments = loadShipments();
@@ -132,7 +138,6 @@ function showOpenHusSummary() {
     Object.keys(shipments).forEach(baseNumber => {
         const shipment = shipments[baseNumber];
         
-        // Dunkelalarm-Logik bleibt unverändert
         if (shipment.scannedItems && shipment.scannedItems.length > 0) {
             const itemsWithDunkelalarm = shipment.scannedItems.filter(item => item.status === 'Dunkelalarm' && !item.isCancelled);
             if (itemsWithDunkelalarm.length > 0) {
@@ -144,27 +149,21 @@ function showOpenHusSummary() {
             }
         }
 
-        // --- HIER BEGINNT DIE NEUE LOGIK FÜR DUPLIKATE ---
         if (shipment.isHuListOrder && shipment.scannedItems && shipment.scannedItems.length > 0) {
-            // Schritt 1: Identifiziere alle "physischen Slots" aus dem ursprünglichen Import.
-            // Das sind alle Einträge, die entweder noch 'Anstehend' sind oder bereits einen finalen Sicherheitsstatus haben.
-            // Dies ist unsere Quelle der Wahrheit für die Gesamtzahl, inkl. Duplikate.
             const manifestSlots = shipment.scannedItems.filter(item => 
                 item.status === 'Anstehend' || securityClearanceStatuses.includes(item.status)
             );
 
-            // Offene Sicherung: Das sind einfach alle Slots, die noch den Status 'Anstehend' haben.
             const pendingSecurityHus = manifestSlots.filter(item => item.status === 'Anstehend');
             if (pendingSecurityHus.length > 0) {
                 openSecurityHusByOrder.push({ 
                     ...shipment, 
                     orderNumber: baseNumber, 
                     pendingHus: pendingSecurityHus, 
-                    totalHus: manifestSlots.length // Die Gesamtzahl basiert auf allen physischen Slots
+                    totalHus: manifestSlots.length
                 });
             }
 
-            // Fehlender Wareneingang: Diese Logik muss jetzt auch Duplikate berücksichtigen.
             const receiptCounts = shipment.scannedItems
                 .filter(item => item.status === 'Wareneingang' && !item.isCancelled)
                 .reduce((acc, item) => {
@@ -172,15 +171,15 @@ function showOpenHusSummary() {
                     return acc;
                 }, {});
             
-            const tempReceiptCounts = {...receiptCounts}; // Eine Kopie, die wir verändern können
+            const tempReceiptCounts = {...receiptCounts};
             
             const missingReceiptHus = manifestSlots.filter(slot => {
                 const hu = slot.rawInput;
                 if (tempReceiptCounts[hu] && tempReceiptCounts[hu] > 0) {
-                    tempReceiptCounts[hu]--; // Ein Wareneingang-Scan wurde für diesen Slot "verbraucht"
-                    return false; // Dieser Slot ist nicht mehr "fehlend"
+                    tempReceiptCounts[hu]--;
+                    return false;
                 }
-                return true; // Für diesen Slot gibt es keinen verfügbaren Wareneingang-Scan
+                return true;
             });
 
             if (missingReceiptHus.length > 0) {
@@ -193,23 +192,54 @@ function showOpenHusSummary() {
                 });
             }
         }
-        // --- ENDE DER NEUEN LOGIK FÜR DUPLIKATE ---
     });
 
-    const sortByCountryAndOrder = (a, b) => (a.destinationCountry || 'zz').localeCompare(b.destinationCountry || 'zz') || (a.orderNumber || a.hawb).localeCompare(b.orderNumber || b.hawb);
+    const sortByCountryAndOrder = (a, b) => (a.destinationCountry || 'zz').localeCompare(b.destinationCountry || 'zz') || (a.orderNumber || a.hawb).localeCompare(b.orderNumber || a.hawb);
     
-    // Die HTML-Generierungsfunktionen bleiben unverändert, da sie die korrekten Daten jetzt erhalten.
-    const generateHuListHtml = (items) => {
+    // HILFSFUNKTION - JETZT MIT ROBUSTER DUNKELALARM-PRÜFUNG
+    const generateHuListHtml = (items, allScannedItemsForContext) => {
         if (!items || items.length === 0) return '';
+
+        // Schritt 1: Erstelle eine Liste (Set) aller Nummern, die einen Dunkelalarm haben.
+        const dunkelalarmedNumbers = new Set(
+            allScannedItemsForContext
+                .filter(scan => scan.status === 'Dunkelalarm' && !scan.isCancelled)
+                .map(scan => scan.rawInput)
+        );
+
         const sortedItems = items.sort((a, b) => (a.position || 9999) - (b.position || 9999));
-        const listItems = sortedItems.map(item => {
-            const huValue = item.hu || item.rawInput;
-            const parentOrder = shipments[item.orderNumber] || shipments[Object.keys(shipments).find(key => shipments[key].scannedItems && shipments[key].scannedItems.some(i => i.rawInput === huValue))];
-            const isManOrderContext = parentOrder && parentOrder.freightForwarder;
-            const positionHtml = isManOrderContext && item.position ? `<span class="position-number">${item.position}.</span>` : `<span class="position-number"></span>`;
-            return `<li>${positionHtml}<span class="hu-value">${escapeHtml(huValue)}</span></li>`;
-        }).join('');
-        return `<ul class="hu-list">${listItems}</ul>`;
+        
+        const isVvlList = sortedItems[0] && sortedItems[0].sendnr;
+
+        if (isVvlList) { // Für VW-Vorverladelisten
+            let html = '<div class="hu-list-header"><span>VSE-Nummer</span><span>Sendungs-Nr.</span></div>';
+            const listItems = sortedItems.map(item => {
+                // Schritt 2: Prüfe direkt, ob die VSE-Nummer in der Dunkelalarm-Liste ist.
+                const hasDunkelalarm = dunkelalarmedNumbers.has(item.rawInput);
+                const alarmClass = hasDunkelalarm ? 'has-dunkelalarm' : '';
+                return `
+                    <li>
+                        <div class="pending-item-details">
+                            <span class="pending-vse ${alarmClass}">${escapeHtml(item.rawInput)}</span>
+                            <span class="pending-sendnr">${escapeHtml(item.sendnr)}</span>
+                        </div>
+                    </li>`;
+            }).join('');
+            return html + `<ul class="hu-list vvl-list">${listItems}</ul>`;
+        } else { // Für alle anderen Listen (MAN, etc.)
+            const listItems = sortedItems.map(item => {
+                const parentOrder = shipments[item.orderNumber] || shipments[Object.keys(shipments).find(key => shipments[key].scannedItems && shipments[key].scannedItems.some(i => i.rawInput === item.rawInput))];
+                const isManOrderContext = parentOrder && parentOrder.freightForwarder;
+                const positionHtml = isManOrderContext && item.position ? `<span class="position-number">${item.position}.</span>` : ``;
+
+                // Schritt 2 (hier auch): Prüfe, ob die HU-Nummer in der Dunkelalarm-Liste ist.
+                const hasDunkelalarm = dunkelalarmedNumbers.has(item.rawInput);
+                const alarmClass = hasDunkelalarm ? 'has-dunkelalarm' : '';
+
+                return `<li>${positionHtml}<span class="hu-value ${alarmClass}">${escapeHtml(item.rawInput)}</span></li>`;
+            }).join('');
+            return `<ul class="hu-list">${listItems}</ul>`;
+        }
     };
     
     const generateHtmlForOrderGroup = (order, listItemsHtml, forDunkelalarm = false) => {
@@ -218,26 +248,34 @@ function showOpenHusSummary() {
         if (!forDunkelalarm) {
              countText = order.receiptCount !== undefined ? `(${order.receiptCount} von ${order.totalHus} erfasst)`: `(${(order.totalHus - order.pendingHus.length)} von ${order.totalHus} erfasst)`;
         }
-        const isManOrder = order.freightForwarder && order.destinationCountry;
-        const titlePrefix = isManOrder ? 'Rechnung: ' : '';
-        let metaLineHtml = '';
-        if (order.plsoNumber && order.plsoNumber !== 'N/A') {
-            metaLineHtml += `<br><small>PLSO: ${escapeHtml(order.plsoNumber)}</small>`;
+
+        let titleHtml = '';
+        if (order.parentOrderNumber) {
+            titleHtml = `VVL: ${escapeHtml(order.parentOrderNumber)}<br><small>Kundennr: ${escapeHtml(orderNumber)} ${countText}</small>`;
+        } else {
+            const isManOrder = order.freightForwarder && order.destinationCountry;
+            const titlePrefix = isManOrder ? 'Rechnung: ' : '';
+            let metaLineHtml = '';
+            if (order.plsoNumber && order.plsoNumber !== 'N/A') {
+                metaLineHtml += `<br><small>PLSO: ${escapeHtml(order.plsoNumber)}</small>`;
+            }
+            if (isManOrder) {
+                const shortForwarderName = shortenForwarderName(order.freightForwarder);
+                metaLineHtml += `<br><small>Sped.: ${escapeHtml(shortForwarderName)} / Land: ${escapeHtml(order.destinationCountry)}</small>`;
+            }
+            titleHtml = `${titlePrefix}${escapeHtml(orderNumber)} ${countText}${metaLineHtml}`;
         }
-        if (isManOrder) {
-            const shortForwarderName = shortenForwarderName(order.freightForwarder);
-            metaLineHtml += `<br><small>Sped.: ${escapeHtml(shortForwarderName)} / Land: ${escapeHtml(order.destinationCountry)}</small>`;
-        }
-        return `<div class="hu-order-group"><div class="hu-order-title">${titlePrefix}${escapeHtml(orderNumber)} ${countText}${metaLineHtml}</div>${listItemsHtml}</div>`;
+
+        return `<div class="hu-order-group"><div class="hu-order-title">${titleHtml}</div>${listItemsHtml}</div>`;
     };
     
     openSecurityHusByOrder.sort(sortByCountryAndOrder);
     missingReceiptHusByOrder.sort(sortByCountryAndOrder);
     const dunkelalarmArray = Object.values(dunkelalarmItemsByOrder).sort(sortByCountryAndOrder);
 
-    openHusListContainerEl.innerHTML = openSecurityHusByOrder.map(order => generateHtmlForOrderGroup(order, generateHuListHtml(order.pendingHus))).join('') || '<p class="no-open-hus-message">Glückwunsch! Alle HUs sind sicherheitstechnisch bearbeitet.</p>';
-    missingReceiptHusListContainerEl.innerHTML = missingReceiptHusByOrder.map(order => generateHtmlForOrderGroup(order, generateHuListHtml(order.pendingHus))).join('') || '<p class="no-open-hus-message">Perfekt! Alle HUs wurden im Wareneingang erfasst.</p>';
-    dunkelalarmHusListContainerEl.innerHTML = dunkelalarmArray.map(data => generateHtmlForOrderGroup(data, generateHuListHtml(data.items), true)).join('') || '<p class="no-open-hus-message">Keine Einträge mit Status "Dunkelalarm" gefunden.</p>';
+    openHusListContainerEl.innerHTML = openSecurityHusByOrder.map(order => generateHtmlForOrderGroup(order, generateHuListHtml(order.pendingHus, order.scannedItems))).join('') || '<p class="no-open-hus-message">Glückwunsch! Alle HUs sind sicherheitstechnisch bearbeitet.</p>';
+    missingReceiptHusListContainerEl.innerHTML = missingReceiptHusByOrder.map(order => generateHtmlForOrderGroup(order, generateHuListHtml(order.pendingHus, order.scannedItems))).join('') || '<p class="no-open-hus-message">Perfekt! Alle HUs wurden im Wareneingang erfasst.</p>';
+    dunkelalarmHusListContainerEl.innerHTML = dunkelalarmArray.map(data => generateHtmlForOrderGroup(data, generateHuListHtml(data.items, data.scannedItems), true)).join('') || '<p class="no-open-hus-message">Keine Einträge mit Status "Dunkelalarm" gefunden.</p>';
 
     showOpenSecurityHusBtnEl.classList.add('active');
     missingReceiptHusListContainerEl.style.display = 'none';
@@ -577,6 +615,12 @@ function shortenForwarderName(fullName) {
         
         
         
+// --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESEM CODE ---
+
+// --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESEM CODE ---
+
+// --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESEM CODE ---
+
 function displayCurrentShipmentDetails(baseNumberToDisplay) {
     clearError();
     removeActiveInlineNoteEditor();
@@ -590,11 +634,16 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
         return;
     }
     
-    const isManOrder = shipment.freightForwarder && shipment.destinationCountry;
     let detailsHtml = '';
+
+    if (shipment.parentOrderNumber) {
+        detailsHtml += `<div style="font-size: 0.9em; color: #555; font-weight: bold; margin-bottom: 5px;">VVL: ${escapeHtml(shipment.parentOrderNumber)}</div>`;
+    }
+
+    const isManOrder = shipment.freightForwarder && shipment.destinationCountry;
     
     if (shipment.isHuListOrder) {
-        const titlePrefix = isManOrder ? 'Rechnung: ' : '';
+        const titlePrefix = isManOrder ? 'Rechnung: ' : 'Kundennr: ';
         detailsHtml += `<strong>${titlePrefix}${escapeHtml(baseNumberToDisplay)}</strong>`;
         if (shipment.plsoNumber && shipment.plsoNumber !== 'N/A') {
             detailsHtml += `<div style="font-size: 0.9em; color: #555;">PLSO: ${escapeHtml(shipment.plsoNumber)}</div>`;
@@ -605,31 +654,49 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
         }
         detailsHtml += `<hr style="border: none; border-top: 1px dotted #ccc; margin: 8px 0;">`;
     } else {
-        detailsHtml = `<strong>Details für ${escapeHtml(baseNumberToDisplay)}:</strong>`;
+        detailsHtml += `<strong>Details für ${escapeHtml(baseNumberToDisplay)}:</strong>`;
     }
 
     if (shipment.isHuListOrder) {
-        // --- HIER BEGINNT DIE NEUE LOGIK FÜR DUPLIKATE IN DIESER FUNKTION ---
         const securityClearanceStatuses = ['XRY', 'ETD', 'EDD'];
-        
-        // Identifiziere alle "physischen Slots" aus dem ursprünglichen Import
         const manifestSlots = shipment.scannedItems.filter(item => 
             item.status === 'Anstehend' || securityClearanceStatuses.includes(item.status)
         );
-
-        // Offene Sicherung: Das sind einfach alle Slots, die noch den Status 'Anstehend' haben
         const pendingHuNumbers = manifestSlots.filter(item => item.status === 'Anstehend');
-        // --- ENDE DER NEUEN LOGIK FÜR DUPLIKATE ---
         
         if (pendingHuNumbers.length > 0) {
             const totalHus = manifestSlots.length;
             const listClass = (totalHus - pendingHuNumbers.length > 0) ? 'partial' : '';
             detailsHtml += `<div id="pendingHuList" class="${listClass}">`;
-            detailsHtml += `<h4>Offene HUs (${pendingHuNumbers.length} von ${totalHus}):</h4>`;
+            detailsHtml += `<h4>Offene Positionen (${pendingHuNumbers.length} von ${totalHus}):</h4>`;
+            
+            // NEU: Kopfzeile nur für VVL-Listen hinzufügen
+            const isVvlList = pendingHuNumbers.some(item => item.sendnr);
+            if (isVvlList) {
+                detailsHtml += `<div class="pending-list-header"><span>VSE-Nummer</span><span>Sendungs-Nr.</span></div>`;
+            }
+
             const listItemsHtml = pendingHuNumbers.sort((a,b) => (a.position || 9999) - (b.position || 9999)).map(item => {
                 const positionHtml = isManOrder && item.position ? `<span class="position-number">${item.position}.</span>` : `<span class="position-number"></span>`;
-                return `<li>${positionHtml}<span class="hu-value">${escapeHtml(item.rawInput)}</span></li>`;
+                
+                let itemContentHtml = '';
+                // NEU: Prüfen, ob eine Sendungsnummer vorhanden ist und das Layout anpassen
+                if (item.sendnr) {
+                    // Zweispaltiges Layout für Vorverladelisten
+                    itemContentHtml = `
+                        <div class="pending-item-details">
+                            <span class="pending-vse">${escapeHtml(item.rawInput)}</span>
+                            <span class="pending-sendnr">${escapeHtml(item.sendnr)}</span>
+                        </div>
+                    `;
+                } else {
+                    // Standard-Layout für normale HU-Listen
+                    itemContentHtml = `<span class="hu-value">${escapeHtml(item.rawInput)}</span>`;
+                }
+                
+                return `<li>${positionHtml}${itemContentHtml}</li>`;
             }).join('');
+            
             detailsHtml += `<ul class="hu-list">${listItemsHtml}</ul>`;
             detailsHtml += `</div>`;
         }
@@ -645,7 +712,8 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
         detailsHtml += `<div class="scan-main-info">`;
         detailsHtml += `<span class="timestamp">[${dateStr} ${timeStr}]</span> `;
         let numberPart = isManOrder && item.position ? `<span class="position-number">${item.position}.</span> ` : '';
-        detailsHtml += `${numberPart}<span class="hu-value">${escapeHtml(item.rawInput)}</span> → <span class="status">${escapeHtml(item.status)}</span>${item.isCombination ? ` <span class="combo">(Kombi)</span>` : ''}`;
+        let sendnrHtml = item.sendnr ? `<span class="sendnr-display"> (Send.: ${escapeHtml(item.sendnr)})</span>` : '';
+        detailsHtml += `${numberPart}<span class="hu-value">${escapeHtml(item.rawInput)}</span>${sendnrHtml} → <span class="status">${escapeHtml(item.status)}</span>${item.isCombination ? ` <span class="combo">(Kombi)</span>` : ''}`;
         if (isCancelled) {
             const cancelDt = item.cancelledTimestamp ? new Date(item.cancelledTimestamp) : null;
             detailsHtml += `<span class="cancelled-info"> (storniert am ${cancelDt ? cancelDt.toLocaleString('de-DE') : 'Unbekannt'})</span>`;
@@ -803,8 +871,10 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
         
         
       // ERSETZEN SIE DIESE GESAMTE FUNKTION
-// ERSETZEN SIE DIESE GESAMTE FUNKTION
-// ERSETZEN SIE DIESE GESAMTE FUNKTION
+// --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESER KORRIGIERTEN VERSION ---
+
+// --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESER FINALEN KORREKTUR ---
+
 function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFromCheckbox) {
     const { baseNumber, suffix, isValidFormat, raw: processedRawInput, isSuffixFormat } = processShipmentNumber(rawInputToSave);
     if (!isValidFormat) { return { success: false, waitingForTotal: false, message: `Ungültiges Format: ${escapeHtml(rawInputToSave)}` }; }
@@ -812,8 +882,8 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
     const shipments = loadShipments();
     const parentHawb = findShipmentByHuNumber(processedRawInput);
 
+    // --- LOGIK FÜR HU-LISTEN-AUFTRÄGE ---
     if (parentHawb) {
-        // Logik für HU-Listen-Aufträge (bereits korrekt)
         const parentShipment = shipments[parentHawb];
         const now = new Date();
         const noteText = noteInputEl.value.trim() || null;
@@ -821,38 +891,50 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
         const isSecurityStatus = EXCLUSIVE_SECURITY_STATUSES.includes(statusToUse);
         const isFinalClearanceScan = isSecurityStatus && !isNewScanKombi;
 
-        const expectedCountForThisHu = parentShipment.scannedItems.filter(item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() && (item.status === 'Anstehend' || EXCLUSIVE_SECURITY_STATUSES.includes(item.status))).length;
+        // KORREKTE ZÄHLUNG: Zählt, wie oft diese HU in der Originalliste vorkam (physische Slots).
+        // Das ist das absolute Limit für jeden Scan-Typ.
+        const packageLimitForThisHu = parentShipment.scannedItems.filter(item => 
+            item.rawInput.toUpperCase() === processedRawInput.toUpperCase() && 
+            (item.status === 'Anstehend' || EXCLUSIVE_SECURITY_STATUSES.includes(item.status))
+        ).length;
 
+        // Fall 1: Finale Sicherung (verbraucht einen "Anstehend"-Slot)
         if (isFinalClearanceScan) {
             const anstehendIndex = parentShipment.scannedItems.findIndex(i => i.rawInput.toUpperCase() === processedRawInput.toUpperCase() && i.status === 'Anstehend' && !i.isCancelled);
-            if (anstehendIndex === -1) { return { success: false, waitingForTotal: false, message: `FEHLER: Für HU ${escapeHtml(processedRawInput)} ist keine offene Sicherung mehr möglich.` }; }
+            if (anstehendIndex === -1) { 
+                return { success: false, waitingForTotal: false, message: `FEHLER: Für HU ${escapeHtml(processedRawInput)} ist keine offene Sicherung mehr möglich.` }; 
+            }
             const itemToUpdate = parentShipment.scannedItems[anstehendIndex];
             itemToUpdate.status = statusToUse;
             itemToUpdate.timestamp = now.toISOString();
             itemToUpdate.isCombination = false;
             if (noteText) itemToUpdate.notes.push(noteText);
+        
+        // Fall 2: Zusätzlicher Scan (wird hinzugefügt, mit präziser Limit-Prüfung)
         } else {
+            // Zählt, wie viele Scans des ZIEL-TYPS bereits existieren
+            let currentScansOfType = 0;
+            if(isNewScanKombi) {
+                currentScansOfType = parentShipment.scannedItems.filter(item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() && item.isCombination && !item.isCancelled).length;
+            } else {
+                 currentScansOfType = parentShipment.scannedItems.filter(item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() && item.status === statusToUse && !item.isCancelled).length;
+            }
+            
+            // Vergleicht die aktuelle Anzahl mit dem Limit
+            if (currentScansOfType >= packageLimitForThisHu) {
+                const scanTypeText = isNewScanKombi ? 'Kombi-Sicherung' : statusToUse;
+                return { success: false, waitingForTotal: false, message: `FEHLER: Limit (${packageLimitForThisHu}) für '${scanTypeText}' bei HU ${escapeHtml(processedRawInput)} erreicht.` };
+            }
+            
             const existingItemIndex = parentShipment.scannedItems.findIndex(i => i.rawInput.toUpperCase() === processedRawInput.toUpperCase());
             if (existingItemIndex === -1) { return { success: false, waitingForTotal: false, message: `FEHLER: HU ${escapeHtml(processedRawInput)} nicht im Auftrag ${parentHawb} gefunden.` }; }
-            
-            if (isNewScanKombi) {
-                const currentKombiCount = parentShipment.scannedItems.filter(item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() && item.isCombination && !item.isCancelled).length;
-                if (currentKombiCount >= expectedCountForThisHu) { return { success: false, waitingForTotal: false, message: `FEHLER: Limit (${expectedCountForThisHu}) für Kombi-Sicherung bei HU ${escapeHtml(processedRawInput)} erreicht.` }; }
-            }
-            if (statusToUse === 'Dunkelalarm') {
-                const currentDunkelalarmCount = parentShipment.scannedItems.filter(item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() && item.status === 'Dunkelalarm' && !item.isCancelled).length;
-                if (currentDunkelalarmCount >= expectedCountForThisHu) { return { success: false, waitingForTotal: false, message: `FEHLER: Limit (${expectedCountForThisHu}) für Dunkelalarm bei HU ${escapeHtml(processedRawInput)} erreicht.` }; }
-            }
-            if (statusToUse === 'Wareneingang') {
-                const currentReceiptCount = parentShipment.scannedItems.filter(item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() && item.status === 'Wareneingang' && !item.isCancelled).length;
-                if (currentReceiptCount >= expectedCountForThisHu) { return { success: false, waitingForTotal: false, message: `FEHLER: Limit (${expectedCountForThisHu}) für Wareneingang bei HU ${escapeHtml(processedRawInput)} erreicht.` }; }
-            }
-            
+
             const originalItem = parentShipment.scannedItems[existingItemIndex];
             const newItem = {
                 rawInput: processedRawInput, status: statusToUse, timestamp: now.toISOString(),
                 isCombination: isNewScanKombi, notes: noteText ? [noteText] : [],
-                isCancelled: false, cancelledTimestamp: null, position: originalItem.position
+                isCancelled: false, cancelledTimestamp: null, position: originalItem.position,
+                sendnr: originalItem.sendnr
             };
             parentShipment.scannedItems.push(newItem);
         }
@@ -865,10 +947,10 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
 
     // --- LOGIK FÜR NORMALE SENDUNGEN (NICHT-HU-LISTEN) ---
     if (shipments[baseNumber] && shipments[baseNumber].isHuListOrder) {
-        return { success: false, waitingForTotal: false, message: `FEHLER: ${baseNumber} ist ein HU-Auftrag. Bitte scannen Sie eine der zugehörigen HU-Nummern.` };
+        return { success: false, waitingForTotal: false, message: `FEHLER: ${baseNumber} ist ein HU-Auftrag. Bitte scannen Sie eine der zugehörigen HU/VSE-Nummern.` };
     }
     if (!shipments[baseNumber]) {
-        // Logik für neue Sendungen bleibt unverändert
+        // Logik für neue Sendungen
         const tempIsCombination = (statusToUse === 'XRY' && !isBatchModeActive && isCombinationFromCheckbox);
         const tempFinalIsCombination = NON_COUNTING_STATUSES.includes(statusToUse) ? false : tempIsCombination;
         pendingScanDataForNewShipment = { baseNumber, rawInput: processedRawInput, status: statusToUse, isCombination: tempFinalIsCombination, note: noteInputEl.value.trim() || null, timestamp: new Date().toISOString(), suffix };
@@ -882,39 +964,27 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
 
     if (isSuffixFormat && !shipment.isHuListOrder) {
         const existingItemsForThisSuffix = shipment.scannedItems.filter(item => !item.isCancelled && item.rawInput.toUpperCase() === processedRawInput.toUpperCase());
-        
         const isNewScanCounting = EXCLUSIVE_SECURITY_STATUSES.includes(statusToUse) && !isCombination;
-        if (isNewScanCounting) {
-            if (existingItemsForThisSuffix.some(item => EXCLUSIVE_SECURITY_STATUSES.includes(item.status) && !item.isCombination)) {
-                return { success: false, message: `FEHLER: Packstück ${escapeHtml(processedRawInput)} wurde bereits final gesichert.` };
-            }
+        if (isNewScanCounting && existingItemsForThisSuffix.some(item => EXCLUSIVE_SECURITY_STATUSES.includes(item.status) && !item.isCombination)) {
+            return { success: false, message: `FEHLER: Packstück ${escapeHtml(processedRawInput)} wurde bereits final gesichert.` };
         }
-        if (isCombination) {
-            if (existingItemsForThisSuffix.some(item => item.isCombination)) {
-                return { success: false, message: `FEHLER: Packstück ${escapeHtml(processedRawInput)} wurde bereits als Kombi-Sicherung erfasst.` };
-            }
+        if (isCombination && existingItemsForThisSuffix.some(item => item.isCombination)) {
+            return { success: false, message: `FEHLER: Packstück ${escapeHtml(processedRawInput)} wurde bereits als Kombi-Sicherung erfasst.` };
         }
-        if (statusToUse === 'Dunkelalarm') {
-            if (existingItemsForThisSuffix.some(item => item.status === 'Dunkelalarm')) {
-                return { success: false, message: `FEHLER: Packstück ${escapeHtml(processedRawInput)} wurde bereits als Dunkelalarm erfasst.` };
-            }
+        if (statusToUse === 'Dunkelalarm' && existingItemsForThisSuffix.some(item => item.status === 'Dunkelalarm')) {
+            return { success: false, message: `FEHLER: Packstück ${escapeHtml(processedRawInput)} wurde bereits als Dunkelalarm erfasst.` };
         }
-        // --- HIER IST DIE NEUE PRÜFUNG FÜR WARENEINGANG ---
-        if (statusToUse === 'Wareneingang') {
-             if (existingItemsForThisSuffix.some(item => item.status === 'Wareneingang')) {
-                return { success: false, message: `FEHLER: Für Packstück ${escapeHtml(processedRawInput)} wurde bereits der Wareneingang erfasst.` };
-            }
+        if (statusToUse === 'Wareneingang' && existingItemsForThisSuffix.some(item => item.status === 'Wareneingang')) {
+            return { success: false, message: `FEHLER: Für Packstück ${escapeHtml(processedRawInput)} wurde bereits der Wareneingang erfasst.` };
         }
-        // --- ENDE DER NEUEN PRÜFUNG ---
     }
 
     const expectedTotal = shipment.totalPiecesExpected;
     const existingNonCancelled = (shipment.scannedItems || []).filter(item => !item.isCancelled);
-    
-    if (isCombination && !shipment.isHuListOrder && expectedTotal !== null && calculateXryKombiCount(existingNonCancelled) >= expectedTotal) {
+    if (isCombination && expectedTotal !== null && calculateXryKombiCount(existingNonCancelled) >= expectedTotal) {
         return { success: false, waitingForTotal: false, message: `Limit (${expectedTotal}) für XRY Kombi bei ${baseNumber} erreicht.` };
     }
-    if (statusToUse === 'Dunkelalarm' && !isSuffixFormat && !shipment.isHuListOrder && expectedTotal !== null && calculateDunkelalarmCount(existingNonCancelled) >= expectedTotal) {
+    if (statusToUse === 'Dunkelalarm' && expectedTotal !== null && calculateDunkelalarmCount(existingNonCancelled) >= expectedTotal) {
         return { success: false, waitingForTotal: false, message: `Limit (${expectedTotal}) für Dunkelalarm bei ${baseNumber} erreicht.` };
     }
     if (statusToUse === 'Wareneingang' && expectedTotal !== null && calculateGoodsReceiptCount(existingNonCancelled) >= expectedTotal) {
@@ -931,12 +1001,10 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
     shipment.lastModified = now.toISOString();
     saveShipments(shipments);
     resetSingleScanNoteInputState();
+    
     const updatedShipment = loadShipments()[baseNumber];
-    if (updatedShipment) {
-        const finalCount = calculateCurrentCountedPieces(updatedShipment.scannedItems);
-        if (updatedShipment.totalPiecesExpected !== null && finalCount === updatedShipment.totalPiecesExpected && !notifiedCompletions.has(baseNumber)) {
-            notifyShipmentCompletion(updatedShipment);
-        }
+    if (updatedShipment && updatedShipment.totalPiecesExpected !== null && calculateCurrentCountedPieces(updatedShipment.scannedItems) === updatedShipment.totalPiecesExpected && !notifiedCompletions.has(baseNumber)) {
+        notifyShipmentCompletion(updatedShipment);
     }
     return { success: true, waitingForTotal: false, message: `${processedRawInput} (${statusToUse}) zu ${baseNumber} hinzugefügt.` };
 }
@@ -1371,169 +1439,160 @@ function skipNoteAndAddFirstBatchItem() {
             focusShipmentInput();
         }
 
-        function saveBatch() {
-            if (currentBatch.length === 0) { displayError("Batch ist leer."); focusShipmentInput(); return; }
-            
-            let successCount = 0;
-            let errorCount = 0;
-            let errorMessages = [];
-            let newBaseShipments = new Set();
-            let affectedBaseNumbersForNotification = new Set();
+// --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESER KORRIGIERTEN VERSION ---
 
-            const shipmentsWorkingCopy = JSON.parse(JSON.stringify(loadShipments()));
+// --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESER KORRIGIERTEN VERSION ---
 
-            currentBatch.forEach(batchItem => {
-                const { rawInput: rawInputFromBatch, scanTimestamp, note: itemNote } = batchItem;
-                
-                const parentHawb = findShipmentByHuNumber(rawInputFromBatch);
-                if (parentHawb) {
-                    const parentShipment = shipmentsWorkingCopy[parentHawb];
-                    const isNewScanKombi = (batchStatus === 'XRY' && batchIsCombination);
-                    const isSecurityStatus = EXCLUSIVE_SECURITY_STATUSES.includes(batchStatus);
-                    
-                    // --- START DER KORREKTUR ---
-                    const packageLimit = parentShipment.scannedItems.filter(
-                        item => item.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() &&
-                               (item.status === 'Anstehend' || (EXCLUSIVE_SECURITY_STATUSES.includes(item.status) && !item.isCombination))
-                    ).length;
+function saveBatch() {
+    if (currentBatch.length === 0) { displayError("Batch ist leer."); focusShipmentInput(); return; }
+    
+    let successCount = 0;
+    let errorCount = 0;
+    let errorMessages = [];
+    let newBaseShipments = new Set();
+    let affectedBaseNumbersForNotification = new Set();
 
-                    if (isNewScanKombi) {
-                        const currentKombiCount = parentShipment.scannedItems.filter(
-                            item => item.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() &&
-                                   !item.isCancelled && item.isCombination
-                        ).length;
-                        if (currentKombiCount >= packageLimit) {
-                            errorCount++; errorMessages.push(`Kombi-Limit (${packageLimit}) für HU ${rawInputFromBatch} erreicht.`); return;
-                        }
-                        const newScanItem = {
-                            rawInput: rawInputFromBatch, status: batchStatus, timestamp: scanTimestamp,
-                            isCombination: true, notes: itemNote ? [itemNote] : [],
-                            isCancelled: false, cancelledTimestamp: null
-                        };
-                        parentShipment.scannedItems.push(newScanItem);
+    const shipmentsWorkingCopy = JSON.parse(JSON.stringify(loadShipments()));
 
-                    } else if (isSecurityStatus) {
-                        const anstehendIndex = parentShipment.scannedItems.findIndex(
-                            i => i.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() && i.status === 'Anstehend'
-                        );
-                        if (anstehendIndex === -1) {
-                            errorCount++; errorMessages.push(`Alle (${packageLimit}) Packstücke für HU ${rawInputFromBatch} bereits final erfasst.`); return;
-                        }
-                        const itemToUpdate = parentShipment.scannedItems[anstehendIndex];
-                        itemToUpdate.status = batchStatus; itemToUpdate.timestamp = scanTimestamp;
-                        itemToUpdate.isCombination = false; itemToUpdate.notes = itemNote ? [itemNote] : [];
-                        itemToUpdate.isCancelled = false; itemToUpdate.cancelledTimestamp = null;
-                        
-                    } else {
-                        const currentStatusCount = parentShipment.scannedItems.filter(
-                            item => item.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() && 
-                                   item.status === batchStatus && !item.isCancelled
-                        ).length;
-                        if (currentStatusCount >= packageLimit) {
-                            errorCount++; errorMessages.push(`Limit (${packageLimit}) für Status '${batchStatus}' bei HU ${rawInputFromBatch} erreicht.`); return;
-                        }
-                        const newScanItem = {
-                            rawInput: rawInputFromBatch, status: batchStatus, timestamp: scanTimestamp,
-                            isCombination: false, notes: itemNote ? [itemNote] : [],
-                            isCancelled: false, cancelledTimestamp: null
-                        };
-                        parentShipment.scannedItems.push(newScanItem);
-                    }
-                    // --- ENDE DER KORREKTUR ---
-                    
-                    parentShipment.lastModified = scanTimestamp;
-                    affectedBaseNumbersForNotification.add(parentHawb);
-                    successCount++;
-                    return;
+    currentBatch.forEach(batchItem => {
+        const { rawInput: rawInputFromBatch, scanTimestamp, note: itemNote } = batchItem;
+        
+        const parentHawb = findShipmentByHuNumber(rawInputFromBatch);
+
+        // --- LOGIK FÜR HU-LISTEN-AUFTRÄGE ---
+        if (parentHawb) {
+            const parentShipment = shipmentsWorkingCopy[parentHawb];
+            const isNewScanKombi = (batchStatus === 'XRY' && batchIsCombination);
+            const isSecurityStatus = EXCLUSIVE_SECURITY_STATUSES.includes(batchStatus);
+            const isFinalClearanceScan = isSecurityStatus && !isNewScanKombi;
+
+            const packageLimitForThisHu = parentShipment.scannedItems.filter(item => 
+                item.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() &&
+                (item.status === 'Anstehend' || EXCLUSIVE_SECURITY_STATUSES.includes(item.status))
+            ).length;
+
+            if (isFinalClearanceScan) {
+                const anstehendIndex = parentShipment.scannedItems.findIndex(i => i.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() && i.status === 'Anstehend' && !i.isCancelled);
+                if (anstehendIndex === -1) {
+                    errorCount++; errorMessages.push(`Alle (${packageLimitForThisHu}) Packstücke für HU ${rawInputFromBatch} bereits final erfasst.`); return;
                 }
-                
-                const { baseNumber, isValidFormat, raw: processedRawInput, isSuffixFormat } = processShipmentNumber(rawInputFromBatch);
-                if (!isValidFormat) {
-                    errorCount++; errorMessages.push(`Ungültiges Format: ${escapeHtml(rawInputFromBatch)}`); return;
+                const itemToUpdate = parentShipment.scannedItems[anstehendIndex];
+                itemToUpdate.status = batchStatus; itemToUpdate.timestamp = scanTimestamp;
+                itemToUpdate.isCombination = false; itemToUpdate.notes = itemNote ? [itemNote] : [];
+                itemToUpdate.isCancelled = false; itemToUpdate.cancelledTimestamp = null;
+            } else {
+                let currentScansOfType = 0;
+                if (isNewScanKombi) {
+                    currentScansOfType = parentShipment.scannedItems.filter(item => item.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() && item.isCombination && !item.isCancelled).length;
+                } else {
+                    currentScansOfType = parentShipment.scannedItems.filter(item => item.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() && item.status === batchStatus && !item.isCancelled).length;
                 }
-                if (!shipmentsWorkingCopy[baseNumber]) {
-                    newBaseShipments.add(baseNumber);
-                    shipmentsWorkingCopy[baseNumber] = {
-                        hawb: baseNumber, lastModified: scanTimestamp, totalPiecesExpected: null,
-                        scannedItems: [], mitarbeiter: MITARBEITER_NAME
-                    };
+
+                if (currentScansOfType >= packageLimitForThisHu) {
+                    const scanTypeText = isNewScanKombi ? 'Kombi-Sicherung' : batchStatus;
+                    errorCount++; errorMessages.push(`Limit (${packageLimitForThisHu}) für '${scanTypeText}' bei HU ${rawInputFromBatch} erreicht.`); return;
                 }
-                const shipmentToUpdate = shipmentsWorkingCopy[baseNumber];
-                if (isSuffixFormat && !shipmentToUpdate.isHuListOrder) {
-                    const existingItemsForThisSuffix = shipmentToUpdate.scannedItems.filter(item => 
-                        !item.isCancelled &&
-                        item.rawInput.toUpperCase() === processedRawInput.toUpperCase()
-                    );
-                    const isBatchScanCounting = EXCLUSIVE_SECURITY_STATUSES.includes(batchStatus) && !batchIsCombination;
-                    if (isBatchScanCounting) {
-                        const existingCountingScan = existingItemsForThisSuffix.find(item => 
-                            EXCLUSIVE_SECURITY_STATUSES.includes(item.status) && !item.isCombination
-                        );
-                        if (existingCountingScan) {
-                            errorCount++; errorMessages.push(`${escapeHtml(processedRawInput)}: hat bereits Status '${escapeHtml(existingCountingScan.status)}'`); return;
-                        }
-                    }
-                    const isBatchScanKombi = batchStatus === 'XRY' && batchIsCombination;
-                    if (isBatchScanKombi) {
-                        const existingKombiScan = existingItemsForThisSuffix.find(item => item.isCombination);
-                        if (existingKombiScan) {
-                            errorCount++; errorMessages.push(`${escapeHtml(processedRawInput)}: bereits als Kombi erfasst`); return;
-                        }
-                    }
-                    if (batchStatus === 'Dunkelalarm') {
-                        const existingDunkelalarm = existingItemsForThisSuffix.find(item => item.status === 'Dunkelalarm');
-                        if (existingDunkelalarm) {
-                             errorCount++; errorMessages.push(`${escapeHtml(processedRawInput)}: bereits als Dunkelalarm erfasst`); return;
-                        }
-                    }
-                }
-                const expectedTotal = shipmentToUpdate.totalPiecesExpected;
-                const isCurrentBatchItemCounting = !NON_COUNTING_STATUSES.includes(batchStatus) && !batchIsCombination;
-                if (isCurrentBatchItemCounting && expectedTotal !== null) {
-                    const currentCountInWorkingCopy = calculateCurrentCountedPieces(shipmentToUpdate.scannedItems);
-                    if (currentCountInWorkingCopy >= expectedTotal) {
-                        errorCount++; errorMessages.push(`Limit (${expectedTotal}) für ${escapeHtml(baseNumber)} erreicht bei Scan ${escapeHtml(processedRawInput)}`); return;
-                    }
-                }
+
+                const originalItem = parentShipment.scannedItems.find(i => i.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase());
                 const newScanItem = {
-                    rawInput: processedRawInput, status: batchStatus, timestamp: scanTimestamp,
-                    isCombination: batchIsCombination, notes: itemNote ? [itemNote] : [],
-                    isCancelled: false, cancelledTimestamp: null
+                    rawInput: rawInputFromBatch, status: batchStatus, timestamp: scanTimestamp,
+                    isCombination: isNewScanKombi, notes: itemNote ? [itemNote] : [],
+                    isCancelled: false, cancelledTimestamp: null, position: originalItem.position, sendnr: originalItem.sendnr
                 };
-                shipmentToUpdate.scannedItems.push(newScanItem);
-                shipmentToUpdate.lastModified = scanTimestamp;
-                affectedBaseNumbersForNotification.add(baseNumber);
-                successCount++;
-            });
-
-            saveShipments(shipmentsWorkingCopy);
-            affectedBaseNumbersForNotification.forEach(bn => {
-                const finalShipmentState = shipmentsWorkingCopy[bn];
-                if (finalShipmentState) {
-                    const finalCount = calculateCurrentCountedPieces(finalShipmentState.scannedItems);
-                    const expected = finalShipmentState.totalPiecesExpected;
-                    if (expected !== null && finalCount === expected && !notifiedCompletions.has(bn)) {
-                        notifyShipmentCompletion(finalShipmentState);
-                    }
-                }
-            });
-            let alertMessage = `Batch Verarbeitung:\n- Erfolgreich: ${successCount}\n- Fehler/Übersprungen: ${errorCount}`;
-            if (newBaseShipments.size > 0) {
-                alertMessage += `\n- Neue Sendungen erstellt für: ${[...newBaseShipments].join(', ')}`;
+                parentShipment.scannedItems.push(newScanItem);
             }
-            if (errorMessages.length > 0) {
-                alertMessage += `\n\nDetails:\n- ${errorMessages.join('\n- ')}`;
-            }
-            alert(alertMessage);
-            renderTable();
-            currentBatch = [];
-            isBatchNotePromptRequired = true;
-            currentBatchGlobalNote = null; 
-            batchNoteToggleEl.checked = false; 
-            updateBatchUI();
-            displayCurrentShipmentDetails('');
-            focusShipmentInput();
+            parentShipment.lastModified = scanTimestamp;
+            affectedBaseNumbersForNotification.add(parentHawb);
+            successCount++;
+            return;
         }
+        
+        // --- LOGIK FÜR NORMALE SENDUNGEN (NICHT-HU-LISTEN) ---
+        const { baseNumber, isValidFormat, raw: processedRawInput, isSuffixFormat } = processShipmentNumber(rawInputFromBatch);
+        if (!isValidFormat) {
+            errorCount++; errorMessages.push(`Ungültiges Format: ${escapeHtml(rawInputFromBatch)}`); return;
+        }
+        if (!shipmentsWorkingCopy[baseNumber]) {
+            newBaseShipments.add(baseNumber);
+            shipmentsWorkingCopy[baseNumber] = {
+                hawb: baseNumber, lastModified: scanTimestamp, totalPiecesExpected: null,
+                scannedItems: [], mitarbeiter: MITARBEITER_NAME
+            };
+        }
+        const shipmentToUpdate = shipmentsWorkingCopy[baseNumber];
+
+        if (isSuffixFormat && !shipmentToUpdate.isHuListOrder) {
+            const existingItemsForThisSuffix = shipmentToUpdate.scannedItems.filter(item => !item.isCancelled && item.rawInput.toUpperCase() === processedRawInput.toUpperCase());
+            const isBatchScanCounting = EXCLUSIVE_SECURITY_STATUSES.includes(batchStatus) && !batchIsCombination;
+
+            if (isBatchScanCounting && existingItemsForThisSuffix.some(item => EXCLUSIVE_SECURITY_STATUSES.includes(item.status) && !item.isCombination)) {
+                errorCount++; errorMessages.push(`${escapeHtml(processedRawInput)}: bereits final gesichert`); return;
+            }
+            if (batchStatus === 'XRY' && batchIsCombination && existingItemsForThisSuffix.some(item => item.isCombination)) {
+                errorCount++; errorMessages.push(`${escapeHtml(processedRawInput)}: bereits als Kombi erfasst`); return;
+            }
+            if (batchStatus === 'Dunkelalarm' && existingItemsForThisSuffix.some(item => item.status === 'Dunkelalarm')) {
+                 errorCount++; errorMessages.push(`${escapeHtml(processedRawInput)}: bereits als Dunkelalarm erfasst`); return;
+            }
+        }
+        const expectedTotal = shipmentToUpdate.totalPiecesExpected;
+        if (!NON_COUNTING_STATUSES.includes(batchStatus) && !batchIsCombination && expectedTotal !== null) {
+            if (calculateCurrentCountedPieces(shipmentToUpdate.scannedItems) >= expectedTotal) {
+                errorCount++; errorMessages.push(`Limit (${expectedTotal}) für ${escapeHtml(baseNumber)} erreicht bei Scan ${escapeHtml(processedRawInput)}`); return;
+            }
+        }
+        const newScanItem = {
+            rawInput: processedRawInput, status: batchStatus, timestamp: scanTimestamp,
+            isCombination: batchIsCombination, notes: itemNote ? [itemNote] : [],
+            isCancelled: false, cancelledTimestamp: null
+        };
+        shipmentToUpdate.scannedItems.push(newScanItem);
+        shipmentToUpdate.lastModified = scanTimestamp;
+        affectedBaseNumbersForNotification.add(baseNumber);
+        successCount++;
+    });
+
+    saveShipments(shipmentsWorkingCopy);
+    affectedBaseNumbersForNotification.forEach(bn => {
+        const finalShipmentState = shipmentsWorkingCopy[bn];
+        if (finalShipmentState && finalShipmentState.totalPiecesExpected !== null) {
+            const finalCount = calculateCurrentCountedPieces(finalShipmentState.scannedItems);
+            if (finalCount === finalShipmentState.totalPiecesExpected && !notifiedCompletions.has(bn)) {
+                notifyShipmentCompletion(finalShipmentState);
+            }
+        }
+    });
+    
+    let alertMessage = `Batch Verarbeitung:\n- Erfolgreich: ${successCount}\n- Fehler/Übersprungen: ${errorCount}`;
+    if (newBaseShipments.size > 0) {
+        alertMessage += `\n- Neue Sendungen erstellt für: ${[...newBaseShipments].join(', ')}`;
+    }
+    if (errorMessages.length > 0) {
+        alertMessage += `\n\nDetails:\n- ${errorMessages.join('\n- ')}`;
+    }
+    alert(alertMessage);
+    
+    renderTable();
+    currentBatch = [];
+    isBatchNotePromptRequired = true;
+    currentBatchGlobalNote = null; 
+    batchNoteToggleEl.checked = false; 
+    updateBatchUI();
+    displayCurrentShipmentDetails('');
+    focusShipmentInput();
+}
+
+
+
+
+
+
+
+
+
+
+
+
 
         // --- Sonstige Aktionen (Löschen, PDF, Edit Modal) ---
         function deleteShipment(baseNumber) {
@@ -1984,99 +2043,178 @@ if (validScans.length > 0) {
                 }
             });
 
-            shipmentNumberInputEl.addEventListener('input', () => {
-                const currentValue = shipmentNumberInputEl.value.trim();
+// --- ERSETZEN SIE DEN GESAMTEN addEventListener-BLOCK MIT DIESEM CODE ---
 
-          
-                
-                    
-                        
-                            
-                                
-if (currentValue.startsWith('FRT_MULTI_V1')) {
-    if (!confirm("Ein Multi-Auftrags-QR-Code wurde erkannt.\n\nMöchtest du alle darin enthaltenen Aufträge jetzt importieren?")) {
-        shipmentNumberInput.value = ''; return;
-    }
-    const parts = currentValue.split(';;;').slice(1);
-    const shipments = loadShipments();
-    const now = new Date().toISOString();
-    let addedCount = 0, duplicateCount = 0, processedOrders = [];
+// --- ERSETZEN SIE DEN GESAMTEN addEventListener-BLOCK MIT DIESEM CODE ---
 
-    parts.forEach(orderData => {
-        const [metaAndOrder, huData] = orderData.split('|||');
-        if (!metaAndOrder || !huData) return;
+shipmentNumberInputEl.addEventListener('input', () => {
+    const currentValue = shipmentNumberInputEl.value.trim();
 
-        const metaParts = metaAndOrder.split('|');
-        const orderNumber = metaParts[0];
-        const hasFullMeta = metaParts.length >= 4;
-        
-        processedOrders.push(orderNumber);
-        const hus = huData.split(' ').filter(Boolean);
+    // --- START: QR-CODE-VERARBEITUNG ---
+    // Priorität 1: Prüft auf spezielle QR-Code-Formate und behandelt sie zuerst.
 
-        if (!shipments[orderNumber]) {
-            const newShipment = {
-                hawb: orderNumber, lastModified: now, totalPiecesExpected: hus.length,
-                scannedItems: [], mitarbeiter: MITARBEITER_NAME, isHuListOrder: true,
-            };
-            if (hasFullMeta) {
-                newShipment.freightForwarder = metaParts[1];
-                newShipment.destinationCountry = metaParts[2];
-                newShipment.plsoNumber = metaParts[3];
-            }
-            shipments[orderNumber] = newShipment;
-            hus.forEach((hu, index) => {
-                newShipment.scannedItems.push({ rawInput: hu, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null, position: index + 1 });
-                addedCount++;
-            });
-        } else {
-            // Logik zum Hinzufügen zu bestehenden Aufträgen bleibt gleich
+    // 1.1: Behandelt den MAN Multi-Auftrag QR-Code
+    if (currentValue.startsWith('FRT_MULTI_V1')) {
+        if (!confirm("Ein Multi-Auftrags-QR-Code wurde erkannt.\n\nMöchtest du alle darin enthaltenen Aufträge jetzt importieren?")) {
+            shipmentNumberInputEl.value = ''; 
+            return;
         }
-    });
-    saveShipments(shipments);
-    alert(`Multi-Import abgeschlossen:\n- Verarbeitete Aufträge: ${processedOrders.length}\n- Neue HUs hinzugefügt: ${addedCount}\n- Duplikate übersprungen: ${duplicateCount}`);
-    location.reload();
-    return;
-}
-                // --- ENDE: NEUE LOGIK FÜR MULTI-QR-CODE ---
-                // --- ENDE: NEUE LOGIK FÜR MULTI-QR-CODE ---
+        const parts = currentValue.split(';;;').slice(1);
+        const shipments = loadShipments();
+        const now = new Date().toISOString();
+        let addedCount = 0, duplicateCount = 0, processedOrders = [];
 
-                updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
+        parts.forEach(orderData => {
+            const [metaAndOrder, huData] = orderData.split('|||');
+            if (!metaAndOrder || !huData) return;
 
-                if (isBatchModeActive) {
-                    if (currentValue.length > 0) mainActionButtonEl.click();
-                    return;
+            const metaParts = metaAndOrder.split('|');
+            const orderNumber = metaParts[0];
+            const hasFullMeta = metaParts.length >= 4;
+            
+            processedOrders.push(orderNumber);
+            const hus = huData.split(' ').filter(Boolean);
+
+            if (!shipments[orderNumber]) {
+                const newShipment = {
+                    hawb: orderNumber, lastModified: now, totalPiecesExpected: hus.length,
+                    scannedItems: [], mitarbeiter: MITARBEITER_NAME, isHuListOrder: true,
+                };
+                if (hasFullMeta) {
+                    newShipment.freightForwarder = metaParts[1];
+                    newShipment.destinationCountry = metaParts[2];
+                    newShipment.plsoNumber = metaParts[3];
                 }
+                shipments[orderNumber] = newShipment;
+                hus.forEach((hu, index) => {
+                    newShipment.scannedItems.push({ rawInput: hu, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null, position: index + 1 });
+                    addedCount++;
+                });
+            } else {
+                // Logik zum Hinzufügen zu bestehenden Aufträgen bleibt gleich
+            }
+        });
+        saveShipments(shipments);
+        alert(`Multi-Import abgeschlossen:\n- Verarbeitete Aufträge: ${processedOrders.length}\n- Neue HUs hinzugefügt: ${addedCount}\n- Duplikate übersprungen: ${duplicateCount}`);
+        location.reload();
+        return;
+    } 
+    // 1.2: NEU - Behandelt den Vorverladelisten QR-Code
+    else if (currentValue.startsWith('FRT_VVL_V1')) {
+        if (!confirm("Eine Vorverladeliste wurde erkannt.\n\nMöchtest du alle darin enthaltenen Kundenaufträge jetzt importieren?")) {
+            shipmentNumberInputEl.value = ''; 
+            return;
+        }
 
-                // --- START: KORRIGIERTE LOGIK FÜR DIE DETAILANZEIGE ---
-                const shipments = loadShipments();
-                const { baseNumber: processedDirectBase } = processShipmentNumber(currentValue);
-                let baseNumberToShow = null;
+        const parts = currentValue.split(';;;').slice(1);
+        const shipments = loadShipments();
+        const now = new Date().toISOString();
+        let addedCount = 0;
+        let newOrders = [];
 
-                // Priorität 1: Ist die Eingabe eine bekannte HU-Nummer?
-                const parentHawbByHu = findShipmentByHuNumber(currentValue);
-                if (parentHawbByHu) {
-                    baseNumberToShow = parentHawbByHu;
-                    displayError(`HU '${escapeHtml(currentValue)}' gehört zu Auftrag: ${escapeHtml(baseNumberToShow)}`, 'blue', 3500);
-                } 
-                // Priorität 2: Ist die Eingabe eine bekannte HAWB?
-                else if (shipments[processedDirectBase.toUpperCase()]) {
-                    baseNumberToShow = processedDirectBase.toUpperCase();
-                    clearError();
-                } 
-                // Priorität 3: Ist die Eingabe eine Notiz?
-                else if (currentValue.length > 3) {
-                    const parentHawbByNote = findShipmentByNoteContent(currentValue);
-                    if (parentHawbByNote) {
-                        baseNumberToShow = parentHawbByNote;
-                        displayError(`Notiz '${escapeHtml(currentValue)}' gefunden für HAWB: ${escapeHtml(baseNumberToShow)}`, 'blue', 3500);
-                    }
-                }
+        parts.forEach(orderData => {
+            const [metaAndOrder, huData] = orderData.split('|||');
+            if (!metaAndOrder || !huData) return;
 
-                // Detailansicht aktualisieren: Entweder mit der gefundenen HAWB oder dem, was getippt wurde (für neue Sendungen)
-                displayCurrentShipmentDetails(baseNumberToShow || processedDirectBase);
-                filterTable(baseNumberToShow || currentValue);
-                // --- ENDE: KORRIGIERTE LOGIK FÜR DIE DETAILANZEIGE ---
-            });
+            const metaParts = metaAndOrder.split('|');
+            const kundennr = metaParts[0];
+            const vorverladelisteNr = metaParts.length > 1 ? metaParts[1] : 'N/A';
+            const positionen = huData.split(' ').filter(Boolean);
+
+            if (!shipments[kundennr]) {
+                newOrders.push(kundennr);
+                shipments[kundennr] = {
+                    hawb: kundennr,
+                    lastModified: now,
+                    totalPiecesExpected: positionen.length,
+                    scannedItems: [],
+                    mitarbeiter: MITARBEITER_NAME,
+                    isHuListOrder: true, // Behandeln wie eine HU-Liste
+                    parentOrderNumber: vorverladelisteNr // Speichern der übergeordneten Nummer
+                };
+                
+                positionen.forEach(pos => {
+                    const [vse, sendnr] = pos.split(':');
+                    shipments[kundennr].scannedItems.push({
+                        rawInput: vse, // Die VSE ist die "HU" / der Barcode
+                        sendnr: sendnr, // Speichern der Sendungsnummer als Zusatzinfo
+                        status: 'Anstehend',
+                        timestamp: now,
+                        isCombination: false,
+                        notes: [],
+                        isCancelled: false,
+                        cancelledTimestamp: null
+                    });
+                    addedCount++;
+                });
+            } else {
+                // Hier könnte Logik stehen, um Positionen zu einem bestehenden Auftrag hinzuzufügen.
+            }
+        });
+
+        saveShipments(shipments);
+        alert(`Import der Vorverladeliste abgeschlossen:\n- ${newOrders.length} neue Kundenaufträge angelegt: ${newOrders.join(', ')}\n- ${addedCount} Positionen importiert.`);
+        location.reload(); // Einfachste Methode, um die UI vollständig zu aktualisieren
+        return;
+    }
+
+    // --- ENDE: QR-CODE-VERARBEITUNG ---
+
+
+    // --- START: MANUELLE EINGABE / BATCH-MODUS ---
+    updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
+
+    // 2.1: Behandelt Scans im Batch-Modus
+    if (isBatchModeActive) {
+        if (currentValue.length > 0) mainActionButtonEl.click();
+        return;
+    }
+
+    // 2.2: Logik für Einzelscans / manuelle Eingabe
+    const shipments = loadShipments();
+    const { baseNumber: processedDirectBase } = processShipmentNumber(currentValue);
+    let baseNumberToShow = null;
+
+    // Such-Priorität:
+    // 1. Ist es eine bekannte HU-Nummer / VSE-Nummer?
+    const parentHawbByHu = findShipmentByHuNumber(currentValue);
+    if (parentHawbByHu) {
+        baseNumberToShow = parentHawbByHu;
+        displayError(`VSE '${escapeHtml(currentValue)}' gehört zu Kundennr: ${escapeHtml(baseNumberToShow)}`, 'blue', 3500);
+    } 
+    // 2. Ist es eine bekannte HAWB / Kundennr?
+    else if (shipments[processedDirectBase.toUpperCase()]) {
+        baseNumberToShow = processedDirectBase.toUpperCase();
+        clearError();
+    } 
+    // 3. Ist es eine bekannte Notiz?
+    else if (currentValue.length > 3) {
+        const parentHawbByNote = findShipmentByNoteContent(currentValue);
+        if (parentHawbByNote) {
+            baseNumberToShow = parentHawbByNote;
+            displayError(`Notiz '${escapeHtml(currentValue)}' gefunden für HAWB: ${escapeHtml(baseNumberToShow)}`, 'blue', 3500);
+        }
+    }
+
+    // UI aktualisieren basierend auf dem, was gefunden wurde oder was eingegeben wird (für neue Sendungen)
+    displayCurrentShipmentDetails(baseNumberToShow || processedDirectBase);
+    filterTable(baseNumberToShow || currentValue);
+    // --- ENDE: MANUELLE EINGABE / BATCH-MODUS ---
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
             clearInputButtonEl.addEventListener('click', () => {
                 shipmentNumberInputEl.value = '';
