@@ -508,4 +508,172 @@ body.modal-open {
     color: red;
     font-weight: bold;
 }
+.sendnr-display {
+    color: #666;
+    font-size: 0.9em;
+    font-style: italic;
+    margin-left: 8px;
+}
 
+/* --- NEU: Styling für die tabellarische Pending-Liste --- */
+.pending-list-header {
+    display: flex;
+    justify-content: space-between;
+    font-weight: bold;
+    color: #333;
+    font-size: 0.9em;
+    padding: 4px 8px;
+    border-bottom: 2px solid #ccc;
+    margin-bottom: 4px;
+}
+.pending-list-header span:first-child {
+    flex-basis: 55%;
+    text-align: left;
+}
+.pending-list-header span:last-child {
+    flex-basis: 45%;
+    text-align: left;
+}
+
+#pendingHuList .hu-list li {
+    display: flex;
+    align-items: center; /* Vertikal zentrieren */
+}
+
+.pending-item-details {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.pending-item-details .pending-vse {
+    flex-basis: 55%;
+    text-align: left;
+    font-weight: bold;
+}
+
+.pending-item-details .pending-sendnr {
+    flex-basis: 45%;
+    text-align: left;
+    color: #555;
+    font-style: italic;
+    font-size: 0.95em;
+}
+/* --- NEU: Styling für VVL-Anzeige im "Offene HUs"-Modal --- */
+
+/* Titel-Formatierung für VVL */
+.hu-order-group .hu-order-title small {
+    font-weight: normal;
+    font-size: 0.9em;
+    color: #555;
+}
+
+/* Kopfzeile für die VVL-Tabelle */
+.hu-list-header {
+    display: flex;
+    font-weight: bold;
+    font-size: 0.9em;
+    padding: 5px 0 5px 5px;
+    border-bottom: 2px solid #ddd;
+    margin-bottom: 5px;
+    color: #333;
+}
+.hu-list-header span:first-child {
+    flex: 2; /* VSE-Spalte bekommt mehr Platz */
+}
+.hu-list-header span:last-child {
+    flex: 1; /* Sendnr-Spalte bekommt weniger Platz */
+}
+
+/* Styling für die Zeilen in der VVL-Tabelle */
+.hu-list.vvl-list li {
+    padding: 4px 0 4px 5px;
+    border-bottom: 1px dotted #eee;
+}
+.hu-list.vvl-list li:last-child {
+    border-bottom: none;
+}
+
+.vvl-item-row {
+    display: flex;
+    width: 100%;
+}
+.vvl-item-row .vvl-vse {
+    flex: 2; /* VSE-Spalte */
+    font-family: monospace;
+    font-weight: bold;
+}
+.vvl-item-row .vvl-sendnr {
+    flex: 1; /* Sendnr-Spalte */
+    font-family: monospace;
+    color: #666;
+    font-size: 0.95em;
+}
+/* --- NEU & OPTIMIERT: Einheitliches Tabellen-Layout für offene Positionen --- */
+
+/* Gemeinsamer Stil für die Kopfzeile in der Detailansicht und im Modal */
+.pending-list-header,
+.hu-list-header {
+    display: flex;
+    font-weight: bold;
+    color: #333;
+    font-size: 0.9em;
+    padding: 4px 8px;
+    border-bottom: 2px solid #ccc;
+    margin-bottom: 4px;
+}
+.pending-list-header span:first-child,
+.hu-list-header span:first-child {
+    flex-basis: 55%;
+    text-align: left;
+}
+.pending-list-header span:last-child,
+.hu-list-header span:last-child {
+    flex-basis: 45%;
+    text-align: left;
+}
+
+/* Gemeinsamer Stil für Listeneinträge */
+#pendingHuList .hu-list li,
+.hu-order-group .hu-list.vvl-list li {
+    padding: 4px 8px;
+    border-bottom: 1px dotted #eee;
+}
+.hu-order-group .hu-list.vvl-list li:last-child {
+    border-bottom: none;
+}
+
+
+/* Gemeinsamer Stil für die zweispaltige Zeile */
+.pending-item-details,
+.vvl-item-row {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+}
+
+/* Gemeinsamer Stil für die VSE-Spalte */
+.pending-item-details .pending-vse,
+.vvl-item-row .vvl-vse {
+    flex-basis: 55%;
+    text-align: left;
+    font-family: monospace;
+    font-weight: bold;
+}
+
+/* Gemeinsamer Stil für die Sendnr-Spalte */
+.pending-item-details .pending-sendnr,
+.vvl-item-row .vvl-sendnr {
+    flex-basis: 45%;
+    text-align: left;
+    font-family: monospace;
+    color: #555;
+    font-style: italic;
+    font-size: 0.95em;
+}
+/* --- NEU: Styling für Positionen mit Dunkelalarm in der "Offene HUs"-Ansicht --- */
+.hu-value.has-dunkelalarm,
+.pending-vse.has-dunkelalarm {
+    color: var(--danger-color);
+    font-weight: bold;
+}
