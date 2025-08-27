@@ -677,3 +677,24 @@ body.modal-open {
     color: var(--danger-color);
     font-weight: bold;
 }
+/* --- NEU: Styling für die VVL-Anzeige in der Haupttabelle --- */
+.vvl-table-entry {
+    font-size: 0.9em;
+    line-height: 1.4;
+}
+.vvl-table-entry .vvl-prefix,
+.vvl-table-entry .kundennr-prefix {
+    font-weight: normal;
+    color: #666;
+}
+/* --- NEU: Styling für die Trennlinie in der "Übersicht"-Spalte --- */
+.summary-cell {
+    padding-top: 12px; /* Etwas mehr Platz oben */
+    padding-bottom: 12px; /* Etwas mehr Platz unten */
+}
+.summary-divider {
+    width: 100%; /* Volle Breite der Zelle */
+    height: 1px; /* Dicke der Linie */
+    background-color: #e0e0e0; /* Farbe der Linie */
+    margin: 8px 0; /* Vertikaler Abstand oben und unten */
+}
