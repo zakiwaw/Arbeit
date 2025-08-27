@@ -2047,13 +2047,12 @@ if (validScans.length > 0) {
 
 // --- ERSETZEN SIE DEN GESAMTEN addEventListener-BLOCK MIT DIESEM CODE ---
 
+// --- ERSETZEN SIE DEN GESAMTEN addEventListener-BLOCK MIT DIESER KORRIGIERTEN VERSION ---
+
 shipmentNumberInputEl.addEventListener('input', () => {
     const currentValue = shipmentNumberInputEl.value.trim();
 
-    // --- START: QR-CODE-VERARBEITUNG ---
-    // Priorität 1: Prüft auf spezielle QR-Code-Formate und behandelt sie zuerst.
-
-    // 1.1: Behandelt den MAN Multi-Auftrag QR-Code
+    // --- QR-CODE-VERARBEITUNG ---
     if (currentValue.startsWith('FRT_MULTI_V1')) {
         if (!confirm("Ein Multi-Auftrags-QR-Code wurde erkannt.\n\nMöchtest du alle darin enthaltenen Aufträge jetzt importieren?")) {
             shipmentNumberInputEl.value = ''; 
@@ -2067,11 +2066,9 @@ shipmentNumberInputEl.addEventListener('input', () => {
         parts.forEach(orderData => {
             const [metaAndOrder, huData] = orderData.split('|||');
             if (!metaAndOrder || !huData) return;
-
             const metaParts = metaAndOrder.split('|');
             const orderNumber = metaParts[0];
             const hasFullMeta = metaParts.length >= 4;
-            
             processedOrders.push(orderNumber);
             const hus = huData.split(' ').filter(Boolean);
 
@@ -2099,7 +2096,6 @@ shipmentNumberInputEl.addEventListener('input', () => {
         location.reload();
         return;
     } 
-    // 1.2: NEU - Behandelt den Vorverladelisten QR-Code
     else if (currentValue.startsWith('FRT_VVL_V1')) {
         if (!confirm("Eine Vorverladeliste wurde erkannt.\n\nMöchtest du alle darin enthaltenen Kundenaufträge jetzt importieren?")) {
             shipmentNumberInputEl.value = ''; 
@@ -2109,85 +2105,88 @@ shipmentNumberInputEl.addEventListener('input', () => {
         const parts = currentValue.split(';;;').slice(1);
         const shipments = loadShipments();
         const now = new Date().toISOString();
-        let addedCount = 0;
-        let newOrders = [];
+        let addedPositionsCount = 0;
+        let newOrders = new Set();
+        let updatedOrders = new Set();
 
         parts.forEach(orderData => {
             const [metaAndOrder, huData] = orderData.split('|||');
             if (!metaAndOrder || !huData) return;
-
             const metaParts = metaAndOrder.split('|');
             const kundennr = metaParts[0];
             const vorverladelisteNr = metaParts.length > 1 ? metaParts[1] : 'N/A';
             const positionen = huData.split(' ').filter(Boolean);
 
+            // PRÜFUNG: Existiert der Kunde bereits?
             if (!shipments[kundennr]) {
-                newOrders.push(kundennr);
+                // NEUER KUNDE: Anlegen und alle Positionen hinzufügen
+                newOrders.add(kundennr);
                 shipments[kundennr] = {
-                    hawb: kundennr,
-                    lastModified: now,
-                    totalPiecesExpected: positionen.length,
-                    scannedItems: [],
-                    mitarbeiter: MITARBEITER_NAME,
-                    isHuListOrder: true, // Behandeln wie eine HU-Liste
-                    parentOrderNumber: vorverladelisteNr // Speichern der übergeordneten Nummer
+                    hawb: kundennr, lastModified: now, totalPiecesExpected: positionen.length,
+                    scannedItems: [], mitarbeiter: MITARBEITER_NAME, isHuListOrder: true,
+                    parentOrderNumber: vorverladelisteNr
                 };
-                
                 positionen.forEach(pos => {
                     const [vse, sendnr] = pos.split(':');
                     shipments[kundennr].scannedItems.push({
-                        rawInput: vse, // Die VSE ist die "HU" / der Barcode
-                        sendnr: sendnr, // Speichern der Sendungsnummer als Zusatzinfo
-                        status: 'Anstehend',
-                        timestamp: now,
-                        isCombination: false,
-                        notes: [],
-                        isCancelled: false,
-                        cancelledTimestamp: null
+                        rawInput: vse, sendnr: sendnr, status: 'Anstehend', timestamp: now,
+                        isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null
                     });
-                    addedCount++;
+                    addedPositionsCount++;
                 });
             } else {
-                // Hier könnte Logik stehen, um Positionen zu einem bestehenden Auftrag hinzuzufügen.
+                // BESTEHENDER KUNDE: Nur die NEUEN Positionen hinzufügen
+                updatedOrders.add(kundennr);
+                const existingShipment = shipments[kundennr];
+                let newPositionsAddedToThisCustomer = 0;
+
+                positionen.forEach(pos => {
+                    const [vse, sendnr] = pos.split(':');
+                    const alreadyExists = existingShipment.scannedItems.some(item => item.rawInput === vse);
+                    if (!alreadyExists) {
+                        existingShipment.scannedItems.push({
+                            rawInput: vse, sendnr: sendnr, status: 'Anstehend', timestamp: now,
+                            isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null
+                        });
+                        addedPositionsCount++;
+                        newPositionsAddedToThisCustomer++;
+                    }
+                });
+
+                if (newPositionsAddedToThisCustomer > 0) {
+                    existingShipment.totalPiecesExpected += newPositionsAddedToThisCustomer;
+                    existingShipment.lastModified = now;
+                }
             }
         });
 
         saveShipments(shipments);
-        alert(`Import der Vorverladeliste abgeschlossen:\n- ${newOrders.length} neue Kundenaufträge angelegt: ${newOrders.join(', ')}\n- ${addedCount} Positionen importiert.`);
-        location.reload(); // Einfachste Methode, um die UI vollständig zu aktualisieren
+        alert(`Import abgeschlossen:\n- ${addedPositionsCount} Positionen importiert.\n- ${newOrders.size} neue Aufträge angelegt.\n- ${updatedOrders.size} Aufträge aktualisiert.`);
+        location.reload();
         return;
     }
 
-    // --- ENDE: QR-CODE-VERARBEITUNG ---
-
-
-    // --- START: MANUELLE EINGABE / BATCH-MODUS ---
+    // --- MANUELLE EINGABE / BATCH-MODUS ---
     updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
 
-    // 2.1: Behandelt Scans im Batch-Modus
     if (isBatchModeActive) {
         if (currentValue.length > 0) mainActionButtonEl.click();
         return;
     }
 
-    // 2.2: Logik für Einzelscans / manuelle Eingabe
     const shipments = loadShipments();
     const { baseNumber: processedDirectBase } = processShipmentNumber(currentValue);
     let baseNumberToShow = null;
 
-    // Such-Priorität:
-    // 1. Ist es eine bekannte HU-Nummer / VSE-Nummer?
     const parentHawbByHu = findShipmentByHuNumber(currentValue);
     if (parentHawbByHu) {
         baseNumberToShow = parentHawbByHu;
         displayError(`VSE '${escapeHtml(currentValue)}' gehört zu Kundennr: ${escapeHtml(baseNumberToShow)}`, 'blue', 3500);
     } 
-    // 2. Ist es eine bekannte HAWB / Kundennr?
     else if (shipments[processedDirectBase.toUpperCase()]) {
         baseNumberToShow = processedDirectBase.toUpperCase();
         clearError();
     } 
-    // 3. Ist es eine bekannte Notiz?
     else if (currentValue.length > 3) {
         const parentHawbByNote = findShipmentByNoteContent(currentValue);
         if (parentHawbByNote) {
@@ -2196,12 +2195,9 @@ shipmentNumberInputEl.addEventListener('input', () => {
         }
     }
 
-    // UI aktualisieren basierend auf dem, was gefunden wurde oder was eingegeben wird (für neue Sendungen)
     displayCurrentShipmentDetails(baseNumberToShow || processedDirectBase);
     filterTable(baseNumberToShow || currentValue);
-    // --- ENDE: MANUELLE EINGABE / BATCH-MODUS ---
 });
-
 
 
 
