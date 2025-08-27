@@ -766,64 +766,72 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
         currentDetailsDivEl.style.borderColor = '#aac';
     }
 }
-         function renderTable() {
-            const shipments = loadShipments();
-            tableBodyEl.innerHTML = '';
-            Object.keys(shipments).sort((a, b) => new Date(shipments[b].lastModified || 0) - new Date(shipments[a].lastModified || 0))
-                .forEach(baseNumber => {
-                    const shipment = shipments[baseNumber];
-                    if (!shipment) return;
-                    const row = tableBodyEl.insertRow();
-                    
-                    const securityCount = calculateCurrentCountedPieces(shipment.scannedItems || []);
-                    const receiptCount = calculateGoodsReceiptCount(shipment.scannedItems || []);
-                    const expected = shipment.totalPiecesExpected;
-                    const expectedText = expected ?? 'N/A';
+// --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESER NEUEN VERSION ---
 
-                    row.insertCell().outerHTML = `<td data-label="HAWB.">${escapeHtml(baseNumber)}</td>`;
+// --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESER NEUEN VERSION ---
 
-                    // Ruft die globale Hilfsfunktion für den Wareneingang auf
-                    const receiptClass = getStatusClass(receiptCount, expected);
+function renderTable() {
+    const shipments = loadShipments();
+    tableBodyEl.innerHTML = '';
+    Object.keys(shipments).sort((a, b) => new Date(shipments[b].lastModified || 0) - new Date(shipments[a].lastModified || 0))
+        .forEach(baseNumber => {
+            const shipment = shipments[baseNumber];
+            if (!shipment) return;
+            const row = tableBodyEl.insertRow();
+            
+            const securityCount = calculateCurrentCountedPieces(shipment.scannedItems || []);
+            const receiptCount = calculateGoodsReceiptCount(shipment.scannedItems || []);
+            const expected = shipment.totalPiecesExpected;
+            const expectedText = expected ?? 'N/A';
 
-                    // --- START DER NEUEN LOGIK FÜR "Sicherungs"-FARBE ---
-                    
-                    // 1. Zähle die Dunkelalarme für diese Sendung (die Funktion existiert bereits)
-                    const dunkelalarmCount = calculateDunkelalarmCount(shipment.scannedItems || []);
-                    
-                    let securityClass = ''; // Variable für die CSS-Klasse initialisieren
+            let hawbCellHtml = '';
+            if (shipment.parentOrderNumber) {
+                hawbCellHtml = `<td data-label="HAWB.">
+                    <div class="vvl-table-entry">
+                         ${escapeHtml(shipment.parentOrderNumber)} | 
+                         ${escapeHtml(baseNumber)}
+                    </div>
+                </td>`;
+            } else {
+                hawbCellHtml = `<td data-label="HAWB.">${escapeHtml(baseNumber)}</td>`;
+            }
+            row.insertCell().outerHTML = hawbCellHtml;
 
-                    // 2. Prüfe die neue Sonderbedingung:
-                    // Wenn die Summe aus zählenden Scans und Dunkelalarmen die Erwartung erfüllt UND es mindestens einen Dunkelalarm gibt...
-                    if (expected !== null && (securityCount + dunkelalarmCount) === expected && dunkelalarmCount > 0) {
-                        // ...dann setze die Farbe auf Rot (Klasse 'over').
-                        securityClass = 'over'; 
-                    } else {
-                        // 3. Wenn die Sonderbedingung nicht zutrifft, verwende die alte, normale Logik.
-                        securityClass = getStatusClass(securityCount, expected);
-                    }
-                    // --- ENDE DER NEUEN LOGIK ---
+            const receiptClass = getStatusClass(receiptCount, expected);
+            const dunkelalarmCount = calculateDunkelalarmCount(shipment.scannedItems || []);
+            let securityClass = '';
 
-                    let summaryHtml = `
-                        <strong class="${receiptClass}">WE: ${receiptCount}/${expectedText}</strong> | 
-                        <strong class="${securityClass}">Sich.: ${securityCount}/${expectedText}</strong>
-                    `;
-                    
-                    row.insertCell().outerHTML = `<td data-label="Übersicht" class="summary-cell">${summaryHtml}</td>`;
-                    
-                    row.insertCell().outerHTML = `<td data-label="Letzte Änd.">${shipment.lastModified ? new Date(shipment.lastModified).toLocaleString('de-DE') : '-'}</td>`;
-                    
-                    const actionsCell = row.insertCell();
-                    actionsCell.setAttribute('data-label', 'Aktionen');
-                    actionsCell.classList.add('actions-cell');
-                    actionsCell.innerHTML = `
-                        <button class="edit-btn" data-basenumber="${escapeHtml(baseNumber)}" title="Sendung ${escapeHtml(baseNumber)} bearbeiten">Edit</button>
-                        <button class="pdf-btn" data-basenumber="${escapeHtml(baseNumber)}">PDF</button>
-                        <button class="delete-btn main-delete-btn" data-basenumber="${escapeHtml(baseNumber)}">Löschen</button>
-                    `;
-                });
-            updateEditButtonVisibilityInTable();
-            filterTable(shipmentNumberInputEl.value);
-        }
+            if (expected !== null && (securityCount + dunkelalarmCount) === expected && dunkelalarmCount > 0) {
+                securityClass = 'over'; 
+            } else {
+                securityClass = getStatusClass(securityCount, expected);
+            }
+
+            // --- HIER IST DIE ÄNDERUNG ---
+            // Das | wird durch ein div mit der Klasse "summary-divider" ersetzt.
+            let summaryHtml = `
+                <strong class="${receiptClass}">WE: ${receiptCount}/${expectedText}</strong>
+                <div class="summary-divider"></div>
+                <strong class="${securityClass}">Sich.: ${securityCount}/${expectedText}</strong>
+            `;
+            // --- ENDE DER ÄNDERUNG ---
+            
+            row.insertCell().outerHTML = `<td data-label="Übersicht" class="summary-cell">${summaryHtml}</td>`;
+            
+            row.insertCell().outerHTML = `<td data-label="Letzte Änd.">${shipment.lastModified ? new Date(shipment.lastModified).toLocaleString('de-DE') : '-'}</td>`;
+            
+            const actionsCell = row.insertCell();
+            actionsCell.setAttribute('data-label', 'Aktionen');
+            actionsCell.classList.add('actions-cell');
+            actionsCell.innerHTML = `
+                <button class="edit-btn" data-basenumber="${escapeHtml(baseNumber)}" title="Sendung ${escapeHtml(baseNumber)} bearbeiten">Edit</button>
+                <button class="pdf-btn" data-basenumber="${escapeHtml(baseNumber)}">PDF</button>
+                <button class="delete-btn main-delete-btn" data-basenumber="${escapeHtml(baseNumber)}">Löschen</button>
+            `;
+        });
+    updateEditButtonVisibilityInTable();
+    filterTable(shipmentNumberInputEl.value);
+}
         function updateEditButtonVisibilityInTable() {
             // Dies wird über CSS body.batch-mode-active td.actions-cell button.edit-btn { display: none; } gesteuert.
             // Diese Funktion könnte für komplexere Logik dienen, ist hier aber implizit durch CSS.
