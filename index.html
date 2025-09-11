@@ -274,26 +274,35 @@
     </div>
 </div>
 
-    <input type="file" id="imageCaptureInput" accept="image/*" capture="environment" style="display: none;">
-<script src="script.js"></script>
+<input type="file" id="imageCaptureInput" accept="image/*" capture="environment" style="display: none;">
 <audio id="errorSound" src="assets/error-sound.mp3" preload="auto"></audio>
-<script src="https://www.gstatic.com/firebasejs/9.x.x/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.x.x/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.x.x/firebase-firestore-compat.js"></script>
+
+<!-- === START DER KORREKTUR === -->
+
+<!-- 1. Firebase Bibliotheken ZUERST laden -->
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+
+<!-- 2. Firebase DANACH initialisieren -->
 <script>
   const firebaseConfig = {
-  apiKey: "AIzaSyB4CpYRhsYaQH0RsfGDWeqKlZzjLJKqKho",
-  authDomain: "lskp-14eee.firebaseapp.com",
-  projectId: "lskp-14eee",
-  storageBucket: "lskp-14eee.firebasestorage.app",
-  messagingSenderId: "1059649586105",
-  appId: "1:1059649586105:web:51b8cd0b808a00800dec68"
-};
+    apiKey: "AIzaSyB4CpYRhsYaQH0RsfGDWeqKlZzjLJKqKho",
+    authDomain: "lskp-14eee.firebaseapp.com",
+    projectId: "lskp-14eee",
+    storageBucket: "lskp-14eee.firebasestorage.app",
+    messagingSenderId: "1059649586105",
+    appId: "1:1059649586105:web:51b8cd0b808a00800dec68"
+  };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+  // KORREKTE Initialisierung für die Compat-Bibliotheken
+  firebase.initializeApp(firebaseConfig);
 </script>
+
+<!-- 3. Ihr eigenes Anwendungs-Skript ZULETZT laden -->
+<script src="script.js"></script>
+
+<!-- === ENDE DER KORREKTUR === -->
+
 </body>
 </html>
-
-
