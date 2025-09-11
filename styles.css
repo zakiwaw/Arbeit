@@ -698,17 +698,3 @@ body.modal-open {
     background-color: #e0e0e0; /* Farbe der Linie */
     margin: 8px 0; /* Vertikaler Abstand oben und unten */
 }
-.photo-button {
-    background-color: var(--secondary-color);
-    color: white;
-    border: none;
-    border-radius: 50%;
-    width: 30px;
-    height: 30px;
-    font-size: 18px;
-    cursor: pointer;
-    margin-left: 10px;
-}
-.photo-button:hover {
-    background-color: var(--secondary-hover);
-}
