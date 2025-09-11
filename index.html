@@ -12,7 +12,22 @@
 <body>
 
 
-
+    
+        <!-- NEU: Login-Container -->
+        <div id="login-container" style="text-align: center; padding-top: 50px;">
+            <h1>Fracht Tracker</h1>
+            <p>Bitte melden Sie sich an, um fortzufahren.</p>
+            <button id="loginButton" class="main-action-button" style="width: 200px;">Mit Google Anmelden</button>
+        </div>
+    
+        <!-- NEU: Haupt-App-Container (dein bisheriger Code hier drin) -->
+        <div id="app-container" style="display: none;">
+    
+            <!-- NEU: User-Info und Logout-Button -->
+            <div id="user-info" style="text-align: right; padding: 5px; background-color: #eee;">
+                Angemeldet als: <span id="userName"></span> 
+                <button id="logoutButton" style="margin-left: 10px;">Abmelden</button>
+            </div>
 
 
 
@@ -259,9 +274,25 @@
     </div>
 </div>
 
+    <input type="file" id="imageCaptureInput" accept="image/*" capture="environment" style="display: none;">
 <script src="script.js"></script>
 <audio id="errorSound" src="assets/error-sound.mp3" preload="auto"></audio>
+<script src="https://www.gstatic.com/firebasejs/9.x.x/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.x.x/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.x.x/firebase-firestore-compat.js"></script>
+<script>
+  const firebaseConfig = {
+  apiKey: "AIzaSyB4CpYRhsYaQH0RsfGDWeqKlZzjLJKqKho",
+  authDomain: "lskp-14eee.firebaseapp.com",
+  projectId: "lskp-14eee",
+  storageBucket: "lskp-14eee.firebasestorage.app",
+  messagingSenderId: "1059649586105",
+  appId: "1:1059649586105:web:51b8cd0b808a00800dec68"
+};
 
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+</script>
 </body>
 </html>
 
