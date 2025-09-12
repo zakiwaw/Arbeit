@@ -3,6 +3,15 @@
 
     document.addEventListener('DOMContentLoaded', function() {
         // --- DOM Elemente ---
+        const noteEditModalEl = document.getElementById('noteEditModal');
+const noteEditContextEl = document.getElementById('noteEditContext');
+const noteEditBaseNumberEl = document.getElementById('noteEditBaseNumber');
+const noteEditTimestampEl = document.getElementById('noteEditTimestamp');
+const noteEditNoteIndexEl = document.getElementById('noteEditNoteIndex');
+const noteEditTextareaEl = document.getElementById('noteEditTextarea');
+const saveNoteEditButtonEl = document.getElementById('saveNoteEditButton');
+const cancelNoteEditButtonEl = document.getElementById('cancelNoteEditButton');
+
         const shipmentNumberInputEl = document.getElementById('shipmentNumberInput');
         const editGoodsReceiptCountInputEl = document.getElementById('editGoodsReceiptCount');
         const clearInputButtonEl = document.getElementById('clearInputButton');
@@ -69,6 +78,13 @@ const showDunkelalarmHusBtnEl = document.getElementById('showDunkelalarmHusBtn')
 const dunkelalarmHusListContainerEl = document.getElementById('dunkelalarmHusListContainer');
 const errorSoundEl = document.getElementById('errorSound');
 const unexpectedHuSoundToggleEl = document.getElementById('unexpectedHuSoundToggle');
+// --- START DER ÄNDERUNG ---
+const batchScanFeedbackModalEl = document.getElementById('batchScanFeedbackModal');
+const feedbackScanNumberEl = document.getElementById('feedbackScanNumber');
+const feedbackCarrierEl = document.getElementById('feedbackCarrier');
+const batchFeedbackToggleEl = document.getElementById('batchFeedbackToggle');
+const closeBatchScanFeedbackModalButtonEl = document.getElementById('closeBatchScanFeedbackModalButton'); // NEU
+// --- ENDE DER ÄNDERUNG ---
 
         // --- Konstanten & Konfiguration ---
 
@@ -410,6 +426,32 @@ function shortenForwarderName(fullName) {
     // Wenn keine Regel zutrifft, den Originalnamen zurückgeben
     return fullName;
 }
+// --- START DER ÄNDERUNG: Neue Hilfsfunktion für Spediteur-Info ---
+/**
+ * Findet den Spediteur für eine gegebene HU-Nummer, wenn sie in einem HU-Listen-Auftrag existiert.
+ * @param {string} huNumber Die zu prüfende HU-Nummer.
+ * @returns {string|null} Den gekürzten Spediteurnamen oder null, wenn nicht gefunden.
+ */
+function findCarrierForHu(huNumber) {
+    const shipments = loadShipments();
+    const upperHuNumber = huNumber.trim().toUpperCase();
+
+    for (const baseNumber in shipments) {
+        const shipment = shipments[baseNumber];
+        if (shipment.isHuListOrder && shipment.scannedItems) {
+            const foundItem = shipment.scannedItems.find(item => item.rawInput.toUpperCase() === upperHuNumber);
+            if (foundItem) {
+                // Wenn der übergeordnete Auftrag einen Spediteur hat, gib ihn zurück
+                if (shipment.freightForwarder) {
+                    return shortenForwarderName(shipment.freightForwarder);
+                }
+                return null; // HU gefunden, aber kein Spediteur im Auftrag hinterlegt
+            }
+        }
+    }
+    return null; // HU nicht in einem HU-Listen-Auftrag gefunden
+}
+// --- ENDE DER ÄNDERUNG: Neue Hilfsfunktion für Spediteur-Info ---
         // --- Hilfsfunktionen: UI & Fehler ---
         function clearError() { errorDisplayEl.textContent = ''; }
         function displayError(message, color = 'red', autoClearTimeout = null) {
@@ -427,7 +469,33 @@ function shortenForwarderName(fullName) {
             if (unsafe === null || unsafe === undefined) return '';
             return unsafe.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
         }
+// --- START DER ÄNDERUNG: Dynamisches Font-Sizing Hilfsfunktion ---
+/**
+ * Passt die Schriftgröße eines HTML-Elements dynamisch an, damit sein Inhalt in einen Container passt.
+ * @param {HTMLElement} element Das zu skalierende Element (z.B. feedbackScanNumberEl).
+ * @param {HTMLElement} container Das Elternelement, dessen Breite als Referenz dient (z.B. batchScanFeedbackModalEl.querySelector('.modal-content')).
+ * @param {number} initialFontSize Der Startwert für die Schriftgröße in px (z.B. 56 für 3.5em bei 16px body font-size).
+ * @param {number} minFontSize Die minimale Schriftgröße, die nicht unterschritten werden soll (in px).
+ * @param {number} paddingPercent Optionaler Padding-Anteil (z.B. 0.1 für 10% links/rechts).
+ */
+function fitTextToContainer(element, container, initialFontSize, minFontSize, paddingPercent = 0.05) {
+    // Setzen Sie die Schriftgröße zuerst auf den maximalen Wert.
+    element.style.fontSize = `${initialFontSize}px`;
 
+    // Berücksichtigen Sie das Padding des Containers oder des Elements selbst
+    const containerStyle = getComputedStyle(container);
+    const containerWidth = container.clientWidth - parseFloat(containerStyle.paddingLeft) - parseFloat(containerStyle.paddingRight);
+
+    let currentFontSize = initialFontSize;
+    const maxTextWidth = containerWidth * (1 - (paddingPercent * 2)); // Beispiel: 10% Padding links/rechts
+
+    // Reduzieren Sie die Schriftgröße, bis der Text passt oder die minimale Größe erreicht ist.
+    while (element.scrollWidth > maxTextWidth && currentFontSize > minFontSize) {
+        currentFontSize -= 1; // Schrittweise verringern
+        element.style.fontSize = `${currentFontSize}px`;
+    }
+}
+// --- ENDE DER ÄNDERUNG: Dynamisches Font-Sizing Hilfsfunktion ---
         function focusShipmentInput() {
             const isModalVisible = (sel) => document.querySelector(sel)?.classList.contains('visible');
             // ANFORDERUNG 2: Das neue HU-Import-Modal zur Prüfung hinzufügen
@@ -1152,41 +1220,40 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
         }
 
 
-      function showInlineNoteEditor(targetElement) {
-            removeActiveInlineNoteEditor(); // Zuerst bestehenden Editor entfernen
-
-            const liElement = targetElement.closest('li');
-            if (!liElement) return;
-
+        function openNoteEditModal(targetElement) {
+            removeActiveInlineNoteEditor(); // Entfernt ggf. noch alte Reste
+        
             const baseNumber = targetElement.dataset.basenumber;
             const itemTimestamp = targetElement.dataset.timestamp;
             const noteIndex = targetElement.dataset.noteIndex; // Kann undefined sein (beim Hinzufügen)
             const isEditing = noteIndex !== undefined;
-            const currentNote = isEditing ? liElement.querySelector(`.editable-note[data-note-index="${noteIndex}"]`).textContent : '';
-
-            // Editor nach "Notiz hinzufügen" oder nach der Notizliste einfügen
-            const placeholderDiv = liElement.querySelector('.inline-note-editor-placeholder');
-            if (!placeholderDiv) return;
-
-            liElement.classList.add('editing-note'); // Versteckt Links, während editiert wird
-
-            const editorHtml = `
-                <div class="inline-note-editor">
-                    <input type="text" class="inline-note-input" value="${escapeHtml(currentNote)}" placeholder="Notiz eingeben...">
-                    <div class="inline-note-editor-actions">
-                        <button class="inline-note-save-btn" data-basenumber="${escapeHtml(baseNumber)}" data-timestamp="${itemTimestamp}" ${isEditing ? `data-note-index="${noteIndex}"` : ''}>Speichern</button>
-                        <button class="inline-note-cancel-btn">Abbrechen</button>
-                    </div>
-                </div>`;
-            placeholderDiv.innerHTML = editorHtml;
-
-            const inputField = placeholderDiv.querySelector('.inline-note-input');
-            if (inputField) {
-                inputField.focus(); inputField.select();
-                inputField.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); placeholderDiv.querySelector('.inline-note-save-btn')?.click(); }});
-                inputField.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); placeholderDiv.querySelector('.inline-note-cancel-btn')?.click(); }});
-            }
+            
+            // Finde das gescannte Item, um die Nummer anzuzeigen
+            const shipments = loadShipments();
+            const shipment = shipments[baseNumber];
+            const item = shipment?.scannedItems.find(i => i.timestamp === itemTimestamp);
+            if (!item) return;
+        
+            const currentNote = isEditing ? item.notes[noteIndex] : '';
+        
+            // Modal mit Daten füllen
+            noteEditContextEl.textContent = `Für Scan: ${item.rawInput}`;
+            noteEditBaseNumberEl.value = baseNumber;
+            noteEditTimestampEl.value = itemTimestamp;
+            noteEditNoteIndexEl.value = isEditing ? noteIndex : ''; // Leerer String für "neu"
+            noteEditTextareaEl.value = currentNote;
+        
+            // Modal anzeigen
+            noteEditModalEl.classList.add('visible');
+            document.body.classList.add('modal-open');
+            setTimeout(() => noteEditTextareaEl.focus(), 100); // Fokus auf Textarea setzen
         }
+        function closeNoteEditModal() {
+            noteEditModalEl.classList.remove('visible');
+            document.body.classList.remove('modal-open');
+            focusShipmentInput();
+        }
+        
 
         function saveOrUpdateNote(baseNumber, itemTimestamp, noteIndex, newNoteValue) {
             const shipments = loadShipments();
@@ -1324,7 +1391,44 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
                 currentBatchNoteDisplayEl.style.display = 'none';
             }
         }
+// --- START DER ÄNDERUNG: Neue Funktion zum Anzeigen des Batch Scan Feedback Modals ---
+// --- START DER ÄNDERUNG: showBatchScanFeedback Funktion angepasst ---
+// --- START DER ÄNDERUNG: showBatchScanFeedback Funktion angepasst (mit Font Sizing) ---
+function showBatchScanFeedback(scanNumber, isExpected, carrierName = null) {
+    if (!batchScanFeedbackModalEl) return;
 
+    feedbackScanNumberEl.textContent = scanNumber;
+    feedbackCarrierEl.textContent = carrierName ? `Spediteur: ${carrierName}` : '';
+
+    // --- START DER ÄNDERUNG: Aufruf der fitTextToContainer Funktion ---
+    const modalContentContainer = batchScanFeedbackModalEl.querySelector('.modal-content');
+    // Annahme: body font-size ist 16px. 3.5em = 56px, 1.5em = 24px.
+    // PaddingPercent ist der Anteil der Breite, der als seitliches Padding vom Text freigehalten wird.
+    fitTextToContainer(feedbackScanNumberEl, modalContentContainer, 56, 24, 0.05);
+    // --- ENDE DER ÄNDERUNG: Aufruf der fitTextToContainer Funktion ---
+
+    // Hintergrund- und Textfarbe anpassen
+    if (isExpected) {
+        feedbackScanNumberEl.classList.remove('unexpected');
+        batchScanFeedbackModalEl.querySelector('.modal-content').classList.remove('unexpected');
+        feedbackScanNumberEl.style.color = 'lime';
+    } else {
+        feedbackScanNumberEl.classList.add('unexpected');
+        batchScanFeedbackModalEl.querySelector('.modal-content').classList.add('unexpected');
+        feedbackScanNumberEl.style.color = 'red';
+    }
+
+    batchScanFeedbackModalEl.classList.add('visible');
+    document.body.classList.add('modal-open');
+
+    // Fokus auf den Schließen-Button legen, damit das Modal nicht im Hintergrund bleibt, wenn die Tastatur nicht geöffnet ist.
+    setTimeout(() => {
+        closeBatchScanFeedbackModalButtonEl.focus();
+    }, 100); 
+}
+// --- ENDE DER ÄNDERUNG: showBatchScanFeedback Funktion angepasst (mit Font Sizing) ---
+// --- ENDE DER ÄNDERUNG: showBatchScanFeedback Funktion angepasst ---
+// --- ENDE DER ÄNDERUNG: Neue Funktion zum Anzeigen des Batch Scan Feedback Modals ---
 function addToBatch() {
     const rawInputFromField = shipmentNumberInputEl.value.trim();
     if (!rawInputFromField) { focusShipmentInput(); return; }
@@ -1339,14 +1443,21 @@ function addToBatch() {
 
     const scanTimestamp = new Date().toISOString();
 
-    if (unexpectedHuSoundToggleEl && unexpectedHuSoundToggleEl.checked) {
-        if (!isHuExpected(processedRawInput)) {
-            // --- HIER IST DIE ÄNDERLUNG ---
-            // Anstatt direkt .play() aufzurufen, rufen wir unsere neue Hilfsfunktion auf.
-            playShortErrorSound();
-            // --- ENDE DER ÄNDERUNG ---
-        }
+    // --- START DER ÄÄNDERUNG: Batch Scan Feedback in addToBatch() ---
+    let isCurrentHuExpected = isHuExpected(processedRawInput);
+
+    // Die Tonfunktion bleibt hier und ist SEPARAT vom Popup!
+    if (!isCurrentHuExpected && unexpectedHuSoundToggleEl && unexpectedHuSoundToggleEl.checked) {
+        playShortErrorSound(); // Spielt den Sound ab, wenn unerwartet und Sound-Toggle aktiv ist
     }
+
+    // Das visuelle Feedback-Popup wird hier aufgerufen, wenn sein Toggle aktiv ist
+    if (batchFeedbackToggleEl && batchFeedbackToggleEl.checked) {
+        const carrier = findCarrierForHu(processedRawInput);
+        showBatchScanFeedback(processedRawInput, isCurrentHuExpected, carrier);
+    }
+    // --- ENDE DER ÄNDERUNG: Batch Scan Feedback in addToBatch() ---
+    // --- ENDE DER ÄNDERUNG: Batch Scan Feedback in addToBatch() ---
 
     if (isBatchModeActive && currentBatch.length === 0 && isBatchNotePromptRequired && batchNoteToggleEl.checked) {
         pendingFirstBatchScanData = { rawInput: processedRawInput, scanTimestamp: scanTimestamp };
@@ -2273,24 +2384,37 @@ shipmentNumberInputEl.addEventListener('input', () => {
 
             currentDetailsDivEl.addEventListener('click', (event) => {
                 const target = event.target;
-                event.preventDefault();
-
+                
+                // Klick auf "Notiz bearbeiten" oder "Notiz hinzufügen"
                 if (target.classList.contains('editable-note') || target.classList.contains('add-note-link')) {
-                    showInlineNoteEditor(target);
-                } else if (target.classList.contains('inline-note-save-btn')) {
-                    const editorDiv = target.closest('.inline-note-editor');
-                    if (editorDiv) {
-                        const inputField = editorDiv.querySelector('.inline-note-input');
-                        const noteIndex = target.dataset.noteIndex;
-                        saveOrUpdateNote(target.dataset.basenumber, target.dataset.timestamp, noteIndex, inputField.value);
-                    }
-                } else if (target.classList.contains('inline-note-cancel-btn')) {
-                    removeActiveInlineNoteEditor();
-                    focusShipmentInput();
-                } else if (target.classList.contains('cancel-button')) {
+                    event.preventDefault();
+                    openNoteEditModal(target);
+                } 
+                // Klick auf Storno-Button
+                else if (target.classList.contains('cancel-button')) {
+                    event.preventDefault();
                     requestCancelScanItem(target.dataset.basenumber, target.dataset.timestamp);
-                } else if (target.classList.contains('delete-note-btn')) {
+                } 
+                // Klick auf Notiz-Löschen-Button
+                else if (target.classList.contains('delete-note-btn')) {
+                    event.preventDefault();
                     requestDeleteNote(target.dataset.basenumber, target.dataset.timestamp, target.dataset.noteIndex);
+                }
+            });
+            saveNoteEditButtonEl.addEventListener('click', () => {
+                const baseNumber = noteEditBaseNumberEl.value;
+                const timestamp = noteEditTimestampEl.value;
+                const noteIndex = noteEditNoteIndexEl.value === '' ? undefined : parseInt(noteEditNoteIndexEl.value, 10);
+                const newNoteValue = noteEditTextareaEl.value;
+                
+                saveOrUpdateNote(baseNumber, timestamp, noteIndex, newNoteValue);
+                closeNoteEditModal();
+            });
+            
+            cancelNoteEditButtonEl.addEventListener('click', closeNoteEditModal);
+            noteEditModalEl.addEventListener('click', (e) => {
+                if (e.target === noteEditModalEl) {
+                    closeNoteEditModal();
                 }
             });
 
@@ -2483,7 +2607,28 @@ shipmentNumberInputEl.addEventListener('input', () => {
             // ===== ENDE: EVENT LISTENER FÜR HU-MODAL-TABS =====
 // --- ENDE DER ÄNDERUNG ---
         } // Ende der setupEventListeners Funktion
+            // --- START DER ÄNDERUNG: Event Listener für Batch Scan Feedback Toggle und Close Button ---
+            batchFeedbackToggleEl.addEventListener('change', () => {
+                if (!isBatchModeActive && batchFeedbackToggleEl.checked) {
+                    alert("Scan-Feedback-Popup ist nur im Batch-Modus verfügbar. Bitte aktivieren Sie zuerst den Batch-Modus.");
+                    batchFeedbackToggleEl.checked = false; // Toggle zurücksetzen
+                }
+            });
 
+            closeBatchScanFeedbackModalButtonEl.addEventListener('click', () => {
+                batchScanFeedbackModalEl.classList.remove('visible');
+                document.body.classList.remove('modal-open');
+                focusShipmentInput(); // Fokus zurück zum Scan-Input
+            });
+
+            batchScanFeedbackModalEl.addEventListener('click', (e) => {
+                if (e.target === batchScanFeedbackModalEl) { // Schließt bei Klick auf Overlay
+                    batchScanFeedbackModalEl.classList.remove('visible');
+                    document.body.classList.remove('modal-open');
+                    focusShipmentInput();
+                }
+            });
+            // --- ENDE DER ÄNDERUNG: Event Listener für Batch Scan Feedback Toggle und Close Button ---
 
 
 
@@ -2592,6 +2737,7 @@ shipmentNumberInputEl.addEventListener('input', () => {
             
             resetSingleScanNoteInputState();
             toggleBatchMode(isBatchModeActive); // Initial Batch Mode anwenden (setzt auch Flags)
+            batchFeedbackToggleEl.checked = false; // Standardmäßig deaktiviert
             // displayCurrentShipmentDetails(''); // Start mit leerem Details-Bereich
             updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
             updateClearButtonVisibility(noteInputEl, clearNoteButtonEl);
