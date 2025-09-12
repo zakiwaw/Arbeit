@@ -184,18 +184,23 @@
     </div>
 
     <!-- HIER IST DER NEUE SWITCH FÜR DEN ÜBERZÄHLIG-TON -->
-<!-- --- START DER ÄNDERUNG --- -->
-<!-- --- START DER ÄNDERUNG --- -->
-<div class="batch-sound-toggle-container">
-    <label for="batchFeedbackToggle" title="Scan-Feedback-Popup im Batch-Modus anzeigen">💬 Scan-Popup</label>
-    <label class="batch-toggle-switch">
-        <input type="checkbox" id="batchFeedbackToggle">
-        <span class="batch-slider"></span>
-    </label>
-</div>
-<!-- --- ENDE DER ÄNDERUNG --- -->
-<!-- --- ENDE DER ÄNDERUNG --- -->
+    <div class="batch-sound-toggle-container">
+        <label for="unexpectedHuSoundToggle" title="Ton abspielen, wenn eine HU auf keiner Liste steht">🔊 Überzählig-Ton</label>
+        <label class="batch-toggle-switch">
+            <input type="checkbox" id="unexpectedHuSoundToggle" checked>
+            <span class="batch-slider"></span>
+        </label>
+    </div>
     <!-- ENDE DES NEUEN SWITCHES -->
+
+<!-- --- START DER ÄNDERUNG (NEUES FEEDBACK-POPUP) --- -->
+    <div class="batch-sound-toggle-container">
+        <label for="batchFeedbackToggle" title="Scan-Feedback-Popup im Batch-Modus anzeigen">💬 Scan-Feedback-Popup</label>
+        <label class="batch-toggle-switch">
+            <input type="checkbox" id="batchFeedbackToggle">
+            <span class="batch-slider"></span>
+        </label>
+    </div>
 
     <div class="batch-action-buttons">
         <button id="saveBatchButton">Batch Speichern</button>
