@@ -69,16 +69,8 @@
 
     #currentShipmentDetails li .note-display{display:inline;padding-left:0;margin-top:0;font-style:italic;color:#448}
     #currentShipmentDetails li .note-prefix{display:inline;font-size:.9em;color:#448;margin-top:3px;padding-left:10px;font-style:italic}
-    .inline-note-editor{margin-top:5px;margin-bottom:5px;padding:8px;background-color:#fffacd;border:1px solid #f0ad4e;border-radius:4px;display:flex;flex-direction:column;gap:5px;animation:fadeIn .3s ease-in-out}
-    @keyframes fadeIn{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
-    .inline-note-editor input[type="text"]{width:100%;padding:6px 8px;border:1px solid #ccc;border-radius:3px;box-sizing:border-box;font-size:.9em;height:36px}
-    .inline-note-editor-actions{display:flex;gap:8px;justify-content:flex-end}
-    .inline-note-editor-actions button{padding:4px 8px;font-size:.85em;border-radius:3px;border:none;cursor:pointer;color:white}
-    .inline-note-save-btn{background-color:var(--primary-color)}
-    .inline-note-save-btn:hover{background-color:var(--primary-hover)}
-    .inline-note-cancel-btn{background-color:#aaa}
-    .inline-note-cancel-btn:hover{background-color:#888}
-    .editing-note .editable-note, .editing-note .add-note-link { display: none !important; } /* Versteckt "Notiz bearbeiten/hinzufügen" Links während Bearbeitung */
+ 
+
     #currentShipmentDetails .summary{margin-top:10px;border-top:1px solid #ccc;padding-top:8px;font-weight:bold} #currentShipmentDetails .summary span{display:block;margin-bottom:3px} /* --- DURCH DIESEN BLOCK ERSETZEN --- */
 .summary .ok, .summary-cell .ok {color:green} 
 .summary .mismatch, .summary-cell .mismatch {color:orange} 
@@ -671,6 +663,74 @@ body.modal-open {
     font-style: italic;
     font-size: 0.95em;
 }
+/* --- START DER ÄNDERUNG: Batch Scan Feedback Modal --- */
+
+/* --- START DER ÄNDERUNG: Batch Scan Feedback Modal Stile --- */
+/* --- START DER ÄNDERUNG: Batch Scan Feedback Modal Stile --- */
+#batchScanFeedbackModal .modal-content {
+    background-color: black;
+    padding: 20px;
+    box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+}
+
+#batchScanFeedbackModal .modal-content.unexpected {
+    box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+}
+
+#batchScanFeedbackModal h3 {
+    color: white;
+    margin-bottom: 20px;
+}
+
+/* --- START DER ÄNDERUNG: Batch Scan Feedback Modal Stile (Font Sizing Vorbereitung) --- */
+#batchScanFeedbackModal .modal-content {
+    background-color: black;
+    padding: 20px;
+    box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+}
+
+#batchScanFeedbackModal .modal-content.unexpected {
+    box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+}
+
+#batchScanFeedbackModal h3 {
+    color: white;
+    margin-bottom: 20px;
+}
+
+#feedbackScanNumber {
+    font-size: 3.5em; /* Dies ist die maximale Startgröße */
+    font-weight: bold;
+    text-align: center;
+    /* white-space, overflow, text-overflow werden hier entfernt */
+    color: lime;
+    background-color: black;
+    padding: 10px 20px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    min-width: 80%;
+    /* NEU: Flexbox-Eigenschaften für die zentrierte Anzeige des Textes */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    line-height: 1; /* Verhindert zusätzlichen Zeilenabstand */
+}
+
+#feedbackScanNumber.unexpected {
+    color: red;
+}
+
+#feedbackCarrier {
+    font-size: 1.4em;
+    color: #bbb;
+    text-align: center;
+    word-break: break-all;
+    font-style: italic;
+    margin-top: 5px;
+}
+/* --- ENDE DER ÄNDERUNG: Batch Scan Feedback Modal Stile (Font Sizing Vorbereitung) --- */
+
+/* --- ENDE DER ÄNDERUNG: Batch Scan Feedback Modal --- */
 /* --- NEU: Styling für Positionen mit Dunkelalarm in der "Offene HUs"-Ansicht --- */
 .hu-value.has-dunkelalarm,
 .pending-vse.has-dunkelalarm {
