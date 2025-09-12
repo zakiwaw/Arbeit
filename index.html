@@ -88,6 +88,18 @@
         </div>
     </div>
 </div>
+<!-- --- START DER ÄNDERUNG --- -->
+<div id="batchScanFeedbackModal" class="modal-overlay">
+    <div class="modal-content"> <!-- KEIN 'batch-feedback-content' HIER -->
+        <h3>Batch Scan Feedback</h3>
+        <div id="feedbackScanNumber" class="feedback-scan-number"></div>
+        <div id="feedbackCarrier" class="feedback-carrier"></div>
+        <div class="modal-actions" style="justify-content: center; margin-top: 20px;">
+            <button id="closeBatchScanFeedbackModalButton" class="main-action-button" style="width: 50%;">Schließen</button>
+        </div>
+    </div>
+</div>
+<!-- --- ENDE DER ÄNDERUNG --- -->
 <!-- --- ENDE DER ÄNDERUNG --- -->
 <div class="container">
     <div class="batch-controls">
@@ -172,13 +184,17 @@
     </div>
 
     <!-- HIER IST DER NEUE SWITCH FÜR DEN ÜBERZÄHLIG-TON -->
-    <div class="batch-sound-toggle-container">
-        <label for="unexpectedHuSoundToggle" title="Ton abspielen, wenn eine HU auf keiner Liste steht">🔊 Überzählig-Ton</label>
-        <label class="batch-toggle-switch">
-            <input type="checkbox" id="unexpectedHuSoundToggle" checked>
-            <span class="batch-slider"></span>
-        </label>
-    </div>
+<!-- --- START DER ÄNDERUNG --- -->
+<!-- --- START DER ÄNDERUNG --- -->
+<div class="batch-sound-toggle-container">
+    <label for="batchFeedbackToggle" title="Scan-Feedback-Popup im Batch-Modus anzeigen">💬 Scan-Popup</label>
+    <label class="batch-toggle-switch">
+        <input type="checkbox" id="batchFeedbackToggle">
+        <span class="batch-slider"></span>
+    </label>
+</div>
+<!-- --- ENDE DER ÄNDERUNG --- -->
+<!-- --- ENDE DER ÄNDERUNG --- -->
     <!-- ENDE DES NEUEN SWITCHES -->
 
     <div class="batch-action-buttons">
@@ -258,6 +274,30 @@
         </div>
     </div>
 </div>
+
+<div id="noteEditModal" class="modal-overlay">
+    <div class="modal-content">
+        <h3>Notiz Bearbeiten/Hinzufügen</h3>
+        <div id="noteEditContext" style="font-size: 0.9em; color: #555; margin-bottom: 15px; text-align: center;"></div>
+        
+        <input type="hidden" id="noteEditBaseNumber">
+        <input type="hidden" id="noteEditTimestamp">
+        <input type="hidden" id="noteEditNoteIndex">
+        
+        <div class="form-group">
+            <label for="noteEditTextarea">Notiz:</label>
+            <textarea id="noteEditTextarea" rows="5" placeholder="Notiz hier eingeben..." style="width: 100%; font-size: 1em; padding: 8px; border-radius: 5px; border: 1px solid #ccc; box-sizing: border-box;"></textarea>
+        </div>
+        
+        <div class="modal-actions">
+            <button id="saveNoteEditButton" class="main-action-button">Speichern</button>
+            <button id="cancelNoteEditButton" class="main-action-button" style="background-color: #aaa;">Abbrechen</button>
+        </div>
+    </div>
+</div>
+
+
+</div> 
 
 <script src="script.js"></script>
 <audio id="errorSound" src="assets/error-sound.mp3" preload="auto"></audio>
