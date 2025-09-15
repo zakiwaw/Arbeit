@@ -89,16 +89,21 @@
     </div>
 </div>
 <!-- --- START DER ÄNDERUNG --- -->
+<!-- --- START DER ÄNDERUNG: Batch Scan Feedback Modal (Close Button überarbeitet) --- -->
 <div id="batchScanFeedbackModal" class="modal-overlay">
-    <div class="modal-content"> <!-- KEIN 'batch-feedback-content' HIER -->
+    <div class="modal-content">
         <h3>Batch Scan Feedback</h3>
+        <!-- NEUER BUTTON MIT ICON UND NEUER KLASSE -->
+        <button id="closeBatchScanFeedbackModalButton" class="close-modal-icon-btn" title="Schließen">
+            <svg viewBox="0 0 24 24"><path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" /></svg>
+        </button>
         <div id="feedbackScanNumber" class="feedback-scan-number"></div>
         <div id="feedbackCarrier" class="feedback-carrier"></div>
-        <div class="modal-actions" style="justify-content: center; margin-top: 20px;">
-            <button id="closeBatchScanFeedbackModalButton" class="main-action-button" style="width: 50%;">Schließen</button>
-        </div>
+        <!-- Die alte .modal-actions div ist jetzt leer oder kann ganz entfernt werden, falls keine weiteren Buttons geplant sind -->
+        <div class="modal-actions" style="display: none;"></div> 
     </div>
 </div>
+<!-- --- ENDE DER ÄNDERUNG: Batch Scan Feedback Modal (Close Button überarbeitet) --- -->
 <!-- --- ENDE DER ÄNDERUNG --- -->
 <!-- --- ENDE DER ÄNDERUNG --- -->
 <div class="container">
