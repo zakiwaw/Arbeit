@@ -432,6 +432,13 @@ function shortenForwarderName(fullName) {
  * @param {string} huNumber Die zu prüfende HU-Nummer.
  * @returns {string|null} Den gekürzten Spediteurnamen oder null, wenn nicht gefunden.
  */
+// --- START DER ÄNDERUNG: findCarrierForHu Funktion angepasst ---
+/**
+ * Findet den Spediteur und das Zielland für eine gegebene HU-Nummer,
+ * wenn sie in einem HU-Listen-Auftrag existiert.
+ * @param {string} huNumber Die zu prüfende HU-Nummer.
+ * @returns {object|null} Ein Objekt { carrier: string, country: string } oder null, wenn nicht gefunden.
+ */
 function findCarrierForHu(huNumber) {
     const shipments = loadShipments();
     const upperHuNumber = huNumber.trim().toUpperCase();
@@ -441,16 +448,20 @@ function findCarrierForHu(huNumber) {
         if (shipment.isHuListOrder && shipment.scannedItems) {
             const foundItem = shipment.scannedItems.find(item => item.rawInput.toUpperCase() === upperHuNumber);
             if (foundItem) {
-                // Wenn der übergeordnete Auftrag einen Spediteur hat, gib ihn zurück
-                if (shipment.freightForwarder) {
-                    return shortenForwarderName(shipment.freightForwarder);
+                // Wenn der übergeordnete Auftrag einen Spediteur und ein Zielland hat, gib beides zurück
+                if (shipment.freightForwarder || shipment.destinationCountry) {
+                    return {
+                        carrier: shipment.freightForwarder ? shortenForwarderName(shipment.freightForwarder) : null,
+                        country: shipment.destinationCountry || null
+                    };
                 }
-                return null; // HU gefunden, aber kein Spediteur im Auftrag hinterlegt
+                return { carrier: null, country: null }; // HU gefunden, aber keine Spediteur/Land-Info im Auftrag
             }
         }
     }
     return null; // HU nicht in einem HU-Listen-Auftrag gefunden
 }
+// --- ENDE DER ÄNDERUNG: findCarrierForHu Funktion angepasst ---
 // --- ENDE DER ÄNDERUNG: Neue Hilfsfunktion für Spediteur-Info ---
         // --- Hilfsfunktionen: UI & Fehler ---
         function clearError() { errorDisplayEl.textContent = ''; }
@@ -478,6 +489,7 @@ function findCarrierForHu(huNumber) {
  * @param {number} minFontSize Die minimale Schriftgröße, die nicht unterschritten werden soll (in px).
  * @param {number} paddingPercent Optionaler Padding-Anteil (z.B. 0.1 für 10% links/rechts).
  */
+
 function fitTextToContainer(element, container, initialFontSize, minFontSize, paddingPercent = 0.05) {
     // Setzen Sie die Schriftgröße zuerst auf den maximalen Wert.
     element.style.fontSize = `${initialFontSize}px`;
@@ -1394,18 +1406,29 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
 // --- START DER ÄNDERUNG: Neue Funktion zum Anzeigen des Batch Scan Feedback Modals ---
 // --- START DER ÄNDERUNG: showBatchScanFeedback Funktion angepasst ---
 // --- START DER ÄNDERUNG: showBatchScanFeedback Funktion angepasst (mit Font Sizing) ---
-function showBatchScanFeedback(scanNumber, isExpected, carrierName = null) {
+// --- START DER ÄNDERUNG: showBatchScanFeedback Funktion angepasst ---
+// --- START DER ÄNDERUNG: showBatchScanFeedback Funktion angepasst (Land in neue Zeile) ---
+function showBatchScanFeedback(scanNumber, isExpected, carrierInfo = null) {
     if (!batchScanFeedbackModalEl) return;
 
     feedbackScanNumberEl.textContent = scanNumber;
-    feedbackCarrierEl.textContent = carrierName ? `Spediteur: ${carrierName}` : '';
-
-    // --- START DER ÄNDERUNG: Aufruf der fitTextToContainer Funktion ---
-    const modalContentContainer = batchScanFeedbackModalEl.querySelector('.modal-content');
-    // Annahme: body font-size ist 16px. 3.5em = 56px, 1.5em = 24px.
-    // PaddingPercent ist der Anteil der Breite, der als seitliches Padding vom Text freigehalten wird.
-    fitTextToContainer(feedbackScanNumberEl, modalContentContainer, 56, 24, 0.05);
-    // --- ENDE DER ÄNDERUNG: Aufruf der fitTextToContainer Funktion ---
+    
+    // Aufbau des Carrier/Country Strings mit Zeilenumbruch
+    let carrierAndCountryHtml = ''; // Ändern zu Html, da wir <br> verwenden
+    if (carrierInfo && (carrierInfo.carrier || carrierInfo.country)) {
+        let parts = [];
+        if (carrierInfo.carrier) {
+            parts.push(`Spediteur: ${carrierInfo.carrier}`);
+        }
+        if (carrierInfo.country) {
+            // Füge <br> hinzu, wenn es bereits einen Spediteur gibt
+            // oder wenn nur das Land angezeigt wird.
+            parts.push(`Land: ${carrierInfo.country}`);
+        }
+        // Füge <br> nur dann ein, wenn sowohl Spediteur als auch Land vorhanden sind.
+        carrierAndCountryHtml = parts.join('<br>'); 
+    }
+    feedbackCarrierEl.innerHTML = carrierAndCountryHtml; // innerHTML statt textContent verwenden
 
     // Hintergrund- und Textfarbe anpassen
     if (isExpected) {
@@ -1421,14 +1444,11 @@ function showBatchScanFeedback(scanNumber, isExpected, carrierName = null) {
     batchScanFeedbackModalEl.classList.add('visible');
     document.body.classList.add('modal-open');
 
-    // Fokus auf den Schließen-Button legen, damit das Modal nicht im Hintergrund bleibt, wenn die Tastatur nicht geöffnet ist.
     setTimeout(() => {
         closeBatchScanFeedbackModalButtonEl.focus();
-    }, 100); 
+    }, 100);
 }
-// --- ENDE DER ÄNDERUNG: showBatchScanFeedback Funktion angepasst (mit Font Sizing) ---
-// --- ENDE DER ÄNDERUNG: showBatchScanFeedback Funktion angepasst ---
-// --- ENDE DER ÄNDERUNG: Neue Funktion zum Anzeigen des Batch Scan Feedback Modals ---
+// --- ENDE DER ÄNDERUNG: showBatchScanFeedback Funktion angepasst (Land in neue Zeile) ---
 function addToBatch() {
     const rawInputFromField = shipmentNumberInputEl.value.trim();
     if (!rawInputFromField) { focusShipmentInput(); return; }
@@ -1446,18 +1466,24 @@ function addToBatch() {
     // --- START DER ÄÄNDERUNG: Batch Scan Feedback in addToBatch() ---
     let isCurrentHuExpected = isHuExpected(processedRawInput);
 
-    // Die Tonfunktion bleibt hier und ist SEPARAT vom Popup!
+
+
+    // --- Tonfunktion bleibt HIER: ---
+    // Wenn die HU NICHT erwartet wird UND der "Überzählig-Ton"-Schalter aktiv ist,
+    // wird der Fehlerton abgespielt.
     if (!isCurrentHuExpected && unexpectedHuSoundToggleEl && unexpectedHuSoundToggleEl.checked) {
-        playShortErrorSound(); // Spielt den Sound ab, wenn unerwartet und Sound-Toggle aktiv ist
+        playShortErrorSound(); // Spielt den Sound ab, wenn unerwartet und Sound aktiv
     }
 
-    // Das visuelle Feedback-Popup wird hier aufgerufen, wenn sein Toggle aktiv ist
+    // --- Neue Feedback-Popup-Funktion HIER: ---
+    // Wenn der "Scan-Feedback-Popup"-Schalter aktiv ist,
+    // wird das Modal angezeigt.
     if (batchFeedbackToggleEl && batchFeedbackToggleEl.checked) {
         const carrier = findCarrierForHu(processedRawInput);
         showBatchScanFeedback(processedRawInput, isCurrentHuExpected, carrier);
     }
-    // --- ENDE DER ÄNDERUNG: Batch Scan Feedback in addToBatch() ---
-    // --- ENDE DER ÄNDERUNG: Batch Scan Feedback in addToBatch() ---
+
+// ... (Rest der addToBatch-Funktion) ...
 
     if (isBatchModeActive && currentBatch.length === 0 && isBatchNotePromptRequired && batchNoteToggleEl.checked) {
         pendingFirstBatchScanData = { rawInput: processedRawInput, scanTimestamp: scanTimestamp };
