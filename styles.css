@@ -678,10 +678,46 @@ body.modal-open {
 }
 
 #batchScanFeedbackModal h3 {
-    color: white;
+    color: black;
     margin-bottom: 20px;
 }
+/* --- START DER ÄNDERUNG: Close-Button Icon Stil --- */
+.close-modal-icon-btn {
+    position: absolute; /* Absolut positioniert innerhalb des .modal-content */
+    top: 15px; /* Abstand vom oberen Rand */
+    right: 15px; /* Abstand vom rechten Rand */
+    background: none; /* Kein Hintergrund */
+    border: none; /* Kein Rahmen */
+    color: #bbb; /* Standardfarbe des Icons */
+    cursor: pointer;
+    font-size: 1.8em; /* Größe des Icons */
+    padding: 0;
+    width: 30px; /* Breite für Click-Bereich */
+    height: 30px; /* Höhe für Click-Bereich */
+    display: flex; /* Flexbox für Zentrierung des SVG */
+    justify-content: center;
+    align-items: center;
+    transition: color 0.2s, transform 0.2s; /* Übergang für Hover-Effekt */
+    z-index: 10; /* Sicherstellen, dass es über anderen Inhalten liegt */
+}
 
+.close-modal-icon-btn:hover {
+    color: white; /* Weißer auf Schwarz bei Hover */
+    transform: scale(1.1); /* Leicht vergrößern bei Hover */
+}
+
+.close-modal-icon-btn svg {
+    fill: currentColor; /* SVG-Farbe folgt der Textfarbe des Buttons */
+    width: 24px; /* Größe des SVG-Icons */
+    height: 24px;
+}
+/* --- ENDE DER ÄNDERUNG: Close-Button Icon Stil --- */
+
+/* Optional: Titel des Modals leicht anpassen, damit er nicht mit dem X-Icon kollidiert */
+#batchScanFeedbackModal h3 {
+    padding-right: 40px; /* Platz für das X-Icon schaffen */
+    text-align: center;
+}
 /* --- START DER ÄNDERUNG: Batch Scan Feedback Modal Stile (Font Sizing Vorbereitung) --- */
 #batchScanFeedbackModal .modal-content {
     background-color: black;
@@ -693,43 +729,53 @@ body.modal-open {
     box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
 }
 
-#batchScanFeedbackModal h3 {
-    color: white;
-    margin-bottom: 20px;
-}
 
+
+/* --- START DER ÄNDERUNG: feedbackScanNumber responsive Schriftgröße --- */
 #feedbackScanNumber {
-    font-size: 3.5em; /* Dies ist die maximale Startgröße */
+    /* Vorherige Eigenschaften beibehalten: */
     font-weight: bold;
     text-align: center;
-    /* white-space, overflow, text-overflow werden hier entfernt */
+    word-break: break-all; /* Wichtig, damit lange Nummern umbrechen, falls nötig */
     color: lime;
     background-color: black;
     padding: 10px 20px;
     border-radius: 10px;
     margin-bottom: 10px;
     min-width: 80%;
-    /* NEU: Flexbox-Eigenschaften für die zentrierte Anzeige des Textes */
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    line-height: 1; /* Verhindert zusätzlichen Zeilenabstand */
+
+    /* NEU: Responsive Schriftgröße */
+    /* clamp(minimale Größe, responsive Größe (vw), maximale Größe) */
+    /* Hier: min. 1.8em, skaliert mit 8vw (8% der Viewport-Breite), max. 3.5em */
+    font-size: clamp(2.5em, 8vw, 3.5em);
+    
+    /* NEU: Flexbox verwenden, um den Text zu zentrieren und bei Bedarf zu schrumpfen */
+    display: flex; /* Macht das Element zu einem Flex-Container */
+    justify-content: center; /* Zentriert horizontal */
+    align-items: center; /* Zentriert vertikal */
+    line-height: 1.2; /* Etwas kleinerer Zeilenabstand */
 }
 
+/* Anpassung für unerwartete Scans, falls noch nicht erfolgt */
 #feedbackScanNumber.unexpected {
     color: red;
 }
+/* --- ENDE DER ÄNDERUNG: feedbackScanNumber responsive Schriftgröße --- */
 
+/* --- START DER ÄNDERUNG: feedbackCarrier linksbündig --- */
 #feedbackCarrier {
-    font-size: 1.4em;
-    color: #bbb;
-    text-align: center;
+    font-size: 1.0em;
+    color: #ccc;
+    text-align: left; /* GEÄNDERT */
     word-break: break-all;
     font-style: italic;
     margin-top: 5px;
+    width: 100%; /* Sicherstellen, dass es die volle Breite einnimmt, um linksbündig zu wirken */
+    padding-left: 20px; /* Optional: Leichte Einrückung von links, passend zum Padding des Modals */
+    padding-right: 20px; /* Optional: Auch rechts ein Padding für Symmetrie, wenn breiter */
+    box-sizing: border-box; /* Sicherstellen, dass Padding in der Breite enthalten ist */
 }
-/* --- ENDE DER ÄNDERUNG: Batch Scan Feedback Modal Stile (Font Sizing Vorbereitung) --- */
-
+/* --- ENDE DER ÄNDERUNG: feedbackCarrier linksbündig --- */
 /* --- ENDE DER ÄNDERUNG: Batch Scan Feedback Modal --- */
 /* --- NEU: Styling für Positionen mit Dunkelalarm in der "Offene HUs"-Ansicht --- */
 .hu-value.has-dunkelalarm,
