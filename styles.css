@@ -739,7 +739,7 @@ body.modal-open {
     word-break: break-all; /* Wichtig, damit lange Nummern umbrechen, falls nötig */
     color: lime;
     background-color: black;
-    padding: 10px 20px;
+    padding: 10px 0px;
     border-radius: 10px;
     margin-bottom: 10px;
     min-width: 80%;
@@ -804,3 +804,4 @@ body.modal-open {
     background-color: #e0e0e0; /* Farbe der Linie */
     margin: 8px 0; /* Vertikaler Abstand oben und unten */
 }
+
