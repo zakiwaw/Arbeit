@@ -97,6 +97,49 @@ const closeBatchScanFeedbackModalButtonEl = document.getElementById('closeBatchS
         const NOTE_ALLOWED_STATUSES = ['XRY', 'Abgelehnt', 'Dunkelalarm', 'ETD', 'EDD'];
 	        // In der Nähe von const NON_COUNTING_STATUSES = ... einfügen
         const EXCLUSIVE_SECURITY_STATUSES = ['XRY', 'ETD', 'EDD']; // Status, die nur einmal vergeben werden dürfen
+        const KUNDENNR_CARRIER_MAP = {
+            "730": "UPS",
+            "824": "Kühne + Nagel",
+            "730201": "UPS",
+            "875201": "Maersk", // Wird von shortenForwarderName zu Maersk/Senator gekürzt
+            "524": "DSV",
+            "595": "DSV",
+            "613": "DSV",
+            "998": "DSV",
+            "285201": "WWS Freight",
+            "811205": "DB Schenker",
+            "9969726": "DB Schenker",
+            "9969729": "DB Schenker",
+            "9974024": "Kühne + Nagel",
+            "9974054": "Kühne + Nagel",
+            "9974074": "Kühne + Nagel",
+            "9974104": "Kühne + Nagel",
+            "9974144": "Kühne + Nagel",
+            "9974224": "Kühne + Nagel",
+            "9974264": "Kühne + Nagel",
+            "9975006": "Kühne + Nagel",
+            "9994954": "DHL",
+            "9994994": "DHL",
+            "758204": "TRA",
+            "7589911": "TRA",
+            "7589983": "TRA",
+            "7589984": "TRA",
+            "7589988": "TRA",
+            "608": "WWS Freight",
+            "801": "WWS Freight",
+            "541": "Kühne + Nagel",
+            "615": "Kühne + Nagel",
+            "355201": "Kühne + Nagel",
+            "985202": "Kühne + Nagel",
+            "9974021": "Kühne + Nagel",
+            "9974071": "Kühne + Nagel",
+            "9974101": "Kühne + Nagel",
+            "9974141": "Kühne + Nagel",
+            "9974221": "Kühne + Nagel",
+            "9974261": "Kühne + Nagel",
+            "9975001": "Kühne + Nagel"
+        };
+
 
         // --- Anwendungsstatus ---
         let isBatchModeActive = false;
@@ -404,6 +447,10 @@ function playShortErrorSound() {
         }
     }
 }
+// script.js
+
+// ... (bestehender Code) ...
+
 function shortenForwarderName(fullName) {
     if (!fullName) return ''; // Leere Eingaben abfangen
 
@@ -422,10 +469,14 @@ function shortenForwarderName(fullName) {
 	if (lowerCaseName.includes('dsv')) return 'DSV';
     if (lowerCaseName.includes('hermes')) return 'HERMES';
     if (lowerCaseName.includes('wws freight')) return 'WWS';
+    // NEU: TRA hinzufügen
+    if (lowerCaseName.includes('tra')) return 'TRA';
 
     // Wenn keine Regel zutrifft, den Originalnamen zurückgeben
     return fullName;
 }
+
+
 // --- START DER ÄNDERUNG: Neue Hilfsfunktion für Spediteur-Info ---
 /**
  * Findet den Spediteur für eine gegebene HU-Nummer, wenn sie in einem HU-Listen-Auftrag existiert.
@@ -792,7 +843,7 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
         detailsHtml += `<div class="scan-main-info">`;
         detailsHtml += `<span class="timestamp">[${dateStr} ${timeStr}]</span> `;
         let numberPart = isManOrder && item.position ? `<span class="position-number">${item.position}.</span> ` : '';
-        let sendnrHtml = item.sendnr ? `<span class="sendnr-display"> (Send.: ${escapeHtml(item.sendnr)})</span>` : '';
+        let sendnrHtml = item.sendnr ? `<span class="sendnr-display"> (${escapeHtml(item.sendnr)})</span>` : '';
         detailsHtml += `${numberPart}<span class="hu-value">${escapeHtml(item.rawInput)}</span>${sendnrHtml} → <span class="status">${escapeHtml(item.status)}</span>${item.isCombination ? ` <span class="combo">(Kombi)</span>` : ''}`;
         if (isCancelled) {
             const cancelDt = item.cancelledTimestamp ? new Date(item.cancelledTimestamp) : null;
@@ -2241,75 +2292,92 @@ shipmentNumberInputEl.addEventListener('input', () => {
         location.reload();
         return;
     } 
-    else if (currentValue.startsWith('FRT_VVL_V1')) {
-        if (!confirm("Eine Vorverladeliste wurde erkannt.\n\nMöchtest du alle darin enthaltenen Kundenaufträge jetzt importieren?")) {
-            shipmentNumberInputEl.value = ''; 
-            return;
-        }
+    // script.js
 
-        const parts = currentValue.split(';;;').slice(1);
-        const shipments = loadShipments();
-        const now = new Date().toISOString();
-        let addedPositionsCount = 0;
-        let newOrders = new Set();
-        let updatedOrders = new Set();
+// ... (bestehender Code im Event-Listener für shipmentNumberInputEl) ...
 
-        parts.forEach(orderData => {
-            const [metaAndOrder, huData] = orderData.split('|||');
-            if (!metaAndOrder || !huData) return;
-            const metaParts = metaAndOrder.split('|');
-            const kundennr = metaParts[0];
-            const vorverladelisteNr = metaParts.length > 1 ? metaParts[1] : 'N/A';
-            const positionen = huData.split(' ').filter(Boolean);
+else if (currentValue.startsWith('FRT_VVL_V1')) {
+    if (!confirm("Eine Vorverladeliste wurde erkannt.\n\nMöchtest du alle darin enthaltenen Kundenaufträge jetzt importieren?")) {
+        shipmentNumberInputEl.value = ''; 
+        return;
+    }
 
-            // PRÜFUNG: Existiert der Kunde bereits?
-            if (!shipments[kundennr]) {
-                // NEUER KUNDE: Anlegen und alle Positionen hinzufügen
-                newOrders.add(kundennr);
-                shipments[kundennr] = {
-                    hawb: kundennr, lastModified: now, totalPiecesExpected: positionen.length,
-                    scannedItems: [], mitarbeiter: MITARBEITER_NAME, isHuListOrder: true,
-                    parentOrderNumber: vorverladelisteNr
-                };
-                positionen.forEach(pos => {
-                    const [vse, sendnr] = pos.split(':');
-                    shipments[kundennr].scannedItems.push({
+    const parts = currentValue.split(';;;').slice(1);
+    const shipments = loadShipments();
+    const now = new Date().toISOString();
+    let addedPositionsCount = 0;
+    let newOrders = new Set();
+    let updatedOrders = new Set();
+
+    parts.forEach(orderData => {
+        const [metaAndOrder, huData] = orderData.split('|||');
+        if (!metaAndOrder || !huData) return;
+        const metaParts = metaAndOrder.split('|');
+        const kundennr = metaParts[0];
+        const vorverladelisteNr = metaParts.length > 1 ? metaParts[1] : 'N/A';
+        const positionen = huData.split(' ').filter(Boolean);
+
+        // PRÜFUNG: Existiert der Kunde bereits?
+        if (!shipments[kundennr]) {
+            // NEUER KUNDE: Anlegen und alle Positionen hinzufügen
+            newOrders.add(kundennr);
+            shipments[kundennr] = {
+                hawb: kundennr, lastModified: now, totalPiecesExpected: positionen.length,
+                scannedItems: [], mitarbeiter: MITARBEITER_NAME, isHuListOrder: true,
+                parentOrderNumber: vorverladelisteNr
+            };
+            // NEU: Spediteur aus der Map hinzufügen
+            if (KUNDENNR_CARRIER_MAP[kundennr]) {
+                shipments[kundennr].freightForwarder = KUNDENNR_CARRIER_MAP[kundennr];
+                // Das Zielland ist in der bereitgestellten Karte nicht enthalten,
+                // daher wird es hier nicht gesetzt.
+            }
+
+            positionen.forEach(pos => {
+                const [vse, sendnr] = pos.split(':');
+                shipments[kundennr].scannedItems.push({
+                    rawInput: vse, sendnr: sendnr, status: 'Anstehend', timestamp: now,
+                    isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null
+                });
+                addedPositionsCount++;
+            });
+        } else {
+            // BESTEHENDER KUNDE: Nur die NEUEN Positionen hinzufügen
+            updatedOrders.add(kundennr);
+            const existingShipment = shipments[kundennr];
+            let newPositionsAddedToThisCustomer = 0;
+
+            // NEU: Spediteur aktualisieren, falls nicht bereits vorhanden
+            if (KUNDENNR_CARRIER_MAP[kundennr] && !existingShipment.freightForwarder) {
+                existingShipment.freightForwarder = KUNDENNR_CARRIER_MAP[kundennr];
+            }
+
+            positionen.forEach(pos => {
+                const [vse, sendnr] = pos.split(':');
+                const alreadyExists = existingShipment.scannedItems.some(item => item.rawInput === vse);
+                if (!alreadyExists) {
+                    existingShipment.scannedItems.push({
                         rawInput: vse, sendnr: sendnr, status: 'Anstehend', timestamp: now,
                         isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null
                     });
                     addedPositionsCount++;
-                });
-            } else {
-                // BESTEHENDER KUNDE: Nur die NEUEN Positionen hinzufügen
-                updatedOrders.add(kundennr);
-                const existingShipment = shipments[kundennr];
-                let newPositionsAddedToThisCustomer = 0;
-
-                positionen.forEach(pos => {
-                    const [vse, sendnr] = pos.split(':');
-                    const alreadyExists = existingShipment.scannedItems.some(item => item.rawInput === vse);
-                    if (!alreadyExists) {
-                        existingShipment.scannedItems.push({
-                            rawInput: vse, sendnr: sendnr, status: 'Anstehend', timestamp: now,
-                            isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null
-                        });
-                        addedPositionsCount++;
-                        newPositionsAddedToThisCustomer++;
-                    }
-                });
-
-                if (newPositionsAddedToThisCustomer > 0) {
-                    existingShipment.totalPiecesExpected += newPositionsAddedToThisCustomer;
-                    existingShipment.lastModified = now;
+                    newPositionsAddedToThisCustomer++;
                 }
-            }
-        });
+            });
 
-        saveShipments(shipments);
-        alert(`Import abgeschlossen:\n- ${addedPositionsCount} Positionen importiert.\n- ${newOrders.size} neue Aufträge angelegt.\n- ${updatedOrders.size} Aufträge aktualisiert.`);
-        location.reload();
-        return;
-    }
+            if (newPositionsAddedToThisCustomer > 0) {
+                existingShipment.totalPiecesExpected += newPositionsAddedToThisCustomer;
+                existingShipment.lastModified = now;
+            }
+        }
+    });
+
+    saveShipments(shipments);
+    alert(`Import abgeschlossen:\n- ${addedPositionsCount} Positionen importiert.\n- ${newOrders.size} neue Aufträge angelegt.\n- ${updatedOrders.size} Aufträge aktualisiert.`);
+    location.reload();
+    return;
+}
+
 
     // --- MANUELLE EINGABE / BATCH-MODUS ---
     updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
