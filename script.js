@@ -118,7 +118,11 @@ const closeBatchScanFeedbackModalButtonEl = document.getElementById('closeBatchS
             "9974224": "Kühne + Nagel",
             "9974264": "Kühne + Nagel",
             "9975006": "Kühne + Nagel",
+            "9974051": "Kühne + Nagel",
             "9994954": "DHL",
+            "334": "DHL",
+            "815": "DHL",
+            "981": "DHL",
             "9994994": "DHL",
             "758204": "TRA",
             "7589911": "TRA",
@@ -137,6 +141,7 @@ const closeBatchScanFeedbackModalButtonEl = document.getElementById('closeBatchS
             "9974141": "Kühne + Nagel",
             "9974221": "Kühne + Nagel",
             "9974261": "Kühne + Nagel",
+            "9974251": "Kühne + Nagel",
             "9975001": "Kühne + Nagel"
         };
 
@@ -1430,13 +1435,17 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
                 removeBtn.classList.add('remove-batch-item');
                 removeBtn.title = `${escapeHtml(batchItem.rawInput)} aus Batch entfernen`;
                 removeBtn.onclick = () => {
-                    currentBatch.splice(index, 1);
-                    updateBatchUI();
-                    if (currentBatch.length === 0) { // Wenn Batch leer wird
-                        isBatchNotePromptRequired = true; // Für nächsten Batch wieder Modal
-                        currentBatchGlobalNote = null;
-                        updateCurrentBatchNoteDisplay();
+                    // --- START DER ÄNDERUNG ---
+                    if (confirm(`Soll "${escapeHtml(batchItem.rawInput)}" aus dem Batch entfernt werden?`)) {
+                        currentBatch.splice(index, 1);
+                        updateBatchUI();
+                        if (currentBatch.length === 0) { // Wenn Batch leer wird
+                            isBatchNotePromptRequired = true; // Für nächsten Batch wieder Modal
+                            currentBatchGlobalNote = null;
+                            updateCurrentBatchNoteDisplay();
+                        }
                     }
+                    // --- ENDE DER ÄNDERUNG ---
                 };
                 li.appendChild(removeBtn);
                 batchListEl.appendChild(li);
@@ -1444,6 +1453,7 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
             batchItemCountEl.textContent = currentBatch.length;
             updateCurrentBatchNoteDisplay();
         }
+
         
         function updateCurrentBatchNoteDisplay() {
             if (isBatchModeActive && currentBatchGlobalNote) {
