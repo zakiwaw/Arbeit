@@ -87,7 +87,7 @@ const closeBatchScanFeedbackModalButtonEl = document.getElementById('closeBatchS
 // --- ENDE DER ÄNDERUNG ---
 
         // --- Konstanten & Konfiguration ---
-        const WEB_APP_URL_BACKEND = 'https://script.google.com/macros/s/AKfycbxEdEC7uAOy743-7cK8T0pP46vM4TNU2SgzOE_UBtI_IaGIxjKsFbre0Yo9WQTg7r63/exec';
+        const WEB_APP_URL_BACKEND = 'https://script.google.com/macros/s/AKfycbykFSszgRbAlm6hEG_s8Qp0taUTG_lVxRpT6C-clxaCF8OHF3KawTMGcfqtHV_dZ3fp/exec'; // Mail_12
         const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbweFC3K1wgksWq3Dd79bJDkbsBdYaORycXSlbIGvQ5JDe6eYj7PtTti3gpBJArRSdp63Q/exec';
         const LOCAL_STORAGE_KEY = 'frachtSicherungMobile_V8_18_Refactored';
         const SUFFIX_LENGTH = 4;
