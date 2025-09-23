@@ -1023,7 +1023,10 @@ function renderTable() {
 
 // --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESER FINALEN KORREKTUR ---
 
+// --- START DER ÄNDERUNG: Die komplette Funktion wird aktualisiert (mit WE-Prüfung) ---
 function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFromCheckbox) {
+    const statusesThatTriggerWE = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
+
     const { baseNumber, suffix, isValidFormat, raw: processedRawInput, isSuffixFormat } = processShipmentNumber(rawInputToSave);
     if (!isValidFormat) { return { success: false, waitingForTotal: false, message: `Ungültiges Format: ${escapeHtml(rawInputToSave)}` }; }
 
@@ -1039,14 +1042,11 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
         const isSecurityStatus = EXCLUSIVE_SECURITY_STATUSES.includes(statusToUse);
         const isFinalClearanceScan = isSecurityStatus && !isNewScanKombi;
 
-        // KORREKTE ZÄHLUNG: Zählt, wie oft diese HU in der Originalliste vorkam (physische Slots).
-        // Das ist das absolute Limit für jeden Scan-Typ.
         const packageLimitForThisHu = parentShipment.scannedItems.filter(item => 
             item.rawInput.toUpperCase() === processedRawInput.toUpperCase() && 
             (item.status === 'Anstehend' || EXCLUSIVE_SECURITY_STATUSES.includes(item.status))
         ).length;
 
-        // Fall 1: Finale Sicherung (verbraucht einen "Anstehend"-Slot)
         if (isFinalClearanceScan) {
             const anstehendIndex = parentShipment.scannedItems.findIndex(i => i.rawInput.toUpperCase() === processedRawInput.toUpperCase() && i.status === 'Anstehend' && !i.isCancelled);
             if (anstehendIndex === -1) { 
@@ -1057,23 +1057,17 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
             itemToUpdate.timestamp = now.toISOString();
             itemToUpdate.isCombination = false;
             if (noteText) itemToUpdate.notes.push(noteText);
-        
-        // Fall 2: Zusätzlicher Scan (wird hinzugefügt, mit präziser Limit-Prüfung)
         } else {
-            // Zählt, wie viele Scans des ZIEL-TYPS bereits existieren
             let currentScansOfType = 0;
             if(isNewScanKombi) {
                 currentScansOfType = parentShipment.scannedItems.filter(item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() && item.isCombination && !item.isCancelled).length;
             } else {
                  currentScansOfType = parentShipment.scannedItems.filter(item => item.rawInput.toUpperCase() === processedRawInput.toUpperCase() && item.status === statusToUse && !item.isCancelled).length;
             }
-            
-            // Vergleicht die aktuelle Anzahl mit dem Limit
             if (currentScansOfType >= packageLimitForThisHu) {
                 const scanTypeText = isNewScanKombi ? 'Kombi-Sicherung' : statusToUse;
                 return { success: false, waitingForTotal: false, message: `FEHLER: Limit (${packageLimitForThisHu}) für '${scanTypeText}' bei HU ${escapeHtml(processedRawInput)} erreicht.` };
             }
-            
             const existingItemIndex = parentShipment.scannedItems.findIndex(i => i.rawInput.toUpperCase() === processedRawInput.toUpperCase());
             if (existingItemIndex === -1) { return { success: false, waitingForTotal: false, message: `FEHLER: HU ${escapeHtml(processedRawInput)} nicht im Auftrag ${parentHawb} gefunden.` }; }
 
@@ -1086,6 +1080,26 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
             };
             parentShipment.scannedItems.push(newItem);
         }
+
+        // *** KERNÄNDERUNG: Prüfung auf existierenden Wareneingang ***
+        if (statusesThatTriggerWE.includes(statusToUse)) {
+            const weAlreadyExistsForHu = parentShipment.scannedItems.some(item => 
+                !item.isCancelled &&
+                item.status === 'Wareneingang' &&
+                item.rawInput.toUpperCase() === processedRawInput.toUpperCase()
+            );
+            if (!weAlreadyExistsForHu) {
+                const originalItemForWE = parentShipment.scannedItems.find(i => i.rawInput.toUpperCase() === processedRawInput.toUpperCase());
+                const weItem = {
+                    rawInput: processedRawInput, status: 'Wareneingang', 
+                    timestamp: new Date(now.getTime() + 1).toISOString(),
+                    isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null,
+                    position: originalItemForWE.position, sendnr: originalItemForWE.sendnr
+                };
+                parentShipment.scannedItems.push(weItem);
+            }
+        }
+
         parentShipment.lastModified = now.toISOString();
         saveShipments(shipments);
         resetSingleScanNoteInputState();
@@ -1098,7 +1112,6 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
         return { success: false, waitingForTotal: false, message: `FEHLER: ${baseNumber} ist ein HU-Auftrag. Bitte scannen Sie eine der zugehörigen HU/VSE-Nummern.` };
     }
     if (!shipments[baseNumber]) {
-        // Logik für neue Sendungen
         const tempIsCombination = (statusToUse === 'XRY' && !isBatchModeActive && isCombinationFromCheckbox);
         const tempFinalIsCombination = NON_COUNTING_STATUSES.includes(statusToUse) ? false : tempIsCombination;
         pendingScanDataForNewShipment = { baseNumber, rawInput: processedRawInput, status: statusToUse, isCombination: tempFinalIsCombination, note: noteInputEl.value.trim() || null, timestamp: new Date().toISOString(), suffix };
@@ -1106,7 +1119,6 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
         return { success: false, waitingForTotal: true, message: `Bitte Gesamtstückzahl für ${escapeHtml(baseNumber)} eingeben oder überspringen.` };
     }
     
-    // Logik für bereits existierende, normale Sendungen
     const shipment = shipments[baseNumber];
     const isCombination = (statusToUse === 'XRY' && isCombinationFromCheckbox);
 
@@ -1146,6 +1158,24 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
     const noteText = noteInputEl.value.trim() || null;
     const newItem = { rawInput: processedRawInput, status: statusToUse, timestamp: now.toISOString(), isCombination, notes: noteText ? [noteText] : [], isCancelled: false, cancelledTimestamp: null };
     shipment.scannedItems.push(newItem);
+
+    // *** KERNÄNDERUNG: Prüfung auf existierenden Wareneingang ***
+    if (statusesThatTriggerWE.includes(statusToUse)) {
+        const weAlreadyExists = shipment.scannedItems.some(item =>
+            !item.isCancelled &&
+            item.status === 'Wareneingang' &&
+            item.rawInput.toUpperCase() === processedRawInput.toUpperCase()
+        );
+        if (!weAlreadyExists) {
+            const weItem = {
+                rawInput: processedRawInput, status: 'Wareneingang',
+                timestamp: new Date(now.getTime() + 1).toISOString(),
+                isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null
+            };
+            shipment.scannedItems.push(weItem);
+        }
+    }
+
     shipment.lastModified = now.toISOString();
     saveShipments(shipments);
     resetSingleScanNoteInputState();
@@ -1156,6 +1186,8 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
     }
     return { success: true, waitingForTotal: false, message: `${processedRawInput} (${statusToUse}) zu ${baseNumber} hinzugefügt.` };
 }
+// --- ENDE DER ÄNDERUNG ---
+
         
         
         
@@ -1653,9 +1685,13 @@ function skipNoteAndAddFirstBatchItem() {
 
 // --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESER KORRIGIERTEN VERSION ---
 
+// --- START DER ÄNDERUNG: Die komplette Funktion wird aktualisiert ---
 function saveBatch() {
     if (currentBatch.length === 0) { displayError("Batch ist leer."); focusShipmentInput(); return; }
     
+    // NEU: Status-Liste, die automatisch einen Wareneingang auslöst
+    const statusesThatTriggerWE = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
+
     let successCount = 0;
     let errorCount = 0;
     let errorMessages = [];
@@ -1711,6 +1747,19 @@ function saveBatch() {
                 };
                 parentShipment.scannedItems.push(newScanItem);
             }
+
+            // NEU: Automatisches Hinzufügen eines Wareneingang-Scans im Batch
+            if (statusesThatTriggerWE.includes(batchStatus)) {
+                const originalItemForWE = parentShipment.scannedItems.find(i => i.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase());
+                const weItem = {
+                    rawInput: rawInputFromBatch, status: 'Wareneingang',
+                    timestamp: new Date(new Date(scanTimestamp).getTime() + 1).toISOString(),
+                    isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null,
+                    position: originalItemForWE.position, sendnr: originalItemForWE.sendnr
+                };
+                parentShipment.scannedItems.push(weItem);
+            }
+
             parentShipment.lastModified = scanTimestamp;
             affectedBaseNumbersForNotification.add(parentHawb);
             successCount++;
@@ -1757,6 +1806,17 @@ function saveBatch() {
             isCancelled: false, cancelledTimestamp: null
         };
         shipmentToUpdate.scannedItems.push(newScanItem);
+
+        // NEU: Automatisches Hinzufügen eines Wareneingang-Scans im Batch
+        if (statusesThatTriggerWE.includes(batchStatus)) {
+            const weItem = {
+                rawInput: processedRawInput, status: 'Wareneingang',
+                timestamp: new Date(new Date(scanTimestamp).getTime() + 1).toISOString(),
+                isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null
+            };
+            shipmentToUpdate.scannedItems.push(weItem);
+        }
+
         shipmentToUpdate.lastModified = scanTimestamp;
         affectedBaseNumbersForNotification.add(baseNumber);
         successCount++;
@@ -1791,6 +1851,7 @@ function saveBatch() {
     displayCurrentShipmentDetails('');
     focusShipmentInput();
 }
+// --- ENDE DER ÄNDERUNG ---
 
 
 
