@@ -62,11 +62,18 @@
 
         
         <!-- TAB-BUTTONS AKTUALISIERT -->
-        <div class="modal-tabs">
-            <button id="showOpenSecurityHusBtn" class="modal-tab-btn active">Offene Sicherung</button>
-            <button id="showMissingReceiptHusBtn" class="modal-tab-btn">Fehlende Eingänge</button>
-            <button id="showDunkelalarmHusBtn" class="modal-tab-btn">Dunkelalarm</button>
-        </div>
+        <!-- ÄNDERUNG in index.html -->
+<div class="modal-tabs">
+    <button id="showOpenSecurityHusBtn" class="modal-tab-btn active">Offene Sicherung</button>
+    <button id="showMissingReceiptHusBtn" class="modal-tab-btn">
+        Fehlende Eingänge
+        <span id="missingReceiptsBadge" class="tab-badge hidden"></span>
+    </button>
+    <button id="showDunkelalarmHusBtn" class="modal-tab-btn">
+        Dunkelalarm
+        <span id="dunkelalarmBadge" class="tab-badge hidden"></span>
+    </button>
+</div>
 
         <!-- Container für die erste Ansicht (bestehend) -->
         <div id="openHusListContainer" style="max-height: 60vh; overflow-y: auto; padding-right: 10px;">
