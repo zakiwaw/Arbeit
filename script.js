@@ -87,7 +87,7 @@ const closeBatchScanFeedbackModalButtonEl = document.getElementById('closeBatchS
 // --- ENDE DER ÄNDERUNG ---
 
         // --- Konstanten & Konfiguration ---
-        const WEB_APP_URL_BACKEND = 'https://script.google.com/macros/s/AKfycbykFSszgRbAlm6hEG_s8Qp0taUTG_lVxRpT6C-clxaCF8OHF3KawTMGcfqtHV_dZ3fp/exec'; // Mail_12
+        const WEB_APP_URL_BACKEND = 'https://script.google.com/macros/s/AKfycbyBtlm37WxzXdFCDjQuSIWfnQiTny6gwrmXuoq_cacGY9_bkqZxuuW7aJEqLuHJhWYg/exec'; // Mail_12
         const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbweFC3K1wgksWq3Dd79bJDkbsBdYaORycXSlbIGvQ5JDe6eYj7PtTti3gpBJArRSdp63Q/exec';
         const LOCAL_STORAGE_KEY = 'frachtSicherungMobile_V8_18_Refactored';
         const SUFFIX_LENGTH = 4;
@@ -189,9 +189,7 @@ function calculateGoodsReceiptCount(scannedItems) {
 // --- START DER ÄNDERUNG: Die gesamte Funktion wird aktualisiert ---
 // --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESEM CODE ---
 
-// --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESEM CODE ---
-
-// --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESER FINALEN KORREKTUR ---
+// ERSETZE die komplette Funktion showOpenHusSummary in script.js
 
 function showOpenHusSummary() {
     removeActiveInlineNoteEditor();
@@ -199,6 +197,8 @@ function showOpenHusSummary() {
     const securityClearanceStatuses = ['XRY', 'ETD', 'EDD'];
     let openSecurityHusByOrder = [], missingReceiptHusByOrder = [], dunkelalarmItemsByOrder = {};
 
+    // ... (der gesamte Code zur Datensammlung bleibt unverändert) ...
+    // HIER beginnt die unveränderte Logik zum Sammeln der Daten
     Object.keys(shipments).forEach(baseNumber => {
         const shipment = shipments[baseNumber];
         
@@ -257,28 +257,41 @@ function showOpenHusSummary() {
             }
         }
     });
+    // HIER endet die unveränderte Logik zum Sammeln der Daten
+
+    // --- START: NEUE LOGIK ZUM BERECHNEN UND ANZEIGEN DER BADGES ---
+    const totalMissingReceipts = missingReceiptHusByOrder.reduce((sum, order) => sum + order.pendingHus.length, 0);
+    const totalDunkelalarms = Object.values(dunkelalarmItemsByOrder).reduce((sum, data) => sum + data.items.length, 0);
+
+    const missingBadge = document.getElementById('missingReceiptsBadge');
+    const dunkelalarmBadge = document.getElementById('dunkelalarmBadge');
+
+    if (missingBadge) {
+        missingBadge.textContent = totalMissingReceipts;
+        missingBadge.classList.toggle('hidden', totalMissingReceipts === 0);
+    }
+    if (dunkelalarmBadge) {
+        dunkelalarmBadge.textContent = totalDunkelalarms;
+        dunkelalarmBadge.classList.toggle('hidden', totalDunkelalarms === 0);
+    }
+    // --- ENDE: NEUE LOGIK FÜR BADGES ---
 
     const sortByCountryAndOrder = (a, b) => (a.destinationCountry || 'zz').localeCompare(b.destinationCountry || 'zz') || (a.orderNumber || a.hawb).localeCompare(b.orderNumber || a.hawb);
     
-    // HILFSFUNKTION - JETZT MIT ROBUSTER DUNKELALARM-PRÜFUNG
+    // ... (der Rest der Funktion, generateHuListHtml etc., bleibt komplett unverändert) ...
+    // HIER beginnt der unveränderte Rest der Funktion
     const generateHuListHtml = (items, allScannedItemsForContext) => {
         if (!items || items.length === 0) return '';
-
-        // Schritt 1: Erstelle eine Liste (Set) aller Nummern, die einen Dunkelalarm haben.
         const dunkelalarmedNumbers = new Set(
             allScannedItemsForContext
                 .filter(scan => scan.status === 'Dunkelalarm' && !scan.isCancelled)
                 .map(scan => scan.rawInput)
         );
-
         const sortedItems = items.sort((a, b) => (a.position || 9999) - (b.position || 9999));
-        
         const isVvlList = sortedItems[0] && sortedItems[0].sendnr;
-
-        if (isVvlList) { // Für VW-Vorverladelisten
+        if (isVvlList) {
             let html = '<div class="hu-list-header"><span>VSE-Nummer</span><span>Sendungs-Nr.</span></div>';
             const listItems = sortedItems.map(item => {
-                // Schritt 2: Prüfe direkt, ob die VSE-Nummer in der Dunkelalarm-Liste ist.
                 const hasDunkelalarm = dunkelalarmedNumbers.has(item.rawInput);
                 const alarmClass = hasDunkelalarm ? 'has-dunkelalarm' : '';
                 return `
@@ -290,29 +303,24 @@ function showOpenHusSummary() {
                     </li>`;
             }).join('');
             return html + `<ul class="hu-list vvl-list">${listItems}</ul>`;
-        } else { // Für alle anderen Listen (MAN, etc.)
+        } else {
             const listItems = sortedItems.map(item => {
                 const parentOrder = shipments[item.orderNumber] || shipments[Object.keys(shipments).find(key => shipments[key].scannedItems && shipments[key].scannedItems.some(i => i.rawInput === item.rawInput))];
                 const isManOrderContext = parentOrder && parentOrder.freightForwarder;
                 const positionHtml = isManOrderContext && item.position ? `<span class="position-number">${item.position}.</span>` : ``;
-
-                // Schritt 2 (hier auch): Prüfe, ob die HU-Nummer in der Dunkelalarm-Liste ist.
                 const hasDunkelalarm = dunkelalarmedNumbers.has(item.rawInput);
                 const alarmClass = hasDunkelalarm ? 'has-dunkelalarm' : '';
-
                 return `<li>${positionHtml}<span class="hu-value ${alarmClass}">${escapeHtml(item.rawInput)}</span></li>`;
             }).join('');
             return `<ul class="hu-list">${listItems}</ul>`;
         }
     };
-    
     const generateHtmlForOrderGroup = (order, listItemsHtml, forDunkelalarm = false) => {
         const orderNumber = order.orderNumber || order.hawb;
         let countText = '';
         if (!forDunkelalarm) {
              countText = order.receiptCount !== undefined ? `(${order.receiptCount} von ${order.totalHus} erfasst)`: `(${(order.totalHus - order.pendingHus.length)} von ${order.totalHus} erfasst)`;
         }
-
         let titleHtml = '';
         if (order.parentOrderNumber) {
             titleHtml = `VVL: ${escapeHtml(order.parentOrderNumber)}<br><small>Kundennr: ${escapeHtml(orderNumber)} ${countText}</small>`;
@@ -329,18 +337,14 @@ function showOpenHusSummary() {
             }
             titleHtml = `${titlePrefix}${escapeHtml(orderNumber)} ${countText}${metaLineHtml}`;
         }
-
         return `<div class="hu-order-group"><div class="hu-order-title">${titleHtml}</div>${listItemsHtml}</div>`;
     };
-    
     openSecurityHusByOrder.sort(sortByCountryAndOrder);
     missingReceiptHusByOrder.sort(sortByCountryAndOrder);
     const dunkelalarmArray = Object.values(dunkelalarmItemsByOrder).sort(sortByCountryAndOrder);
-
     openHusListContainerEl.innerHTML = openSecurityHusByOrder.map(order => generateHtmlForOrderGroup(order, generateHuListHtml(order.pendingHus, order.scannedItems))).join('') || '<p class="no-open-hus-message">Glückwunsch! Alle HUs sind sicherheitstechnisch bearbeitet.</p>';
     missingReceiptHusListContainerEl.innerHTML = missingReceiptHusByOrder.map(order => generateHtmlForOrderGroup(order, generateHuListHtml(order.pendingHus, order.scannedItems))).join('') || '<p class="no-open-hus-message">Perfekt! Alle HUs wurden im Wareneingang erfasst.</p>';
     dunkelalarmHusListContainerEl.innerHTML = dunkelalarmArray.map(data => generateHtmlForOrderGroup(data, generateHuListHtml(data.items, data.scannedItems), true)).join('') || '<p class="no-open-hus-message">Keine Einträge mit Status "Dunkelalarm" gefunden.</p>';
-
     showOpenSecurityHusBtnEl.classList.add('active');
     missingReceiptHusListContainerEl.style.display = 'none';
     openHusListContainerEl.style.display = 'block';
@@ -1024,6 +1028,8 @@ function renderTable() {
 // --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESER FINALEN KORREKTUR ---
 
 // --- START DER ÄNDERUNG: Die komplette Funktion wird aktualisiert (mit WE-Prüfung) ---
+// --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESER NEUEN VERSION ---
+
 function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFromCheckbox) {
     const statusesThatTriggerWE = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
 
@@ -1081,7 +1087,6 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
             parentShipment.scannedItems.push(newItem);
         }
 
-        // *** KERNÄNDERUNG: Prüfung auf existierenden Wareneingang ***
         if (statusesThatTriggerWE.includes(statusToUse)) {
             const weAlreadyExistsForHu = parentShipment.scannedItems.some(item => 
                 !item.isCancelled &&
@@ -1094,7 +1099,8 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
                     rawInput: processedRawInput, status: 'Wareneingang', 
                     timestamp: new Date(now.getTime() + 1).toISOString(),
                     isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null,
-                    position: originalItemForWE.position, sendnr: originalItemForWE.sendnr
+                    position: originalItemForWE.position, sendnr: originalItemForWE.sendnr,
+                    isAutoGeneratedWE: true // <-- NEUES FLAG
                 };
                 parentShipment.scannedItems.push(weItem);
             }
@@ -1159,7 +1165,6 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
     const newItem = { rawInput: processedRawInput, status: statusToUse, timestamp: now.toISOString(), isCombination, notes: noteText ? [noteText] : [], isCancelled: false, cancelledTimestamp: null };
     shipment.scannedItems.push(newItem);
 
-    // *** KERNÄNDERUNG: Prüfung auf existierenden Wareneingang ***
     if (statusesThatTriggerWE.includes(statusToUse)) {
         const weAlreadyExists = shipment.scannedItems.some(item =>
             !item.isCancelled &&
@@ -1170,7 +1175,8 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
             const weItem = {
                 rawInput: processedRawInput, status: 'Wareneingang',
                 timestamp: new Date(now.getTime() + 1).toISOString(),
-                isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null
+                isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null,
+                isAutoGeneratedWE: true // <-- NEUES FLAG
             };
             shipment.scannedItems.push(weItem);
         }
@@ -1186,7 +1192,6 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
     }
     return { success: true, waitingForTotal: false, message: `${processedRawInput} (${statusToUse}) zu ${baseNumber} hinzugefügt.` };
 }
-// --- ENDE DER ÄNDERUNG ---
 
         
         
@@ -1686,10 +1691,11 @@ function skipNoteAndAddFirstBatchItem() {
 // --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESER KORRIGIERTEN VERSION ---
 
 // --- START DER ÄNDERUNG: Die komplette Funktion wird aktualisiert ---
+// --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESER NEUEN VERSION ---
+
 function saveBatch() {
     if (currentBatch.length === 0) { displayError("Batch ist leer."); focusShipmentInput(); return; }
     
-    // NEU: Status-Liste, die automatisch einen Wareneingang auslöst
     const statusesThatTriggerWE = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
 
     let successCount = 0;
@@ -1748,14 +1754,14 @@ function saveBatch() {
                 parentShipment.scannedItems.push(newScanItem);
             }
 
-            // NEU: Automatisches Hinzufügen eines Wareneingang-Scans im Batch
             if (statusesThatTriggerWE.includes(batchStatus)) {
                 const originalItemForWE = parentShipment.scannedItems.find(i => i.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase());
                 const weItem = {
                     rawInput: rawInputFromBatch, status: 'Wareneingang',
                     timestamp: new Date(new Date(scanTimestamp).getTime() + 1).toISOString(),
                     isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null,
-                    position: originalItemForWE.position, sendnr: originalItemForWE.sendnr
+                    position: originalItemForWE.position, sendnr: originalItemForWE.sendnr,
+                    isAutoGeneratedWE: true // <-- NEUES FLAG
                 };
                 parentShipment.scannedItems.push(weItem);
             }
@@ -1807,12 +1813,12 @@ function saveBatch() {
         };
         shipmentToUpdate.scannedItems.push(newScanItem);
 
-        // NEU: Automatisches Hinzufügen eines Wareneingang-Scans im Batch
         if (statusesThatTriggerWE.includes(batchStatus)) {
             const weItem = {
                 rawInput: processedRawInput, status: 'Wareneingang',
                 timestamp: new Date(new Date(scanTimestamp).getTime() + 1).toISOString(),
-                isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null
+                isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null,
+                isAutoGeneratedWE: true // <-- NEUES FLAG
             };
             shipmentToUpdate.scannedItems.push(weItem);
         }
@@ -1851,7 +1857,6 @@ function saveBatch() {
     displayCurrentShipmentDetails('');
     focusShipmentInput();
 }
-// --- ENDE DER ÄNDERUNG ---
 
 
 
@@ -2328,13 +2333,19 @@ function generatePdfInBrowser(event) {
     // focusShipmentInput(); // Fokus nicht sofort zurücksetzen, da das Senden asynchron ist
 }
     
+// --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESER NEUEN VERSION ---
+
+// --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESER KORRIGIERTEN VERSION ---
+
+// In script.js
+// --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESER VERSION ---
+
 async function sendPdfEmailViaBackend(event) {
     const pdfButton = event.target;
-    pdfButton.disabled = true; // Button während des Sendens deaktivieren
+    pdfButton.disabled = true;
     const originalText = pdfButton.textContent;
-    pdfButton.textContent = 'Sende E-Mail...'; // Statusanzeige am Button
+    pdfButton.textContent = 'Sende E-Mail...';
 
-    // Daten sammeln (identisch zur Logik in generatePdfInBrowser)
     const clickedBaseNumber = pdfButton.dataset.basenumber;
     const parentOrderNumber = pdfButton.dataset.parentordernumber;
 
@@ -2362,11 +2373,12 @@ async function sendPdfEmailViaBackend(event) {
         return;
     }
 
-    // Payload für das Apps Script Backend vorbereiten
+    // WICHTIG: Es findet keine Filterung statt. Wir senden die kompletten Daten,
+    // damit das Backend die korrekten Summen berechnen kann.
     const payload = {
         action: "sendPdfEmail",
         payload: {
-            shipmentsToProcess: shipmentsToProcess,
+            shipmentsToProcess: shipmentsToProcess, 
             pdfInfo: {
                 clickedBaseNumber: clickedBaseNumber,
                 parentOrderNumber: parentOrderNumber,
@@ -2374,7 +2386,7 @@ async function sendPdfEmailViaBackend(event) {
             },
             mitarbeiter: MITARBEITER_NAME,
             racNummer: RAC_NUMMER,
-            firmenlogoBase64: FIRMENLOGO_BASE64 // Base64-String des Logos mitsenden
+            firmenlogoBase64: FIRMENLOGO_BASE64
         }
     };
 
@@ -2400,16 +2412,12 @@ async function sendPdfEmailViaBackend(event) {
     } catch (error) {
         console.error("Fehler beim Senden des PDF per E-Mail:", error);
         displayError(`Fehler beim Senden des PDF: ${error.message}`, 'red', 10000);
-        // Optional: PDF trotzdem im Browser anzeigen, wenn der E-Mail-Versand fehlschlägt
-        // generatePdfInBrowser(event); 
     } finally {
         pdfButton.disabled = false;
         pdfButton.textContent = originalText;
         focusShipmentInput();
     }
 }
-
-// ... (bestehender Code, z.B. nach calculateDunkelalarmCount) ...
 
         // --- START DER ÄNDERUNG: Neue Hilfsfunktion ---
         /**
