@@ -1,170 +1,122 @@
 
-    const { jsPDF } = window.jspdf;
+const { jsPDF } = window.jspdf;
 
-    document.addEventListener('DOMContentLoaded', function() {
-        // --- DOM Elemente ---
-        const noteEditModalEl = document.getElementById('noteEditModal');
-const noteEditContextEl = document.getElementById('noteEditContext');
-const noteEditBaseNumberEl = document.getElementById('noteEditBaseNumber');
-const noteEditTimestampEl = document.getElementById('noteEditTimestamp');
-const noteEditNoteIndexEl = document.getElementById('noteEditNoteIndex');
-const noteEditTextareaEl = document.getElementById('noteEditTextarea');
-const saveNoteEditButtonEl = document.getElementById('saveNoteEditButton');
-const cancelNoteEditButtonEl = document.getElementById('cancelNoteEditButton');
-
-        const shipmentNumberInputEl = document.getElementById('shipmentNumberInput');
-        const editGoodsReceiptCountInputEl = document.getElementById('editGoodsReceiptCount');
-        const clearInputButtonEl = document.getElementById('clearInputButton');
-        const securityStatusSelectEl = document.getElementById('securityStatusSelect');
-        const comboCheckboxEl = document.getElementById('comboCheckbox');
-        const comboCheckboxContainerEl = document.getElementById('comboCheckboxContainer');
-        const mainActionButtonEl = document.getElementById('mainActionButton');
-        const tableBodyEl = document.getElementById('shipmentTableBody');
-        const currentDetailsDivEl = document.getElementById('currentShipmentDetails');
-        const errorDisplayEl = document.getElementById('errorDisplay');
-        const batchModeToggleEl = document.getElementById('batchModeToggle');
-        const batchStatusDisplayEl = document.getElementById('batchStatusDisplay');
-        const batchAreaEl = document.getElementById('batchArea');
-        const batchModeStatusLabelEl = document.getElementById('batchModeStatusLabel');
-        const batchListEl = document.getElementById('batchList');
-        const batchItemCountEl = document.getElementById('batchItemCount');
-        const saveBatchButtonEl = document.getElementById('saveBatchButton');
-        const clearBatchButtonEl = document.getElementById('clearBatchButton');
-        const editModalEl = document.getElementById('editModal');
-        const editShipmentBaseNumberInputEl = document.getElementById('editShipmentBaseNumber');
-        const editShipmentNumberDisplayEl = document.getElementById('editShipmentNumberDisplay');
-        const editTotalPiecesExpectedInputEl = document.getElementById('editTotalPiecesExpected');
-        const saveEditButtonEl = document.getElementById('saveEditButton');
-        const cancelEditButtonEl = document.getElementById('cancelEditButton');
-        const newTotalSectionEl = document.getElementById('newTotalSection');
-        const newTotalLabelEl = document.getElementById('newTotalLabel');
-        const newTotalInputEl = document.getElementById('newTotalInput');
-        const confirmNewTotalBtnEl = document.getElementById('confirmNewTotalBtn');
-        const skipNewTotalBtnEl = document.getElementById('skipNewTotalBtn');
-        const sendToSheetButtonEl = document.getElementById('sendToSheetButton');
-        const sheetStatusEl = document.getElementById('sheetStatus');
-        const menuToggleBtnEl = document.getElementById('menu-toggle-btn');
-        const sideMenuEl = document.getElementById('side-menu');
-        const menuOverlayEl = document.getElementById('menu-overlay');
-        const resetDataButtonEl = document.getElementById('resetDataButton');
-        const sendSummaryEmailButtonEl = document.getElementById('sendSummaryEmailButton');
-        const noteToggleButtonEl = document.getElementById('noteToggleButton');
-        const noteInputContainerEl = document.getElementById('noteInputContainer');
-        const noteInputEl = document.getElementById('noteInput');
-        const clearNoteButtonEl = document.getElementById('clearNoteButton');
-        const batchNoteModalEl = document.getElementById('batchNoteModal');
-        const batchNoteInputEl = document.getElementById('batchNoteInput');
-        const confirmBatchNoteButtonEl = document.getElementById('confirmBatchNoteButton');
-        const skipBatchNoteButtonEl = document.getElementById('skipBatchNoteButton');
-const batchNoteToggleEl = document.getElementById('batchNoteToggle'); // <-- DIESE ZEILE HINZUFÜGEN
-        const currentBatchNoteDisplayEl = document.getElementById('currentBatchNoteDisplay');
-	 const containerEl = document.querySelector('.container'); // <-- DIESE ZEILE HINZUFÜGEN
-        const importHuListButtonEl = document.getElementById('importHuListButton');
-        const importHuModalEl = document.getElementById('importHuModal');
-        const mainOrderNumberInputEl = document.getElementById('mainOrderNumberInput');
-        const huListTextareaEl = document.getElementById('huListTextarea');
-        const saveHuListButtonEl = document.getElementById('saveHuListButton');
-        const cancelHuImportButtonEl = document.getElementById('cancelHuImportButton');
-	const addAndContinueHuButtonEl = document.getElementById('addAndContinueHuButton');
-	const showOpenHusButtonEl = document.getElementById('showOpenHusButton');
-const openHusModalEl = document.getElementById('openHusModal');
-const openHusListContainerEl = document.getElementById('openHusListContainer');
-const closeOpenHusModalButtonEl = document.getElementById('closeOpenHusModalButton');
-// In der Nähe der anderen Modal-Variablen einfügen
-const showOpenSecurityHusBtnEl = document.getElementById('showOpenSecurityHusBtn');
-const showMissingReceiptHusBtnEl = document.getElementById('showMissingReceiptHusBtn');
-const missingReceiptHusListContainerEl = document.getElementById('missingReceiptHusListContainer');
-const showDunkelalarmHusBtnEl = document.getElementById('showDunkelalarmHusBtn');
-const dunkelalarmHusListContainerEl = document.getElementById('dunkelalarmHusListContainer');
-const errorSoundEl = document.getElementById('errorSound');
-const unexpectedHuSoundToggleEl = document.getElementById('unexpectedHuSoundToggle');
-// --- START DER ÄNDERUNG ---
-const batchScanFeedbackModalEl = document.getElementById('batchScanFeedbackModal');
-const feedbackScanNumberEl = document.getElementById('feedbackScanNumber');
-const feedbackCarrierEl = document.getElementById('feedbackCarrier');
-const batchFeedbackToggleEl = document.getElementById('batchFeedbackToggle');
-const closeBatchScanFeedbackModalButtonEl = document.getElementById('closeBatchScanFeedbackModalButton'); // NEU
-// --- ENDE DER ÄNDERUNG ---
-
-        // --- Konstanten & Konfiguration ---
-        const WEB_APP_URL_BACKEND = 'https://script.google.com/macros/s/AKfycbyBtlm37WxzXdFCDjQuSIWfnQiTny6gwrmXuoq_cacGY9_bkqZxuuW7aJEqLuHJhWYg/exec'; // Mail_12
-        const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbweFC3K1wgksWq3Dd79bJDkbsBdYaORycXSlbIGvQ5JDe6eYj7PtTti3gpBJArRSdp63Q/exec';
-        const LOCAL_STORAGE_KEY = 'frachtSicherungMobile_V8_18_Refactored';
-        const SUFFIX_LENGTH = 4;
-        const MITARBEITER_NAME = "Zakaria Bisbiss";
-        const RAC_NUMMER = "DE/RA/00889-07";
-        const NON_COUNTING_STATUSES = ['Dunkelalarm', 'Anstehend', 'NichtSichern', 'Abgelehnt', 'Wareneingang']; // <-- WARENEINGANG HINZUGEFÜGT
-        const NOTE_ALLOWED_STATUSES = ['XRY', 'Abgelehnt', 'Dunkelalarm', 'ETD', 'EDD'];
-	        // In der Nähe von const NON_COUNTING_STATUSES = ... einfügen
-        const EXCLUSIVE_SECURITY_STATUSES = ['XRY', 'ETD', 'EDD']; // Status, die nur einmal vergeben werden dürfen
-        const KUNDENNR_CARRIER_MAP = {
-            "730": "UPS",
-            "824": "Kühne + Nagel",
-            "730201": "UPS",
-            "875201": "Maersk", // Wird von shortenForwarderName zu Maersk/Senator gekürzt
-            "524": "DSV",
-            "595": "DSV",
-            "613": "DSV",
-            "998": "DSV",
-            "285201": "WWS Freight",
-            "811205": "DB Schenker",
-            "9969726": "DB Schenker",
-            "9969729": "DB Schenker",
-            "9974024": "Kühne + Nagel",
-            "9974054": "Kühne + Nagel",
-            "9974074": "Kühne + Nagel",
-            "9974104": "Kühne + Nagel",
-            "9974144": "Kühne + Nagel",
-            "9974224": "Kühne + Nagel",
-            "9974264": "Kühne + Nagel",
-            "9975006": "Kühne + Nagel",
-            "9974051": "Kühne + Nagel",
-            "9994954": "DHL",
-            "334": "DHL",
-            "815": "DHL",
-            "981": "DHL",
-            "9994994": "DHL",
-            "758204": "TRA",
-            "7589911": "TRA",
-            "7589983": "TRA",
-            "7589984": "TRA",
-            "7589988": "TRA",
-            "608": "WWS Freight",
-            "801": "WWS Freight",
-            "541": "Kühne + Nagel",
-            "615": "Kühne + Nagel",
-            "355201": "Kühne + Nagel",
-            "985202": "Kühne + Nagel",
-            "9974021": "Kühne + Nagel",
-            "9974071": "Kühne + Nagel",
-            "9974101": "Kühne + Nagel",
-            "9974141": "Kühne + Nagel",
-            "9974221": "Kühne + Nagel",
-            "9974261": "Kühne + Nagel",
-            "9974251": "Kühne + Nagel",
-            "9975001": "Kühne + Nagel"
-        };
+document.addEventListener('DOMContentLoaded', function() {
+    // --- DOM Elemente ---
+    const noteEditModalEl = document.getElementById('noteEditModal');
+    const noteEditContextEl = document.getElementById('noteEditContext');
+    const noteEditBaseNumberEl = document.getElementById('noteEditBaseNumber');
+    const noteEditTimestampEl = document.getElementById('noteEditTimestamp');
+    const noteEditNoteIndexEl = document.getElementById('noteEditNoteIndex');
+    const noteEditTextareaEl = document.getElementById('noteEditTextarea');
+    const saveNoteEditButtonEl = document.getElementById('saveNoteEditButton');
+    const cancelNoteEditButtonEl = document.getElementById('cancelNoteEditButton');
+    const shipmentNumberInputEl = document.getElementById('shipmentNumberInput');
+    const editGoodsReceiptCountInputEl = document.getElementById('editGoodsReceiptCount');
+    const clearInputButtonEl = document.getElementById('clearInputButton');
+    const securityStatusSelectEl = document.getElementById('securityStatusSelect');
+    const comboCheckboxEl = document.getElementById('comboCheckbox');
+    const comboCheckboxContainerEl = document.getElementById('comboCheckboxContainer');
+    const mainActionButtonEl = document.getElementById('mainActionButton');
+    const tableBodyEl = document.getElementById('shipmentTableBody');
+    const currentDetailsDivEl = document.getElementById('currentShipmentDetails');
+    const errorDisplayEl = document.getElementById('errorDisplay');
+    const batchModeToggleEl = document.getElementById('batchModeToggle');
+    const batchStatusDisplayEl = document.getElementById('batchStatusDisplay');
+    const batchAreaEl = document.getElementById('batchArea');
+    const batchModeStatusLabelEl = document.getElementById('batchModeStatusLabel');
+    const batchListEl = document.getElementById('batchList');
+    const batchItemCountEl = document.getElementById('batchItemCount');
+    const saveBatchButtonEl = document.getElementById('saveBatchButton');
+    const clearBatchButtonEl = document.getElementById('clearBatchButton');
+    const editModalEl = document.getElementById('editModal');
+    const editShipmentBaseNumberInputEl = document.getElementById('editShipmentBaseNumber');
+    const editShipmentNumberDisplayEl = document.getElementById('editShipmentNumberDisplay');
+    const editTotalPiecesExpectedInputEl = document.getElementById('editTotalPiecesExpected');
+    const saveEditButtonEl = document.getElementById('saveEditButton');
+    const cancelEditButtonEl = document.getElementById('cancelEditButton');
+    const newTotalSectionEl = document.getElementById('newTotalSection');
+    const newTotalLabelEl = document.getElementById('newTotalLabel');
+    const newTotalInputEl = document.getElementById('newTotalInput');
+    const confirmNewTotalBtnEl = document.getElementById('confirmNewTotalBtn');
+    const skipNewTotalBtnEl = document.getElementById('skipNewTotalBtn');
+    const sendToSheetButtonEl = document.getElementById('sendToSheetButton');
+    const sheetStatusEl = document.getElementById('sheetStatus');
+    const menuToggleBtnEl = document.getElementById('menu-toggle-btn');
+    const sideMenuEl = document.getElementById('side-menu');
+    const menuOverlayEl = document.getElementById('menu-overlay');
+    const resetDataButtonEl = document.getElementById('resetDataButton');
+    const sendSummaryEmailButtonEl = document.getElementById('sendSummaryEmailButton');
+    const noteToggleButtonEl = document.getElementById('noteToggleButton');
+    const noteInputContainerEl = document.getElementById('noteInputContainer');
+    const noteInputEl = document.getElementById('noteInput');
+    const clearNoteButtonEl = document.getElementById('clearNoteButton');
+    const batchNoteModalEl = document.getElementById('batchNoteModal');
+    const batchNoteInputEl = document.getElementById('batchNoteInput');
+    const confirmBatchNoteButtonEl = document.getElementById('confirmBatchNoteButton');
+    const skipBatchNoteButtonEl = document.getElementById('skipBatchNoteButton');
+    const batchNoteToggleEl = document.getElementById('batchNoteToggle');
+    const currentBatchNoteDisplayEl = document.getElementById('currentBatchNoteDisplay');
+    const containerEl = document.querySelector('.container');
+    const importHuListButtonEl = document.getElementById('importHuListButton');
+    const importHuModalEl = document.getElementById('importHuModal');
+    const mainOrderNumberInputEl = document.getElementById('mainOrderNumberInput');
+    const huListTextareaEl = document.getElementById('huListTextarea');
+    const saveHuListButtonEl = document.getElementById('saveHuListButton');
+    const cancelHuImportButtonEl = document.getElementById('cancelHuImportButton');
+    const addAndContinueHuButtonEl = document.getElementById('addAndContinueHuButton');
+    const showOpenHusButtonEl = document.getElementById('showOpenHusButton');
+    const openHusModalEl = document.getElementById('openHusModal');
+    const openHusListContainerEl = document.getElementById('openHusListContainer');
+    const closeOpenHusModalButtonEl = document.getElementById('closeOpenHusModalButton');
+    const showOpenSecurityHusBtnEl = document.getElementById('showOpenSecurityHusBtn');
+    const showMissingReceiptHusBtnEl = document.getElementById('showMissingReceiptHusBtn');
+    const missingReceiptHusListContainerEl = document.getElementById('missingReceiptHusListContainer');
+    const showDunkelalarmHusBtnEl = document.getElementById('showDunkelalarmHusBtn');
+    const dunkelalarmHusListContainerEl = document.getElementById('dunkelalarmHusListContainer');
+    const errorSoundEl = document.getElementById('errorSound');
+    const unexpectedHuSoundToggleEl = document.getElementById('unexpectedHuSoundToggle');
+    const batchScanFeedbackModalEl = document.getElementById('batchScanFeedbackModal');
+    const feedbackScanNumberEl = document.getElementById('feedbackScanNumber');
+    const feedbackCarrierEl = document.getElementById('feedbackCarrier');
+    const batchFeedbackToggleEl = document.getElementById('batchFeedbackToggle');
+    const closeBatchScanFeedbackModalButtonEl = document.getElementById('closeBatchScanFeedbackModalButton');
+    const loadingOverlayEl = document.getElementById('loadingOverlay');
 
 
-        // --- Anwendungsstatus ---
-        let isBatchModeActive = false;
-        let currentBatch = [];
-        let batchStatus = '';
-        let batchIsCombination = false;
-        let pendingScanDataForNewShipment = null;
-let pendingTotalUpdateInfo = null; 
-        let sessionFirstSuffixScans = {}; // Trackt erste Suffix-Scans pro HAWB in der Session
-        let notifiedCompletions = new Set(); // Trackt HAWBs, für die schon eine Abschlussmail gesendet wurde
-        let currentBatchGlobalNote = null;
-        let isBatchNotePromptRequired = true;
-        let pendingFirstBatchScanData = null;
+    // --- Konstanten & Konfiguration ---
+    const WEB_APP_URL_BACKEND = 'https://script.google.com/macros/s/AKfycbyBtlm37WxzXdFCDjQuSIWfnQiTny6gwrmXuoq_cacGY9_bkqZxuuW7aJEqLuHJhWYg/exec'; // Mail_13
+    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzudnkXw5mJu-l85XYtIOhTY-eahic4IYNKYyi1MsPk3jLxH9tmNWbOuv8-z0-saGAuEQ/exec';
+    const LOCAL_STORAGE_KEY = 'frachtSicherungMobile_V8_18_Refactored';
+    const SUFFIX_LENGTH = 4;
+    const MITARBEITER_NAME = "Zakaria Bisbiss";
+    const RAC_NUMMER = "DE/RA/00889-07";
+    const NON_COUNTING_STATUSES = ['Dunkelalarm', 'Anstehend', 'NichtSichern', 'Abgelehnt', 'Wareneingang'];
+    const NOTE_ALLOWED_STATUSES = ['XRY', 'Abgelehnt', 'Dunkelalarm', 'ETD', 'EDD'];
+    const EXCLUSIVE_SECURITY_STATUSES = ['XRY', 'ETD', 'EDD'];
+    const KUNDENNR_CARRIER_MAP = { "730": "UPS", "824": "Kühne + Nagel", "730201": "UPS", "875201": "Maersk", "524": "DSV", "595": "DSV", "613": "DSV", "998": "DSV", "285201": "WWS Freight", "811205": "DB Schenker", "9969726": "DB Schenker", "9969729": "DB Schenker", "9974024": "Kühne + Nagel", "9974054": "Kühne + Nagel", "9974074": "Kühne + Nagel", "9974104": "Kühne + Nagel", "9974144": "Kühne + Nagel", "9974224": "Kühne + Nagel", "9974264": "Kühne + Nagel", "9975006": "Kühne + Nagel", "9974051": "Kühne + Nagel", "9994954": "DHL", "334": "DHL", "815": "DHL", "981": "DHL", "9994994": "DHL", "758204": "TRA", "7589911": "TRA", "7589983": "TRA", "7589984": "TRA", "7589988": "TRA", "608": "WWS Freight", "801": "WWS Freight", "541": "Kühne + Nagel", "615": "Kühne + Nagel", "355201": "Kühne + Nagel", "985202": "Kühne + Nagel", "9974021": "Kühne + Nagel", "9974071": "Kühne + Nagel", "9974101": "Kühne + Nagel", "9974141": "Kühne + Nagel", "9974221": "Kühne + Nagel", "9974261": "Kühne + Nagel", "9974251": "Kühne + Nagel", "9975001": "Kühne + Nagel" };
+
+
+    // --- Anwendungsstatus ---
+    let isBatchModeActive = false;
+    let currentBatch = [];
+    let batchStatus = '';
+    let batchIsCombination = false;
+    let pendingScanDataForNewShipment = null;
+    let pendingTotalUpdateInfo = null;
+    let sessionFirstSuffixScans = {};
+    let notifiedCompletions = new Set();
+    let currentBatchGlobalNote = null;
+    let isBatchNotePromptRequired = true;
+    let pendingFirstBatchScanData = null;
+
 
         // --- Hilfsfunktionen: Persistenz ---
-   function loadShipments() {
+        function loadShipments() {
             const data = localStorage.getItem(LOCAL_STORAGE_KEY);
             const shipments = data ? JSON.parse(data) : {};
-
-            // Datenmigration: Konvertiert alte 'note' (string) zu neuer 'notes' (array)
+    
+            // Datenmigration
             Object.values(shipments).forEach(shipment => {
                 if (shipment.scannedItems && Array.isArray(shipment.scannedItems)) {
                     shipment.scannedItems.forEach(item => {
@@ -183,60 +135,62 @@ let pendingTotalUpdateInfo = null;
 
 function calculateGoodsReceiptCount(scannedItems) {
     if (!Array.isArray(scannedItems)) return 0;
-    // Zählt nur Scans mit dem Status "Wareneingang", die nicht storniert sind
     return scannedItems.filter(item => item.status === 'Wareneingang' && !item.isCancelled).length;
 }
-// --- START DER ÄNDERUNG: Die gesamte Funktion wird aktualisiert ---
-// --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESEM CODE ---
 
-// ERSETZE die komplette Funktion showOpenHusSummary in script.js
+// --- NEUE HILFSFUNKTIONEN FÜR DEN LADE-SPINNER ---
+function showLoader() {
+    if (loadingOverlayEl) {
+        loadingOverlayEl.classList.add('visible');
+    }
+}
 
+function hideLoader() {
+    if (loadingOverlayEl) {
+        loadingOverlayEl.classList.remove('visible');
+    }
+}
+// --- ENDE DER NEUEN HILFSFUNKTIONEN ---
 function showOpenHusSummary() {
     removeActiveInlineNoteEditor();
     const shipments = loadShipments();
     const securityClearanceStatuses = ['XRY', 'ETD', 'EDD'];
-    let openSecurityHusByOrder = [], missingReceiptHusByOrder = [], dunkelalarmItemsByOrder = {};
+    let openSecurityHusByOrder = [],
+        missingReceiptHusByOrder = [],
+        dunkelalarmItemsByOrder = {};
 
-    // ... (der gesamte Code zur Datensammlung bleibt unverändert) ...
-    // HIER beginnt die unveränderte Logik zum Sammeln der Daten
     Object.keys(shipments).forEach(baseNumber => {
         const shipment = shipments[baseNumber];
-        
         if (shipment.scannedItems && shipment.scannedItems.length > 0) {
             const itemsWithDunkelalarm = shipment.scannedItems.filter(item => item.status === 'Dunkelalarm' && !item.isCancelled);
             if (itemsWithDunkelalarm.length > 0) {
                 if (!dunkelalarmItemsByOrder[baseNumber]) dunkelalarmItemsByOrder[baseNumber] = { items: [], ...shipment };
                 itemsWithDunkelalarm.forEach(item => {
-                    const enhancedItem = {...item, orderNumber: baseNumber};
+                    const enhancedItem = { ...item, orderNumber: baseNumber };
                     dunkelalarmItemsByOrder[baseNumber].items.push(enhancedItem);
                 });
             }
         }
-
         if (shipment.isHuListOrder && shipment.scannedItems && shipment.scannedItems.length > 0) {
-            const manifestSlots = shipment.scannedItems.filter(item => 
+            const manifestSlots = shipment.scannedItems.filter(item =>
                 item.status === 'Anstehend' || securityClearanceStatuses.includes(item.status)
             );
-
             const pendingSecurityHus = manifestSlots.filter(item => item.status === 'Anstehend');
             if (pendingSecurityHus.length > 0) {
-                openSecurityHusByOrder.push({ 
-                    ...shipment, 
-                    orderNumber: baseNumber, 
-                    pendingHus: pendingSecurityHus, 
+                openSecurityHusByOrder.push({
+                    ...shipment,
+                    orderNumber: baseNumber,
+                    pendingHus: pendingSecurityHus,
                     totalHus: manifestSlots.length
                 });
             }
-
             const receiptCounts = shipment.scannedItems
                 .filter(item => item.status === 'Wareneingang' && !item.isCancelled)
                 .reduce((acc, item) => {
                     acc[item.rawInput] = (acc[item.rawInput] || 0) + 1;
                     return acc;
                 }, {});
-            
-            const tempReceiptCounts = {...receiptCounts};
-            
+            const tempReceiptCounts = { ...receiptCounts };
             const missingReceiptHus = manifestSlots.filter(slot => {
                 const hu = slot.rawInput;
                 if (tempReceiptCounts[hu] && tempReceiptCounts[hu] > 0) {
@@ -245,27 +199,22 @@ function showOpenHusSummary() {
                 }
                 return true;
             });
-
             if (missingReceiptHus.length > 0) {
-                missingReceiptHusByOrder.push({ 
-                    ...shipment, 
-                    orderNumber: baseNumber, 
-                    pendingHus: missingReceiptHus, 
-                    totalHus: manifestSlots.length, 
-                    receiptCount: manifestSlots.length - missingReceiptHus.length 
+                missingReceiptHusByOrder.push({
+                    ...shipment,
+                    orderNumber: baseNumber,
+                    pendingHus: missingReceiptHus,
+                    totalHus: manifestSlots.length,
+                    receiptCount: manifestSlots.length - missingReceiptHus.length
                 });
             }
         }
     });
-    // HIER endet die unveränderte Logik zum Sammeln der Daten
 
-    // --- START: NEUE LOGIK ZUM BERECHNEN UND ANZEIGEN DER BADGES ---
     const totalMissingReceipts = missingReceiptHusByOrder.reduce((sum, order) => sum + order.pendingHus.length, 0);
     const totalDunkelalarms = Object.values(dunkelalarmItemsByOrder).reduce((sum, data) => sum + data.items.length, 0);
-
     const missingBadge = document.getElementById('missingReceiptsBadge');
     const dunkelalarmBadge = document.getElementById('dunkelalarmBadge');
-
     if (missingBadge) {
         missingBadge.textContent = totalMissingReceipts;
         missingBadge.classList.toggle('hidden', totalMissingReceipts === 0);
@@ -274,18 +223,14 @@ function showOpenHusSummary() {
         dunkelalarmBadge.textContent = totalDunkelalarms;
         dunkelalarmBadge.classList.toggle('hidden', totalDunkelalarms === 0);
     }
-    // --- ENDE: NEUE LOGIK FÜR BADGES ---
 
     const sortByCountryAndOrder = (a, b) => (a.destinationCountry || 'zz').localeCompare(b.destinationCountry || 'zz') || (a.orderNumber || a.hawb).localeCompare(b.orderNumber || a.hawb);
-    
-    // ... (der Rest der Funktion, generateHuListHtml etc., bleibt komplett unverändert) ...
-    // HIER beginnt der unveränderte Rest der Funktion
     const generateHuListHtml = (items, allScannedItemsForContext) => {
         if (!items || items.length === 0) return '';
         const dunkelalarmedNumbers = new Set(
             allScannedItemsForContext
-                .filter(scan => scan.status === 'Dunkelalarm' && !scan.isCancelled)
-                .map(scan => scan.rawInput)
+            .filter(scan => scan.status === 'Dunkelalarm' && !scan.isCancelled)
+            .map(scan => scan.rawInput)
         );
         const sortedItems = items.sort((a, b) => (a.position || 9999) - (b.position || 9999));
         const isVvlList = sortedItems[0] && sortedItems[0].sendnr;
@@ -295,12 +240,12 @@ function showOpenHusSummary() {
                 const hasDunkelalarm = dunkelalarmedNumbers.has(item.rawInput);
                 const alarmClass = hasDunkelalarm ? 'has-dunkelalarm' : '';
                 return `
-                    <li>
-                        <div class="pending-item-details">
-                            <span class="pending-vse ${alarmClass}">${escapeHtml(item.rawInput)}</span>
-                            <span class="pending-sendnr">${escapeHtml(item.sendnr)}</span>
-                        </div>
-                    </li>`;
+                <li>
+                    <div class="pending-item-details">
+                        <span class="pending-vse ${alarmClass}">${escapeHtml(item.rawInput)}</span>
+                        <span class="pending-sendnr">${escapeHtml(item.sendnr)}</span>
+                    </div>
+                </li>`;
             }).join('');
             return html + `<ul class="hu-list vvl-list">${listItems}</ul>`;
         } else {
@@ -319,7 +264,7 @@ function showOpenHusSummary() {
         const orderNumber = order.orderNumber || order.hawb;
         let countText = '';
         if (!forDunkelalarm) {
-             countText = order.receiptCount !== undefined ? `(${order.receiptCount} von ${order.totalHus} erfasst)`: `(${(order.totalHus - order.pendingHus.length)} von ${order.totalHus} erfasst)`;
+            countText = order.receiptCount !== undefined ? `(${order.receiptCount} von ${order.totalHus} erfasst)` : `(${(order.totalHus - order.pendingHus.length)} von ${order.totalHus} erfasst)`;
         }
         let titleHtml = '';
         if (order.parentOrderNumber) {
@@ -353,8 +298,9 @@ function showOpenHusSummary() {
     showDunkelalarmHusBtnEl.classList.remove('active');
     openHusModalEl.classList.add('visible');
     document.body.classList.add('modal-open');
-    closeSideMenu(); 
-}       
+    closeSideMenu();
+}
+   
         
         
         
@@ -366,24 +312,68 @@ function showOpenHusSummary() {
         // --- START: NEUE HILFSFUNKTION ---
         function calculateXryKombiCount(scannedItems) {
             if (!Array.isArray(scannedItems)) return 0;
-            // Zählt nur nicht-stornierte Scans, die explizit als XRY Kombi markiert sind.
-            return scannedItems.filter(item => 
-                item.status === 'XRY' && 
-                item.isCombination && 
+            return scannedItems.filter(item =>
+                item.status === 'XRY' &&
+                item.isCombination &&
                 !item.isCancelled
             ).length;
         }
+    
         // --- ENDE: NEUE HILFSFUNKTION ---
 
-        function saveShipments(shipments) {
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(shipments));
-        }
 /**
- * Prüft, ob eine HU-Nummer in irgendeinem HU-Listen-Auftrag existiert.
- * Spielt nur einen Ton, wenn überhaupt HU-Listen-Aufträge existieren.
- * @param {string} huNumber Die zu prüfende HU-Nummer.
- * @returns {boolean} True, wenn die HU erwartet wird, sonst false.
+ * Speichert Sendungen zuerst lokal und synchronisiert dann mit dem Server.
+ * @param {object} shipments Das Objekt mit allen Sendungen.
  */
+async function saveShipments(shipments) {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(shipments));
+    try {
+        const response = await fetch(WEB_APP_URL, {
+            method: 'POST',
+            mode: 'cors',
+            cache: 'no-cache',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: "saveAllData", payload: shipments })
+        });
+        if (!response.ok) throw new Error(`Server-Fehler: ${response.status}`);
+        const result = await response.json();
+        if (result.status === 'success') {
+            console.log("Daten erfolgreich zum Server synchronisiert.");
+            displayError("Gespeichert & Synchronisiert", 'green', 1500);
+        } else {
+            throw new Error(result.message);
+        }
+    } catch (error) {
+        console.error("Fehler bei der Server-Synchronisierung:", error);
+        displayError("Lokal gespeichert, aber Server-Sync fehlgeschlagen!", 'red', 5000);
+    }
+}
+async function loadDataFromServer() {
+    console.log("Versuche Daten vom Server zu laden...");
+    try {
+        const response = await fetch(WEB_APP_URL, {
+            method: 'POST',
+            mode: 'cors',
+            cache: 'no-cache',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: "loadAllData" })
+        });
+        if (!response.ok) throw new Error(`Server-Fehler: ${response.status}`);
+        
+        const result = await response.json();
+        if (result.status === 'success') {
+            console.log("Daten erfolgreich vom Server geladen.");
+            return result.data || {};
+        } else {
+            throw new Error(result.message);
+        }
+    } catch (error) {
+        console.error("Fehler beim Laden vom Server:", error);
+        displayError("Keine Serververbindung. Lade lokale Daten.", 'orange', 4000);
+        const localData = localStorage.getItem(LOCAL_STORAGE_KEY);
+        return localData ? JSON.parse(localData) : {};
+    }
+}
 function isHuExpected(huNumber) {
     const upperHu = huNumber.trim().toUpperCase();
     if (!upperHu) return true;
@@ -2472,6 +2462,7 @@ async function sendPdfEmailViaBackend(event) {
                 sheetStatusEl.textContent = 'Fehler: Web App URL fehlt.'; sheetStatusEl.style.color = 'red';
                 alert("Fehler: Die Web App URL wurde nicht im Skript konfiguriert."); return;
             }
+            showLoader(); 
             sheetStatusEl.textContent = 'Sende Daten an Google Sheet...'; sheetStatusEl.style.color = '#f0ad4e';
             sendToSheetButtonEl.disabled = true; clearError();
             try {
@@ -2498,6 +2489,7 @@ async function sendPdfEmailViaBackend(event) {
                 alert(`Fehler beim Senden:\n${error.message}`);
             } finally {
                 sendToSheetButtonEl.disabled = false;
+                hideLoader();
                 setTimeout(() => { if (sheetStatusEl.textContent && !sheetStatusEl.textContent.startsWith('Erfolg')) sheetStatusEl.textContent = ''; }, 7000);
             }
         }
@@ -2666,10 +2658,13 @@ async function sendPdfEmailViaBackend(event) {
 
 // --- ERSETZEN SIE DEN GESAMTEN addEventListener-BLOCK MIT DIESER KORRIGIERTEN VERSION ---
 
+// --- ERSETZEN SIE DEN GESAMTEN addEventListener-BLOCK MIT DIESEM CODE ---
+
 shipmentNumberInputEl.addEventListener('input', () => {
     const currentValue = shipmentNumberInputEl.value.trim();
+    updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
 
-    // --- QR-CODE-VERARBEITUNG ---
+    // --- LOGIK FÜR MAN FRacht QR-CODE ---
     if (currentValue.startsWith('FRT_MULTI_V1')) {
         if (!confirm("Ein Multi-Auftrags-QR-Code wurde erkannt.\n\nMöchtest du alle darin enthaltenen Aufträge jetzt importieren?")) {
             shipmentNumberInputEl.value = ''; 
@@ -2702,107 +2697,121 @@ shipmentNumberInputEl.addEventListener('input', () => {
                 shipments[orderNumber] = newShipment;
                 hus.forEach((hu, index) => {
                     newShipment.scannedItems.push({ rawInput: hu, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null, position: index + 1 });
-                    addedCount++;
                 });
+                addedCount += hus.length;
             } else {
-                // Logik zum Hinzufügen zu bestehenden Aufträgen bleibt gleich
+                // Hier könnten Sie Logik hinzufügen, um bestehende Aufträge zu aktualisieren
             }
         });
         saveShipments(shipments);
-        alert(`Multi-Import abgeschlossen:\n- Verarbeitete Aufträge: ${processedOrders.length}\n- Neue HUs hinzugefügt: ${addedCount}\n- Duplikate übersprungen: ${duplicateCount}`);
+        alert(`Multi-Import abgeschlossen:\n- Verarbeitete Aufträge: ${processedOrders.length}\n- Neue HUs hinzugefügt: ${addedCount}`);
         location.reload();
         return;
     } 
-    // script.js
+    
+    // --- NEUE LOGIK FÜR VORVERLADELISTEN QR-CODE ---
+    else if (currentValue.startsWith('FRT_VVL_V1')) {
+        if (!confirm("Eine Vorverladeliste wurde erkannt.\n\nMöchtest du alle darin enthaltenen Kundenaufträge jetzt importieren?")) {
+            shipmentNumberInputEl.value = ''; 
+            return;
+        }
 
-// ... (bestehender Code im Event-Listener für shipmentNumberInputEl) ...
+        const parts = currentValue.split(';;;').slice(1);
+        const shipments = loadShipments();
+        const now = new Date().toISOString();
+        let addedPositionsCount = 0;
+        let newOrders = new Set();
+        let updatedOrders = new Set();
+        let processedVVLs = new Set();
 
-else if (currentValue.startsWith('FRT_VVL_V1')) {
-    if (!confirm("Eine Vorverladeliste wurde erkannt.\n\nMöchtest du alle darin enthaltenen Kundenaufträge jetzt importieren?")) {
-        shipmentNumberInputEl.value = ''; 
+        parts.forEach(orderData => {
+            const [meta, huData] = orderData.split('|||');
+            if (!meta || !huData) return;
+
+            const [kundennr, vorverladelisteNr] = meta.split('|');
+            const positionen = huData.split(' ').filter(Boolean);
+            processedVVLs.add(vorverladelisteNr);
+
+            if (!shipments[kundennr]) {
+                // Neuer Kunde: Anlegen und alle Positionen hinzufügen
+                newOrders.add(kundennr);
+                shipments[kundennr] = {
+                    hawb: kundennr,
+                    lastModified: now,
+                    totalPiecesExpected: positionen.length,
+                    scannedItems: [],
+                    mitarbeiter: MITARBEITER_NAME,
+                    isHuListOrder: true,
+                    parentOrderNumber: vorverladelisteNr // Wichtig: Die VVL-Nummer speichern
+                };
+                // Spediteur aus der Karte hinzufügen, falls vorhanden
+                if (KUNDENNR_CARRIER_MAP[kundennr]) {
+                    shipments[kundennr].freightForwarder = KUNDENNR_CARRIER_MAP[kundennr];
+                }
+
+                positionen.forEach(pos => {
+                    const [vse, sendnr] = pos.split(':');
+                    shipments[kundennr].scannedItems.push({
+                        rawInput: vse, 
+                        sendnr: sendnr, 
+                        status: 'Anstehend', 
+                        timestamp: now,
+                        isCombination: false, 
+                        notes: [], 
+                        isCancelled: false, 
+                        cancelledTimestamp: null
+                    });
+                });
+                addedPositionsCount += positionen.length;
+            } else {
+                // Bestehender Kunde: Nur die neuen Positionen hinzufügen
+                updatedOrders.add(kundennr);
+                const existingShipment = shipments[kundennr];
+                let newPositionsAddedToThisCustomer = 0;
+
+                // Spediteur aktualisieren, falls nicht bereits vorhanden
+                if (KUNDENNR_CARRIER_MAP[kundennr] && !existingShipment.freightForwarder) {
+                    existingShipment.freightForwarder = KUNDENNR_CARRIER_MAP[kundennr];
+                }
+                
+                // VVL-Nummer aktualisieren, falls sie fehlt
+                if (!existingShipment.parentOrderNumber) {
+                     existingShipment.parentOrderNumber = vorverladelisteNr;
+                }
+
+                positionen.forEach(pos => {
+                    const [vse, sendnr] = pos.split(':');
+                    const alreadyExists = existingShipment.scannedItems.some(item => item.rawInput === vse);
+                    if (!alreadyExists) {
+                        existingShipment.scannedItems.push({
+                            rawInput: vse, 
+                            sendnr: sendnr, 
+                            status: 'Anstehend', 
+                            timestamp: now,
+                            isCombination: false, 
+                            notes: [], 
+                            isCancelled: false, 
+                            cancelledTimestamp: null
+                        });
+                        newPositionsAddedToThisCustomer++;
+                    }
+                });
+
+                if (newPositionsAddedToThisCustomer > 0) {
+                    existingShipment.totalPiecesExpected = (existingShipment.totalPiecesExpected || 0) + newPositionsAddedToThisCustomer;
+                    existingShipment.lastModified = now;
+                    addedPositionsCount += newPositionsAddedToThisCustomer;
+                }
+            }
+        });
+
+        saveShipments(shipments);
+        alert(`Import der Vorverladeliste(n) [${[...processedVVLs].join(', ')}] abgeschlossen:\n\n- ${addedPositionsCount} neue Positionen importiert.\n- ${newOrders.size} neue Aufträge angelegt.\n- ${updatedOrders.size} Aufträge aktualisiert.`);
+        location.reload();
         return;
     }
 
-    const parts = currentValue.split(';;;').slice(1);
-    const shipments = loadShipments();
-    const now = new Date().toISOString();
-    let addedPositionsCount = 0;
-    let newOrders = new Set();
-    let updatedOrders = new Set();
-
-    parts.forEach(orderData => {
-        const [metaAndOrder, huData] = orderData.split('|||');
-        if (!metaAndOrder || !huData) return;
-        const metaParts = metaAndOrder.split('|');
-        const kundennr = metaParts[0];
-        const vorverladelisteNr = metaParts.length > 1 ? metaParts[1] : 'N/A';
-        const positionen = huData.split(' ').filter(Boolean);
-
-        // PRÜFUNG: Existiert der Kunde bereits?
-        if (!shipments[kundennr]) {
-            // NEUER KUNDE: Anlegen und alle Positionen hinzufügen
-            newOrders.add(kundennr);
-            shipments[kundennr] = {
-                hawb: kundennr, lastModified: now, totalPiecesExpected: positionen.length,
-                scannedItems: [], mitarbeiter: MITARBEITER_NAME, isHuListOrder: true,
-                parentOrderNumber: vorverladelisteNr
-            };
-            // NEU: Spediteur aus der Map hinzufügen
-            if (KUNDENNR_CARRIER_MAP[kundennr]) {
-                shipments[kundennr].freightForwarder = KUNDENNR_CARRIER_MAP[kundennr];
-                // Das Zielland ist in der bereitgestellten Karte nicht enthalten,
-                // daher wird es hier nicht gesetzt.
-            }
-
-            positionen.forEach(pos => {
-                const [vse, sendnr] = pos.split(':');
-                shipments[kundennr].scannedItems.push({
-                    rawInput: vse, sendnr: sendnr, status: 'Anstehend', timestamp: now,
-                    isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null
-                });
-                addedPositionsCount++;
-            });
-        } else {
-            // BESTEHENDER KUNDE: Nur die NEUEN Positionen hinzufügen
-            updatedOrders.add(kundennr);
-            const existingShipment = shipments[kundennr];
-            let newPositionsAddedToThisCustomer = 0;
-
-            // NEU: Spediteur aktualisieren, falls nicht bereits vorhanden
-            if (KUNDENNR_CARRIER_MAP[kundennr] && !existingShipment.freightForwarder) {
-                existingShipment.freightForwarder = KUNDENNR_CARRIER_MAP[kundennr];
-            }
-
-            positionen.forEach(pos => {
-                const [vse, sendnr] = pos.split(':');
-                const alreadyExists = existingShipment.scannedItems.some(item => item.rawInput === vse);
-                if (!alreadyExists) {
-                    existingShipment.scannedItems.push({
-                        rawInput: vse, sendnr: sendnr, status: 'Anstehend', timestamp: now,
-                        isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null
-                    });
-                    addedPositionsCount++;
-                    newPositionsAddedToThisCustomer++;
-                }
-            });
-
-            if (newPositionsAddedToThisCustomer > 0) {
-                existingShipment.totalPiecesExpected += newPositionsAddedToThisCustomer;
-                existingShipment.lastModified = now;
-            }
-        }
-    });
-
-    saveShipments(shipments);
-    alert(`Import abgeschlossen:\n- ${addedPositionsCount} Positionen importiert.\n- ${newOrders.size} neue Aufträge angelegt.\n- ${updatedOrders.size} Aufträge aktualisiert.`);
-    location.reload();
-    return;
-}
-
-
-    // --- MANUELLE EINGABE / BATCH-MODUS ---
-    updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
-
+    // --- STANDARD LOGIK FÜR MANUELLE EINGABE / BATCH-MODUS ---
     if (isBatchModeActive) {
         if (currentValue.length > 0) mainActionButtonEl.click();
         return;
@@ -2816,12 +2825,10 @@ else if (currentValue.startsWith('FRT_VVL_V1')) {
     if (parentHawbByHu) {
         baseNumberToShow = parentHawbByHu;
         displayError(`VSE '${escapeHtml(currentValue)}' gehört zu Kundennr: ${escapeHtml(baseNumberToShow)}`, 'blue', 3500);
-    } 
-    else if (shipments[processedDirectBase.toUpperCase()]) {
+    } else if (shipments[processedDirectBase.toUpperCase()]) {
         baseNumberToShow = processedDirectBase.toUpperCase();
         clearError();
-    } 
-    else if (currentValue.length > 3) {
+    } else if (currentValue.length > 3) {
         const parentHawbByNote = findShipmentByNoteContent(currentValue);
         if (parentHawbByNote) {
             baseNumberToShow = parentHawbByNote;
@@ -2995,30 +3002,49 @@ else if (currentValue.startsWith('FRT_VVL_V1')) {
             menuToggleBtnEl.addEventListener('click', (e) => { e.stopPropagation(); sideMenuEl.classList.contains('open') ? closeSideMenu() : openSideMenu(); });
             menuOverlayEl.addEventListener('click', closeSideMenu);
             sendToSheetButtonEl.addEventListener('click', sendDataToSheet);
-            resetDataButtonEl.addEventListener('click', () => {
+            resetDataButtonEl.addEventListener('click', async () => { // Die Funktion wird async
                 removeActiveInlineNoteEditor();
-                if (confirm("WARNUNG!\n\nMöchtest du wirklich ALLE erfassten Sendungsdaten unwiderruflich löschen?")) {
-                    // Die Hauptaktion bleibt: Lokalen Speicher leeren
-                    localStorage.removeItem(LOCAL_STORAGE_KEY);
+                if (confirm("WARNUNG!\n\nMöchtest du wirklich ALLE erfassten Sendungsdaten auf diesem Gerät UND auf dem Server unwiderruflich löschen?")) {
                     
-                    // NEU: Seite neu laden, um den Reset abzuschließen.
-                    // Die UI-Updates danach sind nicht mehr nötig, da die Seite von Grund auf neu lädt.
-                    location.reload(); 
+                    showLoader(); 
+                    sheetStatusEl.textContent = 'Lösche Daten auf dem Server...';
+                    sheetStatusEl.style.color = 'orange';
+            
+                    try {
+                        // 1. Sende den Befehl zum Löschen an den Server
+                        const response = await fetch(WEB_APP_URL, {
+                            method: 'POST',
+                            mode: 'cors',
+                            cache: 'no-cache',
+                            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                            body: JSON.stringify({ action: "clearAllData" })
+                        });
+            
+                        if (!response.ok) throw new Error(`Server-Fehler: ${response.status}`);
+                        const result = await response.json();
+                        if (result.status !== 'success') throw new Error(result.message);
+            
+                        // 2. Wenn der Server erfolgreich war, lösche auch die lokalen Daten
+                        localStorage.removeItem(LOCAL_STORAGE_KEY);
+                        
+                        // 3. Lade die Seite neu, um den leeren Zustand anzuzeigen
+                        location.reload(); 
+            
+                    } catch (error) {
+                        console.error("Fehler beim Zurücksetzen der Daten:", error);
+                        sheetStatusEl.textContent = `Fehler: ${error.message}`;
+                        sheetStatusEl.style.color = 'red';
+                        alert("Die Daten konnten auf dem Server nicht gelöscht werden. Bitte prüfen Sie Ihre Verbindung.");
+                        hideLoader();
+                    }
+            
                 } else {
                     sheetStatusEl.textContent = 'Zurücksetzen abgebrochen.';
                     sheetStatusEl.style.color = 'blue';
                     setTimeout(() => { if (sheetStatusEl.textContent.includes('abgebrochen')) sheetStatusEl.textContent = ''; }, 3000);
                 }
             });
-            sendSummaryEmailButtonEl.addEventListener('click', sendSummaryEmail);
-
-            // Double-Click auf Input für manuelle Eingabe (optional)
-            shipmentNumberInputEl.addEventListener('dblclick', () => {
-                 if (!isBatchModeActive && !editModalEl.classList.contains('visible') && !batchNoteModalEl.classList.contains('visible')) {
-                    shipmentNumberInputEl.inputMode = 'text';
-                    setTimeout(() => shipmentNumberInputEl.focus(), 0);
-                 }
-            });
+            
 
             importHuListButtonEl.addEventListener('click', () => {
                 // 1. Zwingt die Tastatur zum Schließen, indem der Fokus vom aktuellen Element genommen wird.
@@ -3247,27 +3273,38 @@ else if (currentValue.startsWith('FRT_VVL_V1')) {
             });
 
         // --- Initialisierung ---
-        function initializeApp() {
-            renderTable();
-            isBatchModeActive = batchModeToggleEl.checked; // Zustand vom Toggle übernehmen
-            sessionFirstSuffixScans = {}; // Reset bei jedem Laden
-            notifiedCompletions = new Set(); // Reset bei jedem Laden
-            
-            resetSingleScanNoteInputState();
-            toggleBatchMode(isBatchModeActive); // Initial Batch Mode anwenden (setzt auch Flags)
-            batchFeedbackToggleEl.checked = false; // Standardmäßig deaktiviert
-            // displayCurrentShipmentDetails(''); // Start mit leerem Details-Bereich
-            updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
-            updateClearButtonVisibility(noteInputEl, clearNoteButtonEl);
-            updateCurrentBatchNoteDisplay(); // Initial Batch Notiz (leer)
+/**
+ * Initialisiert die Anwendung: Lädt Daten, setzt UI und Event Listener.
+ */
+async function initializeApp() {
+    showLoader(); // <<<< NEU: Lade-Spinner anzeigen
+    const initialShipments = await loadDataFromServer();
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(initialShipments));
 
-            setupEventListeners();
-            focusShipmentInput();
-            console.log(`Fracht Tracker ${document.title.split('(')[1].split(')')[0]} initialized.`);
-        }
+    renderTable();
+    isBatchModeActive = batchModeToggleEl.checked;
+    sessionFirstSuffixScans = {};
+    notifiedCompletions = new Set();
+    
+    resetSingleScanNoteInputState();
+    toggleBatchMode(isBatchModeActive);
+    batchFeedbackToggleEl.checked = false;
+    updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
+    updateClearButtonVisibility(noteInputEl, clearNoteButtonEl);
+    updateCurrentBatchNoteDisplay();
 
-        initializeApp();
-    });
+    setupEventListeners();
+    focusShipmentInput();
+    console.log(`Fracht Tracker ${document.title.split('(')[1].split(')')[0]} initialized.`);
+    hideLoader(); // <<<< NEU: Lade-Spinner verstecken, wenn alles fertig ist
+}
+
+// =========================================================================
+// HIER IST DIE KORREKTUR: Die fehlenden Zeilen werden hinzugefügt
+// =========================================================================
+initializeApp();
+
+});
 
 // Screen Orientation Lock (optional, mit geringer Erfolgschance ohne User Interaktion)
 /*
