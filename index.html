@@ -110,8 +110,31 @@
         <div class="modal-actions" style="display: none;"></div> 
     </div>
 </div>
-<!-- --- ENDE DER ÄNDERUNG: Batch Scan Feedback Modal (Close Button überarbeitet) --- -->
-<!-- --- ENDE DER ÄNDERUNG --- -->
+
+<!-- --- START: NEUES MODAL FÜR HU-DETAILS --- -->
+<div id="huDetailsModal" class="modal-overlay">
+    <div class="modal-content">
+
+        <button class="close-modal-icon-btn" data-close-modal="huDetailsModal" title="Schließen">
+            <svg viewBox="0 0 24 24"><path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" /></svg>
+        </button>
+        <div id="huDetailsContent">
+            <dl>
+                <dt>Nummer:</dt>
+                <dd id="huDetailsNumber"></dd>
+                <dt>Verpackung:</dt>
+                <dd id="huDetailsPackaging"></dd>
+                <dt>Dimensionen:</dt>
+                <dd id="huDetailsDimensions"></dd>
+                <dt>Bruttogewicht:</dt>
+                <dd id="huDetailsWeight"></dd>
+            </dl>
+        </div>
+        <div class="modal-actions" style="justify-content: center;">
+
+        </div>
+    </div>
+</div>
 <!-- --- ENDE DER ÄNDERUNG --- -->
 <div class="container">
     <div class="batch-controls">
