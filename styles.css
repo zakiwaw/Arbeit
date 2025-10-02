@@ -876,4 +876,43 @@ body.modal-open {
     100% { transform: rotate(360deg); }
 }
 /* ===== ENDE DER NEUEN SPINNER-STILE ===== */
+/* ===== ENDE DER NEUEN SPINNER-STILE ===== */
 
+/* --- START: NEUE STILE FÜR HU-DETAIL-MODAL --- */
+/* NEU: Diese Regel überschreibt die Zentrierung NUR für das HU-Detail-Modal */
+#huDetailsModal {
+    align-items: flex-start; /* Richtet das Modal oben aus statt in der Mitte */
+    padding-top: 20px;       /* Fügt einen kleinen Abstand zum oberen Bildschirmrand hinzu */
+}
+
+#huDetailsModal .modal-content {
+    max-width: 400px; /* Eine passende Breite für das kleine Info-Modal */
+    width: 90%;
+    height: auto; /* Höhe passt sich dem Inhalt an */
+    max-height: 80vh;
+    border-radius: 8px; /* Ecken wieder abrunden */
+}
+
+#huDetailsContent dl {
+    margin: 10px 0;
+    padding: 0;
+}
+
+#huDetailsContent dt {
+    font-weight: bold;
+    color: #555;
+    margin-top: 12px;
+    font-size: 0.9em;
+}
+
+#huDetailsContent dd {
+    margin-left: 0;
+    padding: 4px 8px;
+    background-color: #f4f4f4;
+    border-radius: 4px;
+    border: 1px solid #eee;
+    font-family: monospace;
+    font-size: 1.05em;
+    word-break: break-all;
+}
+/* --- ENDE: NEUE STILE FÜR HU-DETAIL-MODAL --- */
