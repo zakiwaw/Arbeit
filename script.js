@@ -82,6 +82,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const batchFeedbackToggleEl = document.getElementById('batchFeedbackToggle');
     const closeBatchScanFeedbackModalButtonEl = document.getElementById('closeBatchScanFeedbackModalButton');
     const loadingOverlayEl = document.getElementById('loadingOverlay');
+    const huDetailsModalEl = document.getElementById('huDetailsModal');
+    const huDetailsNumberEl = document.getElementById('huDetailsNumber');
+    const huDetailsPackagingEl = document.getElementById('huDetailsPackaging');
+    const huDetailsDimensionsEl = document.getElementById('huDetailsDimensions');
+    const huDetailsWeightEl = document.getElementById('huDetailsWeight');
+
 
 
     // --- Konstanten & Konfiguration ---
@@ -239,10 +245,11 @@ function showOpenHusSummary() {
             const listItems = sortedItems.map(item => {
                 const hasDunkelalarm = dunkelalarmedNumbers.has(item.rawInput);
                 const alarmClass = hasDunkelalarm ? 'has-dunkelalarm' : '';
+                // NEU: Cursor und Titel für Klickbarkeit hinzugefügt
                 return `
                 <li>
                     <div class="pending-item-details">
-                        <span class="pending-vse ${alarmClass}">${escapeHtml(item.rawInput)}</span>
+                        <span class="pending-vse ${alarmClass}" style="cursor:pointer;" title="Details für ${escapeHtml(item.rawInput)} anzeigen">${escapeHtml(item.rawInput)}</span>
                         <span class="pending-sendnr">${escapeHtml(item.sendnr)}</span>
                     </div>
                 </li>`;
@@ -255,7 +262,8 @@ function showOpenHusSummary() {
                 const positionHtml = isManOrderContext && item.position ? `<span class="position-number">${item.position}.</span>` : ``;
                 const hasDunkelalarm = dunkelalarmedNumbers.has(item.rawInput);
                 const alarmClass = hasDunkelalarm ? 'has-dunkelalarm' : '';
-                return `<li>${positionHtml}<span class="hu-value ${alarmClass}">${escapeHtml(item.rawInput)}</span></li>`;
+                // NEU: Cursor und Titel für Klickbarkeit hinzugefügt
+               return `<li>${positionHtml}<span class="hu-value ${alarmClass}" style="cursor:pointer;" title="Details für ${escapeHtml(item.rawInput)} anzeigen">${escapeHtml(item.rawInput)}</span></li>`;
             }).join('');
             return `<ul class="hu-list">${listItems}</ul>`;
         }
@@ -530,7 +538,31 @@ function findCarrierForHu(huNumber) {
             if (unsafe === null || unsafe === undefined) return '';
             return unsafe.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
         }
-// --- START DER ÄNDERUNG: Dynamisches Font-Sizing Hilfsfunktion ---
+
+// --- START: NEUE HILFSFUNKTION ZUM PARSEN VON HU-DATEN ---
+/**
+ * Parst einen HU-String, der zusätzliche, mit | getrennte Daten enthalten kann.
+ * @param {string} huString Der zu parsende String (z.B. "1 09250929101E|box|10x10|5kg").
+ * @returns {object} Ein Objekt mit den extrahierten Daten.
+ */
+function parseComplexHuString(huString) {
+    const parts = huString.split('|');
+    const mainPart = parts[0].trim();
+    
+    // Extrahieren von Position und HU-Nummer aus dem ersten Teil
+    const mainPartMatch = mainPart.match(/^(?:(\d+)\s+)?([0-9A-Z]+)$/);
+    
+    const result = {
+        position: mainPartMatch && mainPartMatch[1] ? parseInt(mainPartMatch[1], 10) : null,
+        rawInput: mainPartMatch ? mainPartMatch[2] : mainPart, // Die reine HU
+        fullInput: mainPart, // Position + HU
+        packaging: parts[1] ? parts[1].trim() : null,
+        dimensions: parts[2] ? parts[2].trim() : null,
+        grossWeight: parts[3] ? parts[3].trim() : null
+    };
+    return result;
+}
+// --- ENDE: NEUE HILFSFUNKTION ---
 /**
  * Passt die Schriftgröße eines HTML-Elements dynamisch an, damit sein Inhalt in einen Container passt.
  * @param {HTMLElement} element Das zu skalierende Element (z.B. feedbackScanNumberEl).
@@ -2682,7 +2714,7 @@ shipmentNumberInputEl.addEventListener('input', () => {
             const orderNumber = metaParts[0];
             const hasFullMeta = metaParts.length >= 4;
             processedOrders.push(orderNumber);
-            const hus = huData.split(' ').filter(Boolean);
+            const hus = huData.split('~~~').filter(Boolean); // GEÄNDERT: Trennzeichen von ' ' zu '~~~'
 
             if (!shipments[orderNumber]) {
                 const newShipment = {
@@ -2695,8 +2727,23 @@ shipmentNumberInputEl.addEventListener('input', () => {
                     newShipment.plsoNumber = metaParts[3];
                 }
                 shipments[orderNumber] = newShipment;
-                hus.forEach((hu, index) => {
-                    newShipment.scannedItems.push({ rawInput: hu, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null, position: index + 1 });
+                hus.forEach((huString, index) => {
+                    // NEU: Verwende die Hilfsfunktion, um die Zusatzdaten zu extrahieren
+                    const huData = parseComplexHuString(huString);
+                    newShipment.scannedItems.push({ 
+                        rawInput: huData.rawInput, 
+                        status: 'Anstehend', 
+                        timestamp: now, 
+                        isCombination: false, 
+                        notes: [], 
+                        isCancelled: false, 
+                        cancelledTimestamp: null, 
+                        position: huData.position || (index + 1),
+                        // NEUE FELDER
+                        packaging: huData.packaging,
+                        dimensions: huData.dimensions,
+                        grossWeight: huData.grossWeight
+                    });
                 });
                 addedCount += hus.length;
             } else {
@@ -3173,6 +3220,58 @@ shipmentNumberInputEl.addEventListener('input', () => {
                 }
             });
             // --- ENDE DER ÄNDERUNG: Event Listener für Batch Scan Feedback Toggle und Close Button ---
+
+            // --- START: NEUE LOGIK FÜR HU-DETAIL-MODAL ---
+            
+            // Hilfsfunktion zum Finden eines Items anhand der HU-Nummer
+            function findShipmentAndItemByHu(huNumber) {
+                const shipments = loadShipments();
+                const upperHu = huNumber.trim().toUpperCase();
+                for (const baseNumber in shipments) {
+                    const shipment = shipments[baseNumber];
+                    if (shipment.scannedItems) {
+                        const foundItem = shipment.scannedItems.find(item => item.rawInput.toUpperCase() === upperHu);
+                        if (foundItem) {
+                            return { shipment, item: foundItem };
+                        }
+                    }
+                }
+                return null;
+            }
+
+            // Funktion zum Öffnen des Modals
+            function openHuDetailsModal(event) {
+                const target = event.target.closest('.hu-value, .pending-vse');
+                if (!target) return;
+
+                const huNumber = target.textContent.trim();
+                const data = findShipmentAndItemByHu(huNumber);
+
+                if (data && data.item) {
+                    huDetailsNumberEl.textContent = data.item.rawInput || 'N/A';
+                    huDetailsPackagingEl.textContent = data.item.packaging || 'N/A';
+                    huDetailsDimensionsEl.textContent = data.item.dimensions || 'N/A';
+                    huDetailsWeightEl.textContent = data.item.grossWeight || 'N/A';
+                    
+                    huDetailsModalEl.classList.add('visible');
+                    document.body.classList.add('modal-open');
+                }
+            }
+
+            // Event Listeners für die drei Listen im "Offene HUs"-Modal
+            openHusListContainerEl.addEventListener('click', openHuDetailsModal);
+            missingReceiptHusListContainerEl.addEventListener('click', openHuDetailsModal);
+            dunkelalarmHusListContainerEl.addEventListener('click', openHuDetailsModal);
+
+            // Schließ-Logik für das neue Modal
+            huDetailsModalEl.addEventListener('click', (e) => {
+                if (e.target === huDetailsModalEl || e.target.closest('[data-close-modal="huDetailsModal"]')) {
+                    huDetailsModalEl.classList.remove('visible');
+                    document.body.classList.remove('modal-open');
+                    // Fokus nicht zurücksetzen, da das Hauptmodal noch offen ist
+                }
+            });
+            // --- ENDE: NEUE LOGIK FÜR HU-DETAIL-MODAL ---
 
 
 
