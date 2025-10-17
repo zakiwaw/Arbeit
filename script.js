@@ -2,7 +2,7 @@
 const { jsPDF } = window.jspdf;
 
 document.addEventListener('DOMContentLoaded', function() {
-    // --- DOM Elemente ---
+
     const mainInputFormEl = document.getElementById('main-input-form'); // Dieser sollte schon da sein
     const noteInputFormEl = document.getElementById('note-input-form'); // NEU
     const noteEditFormEl = document.getElementById('note-edit-form');   // NEU
@@ -96,6 +96,121 @@ document.addEventListener('DOMContentLoaded', function() {
     const huDetailsWeightEl = document.getElementById('huDetailsWeight');
 
 
+    async function initializeApp() {
+        showLoader(); // <<<< NEU: Lade-Spinner anzeigen
+        const initialShipments = await loadDataFromServer();
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(initialShipments));
+    
+        renderTable();
+        isBatchModeActive = batchModeToggleEl.checked;
+        sessionFirstSuffixScans = {};
+        notifiedCompletions = new Set();
+        
+        resetSingleScanNoteInputState();
+        toggleBatchMode(isBatchModeActive);
+        batchFeedbackToggleEl.checked = false;
+        updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
+        updateClearButtonVisibility(noteInputEl, clearNoteButtonEl);
+        updateCurrentBatchNoteDisplay();
+    
+        setupEventListeners();
+        focusShipmentInput();
+        console.log(`Fracht Tracker ${document.title.split('(')[1].split(')')[0]} initialized.`);
+        hideLoader(); // <<<< NEU: Lade-Spinner verstecken, wenn alles fertig ist
+    }
+
+    
+                    // Wiederverwendbare Funktion zum Speichern der HU-Liste
+                    function saveAndProcessHuListData() {
+                        const mainOrderNumber = mainOrderNumberInputEl.value.trim().toUpperCase();
+                        const huListText = huListTextareaEl.value.trim();
+        
+                        if (!mainOrderNumber || !huListText) {
+                            alert("Bitte Auftragsnummer und mindestens eine HU-Nummer eingeben.");
+                            return { success: false };
+                        }
+                        const hus = huListText.split(/[\s\n\r]+/).map(hu => hu.trim().toUpperCase()).filter(hu => hu.length > 0);
+                        if (hus.length === 0) {
+                            alert("Keine gültigen HU-Nummern in der Liste gefunden.");
+                            return { success: false };
+                        }
+        
+                        const shipments = loadShipments();
+                        const now = new Date().toISOString();
+                        let addedCount = 0;
+                        let duplicateCount = 0;
+        
+                        if (!shipments[mainOrderNumber]) {
+                            shipments[mainOrderNumber] = {
+                                hawb: mainOrderNumber, lastModified: now, totalPiecesExpected: hus.length,
+                                scannedItems: [], mitarbeiter: MITARBEITER_NAME, isHuListOrder: true
+                            };
+                            hus.forEach(hu => {
+                                shipments[mainOrderNumber].scannedItems.push({ rawInput: hu, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null });
+                                addedCount++;
+                            });
+                        } else {
+                            if (!shipments[mainOrderNumber].isHuListOrder) {
+                                alert(`FEHLER: ${mainOrderNumber} ist eine normale Sendung. Sie kann nicht mit einer HU-Liste erweitert werden.`);
+                                return { success: false };
+                            }
+                            hus.forEach(hu => {
+                                if (!shipments[mainOrderNumber].scannedItems.find(item => item.rawInput.toUpperCase() === hu)) {
+                                    shipments[mainOrderNumber].scannedItems.push({ rawInput: hu, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null });
+                                    addedCount++;
+                                } else { duplicateCount++; }
+                            });
+                            if (addedCount > 0) {
+                                shipments[mainOrderNumber].lastModified = now;
+                                shipments[mainOrderNumber].totalPiecesExpected += addedCount;
+                            }
+                        }
+        
+                        saveShipments(shipments);
+                        renderTable();
+                        
+                        let message = '';
+                        let messageType = 'green';
+                        if (addedCount > 0 && duplicateCount === 0) {
+                            message = `${addedCount} neue HU(s) zum Auftrag ${mainOrderNumber} hinzugefügt.`;
+                        } else if (addedCount > 0 && duplicateCount > 0) {
+                            message = `${addedCount} neue HU(s) hinzugefügt, ${duplicateCount} Duplikate übersprungen.`;
+                            messageType = 'orange';
+                        } else if (addedCount === 0 && duplicateCount > 0) {
+                            alert(`Import für ${mainOrderNumber}:\n\nKeine neuen HUs gefunden. Alle ${duplicateCount} eingegebenen HUs sind bereits im Auftrag vorhanden.`);
+                        }
+                        
+                        return { success: true, message: message, messageType: messageType, baseNumber: mainOrderNumber };
+                    }
+        
+                    // Listener für den "Importieren & Speichern"-Button (schließt das Modal)
+                    saveHuListButtonEl.addEventListener('click', () => {
+                        const result = saveAndProcessHuListData();
+                        if (result.success) {
+                            displayCurrentShipmentDetails(result.baseNumber);
+                            importHuModalEl.classList.remove('visible');
+                            document.body.classList.remove('modal-open'); // <-- DIESE ZEILE IST NEU
+                            if (result.message) {
+                                displayError(result.message, result.messageType, 5000);
+                            }
+                            focusShipmentInput();
+                        }
+                    });
+        
+                    // Listener für den neuen "+"-Button (speichert und leert die Felder)
+                    addAndContinueHuButtonEl.addEventListener('click', () => {
+                        const result = saveAndProcessHuListData();
+                        if (result.success) {
+                            displayCurrentShipmentDetails(result.baseNumber);
+                            if (result.message) {
+                               displayError(result.message, result.messageType, 5000);
+                            }
+                            // Felder für die nächste Eingabe leeren
+                            mainOrderNumberInputEl.value = '';
+                            huListTextareaEl.value = '';
+                            mainOrderNumberInputEl.focus();
+                        }
+                    });
 
     // --- Konstanten & Konfiguration ---
     const WEB_APP_URL_BACKEND = 'https://script.google.com/macros/s/AKfycbyBtlm37WxzXdFCDjQuSIWfnQiTny6gwrmXuoq_cacGY9_bkqZxuuW7aJEqLuHJhWYg/exec'; // Mail_13
@@ -3090,15 +3205,25 @@ mainInputFormEl.addEventListener('submit', (event) => {
         focusShipmentInput(); // Setzt den Fokus zurück auf das Haupt-Eingabefeld
     });
     
-// Listener für das Absenden des Notiz-Bearbeitungs-Modals
+// in setupEventListeners()
+
+// KORRIGIERTER Listener für das Absenden des Notiz-Bearbeitungs-Modals (ersetzt BEIDE alten Blöcke)
 noteEditFormEl.addEventListener('submit', (e) => {
     e.preventDefault(); // Verhindert Neuladen der Seite
-    
-    // NEU: Explizit den Fokus vom Textarea entfernen, um das Schließen der Tastatur zu erzwingen.
-    noteEditTextareaEl.blur(); 
-    
-    saveNoteEditButtonEl.click(); // Simuliert einen Klick auf den "Speichern"-Button
+    noteEditTextareaEl.blur(); // Tastatur schließen
+
+    // Die Speicherlogik wird DIREKT hier ausgeführt, anstatt einen weiteren Klick auszulösen.
+    const baseNumber = noteEditBaseNumberEl.value;
+    const timestamp = noteEditTimestampEl.value;
+    const noteIndex = noteEditNoteIndexEl.value === '' ? undefined : parseInt(noteEditNoteIndexEl.value, 10);
+    const newNoteValue = noteEditTextareaEl.value;
+
+    saveOrUpdateNote(baseNumber, timestamp, noteIndex, newNoteValue); // Speichert die Notiz EINMAL
+    closeNoteEditModal(); // Schließt das Modal
 });
+
+// Der separate 'click'-Listener für saveNoteEditButtonEl wird komplett entfernt.
+
     
     comboCheckboxEl.addEventListener('change', focusShipmentInput);
 
@@ -3126,16 +3251,7 @@ noteEditFormEl.addEventListener('submit', (e) => {
         focusShipmentInput();
     });
 
-    // Der alte Listener für 'currentDetailsDivEl' wurde entfernt und durch den 'document' Listener oben ersetzt.
 
-    saveNoteEditButtonEl.addEventListener('click', () => {
-        const baseNumber = noteEditBaseNumberEl.value;
-        const timestamp = noteEditTimestampEl.value;
-        const noteIndex = noteEditNoteIndexEl.value === '' ? undefined : parseInt(noteEditNoteIndexEl.value, 10);
-        const newNoteValue = noteEditTextareaEl.value;
-        saveOrUpdateNote(baseNumber, timestamp, noteIndex, newNoteValue);
-        closeNoteEditModal();
-    });
     
     cancelNoteEditButtonEl.addEventListener('click', closeNoteEditModal);
     noteEditModalEl.addEventListener('click', (e) => {
@@ -3417,28 +3533,7 @@ noteEditFormEl.addEventListener('submit', (e) => {
 /**
  * Initialisiert die Anwendung: Lädt Daten, setzt UI und Event Listener.
  */
-async function initializeApp() {
-    showLoader(); // <<<< NEU: Lade-Spinner anzeigen
-    const initialShipments = await loadDataFromServer();
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(initialShipments));
 
-    renderTable();
-    isBatchModeActive = batchModeToggleEl.checked;
-    sessionFirstSuffixScans = {};
-    notifiedCompletions = new Set();
-    
-    resetSingleScanNoteInputState();
-    toggleBatchMode(isBatchModeActive);
-    batchFeedbackToggleEl.checked = false;
-    updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
-    updateClearButtonVisibility(noteInputEl, clearNoteButtonEl);
-    updateCurrentBatchNoteDisplay();
-
-    setupEventListeners();
-    focusShipmentInput();
-    console.log(`Fracht Tracker ${document.title.split('(')[1].split(')')[0]} initialized.`);
-    hideLoader(); // <<<< NEU: Lade-Spinner verstecken, wenn alles fertig ist
-}
 
 // =========================================================================
 // HIER IST DIE KORREKTUR: Die fehlenden Zeilen werden hinzugefügt
@@ -3450,97 +3545,7 @@ initializeApp();
 
 
 
-                    // Wiederverwendbare Funktion zum Speichern der HU-Liste
-            function saveAndProcessHuListData() {
-                const mainOrderNumber = mainOrderNumberInputEl.value.trim().toUpperCase();
-                const huListText = huListTextareaEl.value.trim();
 
-                if (!mainOrderNumber || !huListText) {
-                    alert("Bitte Auftragsnummer und mindestens eine HU-Nummer eingeben.");
-                    return { success: false };
-                }
-                const hus = huListText.split(/[\s\n\r]+/).map(hu => hu.trim().toUpperCase()).filter(hu => hu.length > 0);
-                if (hus.length === 0) {
-                    alert("Keine gültigen HU-Nummern in der Liste gefunden.");
-                    return { success: false };
-                }
-
-                const shipments = loadShipments();
-                const now = new Date().toISOString();
-                let addedCount = 0;
-                let duplicateCount = 0;
-
-                if (!shipments[mainOrderNumber]) {
-                    shipments[mainOrderNumber] = {
-                        hawb: mainOrderNumber, lastModified: now, totalPiecesExpected: hus.length,
-                        scannedItems: [], mitarbeiter: MITARBEITER_NAME, isHuListOrder: true
-                    };
-                    hus.forEach(hu => {
-                        shipments[mainOrderNumber].scannedItems.push({ rawInput: hu, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null });
-                        addedCount++;
-                    });
-                } else {
-                    if (!shipments[mainOrderNumber].isHuListOrder) {
-                        alert(`FEHLER: ${mainOrderNumber} ist eine normale Sendung. Sie kann nicht mit einer HU-Liste erweitert werden.`);
-                        return { success: false };
-                    }
-                    hus.forEach(hu => {
-                        if (!shipments[mainOrderNumber].scannedItems.find(item => item.rawInput.toUpperCase() === hu)) {
-                            shipments[mainOrderNumber].scannedItems.push({ rawInput: hu, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null });
-                            addedCount++;
-                        } else { duplicateCount++; }
-                    });
-                    if (addedCount > 0) {
-                        shipments[mainOrderNumber].lastModified = now;
-                        shipments[mainOrderNumber].totalPiecesExpected += addedCount;
-                    }
-                }
-
-                saveShipments(shipments);
-                renderTable();
-                
-                let message = '';
-                let messageType = 'green';
-                if (addedCount > 0 && duplicateCount === 0) {
-                    message = `${addedCount} neue HU(s) zum Auftrag ${mainOrderNumber} hinzugefügt.`;
-                } else if (addedCount > 0 && duplicateCount > 0) {
-                    message = `${addedCount} neue HU(s) hinzugefügt, ${duplicateCount} Duplikate übersprungen.`;
-                    messageType = 'orange';
-                } else if (addedCount === 0 && duplicateCount > 0) {
-                    alert(`Import für ${mainOrderNumber}:\n\nKeine neuen HUs gefunden. Alle ${duplicateCount} eingegebenen HUs sind bereits im Auftrag vorhanden.`);
-                }
-                
-                return { success: true, message: message, messageType: messageType, baseNumber: mainOrderNumber };
-            }
-
-            // Listener für den "Importieren & Speichern"-Button (schließt das Modal)
-            saveHuListButtonEl.addEventListener('click', () => {
-                const result = saveAndProcessHuListData();
-                if (result.success) {
-                    displayCurrentShipmentDetails(result.baseNumber);
-                    importHuModalEl.classList.remove('visible');
-                    document.body.classList.remove('modal-open'); // <-- DIESE ZEILE IST NEU
-                    if (result.message) {
-                        displayError(result.message, result.messageType, 5000);
-                    }
-                    focusShipmentInput();
-                }
-            });
-
-            // Listener für den neuen "+"-Button (speichert und leert die Felder)
-            addAndContinueHuButtonEl.addEventListener('click', () => {
-                const result = saveAndProcessHuListData();
-                if (result.success) {
-                    displayCurrentShipmentDetails(result.baseNumber);
-                    if (result.message) {
-                       displayError(result.message, result.messageType, 5000);
-                    }
-                    // Felder für die nächste Eingabe leeren
-                    mainOrderNumberInputEl.value = '';
-                    huListTextareaEl.value = '';
-                    mainOrderNumberInputEl.focus();
-                }
-            });
 
 
 
