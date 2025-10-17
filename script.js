@@ -3,6 +3,11 @@ const { jsPDF } = window.jspdf;
 
 document.addEventListener('DOMContentLoaded', function() {
     // --- DOM Elemente ---
+    const mainInputFormEl = document.getElementById('main-input-form');
+    const mainViewEl = document.getElementById('mainView');
+    const detailViewEl = document.getElementById('detailView');
+    const detailViewContentEl = document.getElementById('detailViewContent');
+    const backToMainViewBtnEl = document.getElementById('backToMainViewBtn');
     const noteEditModalEl = document.getElementById('noteEditModal');
     const noteEditContextEl = document.getElementById('noteEditContext');
     const noteEditBaseNumberEl = document.getElementById('noteEditBaseNumber');
@@ -100,10 +105,111 @@ document.addEventListener('DOMContentLoaded', function() {
     const NON_COUNTING_STATUSES = ['Dunkelalarm', 'Anstehend', 'NichtSichern', 'Abgelehnt', 'Wareneingang'];
     const NOTE_ALLOWED_STATUSES = ['XRY', 'Abgelehnt', 'Dunkelalarm', 'ETD', 'EDD'];
     const EXCLUSIVE_SECURITY_STATUSES = ['XRY', 'ETD', 'EDD'];
-    const KUNDENNR_CARRIER_MAP = { "730": "UPS", "824": "Kühne + Nagel", "730201": "UPS", "875201": "Maersk", "524": "DSV", "595": "DSV", "613": "DSV", "998": "DSV", "285201": "WWS Freight", "811205": "DB Schenker", "9969726": "DB Schenker", "9969729": "DB Schenker", "9974024": "Kühne + Nagel", "9974054": "Kühne + Nagel", "9974074": "Kühne + Nagel", "9974104": "Kühne + Nagel", "9974144": "Kühne + Nagel", "9974224": "Kühne + Nagel", "9974264": "Kühne + Nagel", "9975006": "Kühne + Nagel", "9974051": "Kühne + Nagel", "9994954": "DHL", "334": "DHL", "815": "DHL", "981": "DHL", "9994994": "DHL", "758204": "TRA", "7589911": "TRA", "7589983": "TRA", "7589984": "TRA", "7589988": "TRA", "608": "WWS Freight", "801": "WWS Freight", "541": "Kühne + Nagel", "615": "Kühne + Nagel", "355201": "Kühne + Nagel", "985202": "Kühne + Nagel", "9974021": "Kühne + Nagel", "9974071": "Kühne + Nagel", "9974101": "Kühne + Nagel", "9974141": "Kühne + Nagel", "9974221": "Kühne + Nagel", "9974261": "Kühne + Nagel", "9974251": "Kühne + Nagel", "9975001": "Kühne + Nagel" };
+    // ... (Zeile 118) const EXCLUSIVE_SECURITY_STATUSES = ['XRY', 'ETD', 'EDD'];
+    
+    // AKTUALISIERTE LISTE BASIEREND AUF Kundennummerliste VW.xlsx (Stand: 16.10.2025)
+    const KUNDENNR_CARRIER_MAP = {
+        "294": "DSV",
+        "334": "DHL",
+        "341": "DWF",
+        "355201": "Kühne + Nagel",
+        "360": "Maersk",
+        "381": "DSV",
+        "524": "DSV",
+        "541": "Kühne + Nagel",
+        "595": "DSV",
+        "602201": "DSV",
+        "603": "DSV",
+        "607": "Maersk",
+        "608": "WWS Freight",
+        "613": "DSV",
+        "615": "Kühne + Nagel",
+        "631": "Maersk",
+        "637": "DSV",
+        "726": "DHL",
+        "730": "UPS",
+        "730201": "UPS",
+        "758001": "DHL",
+        "758204": "Geodis",
+        "7589911": "Geodis",
+        "7589983": "Geodis",
+        "7589984": "Geodis",
+        "7589988": "Geodis",
+        "7650201": "DHL",
+        "772201": "DHL",
+        "7960032": "DHL",
+        "7960041": "DHL",
+        "796022": "DHL",
+        "796201": "DHL",
+        "796203": "DHL",
+        "796204": "DHL",
+        "796206": "DHL",
+        "796207": "DHL",
+        "796208": "DHL",
+        "801": "WWS Freight",
+        "802": "DSV",
+        "804": "DHL",
+        "811205": "DB Schenker",
+        "813": "DSV",
+        "815": "DHL",
+        "817": "DSV",
+        "819202": "DHL",
+        "824": "Kühne + Nagel",
+        "862": "DSV",
+        "865": "DHL",
+        "868": "WWS Freight",
+        "875201": "Maersk",
+        "897": "DSV",
+        "9380011": "DHL",
+        "938203": "DHL",
+        "945": "DSV",
+        "959201": "DHL",
+        "959202": "DHL",
+        "959203": "DHL",
+        "981": "DHL",
+        "981299": "DHL",
+        "985202": "Kühne + Nagel",
+        "996001": "DB Schenker",
+        "9969726": "DB Schenker",
+        "9969729": "DB Schenker",
+        "9974021": "Kühne + Nagel",
+        "9974024": "Kühne + Nagel",
+        "9974029": "Kühne + Nagel",
+        "9974051": "Kühne + Nagel",
+        "9974054": "Kühne + Nagel",
+        "9974071": "Kühne + Nagel",
+        "9974074": "Kühne + Nagel",
+        "9974079": "Kühne + Nagel",
+        "9974101": "Kühne + Nagel",
+        "9974104": "Kühne + Nagel",
+        "9974109": "Kühne + Nagel",
+        "9974141": "Kühne + Nagel",
+        "9974144": "Kühne + Nagel",
+        "9974149": "Kühne + Nagel",
+        "9974221": "Kühne + Nagel",
+        "9974224": "Kühne + Nagel",
+        "9974229": "Kühne + Nagel",
+        "9974251": "Kühne + Nagel",
+        "9974261": "Kühne + Nagel",
+        "9974264": "Kühne + Nagel",
+        "9974269": "Kühne + Nagel",
+        "9975001": "Kühne + Nagel",
+        "9975006": "Kühne + Nagel",
+        "998": "DSV",
+        "9994951": "DB Schenker",
+        "9994954": "DB Schenker",
+        "9994959": "DB Schenker",
+        "9994991": "DB Schenker",
+        "9994994": "DB Schenker",
+        "9994999": "DB Schenker",
+        "285201": "WWS Freight"
+    };
+
+// ... (Weiter im Code)
 
 
     // --- Anwendungsstatus ---
+    let lastScrollPosition = 0;
     let isBatchModeActive = false;
     let currentBatch = [];
     let batchStatus = '';
@@ -456,28 +562,28 @@ function playShortErrorSound() {
 }
 // script.js
 
-// ... (bestehender Code) ...
-
 function shortenForwarderName(fullName) {
     if (!fullName) return ''; // Leere Eingaben abfangen
 
     const lowerCaseName = fullName.toLowerCase();
 
-    if (lowerCaseName.includes('kühne + nagel')) return 'Kühne + Nagel';
-    if (lowerCaseName.includes('dhl global forwarding')) return 'DHL';
+    if (lowerCaseName.includes('kühne + nagel') || lowerCaseName.includes('kühne')) return 'Kühne + Nagel';
+    if (lowerCaseName.includes('dhl') || lowerCaseName.includes('danmar')) return 'DHL';
     if (lowerCaseName.includes('ups')) return 'UPS';
-    if (lowerCaseName.includes('maersk') && lowerCaseName.includes('senator')) return 'Maersk/Senator';
+    if (lowerCaseName.includes('maersk') || lowerCaseName.includes('senator')) return 'Maersk';
     if (lowerCaseName.includes('freight consol')) return 'Freight Consol';
     if (lowerCaseName.includes('logwin')) return 'Logwin';
     if (lowerCaseName.includes('hartrodt')) return 'Hartrodt';
-    if (lowerCaseName.includes('db schenker')) return 'DB Schenker';
+    if (lowerCaseName.includes('db schenker') || lowerCaseName.includes('schenker')) return 'DB Schenker';
     if (lowerCaseName.includes('ait worldwide')) return 'AIT Worldwide';
     if (lowerCaseName.includes('dachser')) return 'Dachser';
-	if (lowerCaseName.includes('dsv')) return 'DSV';
+    if (lowerCaseName.includes('dsv')) return 'DSV';
     if (lowerCaseName.includes('hermes')) return 'HERMES';
-    if (lowerCaseName.includes('wws freight')) return 'WWS';
-    // NEU: TRA hinzufügen
+    if (lowerCaseName.includes('wws') || lowerCaseName.includes('wws freight')) return 'WWS';
     if (lowerCaseName.includes('tra')) return 'TRA';
+    // --- NEUE EINTRÄGE AUS DER EXCEL-LISTE ---
+    if (lowerCaseName.includes('geodis')) return 'Geodis';
+    if (lowerCaseName.includes('dwf')) return 'DWF';
 
     // Wenn keine Regel zutrifft, den Originalnamen zurückgeben
     return fullName;
@@ -781,21 +887,40 @@ function fitTextToContainer(element, container, initialFontSize, minFontSize, pa
 
 // --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESEM CODE ---
 
-// --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESEM CODE ---
+// =========================================================================
+// ERSETZEN SIE IHRE GESAMTE displayCurrentShipmentDetails FUNKTION MIT DIESER
+// =========================================================================
+// ERSETZEN SIE IHRE ALTE 'displayCurrentShipmentDetails' FUNKTION MIT DIESER
 
 function displayCurrentShipmentDetails(baseNumberToDisplay) {
     clearError();
     removeActiveInlineNoteEditor();
 
+    // DIES IST DIE ENTSCHEIDENDE LOGIK:
+    // Prüft, welche Ansicht (Haupt- oder Detailansicht) aktiv ist
+    // und wählt das richtige Element aus, um die Details hineinzuschreiben.
+    const isDetailViewVisible = !detailViewEl.classList.contains('hidden');
+    const displayTarget = isDetailViewVisible
+        ? detailViewContentEl.querySelector('#currentShipmentDetails') // Ziel in der Detailansicht
+        : currentDetailsDivEl;                                      // Ziel in der Hauptansicht
+
+    if (!displayTarget) {
+        console.error("Fehler: Konnte kein Anzeige-Element für Details finden. Stellen Sie sicher, dass die HTML-Struktur korrekt ist.");
+        return;
+    }
+
     const shipments = loadShipments();
     const shipment = baseNumberToDisplay ? shipments[baseNumberToDisplay] : null;
 
     if (!baseNumberToDisplay || !shipment) {
-        currentDetailsDivEl.innerHTML = 'Geben Sie eine Sendungsnummer ein oder wählen Sie eine aus der Liste.';
-        currentDetailsDivEl.style.borderColor = '#aac';
+        displayTarget.innerHTML = 'Geben Sie eine Sendungsnummer ein oder wählen Sie eine aus der Liste.';
+        displayTarget.style.borderColor = '#aac';
         return;
     }
     
+    // Ab hier ist der Code identisch zur Originalfunktion, aber alle
+    // Änderungen werden auf die `displayTarget` Variable angewendet.
+
     let detailsHtml = '';
 
     if (shipment.parentOrderNumber) {
@@ -832,7 +957,6 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
             detailsHtml += `<div id="pendingHuList" class="${listClass}">`;
             detailsHtml += `<h4>Offene Positionen (${pendingHuNumbers.length} von ${totalHus}):</h4>`;
             
-            // NEU: Kopfzeile nur für VVL-Listen hinzufügen
             const isVvlList = pendingHuNumbers.some(item => item.sendnr);
             if (isVvlList) {
                 detailsHtml += `<div class="pending-list-header"><span>VSE-Nummer</span><span>Sendungs-Nr.</span></div>`;
@@ -840,11 +964,8 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
 
             const listItemsHtml = pendingHuNumbers.sort((a,b) => (a.position || 9999) - (b.position || 9999)).map(item => {
                 const positionHtml = isManOrder && item.position ? `<span class="position-number">${item.position}.</span>` : `<span class="position-number"></span>`;
-                
                 let itemContentHtml = '';
-                // NEU: Prüfen, ob eine Sendungsnummer vorhanden ist und das Layout anpassen
                 if (item.sendnr) {
-                    // Zweispaltiges Layout für Vorverladelisten
                     itemContentHtml = `
                         <div class="pending-item-details">
                             <span class="pending-vse">${escapeHtml(item.rawInput)}</span>
@@ -852,10 +973,8 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
                         </div>
                     `;
                 } else {
-                    // Standard-Layout für normale HU-Listen
                     itemContentHtml = `<span class="hu-value">${escapeHtml(item.rawInput)}</span>`;
                 }
-                
                 return `<li>${positionHtml}${itemContentHtml}</li>`;
             }).join('');
             
@@ -917,18 +1036,19 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
     detailsHtml += `<span>Sicherung erfasst: <span class="${securityClass}">${securityScansCount} von ${expectedText}</span></span>`;
     detailsHtml += `</div>`;
     
-    currentDetailsDivEl.innerHTML = detailsHtml;
+    displayTarget.innerHTML = detailsHtml;
 
     if (expected !== null && expected !== undefined) {
-        if (receiptScansCount > expected || securityScansCount > expected) currentDetailsDivEl.style.borderColor = 'red';
-        else if (receiptScansCount < expected || securityScansCount < expected) currentDetailsDivEl.style.borderColor = 'orange';
-        else if (receiptScansCount === expected && securityScansCount === expected) currentDetailsDivEl.style.borderColor = 'green';
-        else currentDetailsDivEl.style.borderColor = '#aac';
+        if (receiptScansCount > expected || securityScansCount > expected) displayTarget.style.borderColor = 'red';
+        else if (receiptScansCount < expected || securityScansCount < expected) displayTarget.style.borderColor = 'orange';
+        else if (receiptScansCount === expected && securityScansCount === expected) displayTarget.style.borderColor = 'green';
+        else displayTarget.style.borderColor = '#aac';
     } else {
-        currentDetailsDivEl.style.borderColor = '#aac';
+        displayTarget.style.borderColor = '#aac';
     }
 }
-// --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESER NEUEN VERSION ---
+
+
 
 // --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESER NEUEN VERSION ---
 
@@ -941,23 +1061,26 @@ function renderTable() {
             if (!shipment) return;
             const row = tableBodyEl.insertRow();
             
+            // NEU: Füge die baseNumber als data-Attribut zur ganzen Zeile hinzu.
+            // Das macht das Abgreifen beim Klick viel einfacher.
+            row.dataset.basenumber = baseNumber;
+
+            
             const securityCount = calculateCurrentCountedPieces(shipment.scannedItems || []);
             const receiptCount = calculateGoodsReceiptCount(shipment.scannedItems || []);
             const expected = shipment.totalPiecesExpected;
             const expectedText = expected ?? 'N/A';
 
             let hawbCellHtml = '';
-            let pdfButtonData = ''; // Variable für das neue data-Attribut
+            let pdfButtonData = ''; 
 
             if (shipment.parentOrderNumber) {
-                // Wenn es eine Vorverladeliste ist, zeigen wir beide Nummern
                 hawbCellHtml = `<td data-label="HAWB.">
                     <div class="vvl-table-entry">
                          <span class="vvl-prefix">VVL: </span>${escapeHtml(shipment.parentOrderNumber)}<br>
                          <span class="kundennr-prefix">Kundennr: </span>${escapeHtml(baseNumber)}
                     </div>
                 </td>`;
-                // Füge das neue Attribut hinzu, damit die PDF-Funktion weiß, zu welcher VVL der Auftrag gehört
                 pdfButtonData = `data-parentordernumber="${escapeHtml(shipment.parentOrderNumber)}"`;
             } else {
                 hawbCellHtml = `<td data-label="HAWB.">${escapeHtml(baseNumber)}</td>`;
@@ -989,13 +1112,41 @@ function renderTable() {
             actionsCell.classList.add('actions-cell');
             actionsCell.innerHTML = `
                 <button class="edit-btn" data-basenumber="${escapeHtml(baseNumber)}" title="Sendung ${escapeHtml(baseNumber)} bearbeiten">Edit</button>
-                <button class="pdf-btn" data-basenumber="${escapeHtml(baseNumber)}" ${pdfButtonData}>PDF</button> <!-- Hier wird pdfButtonData eingefügt -->
+                <button class="pdf-btn" data-basenumber="${escapeHtml(baseNumber)}" ${pdfButtonData}>PDF</button>
                 <button class="delete-btn main-delete-btn" data-basenumber="${escapeHtml(baseNumber)}">Löschen</button>
             `;
         });
     updateEditButtonVisibilityInTable();
     filterTable(shipmentNumberInputEl.value);
 }
+
+function showDetailView(baseNumber) {
+    // 1. Aktuelle Scroll-Position der Hauptseite speichern
+    lastScrollPosition = window.scrollY;
+
+    // 2. Die Detail-Daten in den Container der Detail-Ansicht laden
+    displayCurrentShipmentDetails(baseNumber);
+
+    // 3. Ansichten umschalten
+    mainViewEl.classList.add('hidden');
+    detailViewEl.classList.remove('hidden');
+    
+    // 4. In der neuen Ansicht nach ganz oben scrollen
+    detailViewEl.scrollTop = 0;
+}
+
+
+function hideDetailView() {
+    // 1. Ansichten zurückschalten
+    detailViewEl.classList.add('hidden');
+    mainViewEl.classList.remove('hidden');
+
+    // 2. Zur gespeicherten Scroll-Position zurückkehren
+    window.scrollTo(0, lastScrollPosition);
+    focusShipmentInput(); // Fokus wieder auf das Eingabefeld setzen
+}
+
+
 
 
         function updateEditButtonVisibilityInTable() {
@@ -1367,8 +1518,7 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
         
             const currentNote = isEditing ? item.notes[noteIndex] : '';
         
-            // Modal mit Daten füllen
-            noteEditContextEl.textContent = `Für Scan: ${item.rawInput}`;
+
             noteEditBaseNumberEl.value = baseNumber;
             noteEditTimestampEl.value = itemTimestamp;
             noteEditNoteIndexEl.value = isEditing ? noteIndex : ''; // Leerer String für "neu"
@@ -2653,572 +2803,527 @@ async function sendPdfEmailViaBackend(event) {
 
 
 
-        // --- Event Listener Setup ---
-        function setupEventListeners() {
-            mainActionButtonEl.addEventListener('click', () => {
-                clearError();
-                removeActiveInlineNoteEditor();
-                if (isBatchModeActive) {
-                    addToBatch();
-                } else {
-                    if (newTotalSectionEl.classList.contains('visible')) return; // Warten auf Total-Eingabe
-                    const rawInput = shipmentNumberInputEl.value;
-                    const status = securityStatusSelectEl.value;
-                    const isCombination = comboCheckboxEl.checked;
-                    const result = processAndSaveSingleScan(rawInput, status, isCombination);
-                    if (!result.waitingForTotal) {
-                        if (result.success) {
-                            renderTable();
-                            displayCurrentShipmentDetails(processShipmentNumber(rawInput).baseNumber);
-                            shipmentNumberInputEl.value = '';
-                            updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
-                            displayError(result.message, 'green', 2000);
-                        } else {
-                            displayError(result.message);
-                        }
-                        focusShipmentInput();
-                    } else { // Warten auf Gesamtstückzahl
-                        displayError(result.message, 'orange');
-                        // Fokus ist auf newTotalInputEl
-                    }
-                }
-            });
+// ERSETZEN SIE IHRE GESAMTE setupEventListeners FUNKTION MIT DIESEM CODE
 
-// --- ERSETZEN SIE DEN GESAMTEN addEventListener-BLOCK MIT DIESEM CODE ---
+function setupEventListeners() {
 
-// --- ERSETZEN SIE DEN GESAMTEN addEventListener-BLOCK MIT DIESEM CODE ---
+    // ===============================================================
+    // NEU: Listener für die Master-Detail-Ansicht
+    // ===============================================================
 
-// --- ERSETZEN SIE DEN GESAMTEN addEventListener-BLOCK MIT DIESER KORRIGIERTEN VERSION ---
+    // Listener für den "Zurück"-Button in der Detailansicht
+    backToMainViewBtnEl.addEventListener('click', hideDetailView);
 
-// --- ERSETZEN SIE DEN GESAMTEN addEventListener-BLOCK MIT DIESEM CODE ---
+    // ÄNDERUNG: Klick-Verhalten der Tabelle wurde überarbeitet
+    tableBodyEl.addEventListener('click', (event) => {
+        const target = event.target;
+        const row = target.closest('tr');
+        if (!row) return;
 
-shipmentNumberInputEl.addEventListener('input', () => {
-    const currentValue = shipmentNumberInputEl.value.trim();
-    updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
+        const baseNumber = row.dataset.basenumber;
+        if (!baseNumber) return;
 
-    // --- LOGIK FÜR MAN FRacht QR-CODE ---
-    if (currentValue.startsWith('FRT_MULTI_V1')) {
-        if (!confirm("Ein Multi-Auftrags-QR-Code wurde erkannt.\n\nMöchtest du alle darin enthaltenen Aufträge jetzt importieren?")) {
-            shipmentNumberInputEl.value = ''; 
-            return;
-        }
-        const parts = currentValue.split(';;;').slice(1);
-        const shipments = loadShipments();
-        const now = new Date().toISOString();
-        let addedCount = 0, duplicateCount = 0, processedOrders = [];
-
-        parts.forEach(orderData => {
-            const [metaAndOrder, huData] = orderData.split('|||');
-            if (!metaAndOrder || !huData) return;
-            const metaParts = metaAndOrder.split('|');
-            const orderNumber = metaParts[0];
-            const hasFullMeta = metaParts.length >= 4;
-            processedOrders.push(orderNumber);
-            const hus = huData.split('~~~').filter(Boolean); // GEÄNDERT: Trennzeichen von ' ' zu '~~~'
-
-            if (!shipments[orderNumber]) {
-                const newShipment = {
-                    hawb: orderNumber, lastModified: now, totalPiecesExpected: hus.length,
-                    scannedItems: [], mitarbeiter: MITARBEITER_NAME, isHuListOrder: true,
-                };
-                if (hasFullMeta) {
-                    newShipment.freightForwarder = metaParts[1];
-                    newShipment.destinationCountry = metaParts[2];
-                    newShipment.plsoNumber = metaParts[3];
-                }
-                shipments[orderNumber] = newShipment;
-                hus.forEach((huString, index) => {
-                    // NEU: Verwende die Hilfsfunktion, um die Zusatzdaten zu extrahieren
-                    const huData = parseComplexHuString(huString);
-                    newShipment.scannedItems.push({ 
-                        rawInput: huData.rawInput, 
-                        status: 'Anstehend', 
-                        timestamp: now, 
-                        isCombination: false, 
-                        notes: [], 
-                        isCancelled: false, 
-                        cancelledTimestamp: null, 
-                        position: huData.position || (index + 1),
-                        // NEUE FELDER
-                        packaging: huData.packaging,
-                        dimensions: huData.dimensions,
-                        grossWeight: huData.grossWeight
-                    });
-                });
-                addedCount += hus.length;
-            } else {
-                // Hier könnten Sie Logik hinzufügen, um bestehende Aufträge zu aktualisieren
-            }
-        });
-        saveShipments(shipments);
-        alert(`Multi-Import abgeschlossen:\n- Verarbeitete Aufträge: ${processedOrders.length}\n- Neue HUs hinzugefügt: ${addedCount}`);
-        location.reload();
-        return;
-    } 
-    
-    // --- NEUE LOGIK FÜR VORVERLADELISTEN QR-CODE ---
-    else if (currentValue.startsWith('FRT_VVL_V1')) {
-        if (!confirm("Eine Vorverladeliste wurde erkannt.\n\nMöchtest du alle darin enthaltenen Kundenaufträge jetzt importieren?")) {
-            shipmentNumberInputEl.value = ''; 
-            return;
-        }
-
-        const parts = currentValue.split(';;;').slice(1);
-        const shipments = loadShipments();
-        const now = new Date().toISOString();
-        let addedPositionsCount = 0;
-        let newOrders = new Set();
-        let updatedOrders = new Set();
-        let processedVVLs = new Set();
-
-        parts.forEach(orderData => {
-            const [meta, huData] = orderData.split('|||');
-            if (!meta || !huData) return;
-
-            const [kundennr, vorverladelisteNr] = meta.split('|');
-            const positionen = huData.split(' ').filter(Boolean);
-            processedVVLs.add(vorverladelisteNr);
-
-            if (!shipments[kundennr]) {
-                // Neuer Kunde: Anlegen und alle Positionen hinzufügen
-                newOrders.add(kundennr);
-                shipments[kundennr] = {
-                    hawb: kundennr,
-                    lastModified: now,
-                    totalPiecesExpected: positionen.length,
-                    scannedItems: [],
-                    mitarbeiter: MITARBEITER_NAME,
-                    isHuListOrder: true,
-                    parentOrderNumber: vorverladelisteNr // Wichtig: Die VVL-Nummer speichern
-                };
-                // Spediteur aus der Karte hinzufügen, falls vorhanden
-                if (KUNDENNR_CARRIER_MAP[kundennr]) {
-                    shipments[kundennr].freightForwarder = KUNDENNR_CARRIER_MAP[kundennr];
-                }
-
-                positionen.forEach(pos => {
-                    const [vse, sendnr] = pos.split(':');
-                    shipments[kundennr].scannedItems.push({
-                        rawInput: vse, 
-                        sendnr: sendnr, 
-                        status: 'Anstehend', 
-                        timestamp: now,
-                        isCombination: false, 
-                        notes: [], 
-                        isCancelled: false, 
-                        cancelledTimestamp: null
-                    });
-                });
-                addedPositionsCount += positionen.length;
-            } else {
-                // Bestehender Kunde: Nur die neuen Positionen hinzufügen
-                updatedOrders.add(kundennr);
-                const existingShipment = shipments[kundennr];
-                let newPositionsAddedToThisCustomer = 0;
-
-                // Spediteur aktualisieren, falls nicht bereits vorhanden
-                if (KUNDENNR_CARRIER_MAP[kundennr] && !existingShipment.freightForwarder) {
-                    existingShipment.freightForwarder = KUNDENNR_CARRIER_MAP[kundennr];
-                }
-                
-                // VVL-Nummer aktualisieren, falls sie fehlt
-                if (!existingShipment.parentOrderNumber) {
-                     existingShipment.parentOrderNumber = vorverladelisteNr;
-                }
-
-                positionen.forEach(pos => {
-                    const [vse, sendnr] = pos.split(':');
-                    const alreadyExists = existingShipment.scannedItems.some(item => item.rawInput === vse);
-                    if (!alreadyExists) {
-                        existingShipment.scannedItems.push({
-                            rawInput: vse, 
-                            sendnr: sendnr, 
-                            status: 'Anstehend', 
-                            timestamp: now,
-                            isCombination: false, 
-                            notes: [], 
-                            isCancelled: false, 
-                            cancelledTimestamp: null
-                        });
-                        newPositionsAddedToThisCustomer++;
-                    }
-                });
-
-                if (newPositionsAddedToThisCustomer > 0) {
-                    existingShipment.totalPiecesExpected = (existingShipment.totalPiecesExpected || 0) + newPositionsAddedToThisCustomer;
-                    existingShipment.lastModified = now;
-                    addedPositionsCount += newPositionsAddedToThisCustomer;
+        // Fall 1: Klick auf einen Aktions-Button (Edit, PDF, Löschen)
+        if (target.closest('button')) {
+            if (target.classList.contains('edit-btn') && !isBatchModeActive) {
+                openEditModal(baseNumber);
+            } else if (target.classList.contains('pdf-btn')) {
+                sendPdfEmailViaBackend(event); 
+            } else if (target.classList.contains('main-delete-btn')) {
+                if (confirm(`Sendung ${escapeHtml(baseNumber)} wirklich löschen?`)) {
+                    deleteShipment(baseNumber);
                 }
             }
-        });
-
-        saveShipments(shipments);
-        alert(`Import der Vorverladeliste(n) [${[...processedVVLs].join(', ')}] abgeschlossen:\n\n- ${addedPositionsCount} neue Positionen importiert.\n- ${newOrders.size} neue Aufträge angelegt.\n- ${updatedOrders.size} Aufträge aktualisiert.`);
-        location.reload();
-        return;
-    }
-
-    // --- STANDARD LOGIK FÜR MANUELLE EINGABE / BATCH-MODUS ---
-    if (isBatchModeActive) {
-        if (currentValue.length > 0) mainActionButtonEl.click();
-        return;
-    }
-
-    const shipments = loadShipments();
-    const { baseNumber: processedDirectBase } = processShipmentNumber(currentValue);
-    let baseNumberToShow = null;
-
-    const parentHawbByHu = findShipmentByHuNumber(currentValue);
-    if (parentHawbByHu) {
-        baseNumberToShow = parentHawbByHu;
-        displayError(`VSE '${escapeHtml(currentValue)}' gehört zu Kundennr: ${escapeHtml(baseNumberToShow)}`, 'blue', 3500);
-    } else if (shipments[processedDirectBase.toUpperCase()]) {
-        baseNumberToShow = processedDirectBase.toUpperCase();
-        clearError();
-    } else if (currentValue.length > 3) {
-        const parentHawbByNote = findShipmentByNoteContent(currentValue);
-        if (parentHawbByNote) {
-            baseNumberToShow = parentHawbByNote;
-            displayError(`Notiz '${escapeHtml(currentValue)}' gefunden für HAWB: ${escapeHtml(baseNumberToShow)}`, 'blue', 3500);
+            return; // Wichtig: Verarbeitung hier beenden
         }
-    }
-
-    displayCurrentShipmentDetails(baseNumberToShow || processedDirectBase);
-    filterTable(baseNumberToShow || currentValue);
-});
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            clearInputButtonEl.addEventListener('click', () => {
-                shipmentNumberInputEl.value = '';
-                updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
-                clearError();
-                displayCurrentShipmentDetails('');
-                filterTable('');
-                resetSingleScanNoteInputState();
-                updateNoteAndComboVisibility();
-                focusShipmentInput();
-            });
-            shipmentNumberInputEl.addEventListener('blur', () => {
-                if (isBatchModeActive) {
-                    setTimeout(focusShipmentInput, 10);
-                }
-            });
-            securityStatusSelectEl.addEventListener('change', () => {
-                updateNoteAndComboVisibility();
-                focusShipmentInput();
-            });
-            comboCheckboxEl.addEventListener('change', focusShipmentInput);
-
-
-            noteToggleButtonEl.addEventListener('click', () => {
-                const isVisible = noteInputContainerEl.style.display === 'block';
-                noteInputContainerEl.style.display = isVisible ? 'none' : 'block';
-                if (!isVisible) noteInputEl.focus(); else focusShipmentInput();
-            });
         
-            noteInputEl.addEventListener('input', () => {
-                const noteValue = noteInputEl.value.trim();
-                noteToggleButtonEl.classList.toggle('note-active', noteValue !== '');
-                updateClearButtonVisibility(noteInputEl, clearNoteButtonEl);
+        // Fall 2: Klick auf eine beliebige andere Stelle in der Zeile -> Detailansicht zeigen
+        showDetailView(baseNumber);
+    });
 
-                const suggestions = document.getElementById('noteSuggestions').options;
-                let isSuggestionSelected = false;
-                for (let i = 0; i < suggestions.length; i++) {
-                    if (suggestions[i].value === noteInputEl.value) {
-                        isSuggestionSelected = true;
-                        break;
-                    }
-                }
+    // ÄNDERUNG: Listener für Notiz-/Storno-Aktionen wird auf das 'document' verlegt (Event Delegation)
+    document.addEventListener('click', (event) => {
+        const target = event.target;
+        const detailContainer = target.closest('#currentShipmentDetails');
+        if (!detailContainer) return;
 
-                if (isSuggestionSelected) {
-                    focusShipmentInput();
-                }
-            });
-            clearNoteButtonEl.addEventListener('click', () => {
-                resetSingleScanNoteInputState();
-                focusShipmentInput();
-            });
-
-            currentDetailsDivEl.addEventListener('click', (event) => {
-                const target = event.target;
-                
-                // Klick auf "Notiz bearbeiten" oder "Notiz hinzufügen"
-                if (target.classList.contains('editable-note') || target.classList.contains('add-note-link')) {
-                    event.preventDefault();
-                    openNoteEditModal(target);
-                } 
-                // Klick auf Storno-Button
-                else if (target.classList.contains('cancel-button')) {
-                    event.preventDefault();
-                    requestCancelScanItem(target.dataset.basenumber, target.dataset.timestamp);
-                } 
-                // Klick auf Notiz-Löschen-Button
-                else if (target.classList.contains('delete-note-btn')) {
-                    event.preventDefault();
-                    requestDeleteNote(target.dataset.basenumber, target.dataset.timestamp, target.dataset.noteIndex);
-                }
-            });
-            saveNoteEditButtonEl.addEventListener('click', () => {
-                const baseNumber = noteEditBaseNumberEl.value;
-                const timestamp = noteEditTimestampEl.value;
-                const noteIndex = noteEditNoteIndexEl.value === '' ? undefined : parseInt(noteEditNoteIndexEl.value, 10);
-                const newNoteValue = noteEditTextareaEl.value;
-                
-                saveOrUpdateNote(baseNumber, timestamp, noteIndex, newNoteValue);
-                closeNoteEditModal();
-            });
-            
-            cancelNoteEditButtonEl.addEventListener('click', closeNoteEditModal);
-            noteEditModalEl.addEventListener('click', (e) => {
-                if (e.target === noteEditModalEl) {
-                    closeNoteEditModal();
-                }
-            });
-
-            tableBodyEl.addEventListener('click', (event) => {
-                const target = event.target;
-                const baseNumber = target.dataset.basenumber;
-                if (!baseNumber) return;
-
-                if (target.classList.contains('edit-btn') && !isBatchModeActive) {
-                    openEditModal(baseNumber);
-                } else if (target.classList.contains('pdf-btn')) {
-                    // Beim Klick auf den PDF-Button: PDF per E-Mail senden
-                    sendPdfEmailViaBackend(event); 
-                } else if (target.classList.contains('main-delete-btn')) {
-                    if (confirm(`Sendung ${escapeHtml(baseNumber)} wirklich löschen?`)) {
-                        deleteShipment(baseNumber);
-                    }
-                }
-            });
-
-
-            
-            // Modals
-            saveEditButtonEl.addEventListener('click', saveShipmentChangesFromModal);
-            cancelEditButtonEl.addEventListener('click', closeEditModal);
-            editModalEl.addEventListener('click', (e) => { if (e.target === editModalEl) closeEditModal(); });
-
-            confirmNewTotalBtnEl.addEventListener('click', () => completeNewShipmentSave(newTotalInputEl.value));
-            skipNewTotalBtnEl.addEventListener('click', () => completeNewShipmentSave(null));
-            newTotalInputEl.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); confirmNewTotalBtnEl.click(); }});
-
-            // Batch Modus
-            batchModeToggleEl.addEventListener('change', (e) => toggleBatchMode(e.target.checked));
-            saveBatchButtonEl.addEventListener('click', saveBatch);
-            clearBatchButtonEl.addEventListener('click', () => {
-                if (currentBatch.length > 0 && confirm("Aktuellen Batch wirklich leeren?")) {
-                    currentBatch = [];
-                    isBatchNotePromptRequired = true;
-                    currentBatchGlobalNote = null; // <-- WICHTIGE ÄNDERUNG: Notiz zurücksetzen
-                    batchNoteToggleEl.checked = false;
-                    updateBatchUI(); clearError(); displayCurrentShipmentDetails('');
-                } else if (currentBatch.length === 0) {
-                    displayError("Batch ist bereits leer.");
-                }
-                focusShipmentInput();
-            });            
-            // Listener für den Notiz-Schalter, um das Modal auch mitten im Batch zu öffnen
-            batchNoteToggleEl.addEventListener('change', () => {
-                if (batchNoteToggleEl.checked && isBatchModeActive) {
-                    batchNoteInputEl.value = currentBatchGlobalNote || '';
-                    batchNoteModalEl.classList.add('visible');
-                    document.body.classList.add('modal-open');
-                    // NEU: Diese Zeile auskommentieren.
-                    // batchNoteInputEl.focus();
-                }
-            });
-
-            confirmBatchNoteButtonEl.addEventListener('click', confirmAndAddFirstBatchItemWithNote); // schließt Modal intern
-            skipBatchNoteButtonEl.addEventListener('click', skipNoteAndAddFirstBatchItem);       // schließt Modal intern
-            batchNoteModalEl.addEventListener('click', (e) => { if (e.target === batchNoteModalEl) skipNoteAndAddFirstBatchItem(); });
-
-            // Seitenmenü
-            menuToggleBtnEl.addEventListener('click', (e) => { e.stopPropagation(); sideMenuEl.classList.contains('open') ? closeSideMenu() : openSideMenu(); });
-            menuOverlayEl.addEventListener('click', closeSideMenu);
-            sendToSheetButtonEl.addEventListener('click', sendDataToSheet);
-            resetDataButtonEl.addEventListener('click', async () => { // Die Funktion wird async
-                removeActiveInlineNoteEditor();
-                if (confirm("WARNUNG!\n\nMöchtest du wirklich ALLE erfassten Sendungsdaten auf diesem Gerät UND auf dem Server unwiderruflich löschen?")) {
-                    
-                    showLoader(); 
-                    sheetStatusEl.textContent = 'Lösche Daten auf dem Server...';
-                    sheetStatusEl.style.color = 'orange';
-            
-                    try {
-                        // 1. Sende den Befehl zum Löschen an den Server
-                        const response = await fetch(WEB_APP_URL, {
-                            method: 'POST',
-                            mode: 'cors',
-                            cache: 'no-cache',
-                            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                            body: JSON.stringify({ action: "clearAllData" })
-                        });
-            
-                        if (!response.ok) throw new Error(`Server-Fehler: ${response.status}`);
-                        const result = await response.json();
-                        if (result.status !== 'success') throw new Error(result.message);
-            
-                        // 2. Wenn der Server erfolgreich war, lösche auch die lokalen Daten
-                        localStorage.removeItem(LOCAL_STORAGE_KEY);
-                        
-                        // 3. Lade die Seite neu, um den leeren Zustand anzuzeigen
-                        location.reload(); 
-            
-                    } catch (error) {
-                        console.error("Fehler beim Zurücksetzen der Daten:", error);
-                        sheetStatusEl.textContent = `Fehler: ${error.message}`;
-                        sheetStatusEl.style.color = 'red';
-                        alert("Die Daten konnten auf dem Server nicht gelöscht werden. Bitte prüfen Sie Ihre Verbindung.");
-                        hideLoader();
-                    }
-            
+        if (target.classList.contains('editable-note') || target.classList.contains('add-note-link')) {
+            event.preventDefault();
+            openNoteEditModal(target);
+        } 
+        else if (target.classList.contains('cancel-button')) {
+            event.preventDefault();
+            requestCancelScanItem(target.dataset.basenumber, target.dataset.timestamp);
+        } 
+        else if (target.classList.contains('delete-note-btn')) {
+            event.preventDefault();
+            requestDeleteNote(target.dataset.basenumber, target.dataset.timestamp, target.dataset.noteIndex);
+        }
+    });
+    
+    // ===============================================================
+    mainActionButtonEl.addEventListener('click', () => {
+        clearError();
+        removeActiveInlineNoteEditor();
+        if (isBatchModeActive) {
+            addToBatch();
+        } else {
+            if (newTotalSectionEl.classList.contains('visible')) return;
+            const rawInput = shipmentNumberInputEl.value;
+            const status = securityStatusSelectEl.value;
+            const isCombination = comboCheckboxEl.checked;
+            const result = processAndSaveSingleScan(rawInput, status, isCombination);
+            if (!result.waitingForTotal) {
+                if (result.success) {
+                    renderTable();
+                    displayCurrentShipmentDetails(processShipmentNumber(rawInput).baseNumber);
+                    shipmentNumberInputEl.value = '';
+                    updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
+                    displayError(result.message, 'green', 2000);
                 } else {
-                    sheetStatusEl.textContent = 'Zurücksetzen abgebrochen.';
-                    sheetStatusEl.style.color = 'blue';
-                    setTimeout(() => { if (sheetStatusEl.textContent.includes('abgebrochen')) sheetStatusEl.textContent = ''; }, 3000);
+                    displayError(result.message);
                 }
-            });
-            
-
-            importHuListButtonEl.addEventListener('click', () => {
-                // 1. Zwingt die Tastatur zum Schließen, indem der Fokus vom aktuellen Element genommen wird.
-                if (document.activeElement && typeof document.activeElement.blur === 'function') {
-                    document.activeElement.blur();
-                }
-
-                sideMenuEl.classList.remove('open');
-                menuOverlayEl.classList.remove('visible');
-                
-                // 2. Setzt Felder in den "Scanner-Modus".
-                mainOrderNumberInputEl.inputMode = 'none';
-                huListTextareaEl.inputMode = 'none';
-                
-                // 3. NEU: Macht die Felder explizit un-fokussierbar, um Android daran zu hindern, die Tastatur zu öffnen.
-                mainOrderNumberInputEl.setAttribute('tabindex', '-1');
-                huListTextareaEl.setAttribute('tabindex', '-1');
-
-                mainOrderNumberInputEl.value = '';
-                huListTextareaEl.value = '';
-                importHuModalEl.classList.add('visible');
-                document.body.classList.add('modal-open');
-            });
-
-            cancelHuImportButtonEl.addEventListener('click', () => {
-                importHuModalEl.classList.remove('visible');
-		document.body.classList.remove('modal-open'); 
                 focusShipmentInput();
-            });
+            } else {
+                displayError(result.message, 'orange');
+            }
+        }
+    });
 
+    shipmentNumberInputEl.addEventListener('input', () => {
+        const currentValue = shipmentNumberInputEl.value.trim();
+        updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
 
-            // --- Doppelklick-Logik für manuelle Eingabe im HU-Modal ---
-            mainOrderNumberInputEl.addEventListener('dblclick', () => {
-                mainOrderNumberInputEl.inputMode = 'text';
-                mainOrderNumberInputEl.focus();
-            });
+        if (currentValue.startsWith('FRT_MULTI_V1')) {
+            if (!confirm("Ein Multi-Auftrags-QR-Code wurde erkannt.\n\nMöchtest du alle darin enthaltenen Aufträge jetzt importieren?")) {
+                shipmentNumberInputEl.value = ''; 
+                return;
+            }
+            const parts = currentValue.split(';;;').slice(1);
+            const shipments = loadShipments();
+            const now = new Date().toISOString();
+            let addedCount = 0, duplicateCount = 0, processedOrders = [];
 
-            huListTextareaEl.addEventListener('dblclick', () => {
-                huListTextareaEl.inputMode = 'text';
-                huListTextareaEl.focus();
-            });
+            parts.forEach(orderData => {
+                const [metaAndOrder, huData] = orderData.split('|||');
+                if (!metaAndOrder || !huData) return;
+                const metaParts = metaAndOrder.split('|');
+                const orderNumber = metaParts[0];
+                const hasFullMeta = metaParts.length >= 4;
+                processedOrders.push(orderNumber);
+                const hus = huData.split('~~~').filter(Boolean);
 
-            // --- HIER IST DER NEUE BLOCK ---
-            // Automatischer Zeilenumbruch beim Scannen in der Textarea
-            huListTextareaEl.addEventListener('input', () => {
-                if (huListTextareaEl.inputMode === 'none') {
-                    huListTextareaEl.value += '\n';
-                    huListTextareaEl.scrollTop = huListTextareaEl.scrollHeight;
+                if (!shipments[orderNumber]) {
+                    const newShipment = {
+                        hawb: orderNumber, lastModified: now, totalPiecesExpected: hus.length,
+                        scannedItems: [], mitarbeiter: MITARBEITER_NAME, isHuListOrder: true,
+                    };
+                    if (hasFullMeta) {
+                        newShipment.freightForwarder = metaParts[1];
+                        newShipment.destinationCountry = metaParts[2];
+                        newShipment.plsoNumber = metaParts[3];
+                    }
+                    shipments[orderNumber] = newShipment;
+                    hus.forEach((huString, index) => {
+                        const huData = parseComplexHuString(huString);
+                        newShipment.scannedItems.push({ 
+                            rawInput: huData.rawInput, status: 'Anstehend', timestamp: now, 
+                            isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null, 
+                            position: huData.position || (index + 1),
+                            packaging: huData.packaging, dimensions: huData.dimensions, grossWeight: huData.grossWeight
+                        });
+                    });
+                    addedCount += hus.length;
                 }
             });
-            // --- ENDE DES NEUEN BLOCKS ---
-            // ===== START: NEUE EVENT LISTENER FÜR HU-ZUSAMMENFASSUNG =====
-            showOpenHusButtonEl.addEventListener('click', (e) => {
-                e.preventDefault();
-                showOpenHusSummary();
+            saveShipments(shipments);
+            alert(`Multi-Import abgeschlossen:\n- Verarbeitete Aufträge: ${processedOrders.length}\n- Neue HUs hinzugefügt: ${addedCount}`);
+            location.reload();
+            return;
+        } 
+        
+        else if (currentValue.startsWith('FRT_VVL_V1')) {
+            if (!confirm("Eine Vorverladeliste wurde erkannt.\n\nMöchtest du alle darin enthaltenen Kundenaufträge jetzt importieren?")) {
+                shipmentNumberInputEl.value = ''; 
+                return;
+            }
+            const parts = currentValue.split(';;;').slice(1);
+            const shipments = loadShipments();
+            const now = new Date().toISOString();
+            let addedPositionsCount = 0;
+            let newOrders = new Set();
+            let updatedOrders = new Set();
+            let processedVVLs = new Set();
+
+            parts.forEach(orderData => {
+                const [meta, huData] = orderData.split('|||');
+                if (!meta || !huData) return;
+
+                const [kundennr, vorverladelisteNr] = meta.split('|');
+                const positionen = huData.split(' ').filter(Boolean);
+                processedVVLs.add(vorverladelisteNr);
+
+                if (!shipments[kundennr]) {
+                    newOrders.add(kundennr);
+                    shipments[kundennr] = {
+                        hawb: kundennr, lastModified: now, totalPiecesExpected: positionen.length,
+                        scannedItems: [], mitarbeiter: MITARBEITER_NAME, isHuListOrder: true,
+                        parentOrderNumber: vorverladelisteNr
+                    };
+                    if (KUNDENNR_CARRIER_MAP[kundennr]) {
+                        shipments[kundennr].freightForwarder = KUNDENNR_CARRIER_MAP[kundennr];
+                    }
+                    positionen.forEach(pos => {
+                        const [vse, sendnr] = pos.split(':');
+                        shipments[kundennr].scannedItems.push({ rawInput: vse, sendnr: sendnr, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null });
+                    });
+                    addedPositionsCount += positionen.length;
+                } else {
+                    updatedOrders.add(kundennr);
+                    const existingShipment = shipments[kundennr];
+                    let newPositionsAddedToThisCustomer = 0;
+                    if (KUNDENNR_CARRIER_MAP[kundennr] && !existingShipment.freightForwarder) {
+                        existingShipment.freightForwarder = KUNDENNR_CARRIER_MAP[kundennr];
+                    }
+                    if (!existingShipment.parentOrderNumber) {
+                         existingShipment.parentOrderNumber = vorverladelisteNr;
+                    }
+                    positionen.forEach(pos => {
+                        const [vse, sendnr] = pos.split(':');
+                        const alreadyExists = existingShipment.scannedItems.some(item => item.rawInput === vse);
+                        if (!alreadyExists) {
+                            existingShipment.scannedItems.push({ rawInput: vse, sendnr: sendnr, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null });
+                            newPositionsAddedToThisCustomer++;
+                        }
+                    });
+                    if (newPositionsAddedToThisCustomer > 0) {
+                        existingShipment.totalPiecesExpected = (existingShipment.totalPiecesExpected || 0) + newPositionsAddedToThisCustomer;
+                        existingShipment.lastModified = now;
+                        addedPositionsCount += newPositionsAddedToThisCustomer;
+                    }
+                }
             });
-            
-            closeOpenHusModalButtonEl.addEventListener('click', () => {
-                openHusModalEl.classList.remove('visible');
-                document.body.classList.remove('modal-open'); // NEU
+            saveShipments(shipments);
+            alert(`Import der Vorverladeliste(n) [${[...processedVVLs].join(', ')}] abgeschlossen:\n\n- ${addedPositionsCount} neue Positionen importiert.\n- ${newOrders.size} neue Aufträge angelegt.\n- ${updatedOrders.size} Aufträge aktualisiert.`);
+            location.reload();
+            return;
+        }
+
+        if (isBatchModeActive) {
+            if (currentValue.length > 0) mainActionButtonEl.click();
+            return;
+        }
+        const shipments = loadShipments();
+        const { baseNumber: processedDirectBase } = processShipmentNumber(currentValue);
+        let baseNumberToShow = null;
+        const parentHawbByHu = findShipmentByHuNumber(currentValue);
+        if (parentHawbByHu) {
+            baseNumberToShow = parentHawbByHu;
+            displayError(`VSE '${escapeHtml(currentValue)}' gehört zu Kundennr: ${escapeHtml(baseNumberToShow)}`, 'blue', 3500);
+        } else if (shipments[processedDirectBase.toUpperCase()]) {
+            baseNumberToShow = processedDirectBase.toUpperCase();
+            clearError();
+        } else if (currentValue.length > 3) {
+            const parentHawbByNote = findShipmentByNoteContent(currentValue);
+            if (parentHawbByNote) {
+                baseNumberToShow = parentHawbByNote;
+                displayError(`Notiz '${escapeHtml(currentValue)}' gefunden für HAWB: ${escapeHtml(baseNumberToShow)}`, 'blue', 3500);
+            }
+        }
+        displayCurrentShipmentDetails(baseNumberToShow || processedDirectBase);
+        filterTable(baseNumberToShow || currentValue);
+    });
+
+    clearInputButtonEl.addEventListener('click', () => {
+        shipmentNumberInputEl.value = '';
+        updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
+        clearError();
+        displayCurrentShipmentDetails('');
+        filterTable('');
+        resetSingleScanNoteInputState();
+        updateNoteAndComboVisibility();
+        focusShipmentInput();
+    });
+
+    shipmentNumberInputEl.addEventListener('blur', () => {
+        if (isBatchModeActive) {
+            setTimeout(focusShipmentInput, 10);
+        }
+    });
+// NEU: Event Listener für das Absenden des Haupt-Formulars (Enter-Taste auf Tastatur)
+mainInputFormEl.addEventListener('submit', (event) => {
+    // 1. Verhindern, dass die Seite durch die Formular-Aktion neu geladen wird
+    event.preventDefault();
+    
+    // 2. Den Klick auf den Haupt-Aktionsbutton simulieren.
+    //    Dies stellt sicher, dass die bestehende Logik (Einzelscan vs. Batch-Modus) korrekt verwendet wird.
+    if (mainActionButtonEl) {
+        mainActionButtonEl.click();
+    }
+});
+    securityStatusSelectEl.addEventListener('change', () => {
+        updateNoteAndComboVisibility();
+        focusShipmentInput();
+    });
+
+    comboCheckboxEl.addEventListener('change', focusShipmentInput);
+
+    noteToggleButtonEl.addEventListener('click', () => {
+        const isVisible = noteInputContainerEl.style.display === 'block';
+        noteInputContainerEl.style.display = isVisible ? 'none' : 'block';
+        if (!isVisible) noteInputEl.focus(); else focusShipmentInput();
+    });
+
+    noteInputEl.addEventListener('input', () => {
+        const noteValue = noteInputEl.value.trim();
+        noteToggleButtonEl.classList.toggle('note-active', noteValue !== '');
+        updateClearButtonVisibility(noteInputEl, clearNoteButtonEl);
+        const suggestions = document.getElementById('noteSuggestions').options;
+        for (let i = 0; i < suggestions.length; i++) {
+            if (suggestions[i].value === noteInputEl.value) {
                 focusShipmentInput();
-            });
-            
-            openHusModalEl.addEventListener('click', (e) => {
-                if (e.target === openHusModalEl) {
-                    openHusModalEl.classList.remove('visible');
-                    document.body.classList.remove('modal-open'); // NEU
-                    focusShipmentInput();
-                }
-            });
-            
-// --- START DER ÄNDERUNG: Die Event-Listener für die Modal-Tabs werden aktualisiert ---
-            // ===== START: EVENT LISTENER FÜR HU-MODAL-TABS =====
-            showOpenSecurityHusBtnEl.addEventListener('click', () => {
-                showOpenSecurityHusBtnEl.classList.add('active');
-                showMissingReceiptHusBtnEl.classList.remove('active');
-                showDunkelalarmHusBtnEl.classList.remove('active');
+                break;
+            }
+        }
+    });
 
-                openHusListContainerEl.style.display = 'block';
-                missingReceiptHusListContainerEl.style.display = 'none';
-                dunkelalarmHusListContainerEl.style.display = 'none';
-            });
+    clearNoteButtonEl.addEventListener('click', () => {
+        resetSingleScanNoteInputState();
+        focusShipmentInput();
+    });
 
-            showMissingReceiptHusBtnEl.addEventListener('click', () => {
-                showMissingReceiptHusBtnEl.classList.add('active');
-                showOpenSecurityHusBtnEl.classList.remove('active');
-                showDunkelalarmHusBtnEl.classList.remove('active');
+    // Der alte Listener für 'currentDetailsDivEl' wurde entfernt und durch den 'document' Listener oben ersetzt.
 
-                missingReceiptHusListContainerEl.style.display = 'block';
-                openHusListContainerEl.style.display = 'none';
-                dunkelalarmHusListContainerEl.style.display = 'none';
-            });
+    saveNoteEditButtonEl.addEventListener('click', () => {
+        const baseNumber = noteEditBaseNumberEl.value;
+        const timestamp = noteEditTimestampEl.value;
+        const noteIndex = noteEditNoteIndexEl.value === '' ? undefined : parseInt(noteEditNoteIndexEl.value, 10);
+        const newNoteValue = noteEditTextareaEl.value;
+        saveOrUpdateNote(baseNumber, timestamp, noteIndex, newNoteValue);
+        closeNoteEditModal();
+    });
+    
+    cancelNoteEditButtonEl.addEventListener('click', closeNoteEditModal);
+    noteEditModalEl.addEventListener('click', (e) => {
+        if (e.target === noteEditModalEl) closeNoteEditModal();
+    });
 
-            // Neuer Listener für den Dunkelalarm-Tab
-            showDunkelalarmHusBtnEl.addEventListener('click', () => {
-                showDunkelalarmHusBtnEl.classList.add('active');
-                showOpenSecurityHusBtnEl.classList.remove('active');
-                showMissingReceiptHusBtnEl.classList.remove('active');
+    // Modals
+    saveEditButtonEl.addEventListener('click', saveShipmentChangesFromModal);
+    cancelEditButtonEl.addEventListener('click', closeEditModal);
+    editModalEl.addEventListener('click', (e) => { if (e.target === editModalEl) closeEditModal(); });
 
-                dunkelalarmHusListContainerEl.style.display = 'block';
-                openHusListContainerEl.style.display = 'none';
-                missingReceiptHusListContainerEl.style.display = 'none';
-            });
-            // ===== ENDE: EVENT LISTENER FÜR HU-MODAL-TABS =====
-// --- ENDE DER ÄNDERUNG ---
-        } // Ende der setupEventListeners Funktion
-            // --- START DER ÄNDERUNG: Event Listener für Batch Scan Feedback Toggle und Close Button ---
-            batchFeedbackToggleEl.addEventListener('change', () => {
-                if (!isBatchModeActive && batchFeedbackToggleEl.checked) {
-                    alert("Scan-Feedback-Popup ist nur im Batch-Modus verfügbar. Bitte aktivieren Sie zuerst den Batch-Modus.");
-                    batchFeedbackToggleEl.checked = false; // Toggle zurücksetzen
-                }
-            });
+    confirmNewTotalBtnEl.addEventListener('click', () => completeNewShipmentSave(newTotalInputEl.value));
+    skipNewTotalBtnEl.addEventListener('click', () => completeNewShipmentSave(null));
+    newTotalInputEl.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); confirmNewTotalBtnEl.click(); }});
 
-            closeBatchScanFeedbackModalButtonEl.addEventListener('click', () => {
-                batchScanFeedbackModalEl.classList.remove('visible');
-                document.body.classList.remove('modal-open');
-                focusShipmentInput(); // Fokus zurück zum Scan-Input
-            });
+    // Batch Modus
+    batchModeToggleEl.addEventListener('change', (e) => toggleBatchMode(e.target.checked));
+    saveBatchButtonEl.addEventListener('click', saveBatch);
+    clearBatchButtonEl.addEventListener('click', () => {
+        if (currentBatch.length > 0 && confirm("Aktuellen Batch wirklich leeren?")) {
+            currentBatch = [];
+            isBatchNotePromptRequired = true;
+            currentBatchGlobalNote = null;
+            batchNoteToggleEl.checked = false;
+            updateBatchUI(); clearError(); displayCurrentShipmentDetails('');
+        } else if (currentBatch.length === 0) {
+            displayError("Batch ist bereits leer.");
+        }
+        focusShipmentInput();
+    });
 
-            batchScanFeedbackModalEl.addEventListener('click', (e) => {
-                if (e.target === batchScanFeedbackModalEl) { // Schließt bei Klick auf Overlay
-                    batchScanFeedbackModalEl.classList.remove('visible');
-                    document.body.classList.remove('modal-open');
-                    focusShipmentInput();
-                }
-            });
+    batchNoteToggleEl.addEventListener('change', () => {
+        if (batchNoteToggleEl.checked && isBatchModeActive) {
+            batchNoteInputEl.value = currentBatchGlobalNote || '';
+            batchNoteModalEl.classList.add('visible');
+            document.body.classList.add('modal-open');
+        }
+    });
+
+    confirmBatchNoteButtonEl.addEventListener('click', confirmAndAddFirstBatchItemWithNote);
+    skipBatchNoteButtonEl.addEventListener('click', skipNoteAndAddFirstBatchItem);
+    batchNoteModalEl.addEventListener('click', (e) => { if (e.target === batchNoteModalEl) skipNoteAndAddFirstBatchItem(); });
+
+    // Seitenmenü
+    menuToggleBtnEl.addEventListener('click', (e) => { e.stopPropagation(); sideMenuEl.classList.contains('open') ? closeSideMenu() : openSideMenu(); });
+    menuOverlayEl.addEventListener('click', closeSideMenu);
+    sendToSheetButtonEl.addEventListener('click', sendDataToSheet);
+    resetDataButtonEl.addEventListener('click', async () => {
+        removeActiveInlineNoteEditor();
+        if (confirm("WARNUNG!\n\nMöchtest du wirklich ALLE erfassten Sendungsdaten auf diesem Gerät UND auf dem Server unwiderruflich löschen?")) {
+            showLoader(); 
+            sheetStatusEl.textContent = 'Lösche Daten auf dem Server...';
+            sheetStatusEl.style.color = 'orange';
+            try {
+                const response = await fetch(WEB_APP_URL, {
+                    method: 'POST', mode: 'cors', cache: 'no-cache',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({ action: "clearAllData" })
+                });
+                if (!response.ok) throw new Error(`Server-Fehler: ${response.status}`);
+                const result = await response.json();
+                if (result.status !== 'success') throw new Error(result.message);
+                localStorage.removeItem(LOCAL_STORAGE_KEY);
+                location.reload(); 
+            } catch (error) {
+                console.error("Fehler beim Zurücksetzen der Daten:", error);
+                sheetStatusEl.textContent = `Fehler: ${error.message}`;
+                sheetStatusEl.style.color = 'red';
+                alert("Die Daten konnten auf dem Server nicht gelöscht werden. Bitte prüfen Sie Ihre Verbindung.");
+                hideLoader();
+            }
+        } else {
+            sheetStatusEl.textContent = 'Zurücksetzen abgebrochen.';
+            sheetStatusEl.style.color = 'blue';
+            setTimeout(() => { if (sheetStatusEl.textContent.includes('abgebrochen')) sheetStatusEl.textContent = ''; }, 3000);
+        }
+    });
+
+    importHuListButtonEl.addEventListener('click', () => {
+        if (document.activeElement && typeof document.activeElement.blur === 'function') {
+            document.activeElement.blur();
+        }
+        sideMenuEl.classList.remove('open');
+        menuOverlayEl.classList.remove('visible');
+        mainOrderNumberInputEl.inputMode = 'none';
+        huListTextareaEl.inputMode = 'none';
+        mainOrderNumberInputEl.setAttribute('tabindex', '-1');
+        huListTextareaEl.setAttribute('tabindex', '-1');
+        mainOrderNumberInputEl.value = '';
+        huListTextareaEl.value = '';
+        importHuModalEl.classList.add('visible');
+        document.body.classList.add('modal-open');
+    });
+
+    cancelHuImportButtonEl.addEventListener('click', () => {
+        importHuModalEl.classList.remove('visible');
+        document.body.classList.remove('modal-open'); 
+        focusShipmentInput();
+    });
+
+    mainOrderNumberInputEl.addEventListener('dblclick', () => {
+        mainOrderNumberInputEl.inputMode = 'text';
+        mainOrderNumberInputEl.focus();
+    });
+
+    huListTextareaEl.addEventListener('dblclick', () => {
+        huListTextareaEl.inputMode = 'text';
+        huListTextareaEl.focus();
+    });
+
+    huListTextareaEl.addEventListener('input', () => {
+        if (huListTextareaEl.inputMode === 'none') {
+            huListTextareaEl.value += '\n';
+            huListTextareaEl.scrollTop = huListTextareaEl.scrollHeight;
+        }
+    });
+
+    showOpenHusButtonEl.addEventListener('click', (e) => {
+        e.preventDefault();
+        showOpenHusSummary();
+    });
+    
+    closeOpenHusModalButtonEl.addEventListener('click', () => {
+        openHusModalEl.classList.remove('visible');
+        document.body.classList.remove('modal-open');
+        focusShipmentInput();
+    });
+    
+    openHusModalEl.addEventListener('click', (e) => {
+        if (e.target === openHusModalEl) {
+            openHusModalEl.classList.remove('visible');
+            document.body.classList.remove('modal-open');
+            focusShipmentInput();
+        }
+    });
+
+    showOpenSecurityHusBtnEl.addEventListener('click', () => {
+        showOpenSecurityHusBtnEl.classList.add('active');
+        showMissingReceiptHusBtnEl.classList.remove('active');
+        showDunkelalarmHusBtnEl.classList.remove('active');
+        openHusListContainerEl.style.display = 'block';
+        missingReceiptHusListContainerEl.style.display = 'none';
+        dunkelalarmHusListContainerEl.style.display = 'none';
+    });
+
+    showMissingReceiptHusBtnEl.addEventListener('click', () => {
+        showMissingReceiptHusBtnEl.classList.add('active');
+        showOpenSecurityHusBtnEl.classList.remove('active');
+        showDunkelalarmHusBtnEl.classList.remove('active');
+        missingReceiptHusListContainerEl.style.display = 'block';
+        openHusListContainerEl.style.display = 'none';
+        dunkelalarmHusListContainerEl.style.display = 'none';
+    });
+
+    showDunkelalarmHusBtnEl.addEventListener('click', () => {
+        showDunkelalarmHusBtnEl.classList.add('active');
+        showOpenSecurityHusBtnEl.classList.remove('active');
+        showMissingReceiptHusBtnEl.classList.remove('active');
+        dunkelalarmHusListContainerEl.style.display = 'block';
+        openHusListContainerEl.style.display = 'none';
+        missingReceiptHusListContainerEl.style.display = 'none';
+    });
+
+    batchFeedbackToggleEl.addEventListener('change', () => {
+        if (!isBatchModeActive && batchFeedbackToggleEl.checked) {
+            alert("Scan-Feedback-Popup ist nur im Batch-Modus verfügbar. Bitte aktivieren Sie zuerst den Batch-Modus.");
+            batchFeedbackToggleEl.checked = false;
+        }
+    });
+
+    closeBatchScanFeedbackModalButtonEl.addEventListener('click', () => {
+        batchScanFeedbackModalEl.classList.remove('visible');
+        document.body.classList.remove('modal-open');
+        focusShipmentInput();
+    });
+
+    batchScanFeedbackModalEl.addEventListener('click', (e) => {
+        if (e.target === batchScanFeedbackModalEl) {
+            batchScanFeedbackModalEl.classList.remove('visible');
+            document.body.classList.remove('modal-open');
+            focusShipmentInput();
+        }
+    });
+
+    openHusListContainerEl.addEventListener('click', openHuDetailsModal);
+    missingReceiptHusListContainerEl.addEventListener('click', openHuDetailsModal);
+    dunkelalarmHusListContainerEl.addEventListener('click', openHuDetailsModal);
+
+    huDetailsModalEl.addEventListener('click', (e) => {
+        if (e.target === huDetailsModalEl || e.target.closest('[data-close-modal="huDetailsModal"]')) {
+            huDetailsModalEl.classList.remove('visible');
+            document.body.classList.remove('modal-open');
+        }
+    });
+
+    saveHuListButtonEl.addEventListener('click', () => {
+        const result = saveAndProcessHuListData();
+        if (result.success) {
+            displayCurrentShipmentDetails(result.baseNumber);
+            importHuModalEl.classList.remove('visible');
+            document.body.classList.remove('modal-open');
+            if (result.message) {
+                displayError(result.message, result.messageType, 5000);
+            }
+            focusShipmentInput();
+        }
+    });
+
+    addAndContinueHuButtonEl.addEventListener('click', () => {
+        const result = saveAndProcessHuListData();
+        if (result.success) {
+            displayCurrentShipmentDetails(result.baseNumber);
+            if (result.message) {
+               displayError(result.message, result.messageType, 5000);
+            }
+            mainOrderNumberInputEl.value = '';
+            huListTextareaEl.value = '';
+            mainOrderNumberInputEl.focus();
+        }
+    });
+
+} // Ende der setupEventListeners Funktion
             // --- ENDE DER ÄNDERUNG: Event Listener für Batch Scan Feedback Toggle und Close Button ---
 
             // --- START: NEUE LOGIK FÜR HU-DETAIL-MODAL ---
@@ -3274,7 +3379,39 @@ shipmentNumberInputEl.addEventListener('input', () => {
             // --- ENDE: NEUE LOGIK FÜR HU-DETAIL-MODAL ---
 
 
+        // --- Initialisierung ---
+/**
+ * Initialisiert die Anwendung: Lädt Daten, setzt UI und Event Listener.
+ */
+async function initializeApp() {
+    showLoader(); // <<<< NEU: Lade-Spinner anzeigen
+    const initialShipments = await loadDataFromServer();
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(initialShipments));
 
+    renderTable();
+    isBatchModeActive = batchModeToggleEl.checked;
+    sessionFirstSuffixScans = {};
+    notifiedCompletions = new Set();
+    
+    resetSingleScanNoteInputState();
+    toggleBatchMode(isBatchModeActive);
+    batchFeedbackToggleEl.checked = false;
+    updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
+    updateClearButtonVisibility(noteInputEl, clearNoteButtonEl);
+    updateCurrentBatchNoteDisplay();
+
+    setupEventListeners();
+    focusShipmentInput();
+    console.log(`Fracht Tracker ${document.title.split('(')[1].split(')')[0]} initialized.`);
+    hideLoader(); // <<<< NEU: Lade-Spinner verstecken, wenn alles fertig ist
+}
+
+// =========================================================================
+// HIER IST DIE KORREKTUR: Die fehlenden Zeilen werden hinzugefügt
+// =========================================================================
+initializeApp();
+
+});
 
 
 
@@ -3371,39 +3508,7 @@ shipmentNumberInputEl.addEventListener('input', () => {
                 }
             });
 
-        // --- Initialisierung ---
-/**
- * Initialisiert die Anwendung: Lädt Daten, setzt UI und Event Listener.
- */
-async function initializeApp() {
-    showLoader(); // <<<< NEU: Lade-Spinner anzeigen
-    const initialShipments = await loadDataFromServer();
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(initialShipments));
 
-    renderTable();
-    isBatchModeActive = batchModeToggleEl.checked;
-    sessionFirstSuffixScans = {};
-    notifiedCompletions = new Set();
-    
-    resetSingleScanNoteInputState();
-    toggleBatchMode(isBatchModeActive);
-    batchFeedbackToggleEl.checked = false;
-    updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
-    updateClearButtonVisibility(noteInputEl, clearNoteButtonEl);
-    updateCurrentBatchNoteDisplay();
-
-    setupEventListeners();
-    focusShipmentInput();
-    console.log(`Fracht Tracker ${document.title.split('(')[1].split(')')[0]} initialized.`);
-    hideLoader(); // <<<< NEU: Lade-Spinner verstecken, wenn alles fertig ist
-}
-
-// =========================================================================
-// HIER IST DIE KORREKTUR: Die fehlenden Zeilen werden hinzugefügt
-// =========================================================================
-initializeApp();
-
-});
 
 // Screen Orientation Lock (optional, mit geringer Erfolgschance ohne User Interaktion)
 /*
