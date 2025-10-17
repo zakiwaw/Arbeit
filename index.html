@@ -70,19 +70,20 @@
                 </div>
                 <button type="button" id="noteToggleButton" class="note-toggle-btn" title="Notiz hinzufügen/bearbeiten (Einzelscan)">📝</button>
             </div>
-            <div id="noteInputContainer" class="note-input-area">
-                <label for="noteInput">Notiz (für nächsten Einzelscan):</label>
-                <div class="input-wrapper">
-                    <input type="text" id="noteInput" placeholder="Notiz eingeben..." list="noteSuggestions">
-                    <button type="button" id="clearNoteButton" class="clear-input-btn clear-note-btn" title="Notiz löschen">×</button>
-                    <datalist id="noteSuggestions">
-                        <option value="Abgepackt"><option value="Muss abgepackt werden"><option value="Eingeschweißte Folien">
-                        <option value="Aluverbundfolie"><option value="Flüssigkeit"><option value="Fässer">
-                        <option value="Verklebte Kartons"><option value="Vakuumfolie"><option value="Kanister">
-                        <option value="Eimer"><option value="Säcke"><option value="Wird gesucht!">
-                    </datalist>
-                </div>
-            </div>
+<!-- NEU: form-Tag umschließt den gesamten Bereich -->
+<form id="note-input-form" action="#">
+    <div id="noteInputContainer" class="note-input-area">
+        <label for="noteInput">Notiz (für nächsten Einzelscan):</label>
+        <div class="input-wrapper">
+            <!-- NEU: enterkeyhint="done" hinzugefügt -->
+            <input type="text" id="noteInput" placeholder="Notiz eingeben..." list="noteSuggestions" enterkeyhint="done">
+            <button type="button" id="clearNoteButton" class="clear-input-btn clear-note-btn" title="Notiz löschen">×</button>
+            <datalist id="noteSuggestions">
+                <!-- ... option values ... -->
+            </datalist>
+        </div>
+    </div>
+</form>
             <div id="newTotalSection">
                 <label for="newTotalInput" id="newTotalLabel">Erwartete Gesamtstückzahl für NEUE Sendung:</label>
                 <input type="number" id="newTotalInput" inputmode="numeric" placeholder="Zahl eingeben...">
@@ -204,12 +205,16 @@
     </div>
 </div>
 <div id="noteEditModal" class="modal-overlay">
-    <div class="modal-content">
+    <!-- NEU: form-Tag umschließt den Inhalt -->
+    <form id="note-edit-form" action="#" class="modal-content">
         <div id="noteEditContext" style="font-size: 0.9em; color: #555; margin-bottom: 15px; text-align: center;"></div>
         <input type="hidden" id="noteEditBaseNumber"><input type="hidden" id="noteEditTimestamp"><input type="hidden" id="noteEditNoteIndex">
-        <div class="form-group"><label for="noteEditTextarea">Notiz:</label><textarea id="noteEditTextarea" rows="5" placeholder="Notiz hier eingeben..." style="width: 100%; font-size: 1em; padding: 8px; border-radius: 5px; border: 1px solid #ccc; box-sizing: border-box;"></textarea></div>
+        <div class="form-group"><label for="noteEditTextarea">Notiz:</label>
+            <!-- NEU: enterkeyhint="done" hinzugefügt -->
+            <textarea id="noteEditTextarea" rows="5" placeholder="Notiz hier eingeben..." style="width: 100%; font-size: 1em; padding: 8px; border-radius: 5px; border: 1px solid #ccc; box-sizing: border-box;" enterkeyhint="done"></textarea>
+        </div>
         <div class="modal-actions"><button id="saveNoteEditButton" class="main-action-button">Speichern</button><button id="cancelNoteEditButton" class="main-action-button" style="background-color: #aaa;">Abbrechen</button></div>
-    </div>
+    </form>
 </div>
 
 <!-- =============================================================== -->
