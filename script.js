@@ -3,7 +3,9 @@ const { jsPDF } = window.jspdf;
 
 document.addEventListener('DOMContentLoaded', function() {
     // --- DOM Elemente ---
-    const mainInputFormEl = document.getElementById('main-input-form');
+    const mainInputFormEl = document.getElementById('main-input-form'); // Dieser sollte schon da sein
+    const noteInputFormEl = document.getElementById('note-input-form'); // NEU
+    const noteEditFormEl = document.getElementById('note-edit-form');   // NEU
     const mainViewEl = document.getElementById('mainView');
     const detailViewEl = document.getElementById('detailView');
     const detailViewContentEl = document.getElementById('detailViewContent');
@@ -3065,7 +3067,17 @@ mainInputFormEl.addEventListener('submit', (event) => {
         updateNoteAndComboVisibility();
         focusShipmentInput();
     });
-
+    noteInputFormEl.addEventListener('submit', (e) => {
+        e.preventDefault(); // Verhindert Neuladen der Seite
+        focusShipmentInput(); // Setzt den Fokus zurück auf das Haupt-Eingabefeld
+    });
+    
+    // NEU: Listener für das Absenden des Notiz-Bearbeitungs-Modals
+    noteEditFormEl.addEventListener('submit', (e) => {
+        e.preventDefault(); // Verhindert Neuladen der Seite
+        saveNoteEditButtonEl.click(); // Simuliert einen Klick auf den "Speichern"-Button
+    });
+    
     comboCheckboxEl.addEventListener('change', focusShipmentInput);
 
     noteToggleButtonEl.addEventListener('click', () => {
