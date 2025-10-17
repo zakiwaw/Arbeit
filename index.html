@@ -204,16 +204,22 @@
         <div class="modal-actions"><button id="confirmBatchNoteButton" class="main-action-button">Übernehmen & Scannen</button><button id="skipBatchNoteButton" class="main-action-button" style="background-color:var(--secondary-color)">Ohne Notiz Scannen</button></div>
     </div>
 </div>
+<!-- in der Datei index.html -->
 <div id="noteEditModal" class="modal-overlay">
-    <!-- NEU: form-Tag umschließt den Inhalt -->
     <form id="note-edit-form" action="#" class="modal-content">
         <div id="noteEditContext" style="font-size: 0.9em; color: #555; margin-bottom: 15px; text-align: center;"></div>
         <input type="hidden" id="noteEditBaseNumber"><input type="hidden" id="noteEditTimestamp"><input type="hidden" id="noteEditNoteIndex">
-        <div class="form-group"><label for="noteEditTextarea">Notiz:</label>
-            <!-- NEU: enterkeyhint="done" hinzugefügt -->
+        <div class="form-group">
+            <label for="noteEditTextarea">Notiz:</label>
             <textarea id="noteEditTextarea" rows="5" placeholder="Notiz hier eingeben..." style="width: 100%; font-size: 1em; padding: 8px; border-radius: 5px; border: 1px solid #ccc; box-sizing: border-box;" enterkeyhint="done"></textarea>
         </div>
-        <div class="modal-actions"><button id="saveNoteEditButton" class="main-action-button">Speichern</button><button id="cancelNoteEditButton" class="main-action-button" style="background-color: #aaa;">Abbrechen</button></div>
+        <div class="modal-actions">
+            <!-- Dieser Button löst das 'submit'-Ereignis aus -->
+            <button type="submit" id="saveNoteEditButton" class="main-action-button">Speichern</button>
+            
+            <!-- DIESER BUTTON IST JETZT NUR NOCH EIN KLICK-BUTTON -->
+            <button type="button" id="cancelNoteEditButton" class="main-action-button" style="background-color: #aaa;">Abbrechen</button>
+        </div>
     </form>
 </div>
 
