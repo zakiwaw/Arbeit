@@ -4,352 +4,223 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
     <title>Fracht Tracker (V8.18 - Refactored)</title>
-	<link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
-
 </head>
 <body>
 
+<!-- =============================================================== -->
+<!-- 1. DIE ANSICHTEN (zuerst)                                       -->
+<!-- =============================================================== -->
+
+<!-- Container für die Detailansicht (anfangs versteckt) -->
+<div id="detailView" class="hidden">
+    <div class="detail-view-header">
+        <button id="backToMainViewBtn" title="Zurück zur Liste">
+            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M20,11V13H8L13.5,18.5L12.08,19.92L4.16,12L12.08,4.08L13.5,5.5L8,11H20Z" /></svg>
+        </button>
+        <h2>Sendungsdetails</h2>
+    </div>
+    <div id="detailViewContent">
+        <div id="currentShipmentDetails"></div>
+    </div>
+</div>
+
+<!-- Container für die Hauptansicht -->
+<div id="mainView">
+    <div class="container">
+        <div class="batch-controls">
+            <button id="menu-toggle-btn" title="Menü öffnen/schließen">☰</button>
+            <label for="batchModeToggle">Batch-Modus:</label>
+            <label class="batch-toggle-switch">
+                <input type="checkbox" id="batchModeToggle">
+                <span class="batch-slider"></span>
+            </label>
+            <span id="batchStatusDisplay"></span>
+        </div>
+
+        <div class="input-section">
+            <div>
+
+<!-- 1. Das neue form-Tag umschließt das Eingabefeld -->
+<form id="main-input-form" action="#">
+    <div class="input-wrapper">
+        <!-- 2. Das neue "enterkeyhint"-Attribut wurde hinzugefügt -->
+        <input type="text" id="shipmentNumberInput" placeholder="Scannen oder eingeben..." autocapitalize="characters" autocomplete="off" enterkeyhint="enter">
+        <button type="button" id="clearInputButton" class="clear-input-btn" title="Eingabe löschen">×</button>
+    </div>
+</form>
+            </div>
+            <div class="status-and-button-container">
+                <div class="status-select-wrapper">
+                    <label for="securityStatusSelect">Status:</label>
+                    <select id="securityStatusSelect">
+                        <option value="XRY">XRY</option><option value="ETD">ETD</option><option value="EDD">EDD</option>
+                        <option value="Wareneingang">Wareneingang</option>
+                        <option value="Dunkelalarm">Dunkelalarm</option><option value="Anstehend">Anstehend</option>
+                        <option value="NichtSichern">Nicht Erf.</option><option value="Abgelehnt">Abgelehnt</option>
+                    </select>
+                </div>
+                <button id="mainActionButton" class="main-action-button">Hinzufügen</button>
+            </div>
+            <div class="controls-row" id="controlsRow">
+                <div class="combo-checkbox-group" id="comboCheckboxContainer">
+                     <input type="checkbox" id="comboCheckbox"><label for="comboCheckbox" id="comboCheckboxLabel">Kombi-Sicherung</label>
+                </div>
+                <button type="button" id="noteToggleButton" class="note-toggle-btn" title="Notiz hinzufügen/bearbeiten (Einzelscan)">📝</button>
+            </div>
+            <div id="noteInputContainer" class="note-input-area">
+                <label for="noteInput">Notiz (für nächsten Einzelscan):</label>
+                <div class="input-wrapper">
+                    <input type="text" id="noteInput" placeholder="Notiz eingeben..." list="noteSuggestions">
+                    <button type="button" id="clearNoteButton" class="clear-input-btn clear-note-btn" title="Notiz löschen">×</button>
+                    <datalist id="noteSuggestions">
+                        <option value="Abgepackt"><option value="Muss abgepackt werden"><option value="Eingeschweißte Folien">
+                        <option value="Aluverbundfolie"><option value="Flüssigkeit"><option value="Fässer">
+                        <option value="Verklebte Kartons"><option value="Vakuumfolie"><option value="Kanister">
+                        <option value="Eimer"><option value="Säcke"><option value="Wird gesucht!">
+                    </datalist>
+                </div>
+            </div>
+            <div id="newTotalSection">
+                <label for="newTotalInput" id="newTotalLabel">Erwartete Gesamtstückzahl für NEUE Sendung:</label>
+                <input type="number" id="newTotalInput" inputmode="numeric" placeholder="Zahl eingeben...">
+                <div>
+                    <button id="confirmNewTotalBtn" class="main-action-button">OK</button>
+                    <button id="skipNewTotalBtn" class="main-action-button">Überspringen (N/A)</button>
+                </div>
+            </div>
+        </div>
+        <div id="errorDisplay" class="error"></div>
+        <div class="batch-area" id="batchArea">
+            <h3>Aktueller Batch (<span id="batchModeStatusLabel"></span>)</h3>
+            <div id="currentBatchNoteDisplay" style="font-style:italic;margin-bottom:5px;font-size:.9em"></div>
+            <ul id="batchList"></ul>
+            <div id="batchSummary">Anzahl im Batch: <span id="batchItemCount">0</span></div>
+            <div class="batch-note-toggle-container" style="display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 10px; font-size: 0.9em;">
+                <label for="batchNoteToggle" style="margin-bottom: 0; font-weight: normal;">Notiz-Popup aktivieren:</label>
+                <label class="batch-toggle-switch">
+                    <input type="checkbox" id="batchNoteToggle">
+                    <span class="batch-slider"></span>
+                </label>
+            </div>
+            <div class="batch-sound-toggle-container">
+                <label for="unexpectedHuSoundToggle" title="Ton abspielen, wenn eine HU auf keiner Liste steht">🔊 Überzählig-Ton</label>
+                <label class="batch-toggle-switch">
+                    <input type="checkbox" id="unexpectedHuSoundToggle" checked>
+                    <span class="batch-slider"></span>
+                </label>
+            </div>
+            <div class="batch-sound-toggle-container">
+                <label for="batchFeedbackToggle" title="Scan-Feedback-Popup im Batch-Modus anzeigen">💬 Scan-Feedback-Popup</label>
+                <label class="batch-toggle-switch">
+                    <input type="checkbox" id="batchFeedbackToggle">
+                    <span class="batch-slider"></span>
+                </label>
+            </div>
+            <div class="batch-action-buttons">
+                <button id="saveBatchButton">Batch Speichern</button>
+                <button id="clearBatchButton">Batch Leeren</button>
+            </div>
+        </div>
+        <div id="currentShipmentDetails">Geben Sie eine Sendungsnummer ein...</div>
+
+        <table>
+            <thead>
+                <tr><th>HAWB.</th><th>Übersicht</th><th>Letzte Änd.</th><th>Aktionen</th></tr>
+            </thead>
+            <tbody id="shipmentTableBody"></tbody>
+        </table>
+    </div>
+</div> <!-- ENDE von #mainView -->
 
 
-
-
-
+<!-- =============================================================== -->
+<!-- 2. ALLE MODALS UND OVERLAYS (jetzt als direkte Body-Kinder)   -->
+<!-- =============================================================== -->
 
 <div id="side-menu" class="side-menu">
     <h3>Optionen</h3>
-
     <ul class="side-menu-list">
-        <li>
-            <a href="#" id="importHuListButton" class="menu-action-item action-warning">
-                <svg viewBox="0 0 24 24"><path d="M9,16V10H5L12,3L19,10H15V16H9M5,20V18H19V20H5Z" /></svg>
-                <span>HU-Liste importieren</span>
-            </a>
-        </li>
-        <li>
-            <a href="#" id="showOpenHusButton" class="menu-action-item">
-                <svg viewBox="0 0 24 24"><path d="M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z" /></svg>
-                <span>Offene HUs anzeigen</span>
-            </a>
-        </li>
-        <li>
-            <a href="#" id="sendToSheetButton" class="menu-action-item action-primary">
-                <svg viewBox="0 0 24 24"><path d="M17,13L12,18L7,13H10V9H14V13M19.35,10.03C18.67,6.59 15.64,4 12,4C9.11,4 6.6,5.64 5.35,8.03C2.34,8.36 0,10.9 0,14A6,6 0 0,0 6,20H19A5,5 0 0,0 24,15C24,12.36 21.95,10.22 19.35,10.03Z" /></svg>
-                <span>An Google Sheet Senden</span>
-            </a>
-        </li>
-        <li>
-            <a href="#" id="sendSummaryEmailButton" class="menu-action-item action-warning">
-                <svg viewBox="0 0 24 24"><path d="M20,8L12,13L4,8V6L12,11L20,6M20,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V6C22,4.89 21.1,4 20,4Z" /></svg>
-                <span>Zusammenfassung per E-Mail</span>
-            </a>
-        </li>
-        <li>
-            <a href="#" id="resetDataButton" class="menu-action-item action-reset">
-                <svg viewBox="0 0 24 24"><path d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" /></svg>
-                <span>Alles Zurücksetzen</span>
-            </a>
-        </li>
+        <li><a href="#" id="importHuListButton" class="menu-action-item action-warning"><svg viewBox="0 0 24 24"><path d="M9,16V10H5L12,3L19,10H15V16H9M5,20V18H19V20H5Z" /></svg><span>HU-Liste importieren</span></a></li>
+        <li><a href="#" id="showOpenHusButton" class="menu-action-item"><svg viewBox="0 0 24 24"><path d="M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z" /></svg><span>Offene HUs anzeigen</span></a></li>
+        <li><a href="#" id="sendToSheetButton" class="menu-action-item action-primary"><svg viewBox="0 0 24 24"><path d="M17,13L12,18L7,13H10V9H14V13M19.35,10.03C18.67,6.59 15.64,4 12,4C9.11,4 6.6,5.64 5.35,8.03C2.34,8.36 0,10.9 0,14A6,6 0 0,0 6,20H19A5,5 0 0,0 24,15C24,12.36 21.95,10.22 19.35,10.03Z" /></svg><span>An Google Sheet Senden</span></a></li>
+        <li><a href="#" id="sendSummaryEmailButton" class="menu-action-item action-warning"><svg viewBox="0 0 24 24"><path d="M20,8L12,13L4,8V6L12,11L20,6M20,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V6C22,4.89 21.1,4 20,4Z" /></svg><span>Zusammenfassung per E-Mail</span></a></li>
+        <li><a href="#" id="resetDataButton" class="menu-action-item action-reset"><svg viewBox="0 0 24 24"><path d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" /></svg><span>Alles Zurücksetzen</span></a></li>
     </ul>
-
     <div id="sheetStatus"></div>
 </div>
 <div id="menu-overlay" class="menu-overlay"></div>
-<!-- --- START DER ÄNDERUNG --- -->
+
 <div id="openHusModal" class="modal-overlay">
     <div class="modal-content">
-
-        
-        <!-- TAB-BUTTONS AKTUALISIERT -->
-        <!-- ÄNDERUNG in index.html -->
-<div class="modal-tabs">
-    <button id="showOpenSecurityHusBtn" class="modal-tab-btn active">Offene Sicherung</button>
-    <button id="showMissingReceiptHusBtn" class="modal-tab-btn">
-        Fehlende Eingänge
-        <span id="missingReceiptsBadge" class="tab-badge hidden"></span>
-    </button>
-    <button id="showDunkelalarmHusBtn" class="modal-tab-btn">
-        Dunkelalarm
-        <span id="dunkelalarmBadge" class="tab-badge hidden"></span>
-    </button>
-</div>
-
-        <!-- Container für die erste Ansicht (bestehend) -->
-        <div id="openHusListContainer" style="max-height: 60vh; overflow-y: auto; padding-right: 10px;">
-            <!-- Inhalt für offene Sicherung wird hier generiert -->
+        <div class="modal-tabs">
+            <button id="showOpenSecurityHusBtn" class="modal-tab-btn active">Offene Sicherung</button>
+            <button id="showMissingReceiptHusBtn" class="modal-tab-btn">Fehlende Eingänge<span id="missingReceiptsBadge" class="tab-badge hidden"></span></button>
+            <button id="showDunkelalarmHusBtn" class="modal-tab-btn">Dunkelalarm<span id="dunkelalarmBadge" class="tab-badge hidden"></span></button>
         </div>
-        
-        <!-- Container für die zweite Ansicht (bestehend) -->
-        <div id="missingReceiptHusListContainer" style="max-height: 60vh; overflow-y: auto; padding-right: 10px; display: none;">
-            <!-- Inhalt für fehlenden Wareneingang wird hier generiert -->
-        </div>
-
-        <!-- NEUER Container für die Dunkelalarm-Ansicht -->
-        <div id="dunkelalarmHusListContainer" style="max-height: 60vh; overflow-y: auto; padding-right: 10px; display: none;">
-            <!-- Inhalt für Dunkelalarm-Sendungen wird hier generiert -->
-        </div>
-
-        <div class="modal-actions" style="justify-content: center; margin-top: 20px;">
-            <button id="closeOpenHusModalButton" class="main-action-button" style="width: 50%;">Schließen</button>
-        </div>
+        <div id="openHusListContainer" style="max-height: 60vh; overflow-y: auto; padding-right: 10px;"></div>
+        <div id="missingReceiptHusListContainer" style="max-height: 60vh; overflow-y: auto; padding-right: 10px; display: none;"></div>
+        <div id="dunkelalarmHusListContainer" style="max-height: 60vh; overflow-y: auto; padding-right: 10px; display: none;"></div>
+        <div class="modal-actions" style="justify-content: center; margin-top: 20px;"><button id="closeOpenHusModalButton" class="main-action-button" style="width: 50%;">Schließen</button></div>
     </div>
 </div>
-<!-- --- START DER ÄNDERUNG --- -->
-<!-- --- START DER ÄNDERUNG: Batch Scan Feedback Modal (Close Button überarbeitet) --- -->
 <div id="batchScanFeedbackModal" class="modal-overlay">
     <div class="modal-content">
         <h3>Batch Scan Feedback</h3>
-        <!-- NEUER BUTTON MIT ICON UND NEUER KLASSE -->
-        <button id="closeBatchScanFeedbackModalButton" class="close-modal-icon-btn" title="Schließen">
-            <svg viewBox="0 0 24 24"><path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" /></svg>
-        </button>
-        <div id="feedbackScanNumber" class="feedback-scan-number"></div>
-        <div id="feedbackCarrier" class="feedback-carrier"></div>
-        <!-- Die alte .modal-actions div ist jetzt leer oder kann ganz entfernt werden, falls keine weiteren Buttons geplant sind -->
+        <button id="closeBatchScanFeedbackModalButton" class="close-modal-icon-btn" title="Schließen"><svg viewBox="0 0 24 24"><path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" /></svg></button>
+        <div id="feedbackScanNumber" class="feedback-scan-number"></div><div id="feedbackCarrier" class="feedback-carrier"></div>
         <div class="modal-actions" style="display: none;"></div> 
     </div>
 </div>
-
-<!-- --- START: NEUES MODAL FÜR HU-DETAILS --- -->
 <div id="huDetailsModal" class="modal-overlay">
     <div class="modal-content">
-
-        <button class="close-modal-icon-btn" data-close-modal="huDetailsModal" title="Schließen">
-            <svg viewBox="0 0 24 24"><path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" /></svg>
-        </button>
-        <div id="huDetailsContent">
-            <dl>
-                <dt>Nummer:</dt>
-                <dd id="huDetailsNumber"></dd>
-                <dt>Verpackung:</dt>
-                <dd id="huDetailsPackaging"></dd>
-                <dt>Dimensionen:</dt>
-                <dd id="huDetailsDimensions"></dd>
-                <dt>Bruttogewicht:</dt>
-                <dd id="huDetailsWeight"></dd>
-            </dl>
-        </div>
-        <div class="modal-actions" style="justify-content: center;">
-
-        </div>
+        <button class="close-modal-icon-btn" data-close-modal="huDetailsModal" title="Schließen"><svg viewBox="0 0 24 24"><path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" /></svg></button>
+        <div id="huDetailsContent"><dl><dt>Nummer:</dt><dd id="huDetailsNumber"></dd><dt>Verpackung:</dt><dd id="huDetailsPackaging"></dd><dt>Dimensionen:</dt><dd id="huDetailsDimensions"></dd><dt>Bruttogewicht:</dt><dd id="huDetailsWeight"></dd></dl></div>
+        <div class="modal-actions" style="justify-content: center;"></div>
     </div>
 </div>
-<!-- --- ENDE DER ÄNDERUNG --- -->
-<div class="container">
-    <div class="batch-controls">
-        <button id="menu-toggle-btn" title="Menü öffnen/schließen">☰</button>
-        <label for="batchModeToggle">Batch-Modus:</label>
-        <label class="batch-toggle-switch">
-            <input type="checkbox" id="batchModeToggle">
-            <span class="batch-slider"></span>
-        </label>
-        <span id="batchStatusDisplay"></span>
-    </div>
-
-    <div class="input-section">
-        <div>
-            <label for="shipmentNumberInput">HAWB/HU:</label>
-            <div class="input-wrapper">
-                <input type="text" id="shipmentNumberInput" placeholder="Scannen oder eingeben..." autocapitalize="characters" autocomplete="off">
-                <button type="button" id="clearInputButton" class="clear-input-btn" title="Eingabe löschen">×</button>
-            </div>
-        </div>
-    
-        <div class="status-and-button-container"> <!-- Container für Status und Button nebeneinander -->
-            <div class="status-select-wrapper"> <!-- Wrapper für Label und Select -->
-                <label for="securityStatusSelect">Status:</label>
-                <select id="securityStatusSelect">
-                    <option value="XRY">XRY</option><option value="ETD">ETD</option><option value="EDD">EDD</option>
-			<option value="Wareneingang">Wareneingang</option> <!-- NEUE ZEILE -->
-                    <option value="Dunkelalarm">Dunkelalarm</option><option value="Anstehend">Anstehend</option>
-                    <option value="NichtSichern">Nicht Erf.</option><option value="Abgelehnt">Abgelehnt</option>
-                </select>
-            </div>
-            <button id="mainActionButton" class="main-action-button">Hinzufügen</button>
-        </div>
-    
-        <div class="controls-row" id="controlsRow">
-            <div class="combo-checkbox-group" id="comboCheckboxContainer">
-                 <input type="checkbox" id="comboCheckbox"><label for="comboCheckbox" id="comboCheckboxLabel">Kombi-Sicherung</label>
-            </div>
-            <button type="button" id="noteToggleButton" class="note-toggle-btn" title="Notiz hinzufügen/bearbeiten (Einzelscan)">📝</button>
-        </div>
-    
-        <div id="noteInputContainer" class="note-input-area">
-            <label for="noteInput">Notiz (für nächsten Einzelscan):</label>
-            <div class="input-wrapper">
-                <input type="text" id="noteInput" placeholder="Notiz eingeben..." list="noteSuggestions">
-                <button type="button" id="clearNoteButton" class="clear-input-btn clear-note-btn" title="Notiz löschen">×</button>
-                <datalist id="noteSuggestions">
-                    <option value="Abgepackt"><option value="Muss abgepackt werden"><option value="Eingeschweißte Folien">
-                    <option value="Aluverbundfolie"><option value="Flüssigkeit"><option value="Fässer">
-                    <option value="Verklebte Kartons"><option value="Vakuumfolie"><option value="Kanister">
-                    <option value="Eimer"><option value="Säcke"><option value="Wird gesucht!">
-                </datalist>
-            </div>
-        </div>
-    
-        <div id="newTotalSection">
-            <label for="newTotalInput" id="newTotalLabel">Erwartete Gesamtstückzahl für NEUE Sendung:</label>
-            <input type="number" id="newTotalInput" inputmode="numeric" placeholder="Zahl eingeben...">
-            <div>
-                <button id="confirmNewTotalBtn" class="main-action-button">OK</button>
-                <button id="skipNewTotalBtn" class="main-action-button">Überspringen (N/A)</button>
-            </div>
-        </div>
-        <!-- Der Button #mainActionButton war ursprünglich hier und wurde nach oben verschoben -->
-    </div>
-
-    <div id="errorDisplay" class="error"></div>
-
-
-<div class="batch-area" id="batchArea">
-    <h3>Aktueller Batch (<span id="batchModeStatusLabel"></span>)</h3>
-    <div id="currentBatchNoteDisplay" style="font-style:italic;margin-bottom:5px;font-size:.9em"></div>
-    <ul id="batchList"></ul>
-    <div id="batchSummary">Anzahl im Batch: <span id="batchItemCount">0</span></div>
-    
-    <div class="batch-note-toggle-container" style="display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 10px; font-size: 0.9em;">
-        <label for="batchNoteToggle" style="margin-bottom: 0; font-weight: normal;">Notiz-Popup aktivieren:</label>
-        <label class="batch-toggle-switch">
-            <input type="checkbox" id="batchNoteToggle">
-            <span class="batch-slider"></span>
-        </label>
-    </div>
-
-    <!-- HIER IST DER NEUE SWITCH FÜR DEN ÜBERZÄHLIG-TON -->
-    <div class="batch-sound-toggle-container">
-        <label for="unexpectedHuSoundToggle" title="Ton abspielen, wenn eine HU auf keiner Liste steht">🔊 Überzählig-Ton</label>
-        <label class="batch-toggle-switch">
-            <input type="checkbox" id="unexpectedHuSoundToggle" checked>
-            <span class="batch-slider"></span>
-        </label>
-    </div>
-    <!-- ENDE DES NEUEN SWITCHES -->
-
-<!-- --- START DER ÄNDERUNG (NEUES FEEDBACK-POPUP) --- -->
-    <div class="batch-sound-toggle-container">
-        <label for="batchFeedbackToggle" title="Scan-Feedback-Popup im Batch-Modus anzeigen">💬 Scan-Feedback-Popup</label>
-        <label class="batch-toggle-switch">
-            <input type="checkbox" id="batchFeedbackToggle">
-            <span class="batch-slider"></span>
-        </label>
-    </div>
-
-    <div class="batch-action-buttons">
-        <button id="saveBatchButton">Batch Speichern</button>
-        <button id="clearBatchButton">Batch Leeren</button>
-    </div>
-</div>
-
-    <div id="currentShipmentDetails">Geben Sie eine Sendungsnummer ein...</div>
-
-
 <div id="importHuModal" class="modal-overlay">
     <div class="modal-content">
         <h3>HU-Liste Importieren</h3>
-        <div class="form-group">
-            <label for="mainOrderNumberInput">Auftragsnummer (z.B. 9007769889):</label>
-            <!-- HIER die Änderung -->
-            <div style="display: flex; align-items: center; gap: 10px;">
-                <input type="text" id="mainOrderNumberInput" placeholder="Übergeordnete Auftragsnummer eingeben" inputmode="none" style="flex-grow: 1;">
-                <button type="button" id="addAndContinueHuButton" title="Speichern und nächste Liste eingeben" class="main-action-button" style="width: 44px; height: 44px; padding: 0; font-size: 2em; flex-shrink: 0; line-height: 44px;">+</button>
-            </div>
-        </div>
-        <div class="form-group">
-            <label for="huListTextarea">HU Nummern (eine pro Zeile):</label>
-            <!-- UND HIER die Änderung -->
-            <textarea id="huListTextarea" rows="8" style="width: 100%; font-family: monospace; font-size: 1em; padding: 8px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box;" placeholder="HU Nummern hier einfügen..." inputmode="none"></textarea>
-        </div>
-        <div class="modal-actions">
-            <button id="saveHuListButton">Importieren & Speichern</button>
-            <button id="cancelHuImportButton">Abbrechen</button>
-        </div>
+        <div class="form-group"><label for="mainOrderNumberInput">Auftragsnummer (z.B. 9007769889):</label><div style="display: flex; align-items: center; gap: 10px;"><input type="text" id="mainOrderNumberInput" placeholder="Übergeordnete Auftragsnummer eingeben" inputmode="none" style="flex-grow: 1;"><button type="button" id="addAndContinueHuButton" title="Speichern und nächste Liste eingeben" class="main-action-button" style="width: 44px; height: 44px; padding: 0; font-size: 2em; flex-shrink: 0; line-height: 44px;">+</button></div></div>
+        <div class="form-group"><label for="huListTextarea">HU Nummern (eine pro Zeile):</label><textarea id="huListTextarea" rows="8" style="width: 100%; font-family: monospace; font-size: 1em; padding: 8px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box;" placeholder="HU Nummern hier einfügen..." inputmode="none"></textarea></div>
+        <div class="modal-actions"><button id="saveHuListButton">Importieren & Speichern</button><button id="cancelHuImportButton">Abbrechen</button></div>
     </div>
 </div>
-<!-- ENDE: NEUE ELEMENTE FÜR HU-LISTEN-IMPORT -->
-    <h2>Erfasste Sendungen</h2>
-    <table>
-        <thead>
-            <tr><th>HAWB.</th><th>Übersicht</th><th>Letzte Änd.</th><th>Aktionen</th></tr>
-        </thead>
-        <tbody id="shipmentTableBody"></tbody>
-    </table>
-
-    <div id="editModal" class="modal-overlay">
-        <div class="modal-content">
-            <h3>Sendung Bearbeiten</h3>
-            <input type="hidden" id="editShipmentBaseNumber">
-            <div class="form-group">
-                <label for="editShipmentNumberDisplay">Sendungsnummer:</label>
-                <input type="text" id="editShipmentNumberDisplay" readonly>
-            </div>
- <div class="form-group">
-                <label for="editGoodsReceiptCount">Manuelle Anzahl Wareneingang:</label>
-                <input type="number" id="editGoodsReceiptCount" inputmode="numeric" placeholder="Leer lassen, um Scans zu nutzen">
-            </div>
-            <div class="form-group">
-                <label for="editTotalPiecesExpected">Erwartete Gesamtstückzahl:</label>
-                <input type="number" id="editTotalPiecesExpected" inputmode="numeric" placeholder="Zahl oder leer">
-            </div>
-            <div class="modal-actions">
-                <button id="saveEditButton">Speichern</button>
-                <button id="cancelEditButton">Abbrechen</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="batchNoteModal" class="modal-overlay">
-        <div class="modal-content">
-            <h3>Batch-Notiz Festlegen</h3>
-            <div class="form-group">
-                <label for="batchNoteInput">Notiz für alle Scans in diesem Batch (optional):</label>
-                <input type="text" id="batchNoteInput" placeholder="Notiz eingeben..." list="noteSuggestions">
-            </div>
-            <div class="modal-actions">
-                <button id="confirmBatchNoteButton" class="main-action-button">Übernehmen & Scannen</button>
-                <button id="skipBatchNoteButton" class="main-action-button" style="background-color:var(--secondary-color)">Ohne Notiz Scannen</button>
-            </div>
-        </div>
+<div id="editModal" class="modal-overlay">
+    <div class="modal-content">
+        <h3>Sendung Bearbeiten</h3><input type="hidden" id="editShipmentBaseNumber"><div class="form-group"><label for="editShipmentNumberDisplay">Sendungsnummer:</label><input type="text" id="editShipmentNumberDisplay" readonly></div>
+        <div class="form-group"><label for="editGoodsReceiptCount">Manuelle Anzahl Wareneingang:</label><input type="number" id="editGoodsReceiptCount" inputmode="numeric" placeholder="Leer lassen, um Scans zu nutzen"></div>
+        <div class="form-group"><label for="editTotalPiecesExpected">Erwartete Gesamtstückzahl:</label><input type="number" id="editTotalPiecesExpected" inputmode="numeric" placeholder="Zahl oder leer"></div>
+        <div class="modal-actions"><button id="saveEditButton">Speichern</button><button id="cancelEditButton">Abbrechen</button></div>
     </div>
 </div>
-
+<div id="batchNoteModal" class="modal-overlay">
+    <div class="modal-content">
+        <h3>Batch-Notiz Festlegen</h3><div class="form-group"><label for="batchNoteInput">Notiz für alle Scans in diesem Batch (optional):</label><input type="text" id="batchNoteInput" placeholder="Notiz eingeben..." list="noteSuggestions"></div>
+        <div class="modal-actions"><button id="confirmBatchNoteButton" class="main-action-button">Übernehmen & Scannen</button><button id="skipBatchNoteButton" class="main-action-button" style="background-color:var(--secondary-color)">Ohne Notiz Scannen</button></div>
+    </div>
+</div>
 <div id="noteEditModal" class="modal-overlay">
     <div class="modal-content">
-        <h3>Notiz Bearbeiten/Hinzufügen</h3>
         <div id="noteEditContext" style="font-size: 0.9em; color: #555; margin-bottom: 15px; text-align: center;"></div>
-        
-        <input type="hidden" id="noteEditBaseNumber">
-        <input type="hidden" id="noteEditTimestamp">
-        <input type="hidden" id="noteEditNoteIndex">
-        
-        <div class="form-group">
-            <label for="noteEditTextarea">Notiz:</label>
-            <textarea id="noteEditTextarea" rows="5" placeholder="Notiz hier eingeben..." style="width: 100%; font-size: 1em; padding: 8px; border-radius: 5px; border: 1px solid #ccc; box-sizing: border-box;"></textarea>
-        </div>
-        
-        <div class="modal-actions">
-            <button id="saveNoteEditButton" class="main-action-button">Speichern</button>
-            <button id="cancelNoteEditButton" class="main-action-button" style="background-color: #aaa;">Abbrechen</button>
-        </div>
+        <input type="hidden" id="noteEditBaseNumber"><input type="hidden" id="noteEditTimestamp"><input type="hidden" id="noteEditNoteIndex">
+        <div class="form-group"><label for="noteEditTextarea">Notiz:</label><textarea id="noteEditTextarea" rows="5" placeholder="Notiz hier eingeben..." style="width: 100%; font-size: 1em; padding: 8px; border-radius: 5px; border: 1px solid #ccc; box-sizing: border-box;"></textarea></div>
+        <div class="modal-actions"><button id="saveNoteEditButton" class="main-action-button">Speichern</button><button id="cancelNoteEditButton" class="main-action-button" style="background-color: #aaa;">Abbrechen</button></div>
     </div>
 </div>
 
-
-</div> 
+<!-- =============================================================== -->
+<!-- 3. SKRIPTE UND ANDERE BODY-ELEMENTE (am Ende)                 -->
+<!-- =============================================================== -->
 
 <script src="script.js"></script>
-<!-- ... (Ihr bisheriger HTML-Code) ... -->
 <audio id="errorSound" src="assets/error-sound.mp3" preload="auto"></audio>
-
-<!-- ===== NEUER LADE-SPINNER HINZUGEFÜGT ===== -->
 <div id="loadingOverlay" class="loading-overlay">
     <div class="spinner"></div>
 </div>
-<!-- ===== ENDE DES NEUEN LADE-SPINNERS ===== -->
 
 </body>
 </html>
-
-
