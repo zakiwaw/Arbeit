@@ -3048,11 +3048,29 @@ function setupEventListeners() {
     });
 
     shipmentNumberInputEl.addEventListener('blur', () => {
+        // Setzt den Modus IMMER zurück in den Scanner-Modus, wenn der Fokus verloren geht.
+        // So ist das Feld für den nächsten Scan bereit.
+        shipmentNumberInputEl.inputMode = 'none';
+    
+        // Bestehende Logik für den Batch-Modus beibehalten: Sofort neu fokussieren.
         if (isBatchModeActive) {
             setTimeout(focusShipmentInput, 10);
         }
     });
 // NEU: Event Listener für das Absenden des Haupt-Formulars (Enter-Taste auf Tastatur)
+// ... in der Funktion setupEventListeners() ...
+
+// NEU: Listener für Doppelklick auf das Haupt-Eingabefeld, um die Tastatur zu öffnen
+shipmentNumberInputEl.addEventListener('dblclick', () => {
+    // Ändert den inputMode, um die Standard-Tastatur des Geräts anzufordern
+    shipmentNumberInputEl.inputMode = 'text'; 
+    
+    // Ein kurzer Timeout stellt sicher, dass der Browser die Änderung verarbeitet hat,
+    // bevor wir versuchen, den Fokus erneut zu setzen.
+    setTimeout(() => {
+        shipmentNumberInputEl.focus(); // Erneut fokussieren, um die Tastatur sicher zu triggern
+    }, 50);
+});
 mainInputFormEl.addEventListener('submit', (event) => {
     // 1. Verhindern, dass die Seite durch die Formular-Aktion neu geladen wird
     event.preventDefault();
@@ -3072,11 +3090,15 @@ mainInputFormEl.addEventListener('submit', (event) => {
         focusShipmentInput(); // Setzt den Fokus zurück auf das Haupt-Eingabefeld
     });
     
-    // NEU: Listener für das Absenden des Notiz-Bearbeitungs-Modals
-    noteEditFormEl.addEventListener('submit', (e) => {
-        e.preventDefault(); // Verhindert Neuladen der Seite
-        saveNoteEditButtonEl.click(); // Simuliert einen Klick auf den "Speichern"-Button
-    });
+// Listener für das Absenden des Notiz-Bearbeitungs-Modals
+noteEditFormEl.addEventListener('submit', (e) => {
+    e.preventDefault(); // Verhindert Neuladen der Seite
+    
+    // NEU: Explizit den Fokus vom Textarea entfernen, um das Schließen der Tastatur zu erzwingen.
+    noteEditTextareaEl.blur(); 
+    
+    saveNoteEditButtonEl.click(); // Simuliert einen Klick auf den "Speichern"-Button
+});
     
     comboCheckboxEl.addEventListener('change', focusShipmentInput);
 
