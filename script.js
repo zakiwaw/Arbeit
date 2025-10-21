@@ -1058,7 +1058,14 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
         }
         detailsHtml += `<hr style="border: none; border-top: 1px dotted #ccc; margin: 8px 0;">`;
     } else {
-        detailsHtml += `<strong>Details für ${escapeHtml(baseNumberToDisplay)}:</strong>`;
+        // --- START DER ÄNDERUNG ---
+        // ID, data-Attribut und Titel für die Kopierfunktion hinzugefügt.
+        // Der style-Tag sorgt für einen "Klick"-Cursor.
+        detailsHtml += `<strong id="shipmentDetailTitle" 
+                                style="cursor:pointer;" 
+                                title="Klicken, um '${escapeHtml(baseNumberToDisplay)}' zu kopieren" 
+                                data-hawb="${escapeHtml(baseNumberToDisplay)}">Details für ${escapeHtml(baseNumberToDisplay)}:</strong>`;
+        // --- ENDE DER ÄNDERUNG ---
     }
 
     if (shipment.isHuListOrder) {
@@ -1109,9 +1116,14 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
         detailsHtml += `<li class="${isCancelled ? 'cancelled-item' : ''}">`;
         detailsHtml += `<div class="scan-main-info">`;
         detailsHtml += `<span class="timestamp">[${dateStr} ${timeStr}]</span> `;
-        let numberPart = isManOrder && item.position ? `<span class="position-number">${item.position}.</span> ` : '';
-        let sendnrHtml = item.sendnr ? `<span class="sendnr-display"> (${escapeHtml(item.sendnr)})</span>` : '';
-        detailsHtml += `${numberPart}<span class="hu-value">${escapeHtml(item.rawInput)}</span>${sendnrHtml} → <span class="status">${escapeHtml(item.status)}</span>${item.isCombination ? ` <span class="combo">(Kombi)</span>` : ''}`;
+//... innerhalb der Funktion displayCurrentShipmentDetails ...
+let numberPart = isManOrder && item.position ? `<span class="position-number">${item.position}.</span> ` : '';
+let sendnrHtml = item.sendnr ? `<span class="sendnr-display"> (${escapeHtml(item.sendnr)})</span>` : '';
+// --- START DER ÄNDERUNG ---
+// Cursor und Titel hinzugefügt, um Klickbarkeit zu signalisieren
+detailsHtml += `${numberPart}<span class="hu-value" style="cursor:pointer;" title="Klicken zum Kopieren">${escapeHtml(item.rawInput)}</span>${sendnrHtml} → <span class="status">${escapeHtml(item.status)}</span>${item.isCombination ? ` <span class="combo">(Kombi)</span>` : ''}`;
+// --- ENDE DER ÄNDERUNG ---
+//...
         if (isCancelled) {
             const cancelDt = item.cancelledTimestamp ? new Date(item.cancelledTimestamp) : null;
             detailsHtml += `<span class="cancelled-info"> (storniert am ${cancelDt ? cancelDt.toLocaleString('de-DE') : 'Unbekannt'})</span>`;
@@ -2932,51 +2944,94 @@ function setupEventListeners() {
     backToMainViewBtnEl.addEventListener('click', hideDetailView);
 
     // ÄNDERUNG: Klick-Verhalten der Tabelle wurde überarbeitet
-    tableBodyEl.addEventListener('click', (event) => {
-        const target = event.target;
-        const row = target.closest('tr');
-        if (!row) return;
+// ÄNDERUNG: Klick-Verhalten der Tabelle wurde überarbeitet
+tableBodyEl.addEventListener('click', (event) => {
+    const target = event.target;
+    const row = target.closest('tr');
+    if (!row) return;
 
-        const baseNumber = row.dataset.basenumber;
-        if (!baseNumber) return;
+    const baseNumber = row.dataset.basenumber;
+    if (!baseNumber) return;
 
-        // Fall 1: Klick auf einen Aktions-Button (Edit, PDF, Löschen)
-        if (target.closest('button')) {
-            if (target.classList.contains('edit-btn') && !isBatchModeActive) {
-                openEditModal(baseNumber);
-            } else if (target.classList.contains('pdf-btn')) {
-                sendPdfEmailViaBackend(event); 
-            } else if (target.classList.contains('main-delete-btn')) {
-                if (confirm(`Sendung ${escapeHtml(baseNumber)} wirklich löschen?`)) {
-                    deleteShipment(baseNumber);
-                }
+    // Fall 1: Klick auf einen Aktions-Button (Edit, PDF, Löschen)
+    if (target.closest('button')) {
+        if (target.classList.contains('edit-btn') && !isBatchModeActive) {
+            openEditModal(baseNumber);
+        } else if (target.classList.contains('pdf-btn')) {
+            sendPdfEmailViaBackend(event); 
+        } else if (target.classList.contains('main-delete-btn')) {
+            if (confirm(`Sendung ${escapeHtml(baseNumber)} wirklich löschen?`)) {
+                deleteShipment(baseNumber);
             }
-            return; // Wichtig: Verarbeitung hier beenden
         }
-        
-        // Fall 2: Klick auf eine beliebige andere Stelle in der Zeile -> Detailansicht zeigen
+        return; // Wichtig: Verarbeitung hier beenden
+    }
+    
+    // --- START DER ÄNDERUNG ---
+    // Finde die genaue Zelle, die geklickt wurde.
+    const cell = target.closest('td');
+
+    // Fall 2: Nur wenn auf die ERSTE Zelle geklickt wurde, die Detailansicht zeigen.
+    // row.cells[0] greift auf die erste <td> der Zeile zu.
+    if (cell && cell === row.cells[0]) {
         showDetailView(baseNumber);
-    });
+    }
+    // Klicks auf andere Zellen (die keine Buttons sind) tun nun nichts mehr.
+    // --- ENDE DER ÄNDERUNG ---
+});
 
-    // ÄNDERUNG: Listener für Notiz-/Storno-Aktionen wird auf das 'document' verlegt (Event Delegation)
-    document.addEventListener('click', (event) => {
-        const target = event.target;
-        const detailContainer = target.closest('#currentShipmentDetails');
-        if (!detailContainer) return;
 
-        if (target.classList.contains('editable-note') || target.classList.contains('add-note-link')) {
-            event.preventDefault();
-            openNoteEditModal(target);
-        } 
-        else if (target.classList.contains('cancel-button')) {
-            event.preventDefault();
-            requestCancelScanItem(target.dataset.basenumber, target.dataset.timestamp);
-        } 
-        else if (target.classList.contains('delete-note-btn')) {
-            event.preventDefault();
-            requestDeleteNote(target.dataset.basenumber, target.dataset.timestamp, target.dataset.noteIndex);
-        }
-    });
+document.addEventListener('click', (event) => {
+    const target = event.target;
+    const detailContainer = target.closest('#currentShipmentDetails');
+    if (!detailContainer) return;
+
+    if (target.classList.contains('editable-note') || target.classList.contains('add-note-link')) {
+        event.preventDefault();
+        openNoteEditModal(target);
+    } 
+    else if (target.classList.contains('cancel-button')) {
+        event.preventDefault();
+        requestCancelScanItem(target.dataset.basenumber, target.dataset.timestamp);
+    } 
+    else if (target.classList.contains('delete-note-btn')) {
+        event.preventDefault();
+        requestDeleteNote(target.dataset.basenumber, target.dataset.timestamp, target.dataset.noteIndex);
+    }
+    // --- START DER ÄNDERUNG ---
+    // Neue Bedingung, um den Klick auf den Titel abzufangen
+//... innerhalb von document.addEventListener('click', ...)
+else if (target.id === 'shipmentDetailTitle') {
+    const hawbToCopy = target.dataset.hawb;
+    if (hawbToCopy && navigator.clipboard) {
+        navigator.clipboard.writeText(hawbToCopy).then(() => {
+            displayError(`'${hawbToCopy}' wurde in die Zwischenablage kopiert.`, 'green', 2000);
+        }).catch(err => {
+            console.error('Fehler beim Kopieren:', err);
+            displayError('Kopieren fehlgeschlagen.', 'red', 2000);
+        });
+    }
+}
+// --- START DER ÄNDERUNG ---
+// Neue Bedingung für Klicks auf eine HU/VSE-Nummer
+else if (target.classList.contains('hu-value')) {
+    const huToCopy = target.textContent.trim();
+    if (huToCopy && navigator.clipboard) {
+        navigator.clipboard.writeText(huToCopy).then(() => {
+            // Füge die Klasse hinzu, um die CSS-Animation auszulösen
+            target.classList.add('copied');
+            // Entferne die Klasse nach der Animation, damit sie erneut ausgelöst werden kann
+            setTimeout(() => {
+                target.classList.remove('copied');
+            }, 1500); // 1.5 Sekunden, passend zur CSS-Animation
+        }).catch(err => {
+            console.error('Fehler beim Kopieren:', err);
+        });
+    }
+}
+// --- ENDE DER ÄNDERUNG ---
+    // --- ENDE DER ÄNDERUNG ---
+});
     
     // ===============================================================
     mainActionButtonEl.addEventListener('click', () => {
