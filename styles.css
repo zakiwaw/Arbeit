@@ -1063,3 +1063,59 @@ body.modal-open {
     margin-top: 0;
     border-style: solid; /* Macht den Rahmen durchgezogen statt gestrichelt */
 }
+/* ===== NEU: Styling für klickbaren Titel zum Kopieren ===== */
+#currentShipmentDetails #shipmentDetailTitle:hover {
+    color: var(--primary-color); /* Hebt den Text farblich hervor */
+    text-decoration: underline;  /* Unterstreicht den Text beim Überfahren mit der Maus */
+    text-decoration-style: dotted;
+}
+/* ===== NEU: Styling für "Kopiert!"-Meldung bei HU-Nummern ===== */
+
+/* Positioniert das Pseudo-Element relativ zur HU-Nummer */
+#currentShipmentDetails .hu-value {
+    position: relative; 
+    transition: color 0.2s;
+}
+#currentShipmentDetails .hu-value:hover {
+    color: var(--primary-color);
+}
+
+/* Das Pseudo-Element, das als "Kopiert!"-Meldung dient */
+#currentShipmentDetails .hu-value.copied::after {
+    content: 'Kopiert!';
+    position: absolute;
+    top: 50%;
+    left: 105%; /* Positioniert es rechts neben der Nummer */
+    transform: translateY(-50%);
+    background-color: var(--primary-color);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    font-weight: bold;
+    white-space: nowrap;
+    opacity: 0;
+    
+    /* Hier wird die Animation zugewiesen */
+    animation: fade-in-out 1.5s ease-in-out;
+}
+
+/* Die Keyframe-Animation für das Ein- und Ausblenden */
+@keyframes fade-in-out {
+    0% {
+        opacity: 0;
+        transform: translateY(-50%) scale(0.8);
+    }
+    20% {
+        opacity: 1;
+        transform: translateY(-50%) scale(1);
+    }
+    80% {
+        opacity: 1;
+        transform: translateY(-50%) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-50%) scale(0.8);
+    }
+}
