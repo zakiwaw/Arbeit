@@ -90,6 +90,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const closeBatchScanFeedbackModalButtonEl = document.getElementById('closeBatchScanFeedbackModalButton');
     const loadingOverlayEl = document.getElementById('loadingOverlay');
     const huDetailsModalEl = document.getElementById('huDetailsModal');
+    const nachlieferungSoundEl = document.getElementById('nachlieferungSound');
     const huDetailsNumberEl = document.getElementById('huDetailsNumber');
     const huDetailsPackagingEl = document.getElementById('huDetailsPackaging');
     const huDetailsDimensionsEl = document.getElementById('huDetailsDimensions');
@@ -677,7 +678,24 @@ function playShortErrorSound() {
         }
     }
 }
-// script.js
+function playNachlieferungSound() {
+    if (nachlieferungSoundEl) {
+        nachlieferungSoundEl.volume = 1.0;
+        nachlieferungSoundEl.currentTime = 0;
+        const playPromise = nachlieferungSoundEl.play();
+
+        if (playPromise !== undefined) {
+            playPromise.then(() => {
+                setTimeout(() => {
+                    nachlieferungSoundEl.pause();
+                }, 500);
+            }).catch(error => {
+                console.warn("Audio playback was interrupted or failed:", error);
+            });
+        }
+    }
+}
+
 
 function shortenForwarderName(fullName) {
     if (!fullName) return ''; // Leere Eingaben abfangen
@@ -1878,8 +1896,23 @@ function addToBatch() {
         playShortErrorSound(); // Spielt den Sound ab, wenn unerwartet und Sound aktiv
     }
 
-    // --- Neue Feedback-Popup-Funktion HIER: ---
-    // Wenn der "Scan-Feedback-Popup"-Schalter aktiv ist,
+    if (unexpectedHuSoundToggleEl && unexpectedHuSoundToggleEl.checked) {
+        const parentHawb = findShipmentByHuNumber(processedRawInput);
+        const shipments = loadShipments();
+        const parentShipment = parentHawb ? shipments[parentHawb] : null;
+
+        // Fall 1: Die HU gehört zu einem Nachlieferungs-Auftrag -> Speziellen Ton abspielen
+        if (parentShipment && parentShipment.isNachlieferung) {
+            playNachlieferungSound();
+        } 
+        // Fall 2: Kein Nachlieferungs-Auftrag -> Alte Logik für "unerwartete" HUs anwenden
+        else {
+            let isCurrentHuExpected = isHuExpected(processedRawInput);
+            if (!isCurrentHuExpected) {
+                playShortErrorSound(); 
+            }
+        }
+    }
     // wird das Modal angezeigt.
     if (batchFeedbackToggleEl && batchFeedbackToggleEl.checked) {
         const carrier = findCarrierForHu(processedRawInput);
@@ -3089,6 +3122,7 @@ else if (target.classList.contains('hu-value')) {
                     const newShipment = {
                         hawb: orderNumber, lastModified: now, totalPiecesExpected: hus.length,
                         scannedItems: [], mitarbeiter: MITARBEITER_NAME, isHuListOrder: true,
+                        isNachlieferung: orderNumber.toLowerCase() === 'nachlieferung'
                     };
                     if (hasFullMeta) {
                         newShipment.freightForwarder = metaParts[1];
