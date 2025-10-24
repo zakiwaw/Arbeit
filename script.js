@@ -671,13 +671,17 @@ function playNachlieferungSound() {
         nachlieferungSoundEl.volume = 1.0;
         nachlieferungSoundEl.currentTime = 0;
         const playPromise = nachlieferungSoundEl.play();
+        
+        // Die playPromise-Behandlung bleibt, aber ohne den setTimeout-Stopp
         if (playPromise !== undefined) {
-            playPromise.then(() => {
-                setTimeout(() => { nachlieferungSoundEl.pause(); }, 500); // Stoppt ebenfalls nach 500ms
-            }).catch(error => { console.warn("Audio playback failed:", error); });
+            playPromise.catch(error => {
+                // Verhindert Konsolenfehler, wenn der Browser das Abspielen blockiert
+                console.warn("Audio playback for 'nachlieferung' failed:", error);
+            });
         }
     }
 }
+
 
 
 function shortenForwarderName(fullName) {
