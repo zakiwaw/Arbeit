@@ -82,6 +82,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const showDunkelalarmHusBtnEl = document.getElementById('showDunkelalarmHusBtn');
     const dunkelalarmHusListContainerEl = document.getElementById('dunkelalarmHusListContainer');
     const errorSoundEl = document.getElementById('errorSound');
+    const nachlieferungSoundEl = document.getElementById('nachlieferungSound');
     const unexpectedHuSoundToggleEl = document.getElementById('unexpectedHuSoundToggle');
     const batchScanFeedbackModalEl = document.getElementById('batchScanFeedbackModal');
     const feedbackScanNumberEl = document.getElementById('feedbackScanNumber');
@@ -90,7 +91,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const closeBatchScanFeedbackModalButtonEl = document.getElementById('closeBatchScanFeedbackModalButton');
     const loadingOverlayEl = document.getElementById('loadingOverlay');
     const huDetailsModalEl = document.getElementById('huDetailsModal');
-    const nachlieferungSoundEl = document.getElementById('nachlieferungSound');
     const huDetailsNumberEl = document.getElementById('huDetailsNumber');
     const huDetailsPackagingEl = document.getElementById('huDetailsPackaging');
     const huDetailsDimensionsEl = document.getElementById('huDetailsDimensions');
@@ -654,44 +654,27 @@ function isHuExpected(huNumber) {
  */
 function playShortErrorSound() {
     if (errorSoundEl) {
-        // --- HIER IST DIE NEUE ZEILE ---
-        // Setzt die Lautstärke auf den maximalen Wert (100%)
         errorSoundEl.volume = 1.0;
-        // --- ENDE DER NEUEN ZEILE ---
-        
-        // Stelle sicher, dass der Ton am Anfang ist, falls er vorher schon lief
         errorSoundEl.currentTime = 0;
-        
-        // Spiele den Ton ab
         const playPromise = errorSoundEl.play();
-
         if (playPromise !== undefined) {
             playPromise.then(() => {
-                // Wenn das Abspielen erfolgreich gestartet wurde, setze einen Timer, um es zu stoppen.
-                setTimeout(() => {
-                    errorSoundEl.pause();
-                }, 500); // Stoppt nach 500 Millisekunden (halbe Sekunde)
-            }).catch(error => {
-                // Verhindert Konsolenfehler, wenn der Browser das Abspielen blockiert
-                console.warn("Audio playback was interrupted or failed:", error);
-            });
+                setTimeout(() => { errorSoundEl.pause(); }, 500);
+            }).catch(error => { console.warn("Audio playback failed:", error); });
         }
     }
 }
+
+// NEUE FUNKTION HINZUFÜGEN
 function playNachlieferungSound() {
     if (nachlieferungSoundEl) {
         nachlieferungSoundEl.volume = 1.0;
         nachlieferungSoundEl.currentTime = 0;
         const playPromise = nachlieferungSoundEl.play();
-
         if (playPromise !== undefined) {
             playPromise.then(() => {
-                setTimeout(() => {
-                    nachlieferungSoundEl.pause();
-                }, 500);
-            }).catch(error => {
-                console.warn("Audio playback was interrupted or failed:", error);
-            });
+                setTimeout(() => { nachlieferungSoundEl.pause(); }, 500); // Stoppt ebenfalls nach 500ms
+            }).catch(error => { console.warn("Audio playback failed:", error); });
         }
     }
 }
@@ -1356,9 +1339,28 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
     const { baseNumber, suffix, isValidFormat, raw: processedRawInput, isSuffixFormat } = processShipmentNumber(rawInputToSave);
     if (!isValidFormat) { return { success: false, waitingForTotal: false, message: `Ungültiges Format: ${escapeHtml(rawInputToSave)}` }; }
 
+    // --- START DER AKTUALISIERTEN SOUND-LOGIK ---
+    if (unexpectedHuSoundToggleEl && unexpectedHuSoundToggleEl.checked) {
+        const isCurrentHuExpected = isHuExpected(processedRawInput);
+        const parentHawbByHu = findShipmentByHuNumber(processedRawInput);
+        const isNachlieferungHu = parentHawbByHu && parentHawbByHu.toUpperCase() === 'NACHLIEFERUNG';
+
+        // Fall 1: HU gehört zu einer Nachlieferung -> spiele den Nachlieferung-Sound
+        if (isNachlieferungHu) {
+            playNachlieferungSound();
+        } 
+        // Fall 2: HU ist unerwartet (und keine Nachlieferung) -> spiele den Fehler-Sound
+        else if (!isCurrentHuExpected) {
+            playShortErrorSound();
+        }
+    }
+    // --- ENDE DER AKTUALISIERTEN SOUND-LOGIK ---
+
     const shipments = loadShipments();
     const parentHawb = findShipmentByHuNumber(processedRawInput);
 
+    // ... (der restliche Code der Funktion bleibt unverändert) ...
+    
     // --- LOGIK FÜR HU-LISTEN-AUFTRÄGE ---
     if (parentHawb) {
         const parentShipment = shipments[parentHawb];
@@ -1420,7 +1422,7 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
                     timestamp: new Date(now.getTime() + 1).toISOString(),
                     isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null,
                     position: originalItemForWE.position, sendnr: originalItemForWE.sendnr,
-                    isAutoGeneratedWE: true // <-- NEUES FLAG
+                    isAutoGeneratedWE: true 
                 };
                 parentShipment.scannedItems.push(weItem);
             }
@@ -1496,7 +1498,7 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
                 rawInput: processedRawInput, status: 'Wareneingang',
                 timestamp: new Date(now.getTime() + 1).toISOString(),
                 isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null,
-                isAutoGeneratedWE: true // <-- NEUES FLAG
+                isAutoGeneratedWE: true
             };
             shipment.scannedItems.push(weItem);
         }
@@ -1884,42 +1886,28 @@ function addToBatch() {
 
     const scanTimestamp = new Date().toISOString();
 
-    // --- START DER ÄÄNDERUNG: Batch Scan Feedback in addToBatch() ---
-    let isCurrentHuExpected = isHuExpected(processedRawInput);
-
-
-
-    // --- Tonfunktion bleibt HIER: ---
-    // Wenn die HU NICHT erwartet wird UND der "Überzählig-Ton"-Schalter aktiv ist,
-    // wird der Fehlerton abgespielt.
-    if (!isCurrentHuExpected && unexpectedHuSoundToggleEl && unexpectedHuSoundToggleEl.checked) {
-        playShortErrorSound(); // Spielt den Sound ab, wenn unerwartet und Sound aktiv
-    }
-
+    // --- START DER AKTUALISIERTEN SOUND-LOGIK ---
     if (unexpectedHuSoundToggleEl && unexpectedHuSoundToggleEl.checked) {
+        const isCurrentHuExpected = isHuExpected(processedRawInput);
         const parentHawb = findShipmentByHuNumber(processedRawInput);
-        const shipments = loadShipments();
-        const parentShipment = parentHawb ? shipments[parentHawb] : null;
+        const isNachlieferungHu = parentHawb && parentHawb.toUpperCase() === 'NACHLIEFERUNG';
 
-        // Fall 1: Die HU gehört zu einem Nachlieferungs-Auftrag -> Speziellen Ton abspielen
-        if (parentShipment && parentShipment.isNachlieferung) {
+        // Fall 1: HU gehört zu einer Nachlieferung -> spiele den Nachlieferung-Sound
+        if (isNachlieferungHu) {
             playNachlieferungSound();
         } 
-        // Fall 2: Kein Nachlieferungs-Auftrag -> Alte Logik für "unerwartete" HUs anwenden
-        else {
-            let isCurrentHuExpected = isHuExpected(processedRawInput);
-            if (!isCurrentHuExpected) {
-                playShortErrorSound(); 
-            }
+        // Fall 2: HU ist unerwartet (und keine Nachlieferung) -> spiele den Fehler-Sound
+        else if (!isCurrentHuExpected) {
+            playShortErrorSound();
         }
     }
-    // wird das Modal angezeigt.
+    // --- ENDE DER AKTUALISIERTEN SOUND-LOGIK ---
+
     if (batchFeedbackToggleEl && batchFeedbackToggleEl.checked) {
         const carrier = findCarrierForHu(processedRawInput);
-        showBatchScanFeedback(processedRawInput, isCurrentHuExpected, carrier);
+        const isExpectedForPopup = isHuExpected(processedRawInput);
+        showBatchScanFeedback(processedRawInput, isExpectedForPopup, carrier);
     }
-
-// ... (Rest der addToBatch-Funktion) ...
 
     if (isBatchModeActive && currentBatch.length === 0 && isBatchNotePromptRequired && batchNoteToggleEl.checked) {
         pendingFirstBatchScanData = { rawInput: processedRawInput, scanTimestamp: scanTimestamp };
@@ -3122,7 +3110,6 @@ else if (target.classList.contains('hu-value')) {
                     const newShipment = {
                         hawb: orderNumber, lastModified: now, totalPiecesExpected: hus.length,
                         scannedItems: [], mitarbeiter: MITARBEITER_NAME, isHuListOrder: true,
-                        isNachlieferung: orderNumber.toLowerCase() === 'nachlieferung'
                     };
                     if (hasFullMeta) {
                         newShipment.freightForwarder = metaParts[1];
