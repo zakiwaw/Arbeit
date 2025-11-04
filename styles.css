@@ -1119,3 +1119,35 @@ body.modal-open {
         transform: translateY(-50%) scale(0.8);
     }
 }
+/* --- START DER ÄNDERUNG --- */
+
+/* Macht die HU-Nummer im Detail-Modal klickbar und fügt visuelles Feedback hinzu */
+#huDetailsContent #huDetailsNumber {
+    cursor: pointer;
+    position: relative; /* Wichtig für die "Kopiert!"-Meldung */
+    transition: background-color 0.2s;
+}
+
+#huDetailsContent #huDetailsNumber:hover {
+    background-color: #e9e9e9; /* Leichter Hover-Effekt */
+}
+
+/* Stil für die "Kopiert!"-Meldung (verwendet die existierende Animation) */
+#huDetailsContent #huDetailsNumber.copied::after {
+    content: 'Kopiert!';
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    transform: translateY(-50%);
+    background-color: var(--primary-color);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    font-weight: bold;
+    white-space: nowrap;
+    opacity: 0;
+    animation: fade-in-out 1.5s ease-in-out;
+}
+
+/* --- ENDE DER ÄNDERUNG --- */
