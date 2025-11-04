@@ -383,6 +383,10 @@ function hideLoader() {
     }
 }
 // --- ENDE DER NEUEN HILFSFUNKTIONEN ---
+// =========================================================================
+// ERSETZEN SIE IHRE GESAMTE showOpenHusSummary FUNKTION MIT DIESER
+// =========================================================================
+
 function showOpenHusSummary() {
     removeActiveInlineNoteEditor();
     const shipments = loadShipments();
@@ -390,7 +394,8 @@ function showOpenHusSummary() {
     let openSecurityHusByOrder = [],
         missingReceiptHusByOrder = [],
         dunkelalarmItemsByOrder = {},
-        ueberzaehligItemsByOrder = {}; // HIER ist die wichtige Deklaration, die gefehlt hat
+        ueberzaehligItemsByOrder = {},
+        suspiciousPairs = []; // NEU: Array zum Sammeln der verdächtigen Paare
 
     // 1. Zuerst eine Liste aller erwarteten HUs aus allen HU-Listen-Aufträgen erstellen
     const expectedHuSet = new Set();
@@ -421,18 +426,41 @@ function showOpenHusSummary() {
             }
         }
 
-        // NEUE LOGIK FÜR ÜBERZÄHLIGE SCANS
+        // ERWEITERTE LOGIK FÜR ÜBERZÄHLIGE SCANS
         if (shipment.scannedItems && shipment.scannedItems.length > 0) {
-            const ueberzaehligItems = shipment.scannedItems.filter(item =>
+            const allUeberzaehligItems = shipment.scannedItems.filter(item =>
                 item.status !== 'Anstehend' && // Es muss ein echter Scan sein, kein Platzhalter
                 !item.isCancelled &&
                 !expectedHuSet.has(item.rawInput.toUpperCase()) // Die HU ist NICHT in der Liste der erwarteten HUs
             );
-            if (ueberzaehligItems.length > 0) {
+
+            const normalUeberzaehligForThisOrder = []; // Temporäre Liste für "normale" überzählige
+
+            allUeberzaehligItems.forEach(item => {
+                const surplusHu = item.rawInput.toUpperCase();
+                let foundSimilar = false;
+
+                // Vergleiche jede überzählige HU mit JEDER erwarteten HU
+                for (const expectedHu of expectedHuSet) {
+                    if (areStringsSimilar(surplusHu, expectedHu)) {
+                        suspiciousPairs.push({ surplus: item, expected: expectedHu, orderNumber: baseNumber });
+                        foundSimilar = true;
+                        break; // Ein Treffer reicht, nächste überzählige HU prüfen
+                    }
+                }
+
+                // Wenn kein ähnlicher Treffer gefunden wurde, ist es eine "normale" überzählige HU
+                if (!foundSimilar) {
+                    normalUeberzaehligForThisOrder.push(item);
+                }
+            });
+
+            // Nur die "normalen" überzähligen HUs zur normalen Anzeige hinzufügen
+            if (normalUeberzaehligForThisOrder.length > 0) {
                 if (!ueberzaehligItemsByOrder[baseNumber]) {
                     ueberzaehligItemsByOrder[baseNumber] = { items: [], ...shipment };
                 }
-                ueberzaehligItems.forEach(item => {
+                normalUeberzaehligForThisOrder.forEach(item => {
                     const enhancedItem = { ...item, orderNumber: baseNumber };
                     ueberzaehligItemsByOrder[baseNumber].items.push(enhancedItem);
                 });
@@ -483,7 +511,7 @@ function showOpenHusSummary() {
     // 3. Badges aktualisieren
     const totalMissingReceipts = missingReceiptHusByOrder.reduce((sum, order) => sum + order.pendingHus.length, 0);
     const totalDunkelalarms = Object.values(dunkelalarmItemsByOrder).reduce((sum, data) => sum + data.items.length, 0);
-    const totalUeberzaehlig = Object.values(ueberzaehligItemsByOrder).reduce((sum, data) => sum + data.items.length, 0);
+    const totalUeberzaehlig = Object.values(ueberzaehligItemsByOrder).reduce((sum, data) => sum + data.items.length, 0) + suspiciousPairs.length;
     const missingBadge = document.getElementById('missingReceiptsBadge');
     const dunkelalarmBadge = document.getElementById('dunkelalarmBadge');
     const ueberzaehligBadge = document.getElementById('ueberzaehligBadge');
@@ -514,16 +542,18 @@ function showOpenHusSummary() {
         const isVvlList = sortedItems[0] && sortedItems[0].sendnr;
         if (isVvlList) {
             let html = '<div class="hu-list-header"><span>VSE-Nummer</span><span>Sendungs-Nr.</span></div>';
-            const listItems = sortedItems.map(item => {
-                const hasDunkelalarm = dunkelalarmedNumbers.has(item.rawInput);
-                const alarmClass = hasDunkelalarm ? 'has-dunkelalarm' : '';
-                return `
-                <li>
-                    <div class="pending-item-details">
-                        <span class="pending-vse ${alarmClass}" style="cursor:pointer;" title="Details für ${escapeHtml(item.rawInput)} anzeigen">${escapeHtml(item.rawInput)}</span>
-                        <span class="pending-sendnr">${escapeHtml(item.sendnr)}</span>
-                    </div>
-                </li>`;
+// ...
+const listItems = sortedItems.map(item => {
+    const hasDunkelalarm = dunkelalarmedNumbers.has(item.rawInput);
+    const alarmClass = hasDunkelalarm ? 'has-dunkelalarm' : '';
+    return `
+    <li>
+        <div class="pending-item-details">
+            <span class="pending-vse hu-value ${alarmClass}" style="cursor:pointer;" title="Klicken zum Kopieren. Details für ${escapeHtml(item.rawInput)} anzeigen">${escapeHtml(item.rawInput)}</span>
+            <span class="pending-sendnr">${escapeHtml(item.sendnr)}</span>
+        </div>
+    </li>`;
+// ...
             }).join('');
             return html + `<ul class="hu-list vvl-list">${listItems}</ul>`;
         } else {
@@ -572,7 +602,30 @@ function showOpenHusSummary() {
     openHusListContainerEl.innerHTML = openSecurityHusByOrder.map(order => generateHtmlForOrderGroup(order, generateHuListHtml(order.pendingHus, order.scannedItems))).join('') || '<p class="no-open-hus-message">Glückwunsch! Alle HUs sind sicherheitstechnisch bearbeitet.</p>';
     missingReceiptHusListContainerEl.innerHTML = missingReceiptHusByOrder.map(order => generateHtmlForOrderGroup(order, generateHuListHtml(order.pendingHus, order.scannedItems))).join('') || '<p class="no-open-hus-message">Perfekt! Alle HUs wurden im Wareneingang erfasst.</p>';
     dunkelalarmHusListContainerEl.innerHTML = dunkelalarmArray.map(data => generateHtmlForOrderGroup(data, generateHuListHtml(data.items, data.scannedItems), true)).join('') || '<p class="no-open-hus-message">Keine Einträge mit Status "Dunkelalarm" gefunden.</p>';
-    ueberzaehligHusListContainerEl.innerHTML = ueberzaehligArray.map(data => generateHtmlForOrderGroup(data, generateHuListHtml(data.items, data.scannedItems), true)).join('') || '<p class="no-open-hus-message">Keine überzähligen Scans gefunden.</p>';
+    
+    // ERWEITERTE HTML-GENERIERUNG FÜR DEN "ÜBERZÄHLIG"-TAB
+    let ueberzaehligHtml = ueberzaehligArray.map(data => generateHtmlForOrderGroup(data, generateHuListHtml(data.items, data.scannedItems), true)).join('');
+
+    console.log("Verdächtige Paare gefunden:", suspiciousPairs);
+    if (suspiciousPairs.length > 0) {
+        ueberzaehligHtml += `<h3 style="margin-top: 20px; color: var(--danger-color); border-top: 2px solid #eee; padding-top: 15px;">Mögliche Tippfehler (Verdachte):</h3>`;
+        suspiciousPairs.forEach((pair, index) => {
+            // HIER WIRD DIE NEUE FUNKTION AUFGERUFEN
+            const diffHtml = highlightDifference(pair.surplus.rawInput, pair.expected);
+
+            ueberzaehligHtml += `
+                <div class="hu-order-group" style="border-left-color: var(--warning-color); padding-left: 10px; margin-bottom: 10px;">
+                    <ul class="hu-list" style="font-family: monospace; padding-left: 5px; list-style-type: none;">
+<li><strong style="color: #333;">Gescant: </strong>&nbsp;<span class="hu-value has-dunkelalarm" style="cursor:pointer;" title="Klicken zum Kopieren. Details für ${escapeHtml(pair.surplus.rawInput)} anzeigen">${diffHtml.html1}</span></li>
+                        <li><strong style="color: #333;">Erwartet:</strong>&nbsp;<span class="hu-value" style="cursor:pointer;" title="Klicken zum Kopieren">${diffHtml.html2}</span></li>
+                    </ul>
+                    ${index < suspiciousPairs.length - 1 ? '<hr style="margin: 5px 0; border: none; border-top: 1px dashed #ccc;">' : ''}
+                </div>
+            `;
+        });
+    }
+    // Setzt den finalen HTML-Code (inkl. Verdachtsfälle) oder die "Nichts gefunden"-Nachricht
+    ueberzaehligHusListContainerEl.innerHTML = ueberzaehligHtml || '<p class="no-open-hus-message">Keine überzähligen Scans gefunden.</p>';
 
     // 6. Initialen Zustand der Tabs setzen
     showOpenSecurityHusBtnEl.classList.add('active');
@@ -766,9 +819,54 @@ function shortenForwarderName(fullName) {
     // Wenn keine Regel zutrifft, den Originalnamen zurückgeben
     return fullName;
 }
+/**
+ * Vergleicht zwei Strings und gibt true zurück, wenn sie die gleiche Länge haben
+ * und sich an genau einer Position unterscheiden.
+ * @param {string} str1 Der erste String.
+ * @param {string} str2 Der zweite String.
+ * @returns {boolean} True, wenn die Strings um genau ein Zeichen abweichen.
+ */
+function areStringsSimilar(str1, str2) {
+    if (str1.length !== str2.length) {
+        return false; // Müssen die gleiche Länge haben
+    }
+    let diffCount = 0;
+    for (let i = 0; i < str1.length; i++) {
+        if (str1[i] !== str2[i]) {
+            diffCount++;
+        }
+        // Optimierung: Bei mehr als einem Unterschied sofort abbrechen
+        if (diffCount > 1) {
+            return false;
+        }
+    }
+    // Gibt nur dann true zurück, wenn exakt ein Unterschied gefunden wurde
+    return diffCount === 1;
+}
 
-
-// --- START DER ÄNDERUNG: Neue Hilfsfunktion für Spediteur-Info ---
+/**
+ * Vergleicht zwei Strings und gibt HTML zurück, bei dem das unterschiedliche Zeichen
+ * mit der Klasse 'blinking-char' umhüllt ist.
+ * @param {string} str1 Der erste String.
+ * @param {string} str2 Der zweite String.
+ * @returns {object} Ein Objekt mit {html1, html2} für die beiden HTML-Strings.
+ */
+function highlightDifference(str1, str2) {
+    let html1 = '';
+    let html2 = '';
+    for (let i = 0; i < str1.length; i++) {
+        const char1 = escapeHtml(str1[i]);
+        const char2 = escapeHtml(str2[i]);
+        if (char1 !== char2) {
+            html1 += `<span class="blinking-char">${char1}</span>`;
+            html2 += `<span class="blinking-char">${char2}</span>`;
+        } else {
+            html1 += char1;
+            html2 += char2;
+        }
+    }
+    return { html1, html2 };
+}
 /**
  * Findet den Spediteur für eine gegebene HU-Nummer, wenn sie in einem HU-Listen-Auftrag existiert.
  * @param {string} huNumber Die zu prüfende HU-Nummer.
@@ -1153,7 +1251,7 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
                 if (item.sendnr) {
                     itemContentHtml = `
                         <div class="pending-item-details">
-                            <span class="pending-vse">${escapeHtml(item.rawInput)}</span>
+                            <span class="pending-vse hu-value" style="cursor:pointer;" title="Klicken zum Kopieren">${escapeHtml(item.rawInput)}</span>
                             <span class="pending-sendnr">${escapeHtml(item.sendnr)}</span>
                         </div>
                     `;
@@ -3095,21 +3193,24 @@ else if (target.id === 'shipmentDetailTitle') {
 }
 // --- START DER ÄNDERUNG ---
 // Neue Bedingung für Klicks auf eine HU/VSE-Nummer
-else if (target.classList.contains('hu-value')) {
-    const huToCopy = target.textContent.trim();
+else if (target.closest('.hu-value')) {
+    const huElement = target.closest('.hu-value'); // Finde das Elternelement mit der Klasse
+    const huToCopy = huElement.textContent.trim(); // Extrahiere den reinen Text
+    
     if (huToCopy && navigator.clipboard) {
         navigator.clipboard.writeText(huToCopy).then(() => {
             // Füge die Klasse hinzu, um die CSS-Animation auszulösen
-            target.classList.add('copied');
+            huElement.classList.add('copied');
             // Entferne die Klasse nach der Animation, damit sie erneut ausgelöst werden kann
             setTimeout(() => {
-                target.classList.remove('copied');
+                huElement.classList.remove('copied');
             }, 1500); // 1.5 Sekunden, passend zur CSS-Animation
         }).catch(err => {
             console.error('Fehler beim Kopieren:', err);
         });
     }
 }
+
 // --- ENDE DER ÄNDERUNG ---
     // --- ENDE DER ÄNDERUNG ---
 });
