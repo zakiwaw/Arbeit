@@ -1151,3 +1151,28 @@ body.modal-open {
 }
 
 /* --- ENDE DER ÄNDERUNG --- */
+/* ===== NEU: STIL FÜR BLINKENDE ZEICHEN BEI HU-VERDACHTSFÄLLEN ===== */
+
+/* Die Keyframe-Animation, die das Blinken erzeugt */
+@keyframes blink {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.2; /* Ein sanfteres Blinken statt komplett unsichtbar */
+    }
+}
+
+/* Die Klasse, die auf das abweichende Zeichen angewendet wird */
+.blinking-char {
+    font-weight: bold;
+    color: var(--danger-color); /* Rot, um den Fehler hervorzuheben */
+    background-color: #fff0f0;  /* Ein sehr leichter roter Hintergrund */
+    border-radius: 3px;
+    padding: 0 2px;
+    
+    /* Zuweisung der Animation */
+    animation-name: blink;
+    animation-duration: 1.5s; /* Dauer eines Blink-Zyklus */
+    animation-iteration-count: infinite; /* Endloses Blinken */
+}
