@@ -81,6 +81,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const missingReceiptHusListContainerEl = document.getElementById('missingReceiptHusListContainer');
     const showDunkelalarmHusBtnEl = document.getElementById('showDunkelalarmHusBtn');
     const dunkelalarmHusListContainerEl = document.getElementById('dunkelalarmHusListContainer');
+    const showUeberzaehligHusBtnEl = document.getElementById('showUeberzaehligHusBtn'); // NEU
+    const ueberzaehligHusListContainerEl = document.getElementById('ueberzaehligHusListContainer'); // NEU
     const errorSoundEl = document.getElementById('errorSound');
     const nachlieferungSoundEl = document.getElementById('nachlieferungSound');
     const unexpectedHuSoundToggleEl = document.getElementById('unexpectedHuSoundToggle');
@@ -387,10 +389,27 @@ function showOpenHusSummary() {
     const securityClearanceStatuses = ['XRY', 'ETD', 'EDD'];
     let openSecurityHusByOrder = [],
         missingReceiptHusByOrder = [],
-        dunkelalarmItemsByOrder = {};
+        dunkelalarmItemsByOrder = {},
+        ueberzaehligItemsByOrder = {}; // HIER ist die wichtige Deklaration, die gefehlt hat
 
+    // 1. Zuerst eine Liste aller erwarteten HUs aus allen HU-Listen-Aufträgen erstellen
+    const expectedHuSet = new Set();
+    Object.values(shipments).forEach(shipment => {
+        if (shipment.isHuListOrder && shipment.scannedItems) {
+            shipment.scannedItems.forEach(item => {
+                // Nur die "Basis"-Items zur erwarteten Liste hinzufügen, nicht die späteren Scans
+                if (item.status === 'Anstehend' || securityClearanceStatuses.includes(item.status)) {
+                   expectedHuSet.add(item.rawInput.toUpperCase());
+                }
+            });
+        }
+    });
+
+    // 2. Alle Sendungen durchgehen und die Daten für die Tabs sammeln
     Object.keys(shipments).forEach(baseNumber => {
         const shipment = shipments[baseNumber];
+
+        // Dunkelalarm-Logik
         if (shipment.scannedItems && shipment.scannedItems.length > 0) {
             const itemsWithDunkelalarm = shipment.scannedItems.filter(item => item.status === 'Dunkelalarm' && !item.isCancelled);
             if (itemsWithDunkelalarm.length > 0) {
@@ -401,6 +420,26 @@ function showOpenHusSummary() {
                 });
             }
         }
+
+        // NEUE LOGIK FÜR ÜBERZÄHLIGE SCANS
+        if (shipment.scannedItems && shipment.scannedItems.length > 0) {
+            const ueberzaehligItems = shipment.scannedItems.filter(item =>
+                item.status !== 'Anstehend' && // Es muss ein echter Scan sein, kein Platzhalter
+                !item.isCancelled &&
+                !expectedHuSet.has(item.rawInput.toUpperCase()) // Die HU ist NICHT in der Liste der erwarteten HUs
+            );
+            if (ueberzaehligItems.length > 0) {
+                if (!ueberzaehligItemsByOrder[baseNumber]) {
+                    ueberzaehligItemsByOrder[baseNumber] = { items: [], ...shipment };
+                }
+                ueberzaehligItems.forEach(item => {
+                    const enhancedItem = { ...item, orderNumber: baseNumber };
+                    ueberzaehligItemsByOrder[baseNumber].items.push(enhancedItem);
+                });
+            }
+        }
+
+        // Logik für HU-Listen-Aufträge (Offene Sicherung & Fehlende WE)
         if (shipment.isHuListOrder && shipment.scannedItems && shipment.scannedItems.length > 0) {
             const manifestSlots = shipment.scannedItems.filter(item =>
                 item.status === 'Anstehend' || securityClearanceStatuses.includes(item.status)
@@ -441,10 +480,14 @@ function showOpenHusSummary() {
         }
     });
 
+    // 3. Badges aktualisieren
     const totalMissingReceipts = missingReceiptHusByOrder.reduce((sum, order) => sum + order.pendingHus.length, 0);
     const totalDunkelalarms = Object.values(dunkelalarmItemsByOrder).reduce((sum, data) => sum + data.items.length, 0);
+    const totalUeberzaehlig = Object.values(ueberzaehligItemsByOrder).reduce((sum, data) => sum + data.items.length, 0);
     const missingBadge = document.getElementById('missingReceiptsBadge');
     const dunkelalarmBadge = document.getElementById('dunkelalarmBadge');
+    const ueberzaehligBadge = document.getElementById('ueberzaehligBadge');
+
     if (missingBadge) {
         missingBadge.textContent = totalMissingReceipts;
         missingBadge.classList.toggle('hidden', totalMissingReceipts === 0);
@@ -453,7 +496,12 @@ function showOpenHusSummary() {
         dunkelalarmBadge.textContent = totalDunkelalarms;
         dunkelalarmBadge.classList.toggle('hidden', totalDunkelalarms === 0);
     }
+    if (ueberzaehligBadge) {
+        ueberzaehligBadge.textContent = totalUeberzaehlig;
+        ueberzaehligBadge.classList.toggle('hidden', totalUeberzaehlig === 0);
+    }
 
+    // 4. HTML für die Listen generieren
     const sortByCountryAndOrder = (a, b) => (a.destinationCountry || 'zz').localeCompare(b.destinationCountry || 'zz') || (a.orderNumber || a.hawb).localeCompare(b.orderNumber || a.hawb);
     const generateHuListHtml = (items, allScannedItemsForContext) => {
         if (!items || items.length === 0) return '';
@@ -469,7 +517,6 @@ function showOpenHusSummary() {
             const listItems = sortedItems.map(item => {
                 const hasDunkelalarm = dunkelalarmedNumbers.has(item.rawInput);
                 const alarmClass = hasDunkelalarm ? 'has-dunkelalarm' : '';
-                // NEU: Cursor und Titel für Klickbarkeit hinzugefügt
                 return `
                 <li>
                     <div class="pending-item-details">
@@ -486,16 +533,15 @@ function showOpenHusSummary() {
                 const positionHtml = isManOrderContext && item.position ? `<span class="position-number">${item.position}.</span>` : ``;
                 const hasDunkelalarm = dunkelalarmedNumbers.has(item.rawInput);
                 const alarmClass = hasDunkelalarm ? 'has-dunkelalarm' : '';
-                // NEU: Cursor und Titel für Klickbarkeit hinzugefügt
                return `<li>${positionHtml}<span class="hu-value ${alarmClass}" style="cursor:pointer;" title="Details für ${escapeHtml(item.rawInput)} anzeigen">${escapeHtml(item.rawInput)}</span></li>`;
             }).join('');
             return `<ul class="hu-list">${listItems}</ul>`;
         }
     };
-    const generateHtmlForOrderGroup = (order, listItemsHtml, forDunkelalarm = false) => {
+    const generateHtmlForOrderGroup = (order, listItemsHtml, forSpecialList = false) => {
         const orderNumber = order.orderNumber || order.hawb;
         let countText = '';
-        if (!forDunkelalarm) {
+        if (!forSpecialList) {
             countText = order.receiptCount !== undefined ? `(${order.receiptCount} von ${order.totalHus} erfasst)` : `(${(order.totalHus - order.pendingHus.length)} von ${order.totalHus} erfasst)`;
         }
         let titleHtml = '';
@@ -503,7 +549,7 @@ function showOpenHusSummary() {
             titleHtml = `VVL: ${escapeHtml(order.parentOrderNumber)}<br><small>Kundennr: ${escapeHtml(orderNumber)} ${countText}</small>`;
         } else {
             const isManOrder = order.freightForwarder && order.destinationCountry;
-            const titlePrefix = isManOrder ? 'Rechnung: ' : '';
+            const titlePrefix = isManOrder ? 'Rechnung: ' : 'Sendung: ';
             let metaLineHtml = '';
             if (order.plsoNumber && order.plsoNumber !== 'N/A') {
                 metaLineHtml += `<br><small>PLSO: ${escapeHtml(order.plsoNumber)}</small>`;
@@ -516,18 +562,28 @@ function showOpenHusSummary() {
         }
         return `<div class="hu-order-group"><div class="hu-order-title">${titleHtml}</div>${listItemsHtml}</div>`;
     };
+
+    // 5. Daten sortieren und in die Container rendern
     openSecurityHusByOrder.sort(sortByCountryAndOrder);
     missingReceiptHusByOrder.sort(sortByCountryAndOrder);
     const dunkelalarmArray = Object.values(dunkelalarmItemsByOrder).sort(sortByCountryAndOrder);
+    const ueberzaehligArray = Object.values(ueberzaehligItemsByOrder).sort(sortByCountryAndOrder);
+
     openHusListContainerEl.innerHTML = openSecurityHusByOrder.map(order => generateHtmlForOrderGroup(order, generateHuListHtml(order.pendingHus, order.scannedItems))).join('') || '<p class="no-open-hus-message">Glückwunsch! Alle HUs sind sicherheitstechnisch bearbeitet.</p>';
     missingReceiptHusListContainerEl.innerHTML = missingReceiptHusByOrder.map(order => generateHtmlForOrderGroup(order, generateHuListHtml(order.pendingHus, order.scannedItems))).join('') || '<p class="no-open-hus-message">Perfekt! Alle HUs wurden im Wareneingang erfasst.</p>';
     dunkelalarmHusListContainerEl.innerHTML = dunkelalarmArray.map(data => generateHtmlForOrderGroup(data, generateHuListHtml(data.items, data.scannedItems), true)).join('') || '<p class="no-open-hus-message">Keine Einträge mit Status "Dunkelalarm" gefunden.</p>';
+    ueberzaehligHusListContainerEl.innerHTML = ueberzaehligArray.map(data => generateHtmlForOrderGroup(data, generateHuListHtml(data.items, data.scannedItems), true)).join('') || '<p class="no-open-hus-message">Keine überzähligen Scans gefunden.</p>';
+
+    // 6. Initialen Zustand der Tabs setzen
     showOpenSecurityHusBtnEl.classList.add('active');
     missingReceiptHusListContainerEl.style.display = 'none';
-    openHusListContainerEl.style.display = 'block';
     showMissingReceiptHusBtnEl.classList.remove('active');
+    openHusListContainerEl.style.display = 'block';
     dunkelalarmHusListContainerEl.style.display = 'none';
     showDunkelalarmHusBtnEl.classList.remove('active');
+    ueberzaehligHusListContainerEl.style.display = 'none';
+    showUeberzaehligHusBtnEl.classList.remove('active');
+    
     openHusModalEl.classList.add('visible');
     document.body.classList.add('modal-open');
     closeSideMenu();
@@ -3468,32 +3524,57 @@ noteEditFormEl.addEventListener('submit', (e) => {
         }
     });
 
-    showOpenSecurityHusBtnEl.addEventListener('click', () => {
-        showOpenSecurityHusBtnEl.classList.add('active');
-        showMissingReceiptHusBtnEl.classList.remove('active');
-        showDunkelalarmHusBtnEl.classList.remove('active');
-        openHusListContainerEl.style.display = 'block';
-        missingReceiptHusListContainerEl.style.display = 'none';
-        dunkelalarmHusListContainerEl.style.display = 'none';
-    });
+   // --- START DES KORRIGIERTEN BLOCKS ---
 
-    showMissingReceiptHusBtnEl.addEventListener('click', () => {
-        showMissingReceiptHusBtnEl.classList.add('active');
-        showOpenSecurityHusBtnEl.classList.remove('active');
-        showDunkelalarmHusBtnEl.classList.remove('active');
-        missingReceiptHusListContainerEl.style.display = 'block';
-        openHusListContainerEl.style.display = 'none';
-        dunkelalarmHusListContainerEl.style.display = 'none';
-    });
+   showOpenSecurityHusBtnEl.addEventListener('click', () => {
+    showOpenSecurityHusBtnEl.classList.add('active');
+    showMissingReceiptHusBtnEl.classList.remove('active');
+    showDunkelalarmHusBtnEl.classList.remove('active');
+    showUeberzaehligHusBtnEl.classList.remove('active'); // KORREKTUR
 
-    showDunkelalarmHusBtnEl.addEventListener('click', () => {
-        showDunkelalarmHusBtnEl.classList.add('active');
-        showOpenSecurityHusBtnEl.classList.remove('active');
-        showMissingReceiptHusBtnEl.classList.remove('active');
-        dunkelalarmHusListContainerEl.style.display = 'block';
-        openHusListContainerEl.style.display = 'none';
-        missingReceiptHusListContainerEl.style.display = 'none';
-    });
+    openHusListContainerEl.style.display = 'block';
+    missingReceiptHusListContainerEl.style.display = 'none';
+    dunkelalarmHusListContainerEl.style.display = 'none';
+    ueberzaehligHusListContainerEl.style.display = 'none'; // KORREKTUR
+});
+
+showMissingReceiptHusBtnEl.addEventListener('click', () => {
+    showMissingReceiptHusBtnEl.classList.add('active');
+    showOpenSecurityHusBtnEl.classList.remove('active');
+    showDunkelalarmHusBtnEl.classList.remove('active');
+    showUeberzaehligHusBtnEl.classList.remove('active'); // KORREKTUR
+
+    missingReceiptHusListContainerEl.style.display = 'block';
+    openHusListContainerEl.style.display = 'none';
+    dunkelalarmHusListContainerEl.style.display = 'none';
+    ueberzaehligHusListContainerEl.style.display = 'none'; // KORREKTUR
+});
+
+showDunkelalarmHusBtnEl.addEventListener('click', () => {
+    showDunkelalarmHusBtnEl.classList.add('active');
+    showOpenSecurityHusBtnEl.classList.remove('active');
+    showMissingReceiptHusBtnEl.classList.remove('active');
+    showUeberzaehligHusBtnEl.classList.remove('active'); // KORREKTUR
+
+    dunkelalarmHusListContainerEl.style.display = 'block';
+    openHusListContainerEl.style.display = 'none';
+    missingReceiptHusListContainerEl.style.display = 'none';
+    ueberzaehligHusListContainerEl.style.display = 'none'; // KORREKTUR
+});
+
+showUeberzaehligHusBtnEl.addEventListener('click', () => {
+    showUeberzaehligHusBtnEl.classList.add('active');
+    showOpenSecurityHusBtnEl.classList.remove('active');
+    showMissingReceiptHusBtnEl.classList.remove('active');
+    showDunkelalarmHusBtnEl.classList.remove('active');
+
+    ueberzaehligHusListContainerEl.style.display = 'block';
+    openHusListContainerEl.style.display = 'none';
+    missingReceiptHusListContainerEl.style.display = 'none';
+    dunkelalarmHusListContainerEl.style.display = 'none';
+});
+
+// --- ENDE DES KORRIGIERTEN BLOCKS ---
 
     batchFeedbackToggleEl.addEventListener('change', () => {
         if (!isBatchModeActive && batchFeedbackToggleEl.checked) {
@@ -3598,21 +3679,31 @@ noteEditFormEl.addEventListener('submit', (e) => {
             missingReceiptHusListContainerEl.addEventListener('click', openHuDetailsModal);
             dunkelalarmHusListContainerEl.addEventListener('click', openHuDetailsModal);
 
-            // Schließ-Logik für das neue Modal
             huDetailsModalEl.addEventListener('click', (e) => {
+                // Klick auf die HU-Nummer zum Kopieren abfangen
+                if (e.target.id === 'huDetailsNumber') {
+                    const huToCopy = e.target.textContent.trim();
+                    if (huToCopy && huToCopy !== 'N/A' && navigator.clipboard) {
+                        navigator.clipboard.writeText(huToCopy).then(() => {
+                            // CSS-Klasse für visuelles Feedback hinzufügen
+                            e.target.classList.add('copied');
+                            // Klasse nach der Animation wieder entfernen
+                            setTimeout(() => {
+                                e.target.classList.remove('copied');
+                            }, 1500); 
+                        }).catch(err => {
+                            console.error('Kopieren fehlgeschlagen:', err);
+                        });
+                    }
+                    return; // Verhindert, dass das Modal geschlossen wird
+                }
+            
+                // Bestehende Logik zum Schließen des Modals
                 if (e.target === huDetailsModalEl || e.target.closest('[data-close-modal="huDetailsModal"]')) {
                     huDetailsModalEl.classList.remove('visible');
                     document.body.classList.remove('modal-open');
-                    // Fokus nicht zurücksetzen, da das Hauptmodal noch offen ist
                 }
             });
-            // --- ENDE: NEUE LOGIK FÜR HU-DETAIL-MODAL ---
-
-
-        // --- Initialisierung ---
-/**
- * Initialisiert die Anwendung: Lädt Daten, setzt UI und Event Listener.
- */
 
 
 // =========================================================================
