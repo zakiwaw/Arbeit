@@ -217,21 +217,6 @@
             <label for="noteEditTextarea">Notiz:</label>
             <textarea id="noteEditTextarea" rows="5" placeholder="Notiz hier eingeben..." style="width: 100%; font-size: 1em; padding: 8px; border-radius: 5px; border: 1px solid #ccc; box-sizing: border-box;" enterkeyhint="done"></textarea>
         </div>
-        <div id="suspicionModal" class="modal-overlay">
-    <div class="modal-content">
-        <h3>Verdacht auf Tippfehler</h3>
-        <div id="suspicionDetails">
-            <p>Gescannte Nummer:<br><strong id="suspicionScannedHu"></strong></p>
-            <p>Mögliche Korrektur:<br><strong id="suspicionExpectedHu"></strong></p>
-            <hr>
-            <p id="suspicionQuestion" class="suspicion-question"></p>
-        </div>
-        <div class="modal-actions">
-            <button id="suspicionConfirmBtn" class="main-action-button">Ja (Korrigieren)</button>
-            <button id="suspicionDenyBtn" class="main-action-button" style="background-color: var(--warning-color);">Nein (Ist korrekt)</button>
-        </div>
-    </div>
-</div>
         <div class="modal-actions">
             <!-- Dieser Button löst das 'submit'-Ereignis aus -->
             <button type="submit" id="saveNoteEditButton" class="main-action-button">Speichern</button>
