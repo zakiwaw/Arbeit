@@ -1,242 +1,1204 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
-    <title>Fracht Tracker (V8.18 - Refactored)</title>
-    <link rel="stylesheet" href="styles.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
-</head>
-<body>
 
-<!-- =============================================================== -->
-<!-- 1. DIE ANSICHTEN (zuerst)                                       -->
-<!-- =============================================================== -->
+    :root{--primary-color:#5cb85c;--primary-hover:#4cae4c;--secondary-color:#5bc0de;--secondary-hover:#31b0d5;--danger-color:#d9534f;--danger-hover:#c9302c;--warning-color:#f0ad4e;--warning-hover:#ec971f;--info-color:#5bc0de;--info-hover:#31b0d5;--light-bg:#f9f9f9;--border-color:#ddd;--text-color:#333;--cancelled-color:#999;}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;margin:0;padding:0;background-color:#f4f4f4;color:var(--text-color);font-size:16px;-webkit-text-size-adjust:100%;-webkit-touch-callout:none;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;position:relative}
+    input[type="text"],input[type="number"]{-webkit-user-select:text;user-select:text}
+    .container{padding:10px;max-width:100%;box-sizing:border-box}
+    h1,h2{text-align:center;margin-top:15px;margin-bottom:15px} h1{font-size:1.6em} h2{font-size:1.3em}
+    .input-section{margin-bottom:10px;margin-top:10px;padding:15px;border:1px solid var(--border-color);border-radius:8px;background-color:var(--light-bg);display:flex;flex-direction:column;gap:15px}
+    .controls-row{display:flex;flex-wrap:wrap;gap:15px;align-items:center;padding-top:5px}
+    label{display:block;margin-bottom:5px;font-weight:bold}
+    input[type="text"],select,input[type="number"]{width:100%;padding:12px 10px;border:1px solid #ccc;border-radius:5px;box-sizing:border-box;font-size:1em;height:44px}
+    input:disabled{background-color:#eee;cursor:not-allowed}
+    .input-wrapper{position:relative}
+    .clear-input-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:#bbb;color:white;border:none;border-radius:50%;width:24px;height:24px;font-size:16px;line-height:22px;text-align:center;cursor:pointer;display:none;padding:0}
+    .clear-input-btn:hover{background:#999}
+    .input-wrapper input[type="text"]{padding-right:35px}
+    .combo-checkbox-group{display:none;align-items:center;padding:5px 0} .combo-checkbox-group input{width:20px;height:20px;margin-right:8px} .combo-checkbox-group label{margin-bottom:0;font-weight:normal;font-size:1em;cursor:pointer} #comboCheckboxContainer.visible{display:flex}
+    .note-toggle-btn{background-color:#f0f0f0;border:1px solid #ccc;border-radius:5px;padding:5px 8px;font-size:1.2em;line-height:1;cursor:pointer;transition:background-color .2s,border-color .2s,color .2s;margin-left:auto;flex-shrink:0;height:38px;width:45px;display:flex;align-items:center;justify-content:center}
+    .note-toggle-btn:hover{background-color:#e0e0e0}
+    .note-toggle-btn.note-active{background-color:var(--warning-color);border-color:var(--warning-hover);color:white}
+    .note-input-area{display:none;margin-top:10px;padding:10px;border:1px dashed var(--warning-color);border-radius:5px;background-color:#fffaf0}
+    .note-input-area label{font-weight:bold;margin-bottom:5px;display:block}
+    .note-input-area .input-wrapper{position:relative}
+    .note-input-area input[type="text"]{width:100%;padding-right:35px;height:44px;box-sizing:border-box}
+    .clear-note-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:#bbb;color:white;border:none;border-radius:50%;width:24px;height:24px;font-size:16px;line-height:22px;text-align:center;cursor:pointer;padding:0;display:block !important}
+    .clear-note-btn:hover{background:#999}
+    .main-action-button{background-color:var(--primary-color);color:white;padding:12px 15px;border:none;border-radius:5px;cursor:pointer;font-size:1.1em;height:48px;text-align:center;width:100%;transition:background-color .2s} .main-action-button:hover,.main-action-button:active{background-color:var(--primary-hover)}
+    .delete-btn{background-color:var(--danger-color) !important}
+    .delete-btn:hover,.delete-btn:active{background-color:var(--danger-hover) !important}
+    #newTotalSection{display:none;flex-direction:column;gap:10px;border-top:1px solid #ccc;margin-top:15px;padding-top:15px}
+    #newTotalSection.visible{display:flex}
+    #newTotalSection div{display:flex;gap:10px;margin-top:10px}
+    #newTotalSection button{flex-grow:1}
+    #confirmNewTotalBtn{background-color:var(--primary-color)}
+    #confirmNewTotalBtn:hover{background-color:var(--primary-hover)}
+    #skipNewTotalBtn{background-color:var(--secondary-color)}
+    #skipNewTotalBtn:hover{background-color:var(--secondary-hover)}
+    .batch-controls{display:flex;justify-content:flex-end;align-items:center;margin-bottom:5px;padding:8px 10px;background-color:#e9e9e9;border-radius:5px;gap:15px;position:relative;z-index:10}
+    #menu-toggle-btn{background-color:var(--secondary-color);color:white;border:none;border-radius:5px;padding:6px 10px;font-size:1.2em;line-height:1;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.1);order:-1;margin-right:auto}
+    #menu-toggle-btn:hover{background-color:var(--secondary-hover)}
+    .batch-controls label{margin:0}
+    .batch-toggle-switch{position:relative;display:inline-block;width:50px;height:28px;flex-shrink:0}
+    .batch-toggle-switch input{opacity:0;width:0;height:0}
+    .batch-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#ccc;transition:.4s;border-radius:28px}
+    .batch-slider:before{position:absolute;content:"";height:20px;width:20px;left:4px;bottom:4px;background-color:white;transition:.4s;border-radius:50%}
+    input:checked+.batch-slider{background-color:var(--primary-color)}
+    input:checked+.batch-slider:before{transform:translateX(22px)}
+    .batch-status-display{font-size:.9em;color:#555;text-align:right;margin-left:5px}
+    .batch-area{display:none;margin-top:15px;padding:10px;border:1px solid var(--info-color);border-radius:8px;background-color:#f0f8ff} .batch-area.visible{display:block} .batch-area h3{margin-top:0;text-align:center;color:var(--info-color);font-size:1.1em} #batchList{list-style-type:none;padding:0;margin:10px 0;max-height:150px;overflow-y:auto;border:1px solid #eee;background-color:#fff;border-radius:4px} #batchList li{display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border-bottom:1px solid #eee;font-family:monospace;font-size:.95em} #batchList li:last-child{border-bottom:none} .remove-batch-item{background-color:var(--danger-color);color:white;border:none;border-radius:3px;padding:2px 5px;font-size:.8em;cursor:pointer;margin-left:10px} .batch-action-buttons{display:flex;justify-content:space-around;margin-top:10px;gap:10px} .batch-action-buttons button{flex-grow:1;padding:10px;font-size:1em;border-radius:5px;border:none;cursor:pointer;transition:background-color .2s} #saveBatchButton{background-color:var(--primary-color);color:white} #saveBatchButton:hover{background-color:var(--primary-hover)} #clearBatchButton{background-color:var(--warning-color);color:white} #clearBatchButton:hover{background-color:var(--warning-hover)}
+    .error{color:var(--danger-color);font-weight:bold;margin-top:5px;min-height:1.2em;text-align:center;padding:5px}
+    #currentShipmentDetails{margin-top:15px;padding:10px;background-color:#eef;border:1px dashed #aac;border-radius:8px;font-size:.9em;line-height:1.5}
+    #currentShipmentDetails strong{color:#335;display:block;margin-bottom:8px}
+    #currentShipmentDetails ul{margin:5px 0;padding-left:5px;list-style-type:none}
+    #currentShipmentDetails li{margin-bottom:4px;padding-bottom:4px;font-family:monospace;white-space:pre-wrap;position:relative;padding-right:70px;border-bottom:1px dotted #ccc;line-height:1.3}
+    #currentShipmentDetails li .timestamp{color:#557;display:block;font-size:.9em}
+    #currentShipmentDetails li .status{font-weight:bold}
+    #currentShipmentDetails li .combo{font-style:italic;color:#66a;margin-left:5px}
+    #currentShipmentDetails li.cancelled-item{text-decoration:line-through;color:var(--cancelled-color)}
+    #currentShipmentDetails li.cancelled-item .timestamp,#currentShipmentDetails li.cancelled-item .status,#currentShipmentDetails li.cancelled-item .combo,#currentShipmentDetails li.cancelled-item .note-display,#currentShipmentDetails li.cancelled-item .editable-note,#currentShipmentDetails li.cancelled-item .add-note-link{color:var(--cancelled-color) !important;cursor:default;text-decoration:none}
+    #currentShipmentDetails li.cancelled-item .add-note-link{display:none}
+    #currentShipmentDetails li .cancelled-info{font-size:.85em;display:block;text-decoration:none !important;color:#777}
+    .cancel-button{position:absolute;right:5px;top:50%;transform:translateY(-50%);background-color:var(--warning-color);color:white;border:none;border-radius:4px;padding:3px 6px;font-size:.8em;cursor:pointer;transition:background-color .2s}
+    .cancel-button:hover,.cancel-button:active{background-color:var(--warning-hover)}
 
-<!-- Container für die Detailansicht (anfangs versteckt) -->
-<div id="detailView" class="hidden">
-    <div class="detail-view-header">
-        <button id="backToMainViewBtn" title="Zurück zur Liste">
-            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M20,11V13H8L13.5,18.5L12.08,19.92L4.16,12L12.08,4.08L13.5,5.5L8,11H20Z" /></svg>
-        </button>
-        <h2>Sendungsdetails</h2>
-    </div>
-    <div id="detailViewContent">
-        <div id="currentShipmentDetails"></div>
-    </div>
-</div>
-
-<!-- Container für die Hauptansicht -->
-<div id="mainView">
-    <div class="container">
-        <div class="batch-controls">
-            <button id="menu-toggle-btn" title="Menü öffnen/schließen">☰</button>
-            <label for="batchModeToggle">Batch-Modus:</label>
-            <label class="batch-toggle-switch">
-                <input type="checkbox" id="batchModeToggle">
-                <span class="batch-slider"></span>
-            </label>
-            <span id="batchStatusDisplay"></span>
-        </div>
-
-        <div class="input-section">
-            <div>
-
-<!-- 1. Das neue form-Tag umschließt das Eingabefeld -->
-<form id="main-input-form" action="#">
-    <div class="input-wrapper">
-        <!-- 2. Das neue "enterkeyhint"-Attribut wurde hinzugefügt -->
-        <input type="text" id="shipmentNumberInput" placeholder="Scannen oder eingeben..." autocapitalize="characters" autocomplete="off" enterkeyhint="enter">
-        <button type="button" id="clearInputButton" class="clear-input-btn" title="Eingabe löschen">×</button>
-    </div>
-</form>
-            </div>
-            <div class="status-and-button-container">
-                <div class="status-select-wrapper">
-                    <label for="securityStatusSelect">Status:</label>
-                    <select id="securityStatusSelect">
-                        <option value="XRY">XRY</option><option value="ETD">ETD</option><option value="EDD">EDD</option>
-                        <option value="Wareneingang">Wareneingang</option>
-                        <option value="Dunkelalarm">Dunkelalarm</option><option value="Anstehend">Anstehend</option>
-                        <option value="NichtSichern">Nicht Erf.</option><option value="Abgelehnt">Abgelehnt</option>
-                    </select>
-                </div>
-                <button id="mainActionButton" class="main-action-button">Hinzufügen</button>
-            </div>
-            <div class="controls-row" id="controlsRow">
-                <div class="combo-checkbox-group" id="comboCheckboxContainer">
-                     <input type="checkbox" id="comboCheckbox"><label for="comboCheckbox" id="comboCheckboxLabel">Kombi-Sicherung</label>
-                </div>
-                <button type="button" id="noteToggleButton" class="note-toggle-btn" title="Notiz hinzufügen/bearbeiten (Einzelscan)">📝</button>
-            </div>
-<!-- NEU: form-Tag umschließt den gesamten Bereich -->
-<form id="note-input-form" action="#">
-    <div id="noteInputContainer" class="note-input-area">
-        <label for="noteInput">Notiz (für nächsten Einzelscan):</label>
-        <div class="input-wrapper">
-            <!-- NEU: enterkeyhint="done" hinzugefügt -->
-            <input type="text" id="noteInput" placeholder="Notiz eingeben..." list="noteSuggestions" enterkeyhint="done">
-            <button type="button" id="clearNoteButton" class="clear-input-btn clear-note-btn" title="Notiz löschen">×</button>
-            <datalist id="noteSuggestions">
-                <!-- ... option values ... -->
-            </datalist>
-        </div>
-    </div>
-</form>
-            <div id="newTotalSection">
-                <label for="newTotalInput" id="newTotalLabel">Erwartete Gesamtstückzahl für NEUE Sendung:</label>
-                <input type="number" id="newTotalInput" inputmode="numeric" placeholder="Zahl eingeben...">
-                <div>
-                    <button id="confirmNewTotalBtn" class="main-action-button">OK</button>
-                    <button id="skipNewTotalBtn" class="main-action-button">Überspringen (N/A)</button>
-                </div>
-            </div>
-        </div>
-        <div id="errorDisplay" class="error"></div>
-        <div class="batch-area" id="batchArea">
-            <h3>Aktueller Batch (<span id="batchModeStatusLabel"></span>)</h3>
-            <div id="currentBatchNoteDisplay" style="font-style:italic;margin-bottom:5px;font-size:.9em"></div>
-            <ul id="batchList"></ul>
-            <div id="batchSummary">Anzahl im Batch: <span id="batchItemCount">0</span></div>
-            <div class="batch-note-toggle-container" style="display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 10px; font-size: 0.9em;">
-                <label for="batchNoteToggle" style="margin-bottom: 0; font-weight: normal;">Notiz-Popup aktivieren:</label>
-                <label class="batch-toggle-switch">
-                    <input type="checkbox" id="batchNoteToggle">
-                    <span class="batch-slider"></span>
-                </label>
-            </div>
-            <div class="batch-sound-toggle-container">
-                <label for="unexpectedHuSoundToggle" title="Ton abspielen, wenn eine HU auf keiner Liste steht">🔊 Überzählig-Ton</label>
-                <label class="batch-toggle-switch">
-                    <input type="checkbox" id="unexpectedHuSoundToggle" checked>
-                    <span class="batch-slider"></span>
-                </label>
-            </div>
-            <div class="batch-sound-toggle-container">
-                <label for="batchFeedbackToggle" title="Scan-Feedback-Popup im Batch-Modus anzeigen">💬 Scan-Feedback-Popup</label>
-                <label class="batch-toggle-switch">
-                    <input type="checkbox" id="batchFeedbackToggle">
-                    <span class="batch-slider"></span>
-                </label>
-            </div>
-            <div class="batch-action-buttons">
-                <button id="saveBatchButton">Batch Speichern</button>
-                <button id="clearBatchButton">Batch Leeren</button>
-            </div>
-        </div>
-        <div id="currentShipmentDetails">Geben Sie eine Sendungsnummer ein...</div>
-
-        <table>
-            <thead>
-                <tr><th>HAWB.</th><th>Übersicht</th><th>Letzte Änd.</th><th>Aktionen</th></tr>
-            </thead>
-            <tbody id="shipmentTableBody"></tbody>
-        </table>
-    </div>
-</div> <!-- ENDE von #mainView -->
+    #currentShipmentDetails li .editable-note{cursor:pointer;text-decoration-style:dotted;color:#007bff;margin-left:5px;font-size:.9em;font-style:italic}
+    #currentShipmentDetails li .add-note-link{cursor:pointer;color:#007bff;font-size:.9em;text-decoration:none;padding-left:10px;font-style:italic}
+    #currentShipmentDetails li .editable-note:hover,#currentShipmentDetails li .add-note-link:hover{color:#0056b3;text-decoration:underline;text-decoration-style:solid}
+    /* Die Regel ::before wird nicht mehr benötigt und kann gelöscht werden */
 
 
-<!-- =============================================================== -->
-<!-- 2. ALLE MODALS UND OVERLAYS (jetzt als direkte Body-Kinder)   -->
-<!-- =============================================================== -->
+    #currentShipmentDetails li .note-display{display:inline;padding-left:0;margin-top:0;font-style:italic;color:#448}
+    #currentShipmentDetails li .note-prefix{display:inline;font-size:.9em;color:#448;margin-top:3px;padding-left:10px;font-style:italic}
+ 
 
-<div id="side-menu" class="side-menu">
-    <h3>Optionen</h3>
-    <ul class="side-menu-list">
-        <li><a href="#" id="importHuListButton" class="menu-action-item action-warning"><svg viewBox="0 0 24 24"><path d="M9,16V10H5L12,3L19,10H15V16H9M5,20V18H19V20H5Z" /></svg><span>HU-Liste importieren</span></a></li>
-        <li><a href="#" id="showOpenHusButton" class="menu-action-item"><svg viewBox="0 0 24 24"><path d="M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z" /></svg><span>Offene HUs anzeigen</span></a></li>
-        <li><a href="#" id="sendToSheetButton" class="menu-action-item action-primary"><svg viewBox="0 0 24 24"><path d="M17,13L12,18L7,13H10V9H14V13M19.35,10.03C18.67,6.59 15.64,4 12,4C9.11,4 6.6,5.64 5.35,8.03C2.34,8.36 0,10.9 0,14A6,6 0 0,0 6,20H19A5,5 0 0,0 24,15C24,12.36 21.95,10.22 19.35,10.03Z" /></svg><span>An Google Sheet Senden</span></a></li>
-        <li><a href="#" id="sendSummaryEmailButton" class="menu-action-item action-warning"><svg viewBox="0 0 24 24"><path d="M20,8L12,13L4,8V6L12,11L20,6M20,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V6C22,4.89 21.1,4 20,4Z" /></svg><span>Zusammenfassung per E-Mail</span></a></li>
-        <li><a href="#" id="resetDataButton" class="menu-action-item action-reset"><svg viewBox="0 0 24 24"><path d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" /></svg><span>Alles Zurücksetzen</span></a></li>
-    </ul>
-    <div id="sheetStatus"></div>
-</div>
-<div id="menu-overlay" class="menu-overlay"></div>
+    #currentShipmentDetails .summary{margin-top:10px;border-top:1px solid #ccc;padding-top:8px;font-weight:bold} #currentShipmentDetails .summary span{display:block;margin-bottom:3px} /* --- DURCH DIESEN BLOCK ERSETZEN --- */
+.summary .ok, .summary-cell .ok {color:green} 
+.summary .mismatch, .summary-cell .mismatch {color:orange} 
+.summary .over, .summary-cell .over {color:red;font-weight:bold}
+    table{width:100%;border-collapse:collapse;margin-top:20px} thead{display:none} tr{display:block;margin-bottom:15px;border:1px solid var(--border-color);border-radius:8px;padding:12px;background-color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.1)} td{display:block;text-align:right;border:none;border-bottom:1px dotted #eee;padding:8px 0;position:relative;padding-left:40%;min-height:24px;font-size:.95em} td:last-child{border-bottom:none} td::before{content:attr(data-label);position:absolute;left:0;width:38%;padding-right:10px;white-space:nowrap;text-align:left;font-weight:bold;color:#555} td.summary-cell span,td.summary-cell strong{display:block} td.actions-cell{text-align:center;padding-left:0;padding-top:10px}
+    td.actions-cell button.edit-btn{background-color:#6c757d} td.actions-cell button.edit-btn:hover{background-color:#5a6268} body.batch-mode-active td.actions-cell button.edit-btn{display:none}
+    td.actions-cell button{background-color:var(--secondary-color);color:white;border:none;padding:8px 10px;border-radius:5px;cursor:pointer;font-size:.9em;margin:3px;transition:background-color .2s;min-width:70px} td.actions-cell button:hover,td.actions-cell button:active{background-color:var(--secondary-hover)}
+    
+   
+    .modal-content{background-color:#fefefe;margin:auto;padding:20px;border:1px solid #888;border-radius:8px;width:90%;max-width:450px;box-shadow:0 4px 8px rgba(0,0,0,.2);position:relative}
+    .modal-content h3{margin-top:0;text-align:center}
+    .modal-content .form-group{margin-bottom:15px}
+    .modal-content label{display:block;margin-bottom:5px;font-weight:bold}
+    .modal-content input[type="number"],.modal-content input[type="text"]{font-size:1em}
+    .modal-content input[readonly]{background-color:#eee;cursor:not-allowed}
+    .modal-actions{display:flex;justify-content:space-between;margin-top:20px;gap:10px}
+    .modal-actions button{padding:10px 15px;border-radius:5px;border:none;cursor:pointer;font-size:1em;flex-grow:1}
+    #saveEditButton{background-color:var(--primary-color);color:white}
+    #cancelEditButton{background-color:#aaa;color:white}
+    #confirmBatchNoteButton{background-color:var(--primary-color)}
+    #skipBatchNoteButton{background-color:var(--secondary-color)}
+    .side-menu{position:fixed;top:0;left:0;width:280px;max-width:80%;height:100vh;background-color:#fff;box-shadow:2px 0 5px rgba(0,0,0,.2);transform:translateX(-100%);transition:transform .3s ease-in-out;z-index:1010;padding:20px;box-sizing:border-box;display:flex;flex-direction:column;overflow-y:auto}
+    .side-menu.open{transform:translateX(0)}
+    .side-menu h3{margin-top:0;margin-bottom:25px;text-align:center;color:var(--text-color)}
+    .side-menu #sendToSheetButton{background-color:var(--info-color);width:100%;margin-top:15px}
+    .side-menu #sendToSheetButton:hover{background-color:var(--info-hover)}
+    .side-menu #sheetStatus{margin-top:10px;margin-bottom:15px;min-height:1.2em;font-weight:bold;text-align:center}
+    .side-menu #resetDataButton{margin-top:10px;width:100%}
+    .side-menu #sendSummaryEmailButton{margin-top:10px;width:100%;background-color:var(--warning-color)}
+    .side-menu #sendSummaryEmailButton:hover{background-color:var(--warning-hover)}
+    .menu-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background-color:rgba(0,0,0,.5);opacity:0;visibility:hidden;transition:opacity .3s ease-in-out,visibility .3s ease-in-out;z-index:1000}
+    .menu-overlay.visible{opacity:1;visibility:visible}
+    .status-and-button-container {
+    display: flex;
+    align-items: flex-end; /* Richtet Select und Button an ihrer Unterkante aus */
+    gap: 15px; /* Konsistenter Abstand, wie in .input-section */
+}
 
-<div id="openHusModal" class="modal-overlay">
-    <div class="modal-content">
-        <div class="modal-tabs">
-            <button id="showOpenSecurityHusBtn" class="modal-tab-btn active">Offene Sicherung</button>
-            <button id="showMissingReceiptHusBtn" class="modal-tab-btn">Fehlende Eingänge<span id="missingReceiptsBadge" class="tab-badge hidden"></span></button>
-            <button id="showDunkelalarmHusBtn" class="modal-tab-btn">Dunkelalarm<span id="dunkelalarmBadge" class="tab-badge hidden"></span></button>
-            <!-- ===== NEUER TAB-BUTTON ===== -->
-            <button id="showUeberzaehligHusBtn" class="modal-tab-btn">Überzählig<span id="ueberzaehligBadge" class="tab-badge hidden"></span></button>
-        </div>
-        <div id="openHusListContainer" style="max-height: 60vh; overflow-y: auto; padding-right: 10px;"></div>
-        <div id="missingReceiptHusListContainer" style="max-height: 60vh; overflow-y: auto; padding-right: 10px; display: none;"></div>
-        <div id="dunkelalarmHusListContainer" style="max-height: 60vh; overflow-y: auto; padding-right: 10px; display: none;"></div>
-        <!-- ===== NEUER INHALTS-CONTAINER ===== -->
-        <div id="ueberzaehligHusListContainer" style="max-height: 60vh; overflow-y: auto; padding-right: 10px; display: none;"></div>
-        <div class="modal-actions" style="justify-content: center; margin-top: 20px;"><button id="closeOpenHusModalButton" class="main-action-button" style="width: 50%;">Schließen</button></div>
-    </div>
-</div>
-<div id="batchScanFeedbackModal" class="modal-overlay">
-    <div class="modal-content">
-        <h3>Batch Scan Feedback</h3>
-        <button id="closeBatchScanFeedbackModalButton" class="close-modal-icon-btn" title="Schließen"><svg viewBox="0 0 24 24"><path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" /></svg></button>
-        <div id="feedbackScanNumber" class="feedback-scan-number"></div><div id="feedbackCarrier" class="feedback-carrier"></div>
-        <div class="modal-actions" style="display: none;"></div> 
-    </div>
-</div>
-<div id="huDetailsModal" class="modal-overlay">
-    <div class="modal-content">
-        <button class="close-modal-icon-btn" data-close-modal="huDetailsModal" title="Schließen"><svg viewBox="0 0 24 24"><path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" /></svg></button>
-        <div id="huDetailsContent"><dl><dt>Nummer:</dt><dd id="huDetailsNumber"></dd><dt>Verpackung:</dt><dd id="huDetailsPackaging"></dd><dt>Dimensionen:</dt><dd id="huDetailsDimensions"></dd><dt>Bruttogewicht:</dt><dd id="huDetailsWeight"></dd></dl></div>
-        <div class="modal-actions" style="justify-content: center;"></div>
-    </div>
-</div>
-<div id="importHuModal" class="modal-overlay">
-    <div class="modal-content">
-        <h3>HU-Liste Importieren</h3>
-        <div class="form-group"><label for="mainOrderNumberInput">Auftragsnummer (z.B. 9007769889):</label><div style="display: flex; align-items: center; gap: 10px;"><input type="text" id="mainOrderNumberInput" placeholder="Übergeordnete Auftragsnummer eingeben" inputmode="none" style="flex-grow: 1;"><button type="button" id="addAndContinueHuButton" title="Speichern und nächste Liste eingeben" class="main-action-button" style="width: 44px; height: 44px; padding: 0; font-size: 2em; flex-shrink: 0; line-height: 44px;">+</button></div></div>
-        <div class="form-group"><label for="huListTextarea">HU Nummern (eine pro Zeile):</label><textarea id="huListTextarea" rows="8" style="width: 100%; font-family: monospace; font-size: 1em; padding: 8px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box;" placeholder="HU Nummern hier einfügen..." inputmode="none"></textarea></div>
-        <div class="modal-actions"><button id="saveHuListButton">Importieren & Speichern</button><button id="cancelHuImportButton">Abbrechen</button></div>
-    </div>
-</div>
-<div id="editModal" class="modal-overlay">
-    <div class="modal-content">
-        <h3>Sendung Bearbeiten</h3><input type="hidden" id="editShipmentBaseNumber"><div class="form-group"><label for="editShipmentNumberDisplay">Sendungsnummer:</label><input type="text" id="editShipmentNumberDisplay" readonly></div>
-        <div class="form-group"><label for="editGoodsReceiptCount">Manuelle Anzahl Wareneingang:</label><input type="number" id="editGoodsReceiptCount" inputmode="numeric" placeholder="Leer lassen, um Scans zu nutzen"></div>
-        <div class="form-group"><label for="editTotalPiecesExpected">Erwartete Gesamtstückzahl:</label><input type="number" id="editTotalPiecesExpected" inputmode="numeric" placeholder="Zahl oder leer"></div>
-        <div class="modal-actions"><button id="saveEditButton">Speichern</button><button id="cancelEditButton">Abbrechen</button></div>
-    </div>
-</div>
-<div id="batchNoteModal" class="modal-overlay">
-    <div class="modal-content">
-        <h3>Batch-Notiz Festlegen</h3><div class="form-group"><label for="batchNoteInput">Notiz für alle Scans in diesem Batch (optional):</label><input type="text" id="batchNoteInput" placeholder="Notiz eingeben..." list="noteSuggestions"></div>
-        <div class="modal-actions"><button id="confirmBatchNoteButton" class="main-action-button">Übernehmen & Scannen</button><button id="skipBatchNoteButton" class="main-action-button" style="background-color:var(--secondary-color)">Ohne Notiz Scannen</button></div>
-    </div>
-</div>
-<!-- in der Datei index.html -->
-<div id="noteEditModal" class="modal-overlay">
-    <form id="note-edit-form" action="#" class="modal-content">
-        <div id="noteEditContext" style="font-size: 0.9em; color: #555; margin-bottom: 15px; text-align: center;"></div>
-        <input type="hidden" id="noteEditBaseNumber"><input type="hidden" id="noteEditTimestamp"><input type="hidden" id="noteEditNoteIndex">
-        <div class="form-group">
-            <label for="noteEditTextarea">Notiz:</label>
-            <textarea id="noteEditTextarea" rows="5" placeholder="Notiz hier eingeben..." style="width: 100%; font-size: 1em; padding: 8px; border-radius: 5px; border: 1px solid #ccc; box-sizing: border-box;" enterkeyhint="done"></textarea>
-        </div>
-        <div class="modal-actions">
-            <!-- Dieser Button löst das 'submit'-Ereignis aus -->
-            <button type="submit" id="saveNoteEditButton" class="main-action-button">Speichern</button>
-            
-            <!-- DIESER BUTTON IST JETZT NUR NOCH EIN KLICK-BUTTON -->
-            <button type="button" id="cancelNoteEditButton" class="main-action-button" style="background-color: #aaa;">Abbrechen</button>
-        </div>
-    </form>
-</div>
+.status-select-wrapper {
+    flex-grow: 1; /* Erlaubt dem Select-Wrapper (mit Label), den verfügbaren Platz einzunehmen */
+}
 
-<!-- =============================================================== -->
-<!-- 3. SKRIPTE UND ANDERE BODY-ELEMENTE (am Ende)                 -->
-<!-- =============================================================== -->
+/* Überschreibt die Breite für mainActionButton, wenn er im neuen Container ist */
+/* --- START DER ÄNDERUNG --- */
 
-<script src="script.js"></script>
-<audio id="errorSound" src="assets/error-sound.mp3" preload="auto"></audio>
-<audio id="nachlieferungSound" src="assets/nachlieferung-sound.mp3" preload="auto"></audio>
-<div id="loadingOverlay" class="loading-overlay">
-    <div class="spinner"></div>
-</div>
+/* Überschreibt die Breite und Höhe für mainActionButton, wenn er im neuen Container ist */
+.status-and-button-container > #mainActionButton {
+    width: auto; /* Behält die automatische Breitenanpassung bei */
+    flex-shrink: 0; /* Verhindert, dass der Button schrumpft */
+    height: 44px; /* Angleichen an die Höhe des Select-Feldes (war 48px) */
+    padding-top: 10px; /* Vertikales Padding anpassen (war 12px) */
+    padding-bottom: 10px; /* Vertikales Padding anpassen (war 12px) */
+    /* padding-left und padding-right (15px) bleiben unverändert von .main-action-button */
+    line-height: normal; /* Stellt sicher, dass line-height die Zentrierung nicht stört, falls es woanders gesetzt wurde */
+    /* Die Schriftgröße (font-size: 1.1em) wird von .main-action-button geerbt */
+}
+    /* --- START: NEUE STILE FÜR MEHRERE NOTIZEN --- */
+    #currentShipmentDetails .notes-container {
+        margin-top: 5px;
+        padding-left: 15px; /* Einrückung für den gesamten Notiz-Block */
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+    }
+    #currentShipmentDetails .note-item {
+        display: flex;
+        align-items: center;
+        gap: 8px; /* Abstand zwischen Notiztext und Löschen-Button */
+    }
+#currentShipmentDetails .note-item .note-prefix {
+    font-weight: bold;
+    color: #555;
+    margin-right: 4px; /* Kleiner Abstand zum Notiztext */
+}
+    #currentShipmentDetails .note-item .editable-note {
+        flex-grow: 1; /* Notiztext nimmt verfügbaren Platz ein */
+    }
+    #currentShipmentDetails .note-item .delete-note-btn {
+        background-color: #e7e7e7;
+        color: #888;
+        border: 1px solid #ccc;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        font-size: 12px;
+        line-height: 18px;
+        text-align: center;
+        cursor: pointer;
+        padding: 0;
+        flex-shrink: 0;
+        transition: all 0.2s;
+    }
+    #currentShipmentDetails .note-item .delete-note-btn:hover {
+        background-color: var(--danger-color);
+        color: white;
+        border-color: var(--danger-hover);
+    }
+    /* --- ENDE: NEUE STILE FÜR MEHRERE NOTIZEN --- */
+/* --- ENDE DER ÄNDERUNG --- */
+#newTotalSection.warning-existing {
+    background-color: #f2dede; /* Heller Rotton */
+    border-color: #ebccd1;
+    border-style: solid;
+    border-width: 1px;
+}
+#newTotalSection.warning-existing label {
+    color: #a94442; /* Dunkelroter Text */
+    font-weight: bold;
+}
 
-</body>
-</html>
+
+    #pendingHuList.partial {
+        border-color: orange; /* Orange für "teilweise bearbeitet" */
+    }
+    #pendingHuList h4 {
+        margin-top: 0;
+        margin-bottom: 8px;
+        font-size: 1em;
+        color: #333;
+    }
+    #pendingHuList ul {
+        list-style-type: none;
+        padding: 0;
+        margin: 0;
+        max-height: 120px; /* Limitiert die Höhe und macht die Liste scrollbar */
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 0.95em;
+    }
+    #pendingHuList li {
+        padding: 2px 4px;
+        border-bottom: 1px dotted #ccc;
+    }
+    #pendingHuList li:last-child {
+        border-bottom: none;
+    }
+    /* --- ENDE: NEUE STILE FÜR OFFENE HU-LISTE --- */
+/* IN DER DATEI DSV_LFS.html, INNERHALB DES <style>-TAGS */
+
+/* --- START: NEUE STILE FÜR OFFENE HU-ZUSAMMENFASSUNG --- */
+#openHusListContainer .hu-order-group {
+    margin-bottom: 15px;
+    border-left: 3px solid var(--info-color);
+    padding-left: 10px;
+}
+#openHusListContainer .hu-order-title {
+    font-size: 1.1em;
+    font-weight: bold;
+    color: var(--text-color);
+    border-bottom: 1px solid #eee;
+    padding-bottom: 5px;
+    margin-bottom: 8px;
+}
+#openHusListContainer .hu-list {
+    list-style-type: none;
+    padding-left: 5px;
+    font-family: monospace;
+}
+#openHusListContainer .hu-list li {
+    padding: 3px 0;
+}
+#openHusListContainer .no-open-hus-message {
+    text-align: center;
+    padding: 20px 0;
+    font-style: italic;
+    color: #555;
+}
+/* --- ENDE: NEUE STILE --- */
+/* IN DER DATEI DSV_LFS.html, INNERHALB DES <style>-TAGS */
+
+/* --- START: NEUES DESIGN FÜR SEITENMENÜ --- */
+.side-menu .side-menu-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 15px 0; /* Abstand nach unten zur Statusmeldung */
+    display: flex;
+    flex-direction: column;
+    gap: 8px; /* Abstand zwischen den Menüpunkten */
+}
+
+.side-menu .menu-action-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 15px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 500; /* Etwas dickere Schrift */
+    color: #333;
+    background-color: transparent;
+    border: 1px solid transparent; /* Platzhalter für den Hover-Effekt */
+    transition: all 0.2s ease-in-out;
+    cursor: pointer;
+}
+
+.side-menu .menu-action-item:hover {
+    background-color: #f4f4f4;
+    border-color: #e0e0e0;
+}
+
+/* Stil für die Icons */
+.side-menu .menu-action-item svg {
+    width: 22px;
+    height: 22px;
+    margin-right: 15px;
+    flex-shrink: 0; /* Verhindert, dass das Icon schrumpft */
+    fill: currentColor; /* Icon nimmt die Textfarbe an */
+}
+
+/* Spezielle Hover-Effekte für bestimmte Aktionen */
+
+/* Primäre Aktion: Senden */
+.side-menu .menu-action-item.action-primary:hover {
+    background-color: #eef8ff;
+    color: var(--secondary-hover);
+    border-color: var(--secondary-color);
+}
+
+/* Wichtige Aktion: Zusammenfassung, Import */
+.side-menu .menu-action-item.action-warning:hover {
+    background-color: #fffaf0;
+    color: var(--warning-hover);
+    border-color: var(--warning-color);
+}
+
+/* Destruktive Aktion: Zurücksetzen */
+.side-menu .menu-action-item.action-reset {
+    /* Kein spezieller Grundzustand, nur der Hover ist anders */
+}
+.side-menu .menu-action-item.action-reset:hover {
+    background-color: #fdeeee; /* Heller Rotton (Tippfehler korrigiert) */
+    color: var(--danger-color);
+    border-color: var(--danger-hover);
+}
+
+/* Die alten Button-Stile im Menü werden nicht mehr gebraucht */
+.side-menu .main-action-button {
+    display: none; /* Versteckt die alten Buttons, falls sie noch da sind */
+}
+
+/* Besserer Stil für die Statusmeldung */
+.side-menu #sheetStatus {
+    margin-top: 10px;
+    padding: 10px;
+    border-radius: 5px;
+    background-color: #f8f9fa;
+    min-height: 1.2em;
+    font-weight: bold;
+    text-align: center;
+    border: 1px solid #eee;
+}
+/* --- ENDE: NEUES DESIGN FÜR SEITENMENÜ --- */
+/* --- START: NEUE STILE FÜR MODAL-TABS --- */
+.modal-tabs {
+    display: flex;
+    margin-bottom: 15px;
+    border-bottom: 2px solid #eee;
+    
+    /* NEU: Horizontales Scrollen aktivieren, wenn der Inhalt überläuft */
+    overflow-x: auto;
+    /* NEU: Verhindert, dass die Buttons in die nächste Zeile umbrechen */
+    flex-wrap: nowrap;
+
+    /* Optional: Verbessert das Scroll-Gefühl auf iOS */
+    -webkit-overflow-scrolling: touch;
+
+    /* Optional: Gestaltet die Scrollleiste unauffälliger */
+    scrollbar-width: thin;
+    scrollbar-color: #ccc transparent;
+}
+.modal-tab-btn {
+    /* ÄNDERUNG: 'flex: 1;' wird entfernt, damit die Buttons nicht mehr gezwungen werden, den Platz auszufüllen */
+    
+    padding: 10px 15px; /* Etwas mehr seitliches Padding für besseres Aussehen */
+    font-size: 0.95em;
+    font-weight: 500;
+    text-align: center;
+    border: none;
+    background-color: transparent;
+    color: #555;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s ease-in-out;
+
+    /* NEU: Verhindert, dass die Buttons schrumpfen */
+    flex-shrink: 0;
+    /* NEU: Stellt sicher, dass der Text im Button nicht umbricht */
+    white-space: nowrap;
+}
+.modal-tabs::-webkit-scrollbar {
+    height: 4px; /* Höhe der Scrollleiste */
+}
+.modal-tabs::-webkit-scrollbar-thumb {
+    background-color: #ccc; /* Farbe des Scroll-Balkens */
+    border-radius: 4px;
+}
+modal-tabs::-webkit-scrollbar-track
+.modal-tab-btn:hover {
+    background-color: #f9f9f9;
+    color: var(--primary-color);
+}
+.modal-tab-btn.active {
+    color: var(--primary-color);
+    font-weight: bold;
+    border-bottom-color: var(--primary-color);
+}
+/* --- ENDE: NEUE STILE FÜR MODAL-TABS --- */
+/* --- START: NEUE STILE FÜR VOLLBILD-MODAL --- */
+
+/* Diese Klasse wird per JavaScript zum <body> hinzugefügt, wenn ein Modal offen ist */
+body.modal-open {
+    overflow: hidden; /* Verhindert das Scrollen des Hintergrunds */
+}
+
+/* Passt das Aussehen des Modal-Inhalts an, um den Bildschirm auszufüllen */
+.modal-content {
+    width: 100%;
+    height: 100%;
+    max-width: 100%; /* Überschreibt die alte Breitenbegrenzung */
+    margin: 0;
+    border: none;
+    border-radius: 0; /* Entfernt abgerundete Ecken für den Vollbild-Look */
+    box-shadow: none;
+    
+    /* Flexbox-Layout, um Header, Inhalt und Footer besser zu steuern */
+    display: flex;
+    flex-direction: column;
+    padding: 15px; /* Etwas Padding für den Inhalt */
+    box-sizing: border-box;
+}
+
+/* Sorgt dafür, dass der scrollbare Bereich im Modal den verfügbaren Platz einnimmt */
+#openHusListContainer, 
+#missingReceiptHusListContainer,
+#editModal .form-group,
+#importHuModal .form-group:nth-of-type(2) /* Zielt auf den Container der Textarea */ {
+    flex-grow: 1; /* Dieser Bereich dehnt sich aus */
+    overflow-y: auto; /* Nur dieser Bereich wird scrollbar, nicht das ganze Modal */
+    min-height: 0; /* Wichtiger Fix für Flexbox-Scrolling */
+}
+
+/* Stellt sicher, dass die Textarea im Import-Modal den ganzen Platz ausfüllt */
+#huListTextarea {
+    flex-grow: 1;
+    height: 100%;
+}
+
+/* Die Aktions-Buttons am Ende sollen nicht mitwachsen */
+.modal-actions {
+    flex-shrink: 0;
+    margin-top: 15px;
+}
+/* --- ENDE: NEUE STILE FÜR VOLLBILD-MODAL --- */
+/* --- NEU: Styling für perfekt ausgerichtete Listen im Modal --- */
+#openHusListContainer .hu-list li,
+#missingReceiptHusListContainer .hu-list li,
+#dunkelalarmHusListContainer .hu-list li {
+    display: flex;
+    align-items: flex-start; /* Stellt sicher, dass die Zeilen oben beginnen */
+    padding: 3px 0; /* Etwas mehr vertikaler Abstand */
+}
+
+/* --- Styling für perfekt ausgerichtete Listen --- */
+/* Gilt für Modal UND Detailansicht */
+#openHusListContainer .hu-list li,
+#missingReceiptHusListContainer .hu-list li,
+#dunkelalarmHusListContainer .hu-list li,
+#pendingHuList .hu-list li {
+    display: flex;
+    align-items: flex-start;
+    padding: 3px 0;
+}
+
+/* Basis-Styling für die Positionsnummer */
+#openHusListContainer .hu-list .position-number,
+#missingReceiptHusListContainer .hu-list .position-number,
+#dunkelalarmHusListContainer .hu-list .position-number,
+#pendingHuList .hu-list .position-number {
+    min-width: 2.5em;
+    text-align: right;
+    padding-right: 0.75em; /* Standard-Abstand */
+    flex-shrink: 0;
+    color: #888;
+}
+
+/* --- HIER IST DIE SPEZIFISCHE ÜBERSCHREIBUNG --- */
+/* Diese Regel erhöht den Abstand NUR für die pendingHuList in der Detailansicht */
+#pendingHuList .hu-list .position-number {
+    padding-right: 1.5em; /* Größerer Abstand */
+}
+.batch-sound-toggle-container {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+    margin-top: 15px; /* Etwas Abstand nach oben */
+    font-size: 0.9em;
+}
+.batch-sound-toggle-container label {
+    margin-bottom: 0;
+    font-weight: normal;
+    cursor: pointer;
+}
+/* --- NEU: Layout für zweizeilige Scan-Einträge --- */
+#currentShipmentDetails li {
+    display: flex;
+    flex-wrap: wrap; /* Erlaubt den Zeilenumbruch */
+    align-items: center;
+    position: relative;
+    padding-right: 70px; /* Platz für den Storno-Button */
+}
+
+#currentShipmentDetails .scan-main-info {
+    flex-grow: 1; /* Nimmt den verfügbaren Platz in der ersten Zeile ein */
+    white-space: nowrap; /* Verhindert Zeilenumbruch innerhalb dieser Zeile */
+    overflow: hidden;
+    text-overflow: ellipsis; /* ... falls es doch zu lang wird */
+}
+
+#currentShipmentDetails .scan-actions-and-notes {
+    flex-basis: 100%; /* Erzwingt, dass dieser Block immer eine neue Zeile beginnt */
+    padding-left: 1.5em; /* Kleine Einrückung für die Notizen */
+    padding-top: 4px; /* Etwas Abstand nach oben */
+}
+/* INNERHALB des <style> Tags */
+
+.hu-value.has-dunkelalarm {
+    color: red;
+    font-weight: bold;
+}
+.sendnr-display {
+    color: #666;
+    font-size: 0.9em;
+    font-style: italic;
+    margin-left: 8px;
+}
+
+/* --- NEU: Styling für die tabellarische Pending-Liste --- */
+.pending-list-header {
+    display: flex;
+    justify-content: space-between;
+    font-weight: bold;
+    color: #333;
+    font-size: 0.9em;
+    padding: 4px 8px;
+    border-bottom: 2px solid #ccc;
+    margin-bottom: 4px;
+}
+.pending-list-header span:first-child {
+    flex-basis: 55%;
+    text-align: left;
+}
+.pending-list-header span:last-child {
+    flex-basis: 45%;
+    text-align: left;
+}
+
+#pendingHuList .hu-list li {
+    display: flex;
+    align-items: center; /* Vertikal zentrieren */
+}
+
+.pending-item-details {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.pending-item-details .pending-vse {
+    flex-basis: 55%;
+    text-align: left;
+    font-weight: bold;
+}
+
+.pending-item-details .pending-sendnr {
+    flex-basis: 45%;
+    text-align: left;
+    color: #555;
+    font-style: italic;
+    font-size: 0.95em;
+}
+/* --- NEU: Styling für VVL-Anzeige im "Offene HUs"-Modal --- */
+
+/* Titel-Formatierung für VVL */
+.hu-order-group .hu-order-title small {
+    font-weight: normal;
+    font-size: 0.9em;
+    color: #555;
+}
+
+/* Kopfzeile für die VVL-Tabelle */
+.hu-list-header {
+    display: flex;
+    font-weight: bold;
+    font-size: 0.9em;
+    padding: 5px 0 5px 5px;
+    border-bottom: 2px solid #ddd;
+    margin-bottom: 5px;
+    color: #333;
+}
+.hu-list-header span:first-child {
+    flex: 2; /* VSE-Spalte bekommt mehr Platz */
+}
+.hu-list-header span:last-child {
+    flex: 1; /* Sendnr-Spalte bekommt weniger Platz */
+}
+
+/* Styling für die Zeilen in der VVL-Tabelle */
+.hu-list.vvl-list li {
+    padding: 4px 0 4px 5px;
+    border-bottom: 1px dotted #eee;
+}
+.hu-list.vvl-list li:last-child {
+    border-bottom: none;
+}
+
+.vvl-item-row {
+    display: flex;
+    width: 100%;
+}
+.vvl-item-row .vvl-vse {
+    flex: 2; /* VSE-Spalte */
+    font-family: monospace;
+    font-weight: bold;
+}
+.vvl-item-row .vvl-sendnr {
+    flex: 1; /* Sendnr-Spalte */
+    font-family: monospace;
+    color: #666;
+    font-size: 0.95em;
+}
+/* --- NEU & OPTIMIERT: Einheitliches Tabellen-Layout für offene Positionen --- */
+
+/* Gemeinsamer Stil für die Kopfzeile in der Detailansicht und im Modal */
+.pending-list-header,
+.hu-list-header {
+    display: flex;
+    font-weight: bold;
+    color: #333;
+    font-size: 0.9em;
+    padding: 4px 8px;
+    border-bottom: 2px solid #ccc;
+    margin-bottom: 4px;
+}
+.pending-list-header span:first-child,
+.hu-list-header span:first-child {
+    flex-basis: 55%;
+    text-align: left;
+}
+.pending-list-header span:last-child,
+.hu-list-header span:last-child {
+    flex-basis: 45%;
+    text-align: left;
+}
+
+/* Gemeinsamer Stil für Listeneinträge */
+#pendingHuList .hu-list li,
+.hu-order-group .hu-list.vvl-list li {
+    padding: 4px 8px;
+    border-bottom: 1px dotted #eee;
+}
+.hu-order-group .hu-list.vvl-list li:last-child {
+    border-bottom: none;
+}
+
+
+/* Gemeinsamer Stil für die zweispaltige Zeile */
+.pending-item-details,
+.vvl-item-row {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+}
+
+/* Gemeinsamer Stil für die VSE-Spalte */
+.pending-item-details .pending-vse,
+.vvl-item-row .vvl-vse {
+    flex-basis: 55%;
+    text-align: left;
+    font-family: monospace;
+    font-weight: bold;
+}
+
+/* Gemeinsamer Stil für die Sendnr-Spalte */
+.pending-item-details .pending-sendnr,
+.vvl-item-row .vvl-sendnr {
+    flex-basis: 45%;
+    text-align: left;
+    font-family: monospace;
+    color: #555;
+    font-style: italic;
+    font-size: 0.95em;
+}
+/* --- START DER ÄNDERUNG: Batch Scan Feedback Modal --- */
+
+/* --- START DER ÄNDERUNG: Batch Scan Feedback Modal Stile --- */
+/* --- START DER ÄNDERUNG: Batch Scan Feedback Modal Stile --- */
+#batchScanFeedbackModal .modal-content {
+    background-color: black;
+    padding: 20px;
+    box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+}
+
+#batchScanFeedbackModal .modal-content.unexpected {
+    box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+}
+
+#batchScanFeedbackModal h3 {
+    color: black;
+    margin-bottom: 20px;
+}
+/* --- START DER ÄNDERUNG: Close-Button Icon Stil --- */
+.close-modal-icon-btn {
+    position: absolute; /* Absolut positioniert innerhalb des .modal-content */
+    top: 15px; /* Abstand vom oberen Rand */
+    right: 15px; /* Abstand vom rechten Rand */
+    background: none; /* Kein Hintergrund */
+    border: none; /* Kein Rahmen */
+    color: #bbb; /* Standardfarbe des Icons */
+    cursor: pointer;
+    font-size: 1.8em; /* Größe des Icons */
+    padding: 0;
+    width: 30px; /* Breite für Click-Bereich */
+    height: 30px; /* Höhe für Click-Bereich */
+    display: flex; /* Flexbox für Zentrierung des SVG */
+    justify-content: center;
+    align-items: center;
+    transition: color 0.2s, transform 0.2s; /* Übergang für Hover-Effekt */
+    z-index: 10; /* Sicherstellen, dass es über anderen Inhalten liegt */
+}
+
+.close-modal-icon-btn:hover {
+    color: white; /* Weißer auf Schwarz bei Hover */
+    transform: scale(1.1); /* Leicht vergrößern bei Hover */
+}
+
+.close-modal-icon-btn svg {
+    fill: currentColor; /* SVG-Farbe folgt der Textfarbe des Buttons */
+    width: 24px; /* Größe des SVG-Icons */
+    height: 24px;
+}
+/* --- ENDE DER ÄNDERUNG: Close-Button Icon Stil --- */
+
+/* Optional: Titel des Modals leicht anpassen, damit er nicht mit dem X-Icon kollidiert */
+#batchScanFeedbackModal h3 {
+    padding-right: 40px; /* Platz für das X-Icon schaffen */
+    text-align: center;
+}
+/* --- START DER ÄNDERUNG: Batch Scan Feedback Modal Stile (Font Sizing Vorbereitung) --- */
+#batchScanFeedbackModal .modal-content {
+    background-color: black;
+    padding: 20px;
+    box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+}
+
+#batchScanFeedbackModal .modal-content.unexpected {
+    box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+}
+
+
+
+/* --- START DER ÄNDERUNG: feedbackScanNumber responsive Schriftgröße --- */
+#feedbackScanNumber {
+    /* Vorherige Eigenschaften beibehalten: */
+    font-weight: bold;
+    text-align: center;
+    word-break: break-all; /* Wichtig, damit lange Nummern umbrechen, falls nötig */
+    color: lime;
+    background-color: black;
+    padding: 10px 0px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    min-width: 80%;
+
+    /* NEU: Responsive Schriftgröße */
+    /* clamp(minimale Größe, responsive Größe (vw), maximale Größe) */
+    /* Hier: min. 1.8em, skaliert mit 8vw (8% der Viewport-Breite), max. 3.5em */
+    font-size: clamp(2.5em, 8vw, 3.5em);
+    
+    /* NEU: Flexbox verwenden, um den Text zu zentrieren und bei Bedarf zu schrumpfen */
+    display: flex; /* Macht das Element zu einem Flex-Container */
+    justify-content: center; /* Zentriert horizontal */
+    align-items: center; /* Zentriert vertikal */
+    line-height: 1.2; /* Etwas kleinerer Zeilenabstand */
+}
+
+/* Anpassung für unerwartete Scans, falls noch nicht erfolgt */
+#feedbackScanNumber.unexpected {
+    color: red;
+}
+/* --- ENDE DER ÄNDERUNG: feedbackScanNumber responsive Schriftgröße --- */
+
+/* --- START DER ÄNDERUNG: feedbackCarrier linksbündig --- */
+#feedbackCarrier {
+    font-size: 1.0em;
+    color: #ccc;
+    text-align: left; /* GEÄNDERT */
+    word-break: break-all;
+    font-style: italic;
+    margin-top: 5px;
+    width: 100%; /* Sicherstellen, dass es die volle Breite einnimmt, um linksbündig zu wirken */
+    padding-left: 20px; /* Optional: Leichte Einrückung von links, passend zum Padding des Modals */
+    padding-right: 20px; /* Optional: Auch rechts ein Padding für Symmetrie, wenn breiter */
+    box-sizing: border-box; /* Sicherstellen, dass Padding in der Breite enthalten ist */
+}
+/* --- ENDE DER ÄNDERUNG: feedbackCarrier linksbündig --- */
+/* --- ENDE DER ÄNDERUNG: Batch Scan Feedback Modal --- */
+/* --- NEU: Styling für Positionen mit Dunkelalarm in der "Offene HUs"-Ansicht --- */
+.hu-value.has-dunkelalarm,
+.pending-vse.has-dunkelalarm {
+    color: var(--danger-color);
+    font-weight: bold;
+}
+/* --- NEU: Styling für die VVL-Anzeige in der Haupttabelle --- */
+.vvl-table-entry {
+    font-size: 0.9em;
+    line-height: 1.4;
+}
+.vvl-table-entry .vvl-prefix,
+.vvl-table-entry .kundennr-prefix {
+    font-weight: normal;
+    color: #666;
+}
+/* --- NEU: Styling für die Trennlinie in der "Übersicht"-Spalte --- */
+.summary-cell {
+    padding-top: 12px; /* Etwas mehr Platz oben */
+    padding-bottom: 12px; /* Etwas mehr Platz unten */
+}
+.summary-divider {
+    width: 100%; /* Volle Breite der Zelle */
+    height: 1px; /* Dicke der Linie */
+    background-color: #e0e0e0; /* Farbe der Linie */
+    margin: 8px 0; /* Vertikaler Abstand oben und unten */
+}
+
+/* --- NEU: Styling für Tab-Notification-Badges (Vorschlag 1) --- */
+.modal-tab-btn {
+    position: relative; /* Wichtig für die Positionierung des Badges */
+    padding-right: 25px; /* Etwas mehr Platz für den Badge */
+}
+
+.tab-badge {
+    position: absolute;
+    top: 50%;
+    right: 8px;
+    transform: translateY(-50%);
+    background-color: var(--danger-color);
+    color: white;
+    font-size: 0.75em; /* Kleinere Schrift */
+    font-weight: bold;
+    padding: 2px 6px;
+    border-radius: 10px; /* Macht es zu einer Pille */
+    min-width: 10px; /* Sorgt dafür, dass auch eine '1' gut aussieht */
+    text-align: center;
+    line-height: 1.2;
+    transition: transform 0.2s ease-in-out;
+}
+
+/* Versteckt den Badge, wenn er leer ist */
+.tab-badge.hidden {
+    transform: translateY(-50%) scale(0); /* Schöner Ausblend-Effekt */
+    opacity: 0;
+}
+/* ===== NEUE STILE FÜR DEN LADE-SPINNER ===== */
+
+/* Das Overlay, das den gesamten Bildschirm abdeckt */
+.loading-overlay {
+    position: fixed; /* Bleibt an Ort und Stelle, auch beim Scrollen */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0.7); /* Leicht durchsichtiger weißer Hintergrund */
+    display: flex; /* Zentriert den Spinner */
+    justify-content: center;
+    align-items: center;
+    z-index: 9999; /* Stellt sicher, dass es über allem anderen liegt */
+    
+    /* Standardmäßig unsichtbar */
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 0.3s, visibility 0.3s;
+}
+
+/* Sichtbarer Zustand für das Overlay */
+.loading-overlay.visible {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Der eigentliche Spinner (das sich drehende Rad) */
+.spinner {
+    width: 60px;
+    height: 60px;
+    border: 8px solid #f3f3f3; /* Der hellgraue Kreis */
+    border-top: 8px solid #3498db; /* Die blaue Farbe, die sich dreht */
+    border-radius: 50%;
+    animation: spin 1s linear infinite; /* Die Dreh-Animation */
+}
+
+/* Die Keyframe-Animation für die Drehung */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+/* ===== ENDE DER NEUEN SPINNER-STILE ===== */
+/* ===== ENDE DER NEUEN SPINNER-STILE ===== */
+
+/* --- START: NEUE STILE FÜR HU-DETAIL-MODAL --- */
+/* NEU: Diese Regel überschreibt die Zentrierung NUR für das HU-Detail-Modal */
+#huDetailsModal {
+    align-items: flex-start; /* Richtet das Modal oben aus statt in der Mitte */
+    padding-top: 20px;       /* Fügt einen kleinen Abstand zum oberen Bildschirmrand hinzu */
+}
+
+#huDetailsModal .modal-content {
+    max-width: 400px; /* Eine passende Breite für das kleine Info-Modal */
+    width: 90%;
+    height: auto; /* Höhe passt sich dem Inhalt an */
+    max-height: 80vh;
+    border-radius: 8px; /* Ecken wieder abrunden */
+}
+
+#huDetailsContent dl {
+    margin: 10px 0;
+    padding: 0;
+}
+
+#huDetailsContent dt {
+    font-weight: bold;
+    color: #555;
+    margin-top: 12px;
+    font-size: 0.9em;
+}
+
+#huDetailsContent dd {
+    margin-left: 0;
+    padding: 4px 8px;
+    background-color: #f4f4f4;
+    border-radius: 4px;
+    border: 1px solid #eee;
+    font-family: monospace;
+    font-size: 1.05em;
+    word-break: break-all;
+}
+/* --- ENDE: NEUE STILE FÜR HU-DETAIL-MODAL --- */
+/* ===== START DER ÄNDERUNG: Stile für die neue Detailansicht ===== */
+
+/* Versteckt die Hauptansicht, wenn die Detailansicht aktiv ist */
+#mainView.hidden {
+    display: none;
+}
+
+/* Container für die Detailansicht */
+.detail-view-container {
+    display: none; /* Standardmäßig versteckt */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #f4f4f4; /* Gleicher Hintergrund wie body */
+    z-index: 100; /* Liegt über dem normalen Inhalt, aber unter Modals */
+    flex-direction: column;
+}
+
+.detail-view-container.visible {
+    display: flex; /* Sichtbar machen */
+}
+
+
+
+.detail-view-header h2 {
+    margin: 0;
+    font-size: 1.2em;
+    text-align: center;
+    flex-grow: 1; /* Nimmt den restlichen Platz ein */
+}
+
+/* Zurück-Button */
+.detail-view-header .back-button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 5px;
+    margin-right: 10px;
+}
+
+.detail-view-header .back-button svg {
+    width: 28px;
+    height: 28px;
+    fill: var(--text-color);
+}
+
+/* Scrollbarer Inhaltsbereich */
+.detail-view-content {
+    flex-grow: 1; /* Füllt den restlichen Platz aus */
+    overflow-y: auto; /* Macht den Inhalt scrollbar */
+    padding: 10px;
+}
+
+/* Wir "stehlen" das Styling von #currentShipmentDetails für unsere neue Ansicht */
+.detail-view-content #currentShipmentDetails {
+    margin-top: 0; /* Kein extra Abstand oben */
+}
+/* ===== ENDE DER ÄNDERUNG ===== */
+/* Fügen Sie dies am Ende Ihrer styles.css Datei hinzu */
+
+/* =============================================================== */
+/* NEU: Stile für die Master-Detail-Ansicht                        */
+/* =============================================================== */
+
+/* =============================================================== */
+/* KORREKTE STILE FÜR ANSICHTEN & MODALS                           */
+/* =============================================================== */
+
+/* Versteckt ein Element zuverlässig */
+.hidden {
+    display: none !important;
+}
+
+/* Container für die Detailansicht */
+#detailView {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #f4f4f4;
+    z-index: 100; /* Liegt UNTER den Modals */
+    overflow-y: auto;
+    padding: 10px;
+    box-sizing: border-box;
+}
+
+/* Das Overlay für ALLE Modals */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    z-index: 9000; /* Extrem hoher Wert, um über allem zu liegen */
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,.5);
+    justify-content: center;
+    align-items: center;
+}
+.modal-overlay.visible {
+    display: flex;
+}
+
+.detail-view-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0px;
+    position: sticky; /* Hält den Header beim Scrollen oben */
+    top: 0;
+    background-color: #f4f4f4;
+    padding-top: 10px;
+    padding-bottom: 5px;
+    z-index: 101;
+}
+
+#backToMainViewBtn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 5px;
+    margin-right: 10px;
+}
+
+#backToMainViewBtn svg {
+    width: 32px;
+    height: 32px;
+    fill: #333;
+    transition: transform 0.2s;
+}
+#backToMainViewBtn:hover svg {
+    transform: scale(1.1);
+}
+
+.detail-view-header h2 {
+    margin: 0;
+    font-size: 1.4em;
+}
+
+/* Passt die Detailanzeige in der Detailansicht an */
+#detailViewContent #currentShipmentDetails {
+    margin-top: 0;
+    border-style: solid; /* Macht den Rahmen durchgezogen statt gestrichelt */
+}
+/* ===== NEU: Styling für klickbaren Titel zum Kopieren ===== */
+#currentShipmentDetails #shipmentDetailTitle:hover {
+    color: var(--primary-color); /* Hebt den Text farblich hervor */
+    text-decoration: underline;  /* Unterstreicht den Text beim Überfahren mit der Maus */
+    text-decoration-style: dotted;
+}
+/* ===== NEU: Styling für "Kopiert!"-Meldung bei HU-Nummern ===== */
+
+/* Positioniert das Pseudo-Element relativ zur HU-Nummer */
+#currentShipmentDetails .hu-value {
+    position: relative; 
+    transition: color 0.2s;
+}
+#currentShipmentDetails .hu-value:hover {
+    color: var(--primary-color);
+}
+
+/* Das Pseudo-Element, das als "Kopiert!"-Meldung dient */
+#currentShipmentDetails .hu-value.copied::after {
+    content: 'Kopiert!';
+    position: absolute;
+    top: 50%;
+    left: 105%; /* Positioniert es rechts neben der Nummer */
+    transform: translateY(-50%);
+    background-color: var(--primary-color);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    font-weight: bold;
+    white-space: nowrap;
+    opacity: 0;
+    
+    /* Hier wird die Animation zugewiesen */
+    animation: fade-in-out 1.5s ease-in-out;
+}
+
+/* Die Keyframe-Animation für das Ein- und Ausblenden */
+@keyframes fade-in-out {
+    0% {
+        opacity: 0;
+        transform: translateY(-50%) scale(0.8);
+    }
+    20% {
+        opacity: 1;
+        transform: translateY(-50%) scale(1);
+    }
+    80% {
+        opacity: 1;
+        transform: translateY(-50%) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-50%) scale(0.8);
+    }
+}
+
+.suspicion-details {
+    text-align: center;
+    font-size: 1.1em;
+    line-height: 1.6;
+}
+.suspicion-details p {
+    margin: 5px 0;
+}
+.suspicion-details code {
+    font-family: monospace;
+    font-size: 1.2em;
+    padding: 3px 6px;
+    background-color: #eee;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+}
+.suspicion-details hr {
+    border: none;
+    border-top: 1px dashed #ccc;
+    margin: 15px 0;
+}
+.suspicion-question {
+    font-weight: bold;
+    color: var(--secondary-hover);
+}
+/* --- START DER ÄNDERUNG --- */
+
+/* Macht die HU-Nummer im Detail-Modal klickbar und fügt visuelles Feedback hinzu */
+#huDetailsContent #huDetailsNumber {
+    cursor: pointer;
+    position: relative; /* Wichtig für die "Kopiert!"-Meldung */
+    transition: background-color 0.2s;
+}
+
+#huDetailsContent #huDetailsNumber:hover {
+    background-color: #e9e9e9; /* Leichter Hover-Effekt */
+}
+
+/* Stil für die "Kopiert!"-Meldung (verwendet die existierende Animation) */
+#huDetailsContent #huDetailsNumber.copied::after {
+    content: 'Kopiert!';
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    transform: translateY(-50%);
+    background-color: var(--primary-color);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    font-weight: bold;
+    white-space: nowrap;
+    opacity: 0;
+    animation: fade-in-out 1.5s ease-in-out;
+}
+
+/* --- ENDE DER ÄNDERUNG --- */
+/* ===== NEU: STIL FÜR BLINKENDE ZEICHEN BEI HU-VERDACHTSFÄLLEN ===== */
+
+/* Die Keyframe-Animation, die das Blinken erzeugt */
+@keyframes blink {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.2; /* Ein sanfteres Blinken statt komplett unsichtbar */
+    }
+}
+
+/* Die Klasse, die auf das abweichende Zeichen angewendet wird */
+.blinking-char {
+    font-weight: bold;
+    color: var(--danger-color); /* Rot, um den Fehler hervorzuheben */
+    background-color: #fff0f0;  /* Ein sehr leichter roter Hintergrund */
+    border-radius: 3px;
+    padding: 0 2px;
+    
+    /* Zuweisung der Animation */
+    animation-name: blink;
+    animation-duration: 1.5s; /* Dauer eines Blink-Zyklus */
+    animation-iteration-count: infinite; /* Endloses Blinken */
+}
