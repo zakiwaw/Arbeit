@@ -2102,12 +2102,35 @@ function showBatchScanFeedback(scanNumber, isExpected, carrierInfo = null) {
     }, 100);
 }
 // --- ENDE DER ÄNDERUNG: showBatchScanFeedback Funktion angepasst (Land in neue Zeile) ---
+// =========================================================================
+// ERSETZE DEINE KOMPLETTE `addToBatch` FUNKTION MIT DIESER VERSION
+// =========================================================================
 function addToBatch() {
     const rawInputFromField = shipmentNumberInputEl.value.trim();
-    if (!rawInputFromField) { focusShipmentInput(); return; }
+    if (!rawInputFromField) {
+        focusShipmentInput();
+        return;
+    }
+
+    // --- NEU: Logik, um einen offenen Verdachtsfall durch einen neuen Scan abzubrechen ---
+    // Wenn ein neues Item gescannt wird, während das Modal offen ist, wird der alte Fall
+    // als "Nein" (nicht korrigieren) behandelt und das Item zur Liste hinzugefügt.
+    if (suspicionModalEl.classList.contains('visible') && suspicionContext) {
+        const itemToAddAsIs = {
+            rawInput: suspicionContext.scannedHu, // Das ursprünglich verdächtige Item
+            scanTimestamp: new Date().toISOString(),
+            note: currentBatchGlobalNote
+        };
+        currentBatch.unshift(itemToAddAsIs);
+        updateBatchUI();
+        closeSuspicionModal(); // Schließt das Modal und löscht den alten Kontext
+    }
 
     const upperRawInput = rawInputFromField.toUpperCase();
-    const { isValidFormat, raw: processedRawInput } = processShipmentNumber(upperRawInput);
+    const {
+        isValidFormat,
+        raw: processedRawInput
+    } = processShipmentNumber(upperRawInput);
     if (!isValidFormat) {
         displayError(`Ungültiges Format für Batch-Eingabe: ${escapeHtml(rawInputFromField)}`);
         focusShipmentInput();
@@ -2115,47 +2138,66 @@ function addToBatch() {
     }
 
     const scanTimestamp = new Date().toISOString();
+    const isCurrentHuExpected = isHuExpected(processedRawInput);
 
-    // --- START DER AKTUALISIERTEN SOUND-LOGIK ---
-    if (unexpectedHuSoundToggleEl && unexpectedHuSoundToggleEl.checked) {
-        const isCurrentHuExpected = isHuExpected(processedRawInput);
-        const parentHawb = findShipmentByHuNumber(processedRawInput);
-        const isNachlieferungHu = parentHawb && parentHawb.toUpperCase() === 'NACHLIEFERUNG';
+    // --- NEU: Sound- und Verdachtslogik für unerwartete HUs ---
+    if (!isCurrentHuExpected) {
+        // Schritt 1: Sound wird IMMER bei einer unerwarteten HU abgespielt.
+        if (unexpectedHuSoundToggleEl && unexpectedHuSoundToggleEl.checked) {
+            const parentHawb = findShipmentByHuNumber(processedRawInput);
+            const isNachlieferungHu = parentHawb && parentHawb.toUpperCase() === 'NACHLIEFERUNG';
+            if (isNachlieferungHu) {
+                playNachlieferungSound();
+            } else {
+                playShortErrorSound();
+            }
+        }
 
-        // Fall 1: HU gehört zu einer Nachlieferung -> spiele den Nachlieferung-Sound
-        if (isNachlieferungHu) {
-            playNachlieferungSound();
-        } 
-        // Fall 2: HU ist unerwartet (und keine Nachlieferung) -> spiele den Fehler-Sound
-        else if (!isCurrentHuExpected) {
-            playShortErrorSound();
+        // Schritt 2: DANACH wird auf Ähnlichkeit für einen möglichen Tippfehler geprüft.
+        const similarHu = findSimilarExpectedHu(processedRawInput);
+        if (similarHu) {
+            // Ein Verdacht wurde gefunden!
+            // Zeige das Modal an und unterbrich die Funktion hier.
+            // Das Item wird erst später durch eine Aktion im Modal hinzugefügt.
+            showSuspicionModal(processedRawInput, similarHu);
+            shipmentNumberInputEl.value = '';
+            updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
+            return; // WICHTIG: Stoppt die weitere Ausführung.
         }
     }
-    // --- ENDE DER AKTUALISIERTEN SOUND-LOGIK ---
 
+    // Dieser Code wird nur erreicht, wenn die HU erwartet war ODER wenn sie
+    // unerwartet war, aber KEIN Verdacht auf einen Tippfehler bestand.
+
+    // Bestehende Logik für das Feedback-Popup
     if (batchFeedbackToggleEl && batchFeedbackToggleEl.checked) {
         const carrier = findCarrierForHu(processedRawInput);
-        const isExpectedForPopup = isHuExpected(processedRawInput);
-        showBatchScanFeedback(processedRawInput, isExpectedForPopup, carrier);
+        showBatchScanFeedback(processedRawInput, isCurrentHuExpected, carrier);
     }
 
+    // Bestehende Logik für die Batch-Notiz beim ersten Scan
     if (isBatchModeActive && currentBatch.length === 0 && isBatchNotePromptRequired && batchNoteToggleEl.checked) {
-        pendingFirstBatchScanData = { rawInput: processedRawInput, scanTimestamp: scanTimestamp };
-        batchNoteInputEl.value = currentBatchGlobalNote || ''; 
+        pendingFirstBatchScanData = {
+            rawInput: processedRawInput,
+            scanTimestamp: scanTimestamp
+        };
+        batchNoteInputEl.value = currentBatchGlobalNote || '';
         batchNoteModalEl.classList.add('visible');
         document.body.classList.add('modal-open');
         batchNoteInputEl.focus();
         return;
     }
 
+    // Standard-Aktion: Item zur Batch-Liste hinzufügen
     const batchItem = {
         rawInput: processedRawInput,
         scanTimestamp: scanTimestamp,
-        note: currentBatchGlobalNote 
+        note: currentBatchGlobalNote
     };
-    
-    currentBatch.unshift(batchItem);
-    
+
+    currentBatch.unshift(batchItem); // Fügt das neue Item am Anfang der Liste hinzu
+
+    // UI aktualisieren und für den nächsten Scan vorbereiten
     updateBatchUI();
     shipmentNumberInputEl.value = '';
     updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
