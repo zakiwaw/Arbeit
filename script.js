@@ -389,6 +389,61 @@ function hideLoader() {
         loadingOverlayEl.classList.remove('visible');
     }
 }
+
+
+/**
+ * Sucht nach einer erwarteten HU, die einer unbekannten HU sehr ähnlich ist.
+ * @param {string} unknownHu Die gescannte, unbekannte HU.
+ * @returns {object|null} Das vollständige Item-Objekt der ähnlichen HU oder null.
+ */
+function findSimilarExpectedHu(unknownHu) {
+    const shipments = loadShipments();
+    for (const baseNumber in shipments) {
+        const shipment = shipments[baseNumber];
+        if (shipment.isHuListOrder && shipment.scannedItems) {
+            for (const item of shipment.scannedItems) {
+                // Nur "anstehende" HUs sind relevant für den Abgleich
+                if (item.status === 'Anstehend' && areStringsSimilar(unknownHu, item.rawInput)) {
+                    return item; // Gibt das gesamte Item-Objekt zurück
+                }
+            }
+        }
+    }
+    return null; // Keine Ähnlichkeit gefunden
+}
+
+/**
+ * Zeigt das Modal für den Tippfehler-Verdacht an.
+ * @param {string} scannedHu Die tatsächlich gescannte HU.
+ * @param {object} suspectedHuItem Das Item-Objekt der vermuteten korrekten HU.
+ */
+function showSuspicionModal(scannedHu, suspectedHuItem) {
+    suspicionContext = { scannedHu, suspectedHuItem }; // Kontext für die Button-Aktionen speichern
+
+    const diffHtml = highlightDifference(scannedHu, suspectedHuItem.rawInput);
+    suspicionScannedHuEl.innerHTML = diffHtml.html1;
+    suspicionExpectedHuEl.innerHTML = diffHtml.html2;
+
+    let question = "Unbekanntes Gewicht.";
+    if (suspectedHuItem.grossWeight) {
+        question = `Stimmt das Gewicht? (Erwartet: ${escapeHtml(suspectedHuItem.grossWeight)})`;
+    }
+    suspicionQuestionEl.textContent = question;
+
+    suspicionModalEl.classList.add('visible');
+    document.body.classList.add('modal-open');
+    suspicionConfirmBtnEl.focus(); // Fokus auf den "Ja"-Button legen
+}
+
+/** Schließt das Verdachts-Modal und setzt den Kontext zurück. */
+function closeSuspicionModal() {
+    if (suspicionModalEl.classList.contains('visible')) {
+        suspicionModalEl.classList.remove('visible');
+        document.body.classList.remove('modal-open');
+        suspicionContext = null;
+        focusShipmentInput();
+    }
+}
 // --- ENDE DER NEUEN HILFSFUNKTIONEN ---
 // =========================================================================
 // ERSETZEN SIE IHRE GESAMTE showOpenHusSummary FUNKTION MIT DIESER
