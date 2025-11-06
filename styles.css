@@ -1176,3 +1176,46 @@ body.modal-open {
     animation-duration: 1.5s; /* Dauer eines Blink-Zyklus */
     animation-iteration-count: infinite; /* Endloses Blinken */
 }
+/* ... am Ende der Datei styles.css ... */
+
+/* =============================================================== */
+/* NEU: STILE FÜR DAS TIPPFEHLER-VERDACHT-MODAL                    */
+/* =============================================================== */
+#suspicionModal .modal-content {
+    max-width: 400px; /* Eine passende, nicht zu große Breite */
+}
+#suspicionDetails {
+    text-align: center;
+    font-size: 1.1em;
+}
+#suspicionDetails p {
+    margin: 10px 0;
+}
+#suspicionDetails strong {
+    font-family: monospace;
+    font-size: 1.3em;
+    padding: 5px 8px;
+    background-color: #f0f0f0;
+    border-radius: 5px;
+    display: inline-block;
+    margin-top: 5px;
+    word-break: break-all;
+}
+#suspicionDetails hr {
+    border: none;
+    border-top: 1px solid #eee;
+    margin: 20px 0;
+}
+.suspicion-question {
+    font-weight: bold;
+    color: var(--secondary-color);
+}
+#suspicionConfirmBtn {
+    background-color: var(--primary-color);
+}
+#suspicionDenyBtn {
+    background-color: var(--warning-color);
+}
+#suspicionDenyBtn:hover {
+    background-color: var(--warning-hover);
+}
