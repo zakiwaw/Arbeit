@@ -97,6 +97,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const huDetailsPackagingEl = document.getElementById('huDetailsPackaging');
     const huDetailsDimensionsEl = document.getElementById('huDetailsDimensions');
     const huDetailsWeightEl = document.getElementById('huDetailsWeight');
+    const suspicionModalEl = document.getElementById('suspicionModal');
+    const suspicionScannedHuEl = document.getElementById('suspicionScannedHu');
+    const suspicionExpectedHuEl = document.getElementById('suspicionExpectedHu');
+    const suspicionQuestionEl = document.getElementById('suspicionQuestion');
+    const suspicionConfirmBtnEl = document.getElementById('suspicionConfirmBtn');
+    const suspicionDenyBtnEl = document.getElementById('suspicionDenyBtn');
 
 
     async function initializeApp() {
