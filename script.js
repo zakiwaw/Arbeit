@@ -3848,6 +3848,18 @@ showUeberzaehligHusBtnEl.addEventListener('click', () => {
             mainOrderNumberInputEl.focus();
         }
     });
+addAndContinueHuButtonEl.addEventListener('click', () => {
+        const result = saveAndProcessHuListData();
+        if (result.success) {
+            displayCurrentShipmentDetails(result.baseNumber);
+            if (result.message) {
+               displayError(result.message, result.messageType, 5000);
+            }
+            mainOrderNumberInputEl.value = '';
+            huListTextareaEl.value = '';
+            mainOrderNumberInputEl.focus();
+        }
+    });
 
 } // Ende der setupEventListeners Funktion
             // --- ENDE DER ÄNDERUNG: Event Listener für Batch Scan Feedback Toggle und Close Button ---
