@@ -347,6 +347,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentBatchGlobalNote = null;
     let isBatchNotePromptRequired = true;
     let pendingFirstBatchScanData = null;
+    let suspicionContext = null;
 
 
         // --- Hilfsfunktionen: Persistenz ---
