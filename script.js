@@ -97,12 +97,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const huDetailsPackagingEl = document.getElementById('huDetailsPackaging');
     const huDetailsDimensionsEl = document.getElementById('huDetailsDimensions');
     const huDetailsWeightEl = document.getElementById('huDetailsWeight');
-    const suspicionModalEl = document.getElementById('suspicionModal');
-    const suspicionScannedHuEl = document.getElementById('suspicionScannedHu');
-    const suspicionExpectedHuEl = document.getElementById('suspicionExpectedHu');
-    const suspicionQuestionEl = document.getElementById('suspicionQuestion');
-    const suspicionConfirmBtnEl = document.getElementById('suspicionConfirmBtn');
-    const suspicionDenyBtnEl = document.getElementById('suspicionDenyBtn');
 
 
     async function initializeApp() {
@@ -347,7 +341,6 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentBatchGlobalNote = null;
     let isBatchNotePromptRequired = true;
     let pendingFirstBatchScanData = null;
-    let suspicionContext = null;
 
 
         // --- Hilfsfunktionen: Persistenz ---
@@ -387,61 +380,6 @@ function showLoader() {
 function hideLoader() {
     if (loadingOverlayEl) {
         loadingOverlayEl.classList.remove('visible');
-    }
-}
-
-
-/**
- * Sucht nach einer erwarteten HU, die einer unbekannten HU sehr ähnlich ist.
- * @param {string} unknownHu Die gescannte, unbekannte HU.
- * @returns {object|null} Das vollständige Item-Objekt der ähnlichen HU oder null.
- */
-function findSimilarExpectedHu(unknownHu) {
-    const shipments = loadShipments();
-    for (const baseNumber in shipments) {
-        const shipment = shipments[baseNumber];
-        if (shipment.isHuListOrder && shipment.scannedItems) {
-            for (const item of shipment.scannedItems) {
-                // Nur "anstehende" HUs sind relevant für den Abgleich
-                if (item.status === 'Anstehend' && areStringsSimilar(unknownHu, item.rawInput)) {
-                    return item; // Gibt das gesamte Item-Objekt zurück
-                }
-            }
-        }
-    }
-    return null; // Keine Ähnlichkeit gefunden
-}
-
-/**
- * Zeigt das Modal für den Tippfehler-Verdacht an.
- * @param {string} scannedHu Die tatsächlich gescannte HU.
- * @param {object} suspectedHuItem Das Item-Objekt der vermuteten korrekten HU.
- */
-function showSuspicionModal(scannedHu, suspectedHuItem) {
-    suspicionContext = { scannedHu, suspectedHuItem }; // Kontext für die Button-Aktionen speichern
-
-    const diffHtml = highlightDifference(scannedHu, suspectedHuItem.rawInput);
-    suspicionScannedHuEl.innerHTML = diffHtml.html1;
-    suspicionExpectedHuEl.innerHTML = diffHtml.html2;
-
-    let question = "Unbekanntes Gewicht.";
-    if (suspectedHuItem.grossWeight) {
-        question = `Stimmt das Gewicht? (Erwartet: ${escapeHtml(suspectedHuItem.grossWeight)})`;
-    }
-    suspicionQuestionEl.textContent = question;
-
-    suspicionModalEl.classList.add('visible');
-    document.body.classList.add('modal-open');
-    suspicionConfirmBtnEl.focus(); // Fokus auf den "Ja"-Button legen
-}
-
-/** Schließt das Verdachts-Modal und setzt den Kontext zurück. */
-function closeSuspicionModal() {
-    if (suspicionModalEl.classList.contains('visible')) {
-        suspicionModalEl.classList.remove('visible');
-        document.body.classList.remove('modal-open');
-        suspicionContext = null;
-        focusShipmentInput();
     }
 }
 // --- ENDE DER NEUEN HILFSFUNKTIONEN ---
@@ -2102,35 +2040,12 @@ function showBatchScanFeedback(scanNumber, isExpected, carrierInfo = null) {
     }, 100);
 }
 // --- ENDE DER ÄNDERUNG: showBatchScanFeedback Funktion angepasst (Land in neue Zeile) ---
-// =========================================================================
-// ERSETZE DEINE KOMPLETTE `addToBatch` FUNKTION MIT DIESER VERSION
-// =========================================================================
 function addToBatch() {
     const rawInputFromField = shipmentNumberInputEl.value.trim();
-    if (!rawInputFromField) {
-        focusShipmentInput();
-        return;
-    }
-
-    // --- NEU: Logik, um einen offenen Verdachtsfall durch einen neuen Scan abzubrechen ---
-    // Wenn ein neues Item gescannt wird, während das Modal offen ist, wird der alte Fall
-    // als "Nein" (nicht korrigieren) behandelt und das Item zur Liste hinzugefügt.
-    if (suspicionModalEl.classList.contains('visible') && suspicionContext) {
-        const itemToAddAsIs = {
-            rawInput: suspicionContext.scannedHu, // Das ursprünglich verdächtige Item
-            scanTimestamp: new Date().toISOString(),
-            note: currentBatchGlobalNote
-        };
-        currentBatch.unshift(itemToAddAsIs);
-        updateBatchUI();
-        closeSuspicionModal(); // Schließt das Modal und löscht den alten Kontext
-    }
+    if (!rawInputFromField) { focusShipmentInput(); return; }
 
     const upperRawInput = rawInputFromField.toUpperCase();
-    const {
-        isValidFormat,
-        raw: processedRawInput
-    } = processShipmentNumber(upperRawInput);
+    const { isValidFormat, raw: processedRawInput } = processShipmentNumber(upperRawInput);
     if (!isValidFormat) {
         displayError(`Ungültiges Format für Batch-Eingabe: ${escapeHtml(rawInputFromField)}`);
         focusShipmentInput();
@@ -2138,66 +2053,47 @@ function addToBatch() {
     }
 
     const scanTimestamp = new Date().toISOString();
-    const isCurrentHuExpected = isHuExpected(processedRawInput);
 
-    // --- NEU: Sound- und Verdachtslogik für unerwartete HUs ---
-    if (!isCurrentHuExpected) {
-        // Schritt 1: Sound wird IMMER bei einer unerwarteten HU abgespielt.
-        if (unexpectedHuSoundToggleEl && unexpectedHuSoundToggleEl.checked) {
-            const parentHawb = findShipmentByHuNumber(processedRawInput);
-            const isNachlieferungHu = parentHawb && parentHawb.toUpperCase() === 'NACHLIEFERUNG';
-            if (isNachlieferungHu) {
-                playNachlieferungSound();
-            } else {
-                playShortErrorSound();
-            }
-        }
+    // --- START DER AKTUALISIERTEN SOUND-LOGIK ---
+    if (unexpectedHuSoundToggleEl && unexpectedHuSoundToggleEl.checked) {
+        const isCurrentHuExpected = isHuExpected(processedRawInput);
+        const parentHawb = findShipmentByHuNumber(processedRawInput);
+        const isNachlieferungHu = parentHawb && parentHawb.toUpperCase() === 'NACHLIEFERUNG';
 
-        // Schritt 2: DANACH wird auf Ähnlichkeit für einen möglichen Tippfehler geprüft.
-        const similarHu = findSimilarExpectedHu(processedRawInput);
-        if (similarHu) {
-            // Ein Verdacht wurde gefunden!
-            // Zeige das Modal an und unterbrich die Funktion hier.
-            // Das Item wird erst später durch eine Aktion im Modal hinzugefügt.
-            showSuspicionModal(processedRawInput, similarHu);
-            shipmentNumberInputEl.value = '';
-            updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
-            return; // WICHTIG: Stoppt die weitere Ausführung.
+        // Fall 1: HU gehört zu einer Nachlieferung -> spiele den Nachlieferung-Sound
+        if (isNachlieferungHu) {
+            playNachlieferungSound();
+        } 
+        // Fall 2: HU ist unerwartet (und keine Nachlieferung) -> spiele den Fehler-Sound
+        else if (!isCurrentHuExpected) {
+            playShortErrorSound();
         }
     }
+    // --- ENDE DER AKTUALISIERTEN SOUND-LOGIK ---
 
-    // Dieser Code wird nur erreicht, wenn die HU erwartet war ODER wenn sie
-    // unerwartet war, aber KEIN Verdacht auf einen Tippfehler bestand.
-
-    // Bestehende Logik für das Feedback-Popup
     if (batchFeedbackToggleEl && batchFeedbackToggleEl.checked) {
         const carrier = findCarrierForHu(processedRawInput);
-        showBatchScanFeedback(processedRawInput, isCurrentHuExpected, carrier);
+        const isExpectedForPopup = isHuExpected(processedRawInput);
+        showBatchScanFeedback(processedRawInput, isExpectedForPopup, carrier);
     }
 
-    // Bestehende Logik für die Batch-Notiz beim ersten Scan
     if (isBatchModeActive && currentBatch.length === 0 && isBatchNotePromptRequired && batchNoteToggleEl.checked) {
-        pendingFirstBatchScanData = {
-            rawInput: processedRawInput,
-            scanTimestamp: scanTimestamp
-        };
-        batchNoteInputEl.value = currentBatchGlobalNote || '';
+        pendingFirstBatchScanData = { rawInput: processedRawInput, scanTimestamp: scanTimestamp };
+        batchNoteInputEl.value = currentBatchGlobalNote || ''; 
         batchNoteModalEl.classList.add('visible');
         document.body.classList.add('modal-open');
         batchNoteInputEl.focus();
         return;
     }
 
-    // Standard-Aktion: Item zur Batch-Liste hinzufügen
     const batchItem = {
         rawInput: processedRawInput,
         scanTimestamp: scanTimestamp,
-        note: currentBatchGlobalNote
+        note: currentBatchGlobalNote 
     };
-
-    currentBatch.unshift(batchItem); // Fügt das neue Item am Anfang der Liste hinzu
-
-    // UI aktualisieren und für den nächsten Scan vorbereiten
+    
+    currentBatch.unshift(batchItem);
+    
     updateBatchUI();
     shipmentNumberInputEl.value = '';
     updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
@@ -3837,18 +3733,6 @@ showUeberzaehligHusBtnEl.addEventListener('click', () => {
     });
 
     addAndContinueHuButtonEl.addEventListener('click', () => {
-        const result = saveAndProcessHuListData();
-        if (result.success) {
-            displayCurrentShipmentDetails(result.baseNumber);
-            if (result.message) {
-               displayError(result.message, result.messageType, 5000);
-            }
-            mainOrderNumberInputEl.value = '';
-            huListTextareaEl.value = '';
-            mainOrderNumberInputEl.focus();
-        }
-    });
-addAndContinueHuButtonEl.addEventListener('click', () => {
         const result = saveAndProcessHuListData();
         if (result.success) {
             displayCurrentShipmentDetails(result.baseNumber);
