@@ -387,6 +387,10 @@ function hideLoader() {
 // ERSETZEN SIE IHRE GESAMTE showOpenHusSummary FUNKTION MIT DIESER
 // =========================================================================
 
+// =========================================================================
+// ERSETZEN SIE IHRE GESAMTE showOpenHusSummary FUNKTION MIT DIESER
+// =========================================================================
+
 function showOpenHusSummary() {
     removeActiveInlineNoteEditor();
     const shipments = loadShipments();
@@ -395,14 +399,15 @@ function showOpenHusSummary() {
         missingReceiptHusByOrder = [],
         dunkelalarmItemsByOrder = {},
         ueberzaehligItemsByOrder = {},
-        suspiciousPairs = []; // NEU: Array zum Sammeln der verdächtigen Paare
+        suspiciousPairs = [];
+
+    const processedUeberzaehligHus = new Set();
 
     // 1. Zuerst eine Liste aller erwarteten HUs aus allen HU-Listen-Aufträgen erstellen
     const expectedHuSet = new Set();
     Object.values(shipments).forEach(shipment => {
         if (shipment.isHuListOrder && shipment.scannedItems) {
             shipment.scannedItems.forEach(item => {
-                // Nur die "Basis"-Items zur erwarteten Liste hinzufügen, nicht die späteren Scans
                 if (item.status === 'Anstehend' || securityClearanceStatuses.includes(item.status)) {
                    expectedHuSet.add(item.rawInput.toUpperCase());
                 }
@@ -429,33 +434,36 @@ function showOpenHusSummary() {
         // ERWEITERTE LOGIK FÜR ÜBERZÄHLIGE SCANS
         if (shipment.scannedItems && shipment.scannedItems.length > 0) {
             const allUeberzaehligItems = shipment.scannedItems.filter(item =>
-                item.status !== 'Anstehend' && // Es muss ein echter Scan sein, kein Platzhalter
+                item.status !== 'Anstehend' &&
                 !item.isCancelled &&
-                !expectedHuSet.has(item.rawInput.toUpperCase()) // Die HU ist NICHT in der Liste der erwarteten HUs
+                !expectedHuSet.has(item.rawInput.toUpperCase())
             );
 
-            const normalUeberzaehligForThisOrder = []; // Temporäre Liste für "normale" überzählige
+            const normalUeberzaehligForThisOrder = [];
 
             allUeberzaehligItems.forEach(item => {
                 const surplusHu = item.rawInput.toUpperCase();
+                
+                if (processedUeberzaehligHus.has(surplusHu)) {
+                    return; 
+                }
+                processedUeberzaehligHus.add(surplusHu);
+                
                 let foundSimilar = false;
 
-                // Vergleiche jede überzählige HU mit JEDER erwarteten HU
                 for (const expectedHu of expectedHuSet) {
                     if (areStringsSimilar(surplusHu, expectedHu)) {
                         suspiciousPairs.push({ surplus: item, expected: expectedHu, orderNumber: baseNumber });
                         foundSimilar = true;
-                        break; // Ein Treffer reicht, nächste überzählige HU prüfen
+                        break;
                     }
                 }
 
-                // Wenn kein ähnlicher Treffer gefunden wurde, ist es eine "normale" überzählige HU
                 if (!foundSimilar) {
                     normalUeberzaehligForThisOrder.push(item);
                 }
             });
 
-            // Nur die "normalen" überzähligen HUs zur normalen Anzeige hinzufügen
             if (normalUeberzaehligForThisOrder.length > 0) {
                 if (!ueberzaehligItemsByOrder[baseNumber]) {
                     ueberzaehligItemsByOrder[baseNumber] = { items: [], ...shipment };
@@ -542,18 +550,16 @@ function showOpenHusSummary() {
         const isVvlList = sortedItems[0] && sortedItems[0].sendnr;
         if (isVvlList) {
             let html = '<div class="hu-list-header"><span>VSE-Nummer</span><span>Sendungs-Nr.</span></div>';
-// ...
-const listItems = sortedItems.map(item => {
-    const hasDunkelalarm = dunkelalarmedNumbers.has(item.rawInput);
-    const alarmClass = hasDunkelalarm ? 'has-dunkelalarm' : '';
-    return `
-    <li>
-        <div class="pending-item-details">
-            <span class="pending-vse hu-value ${alarmClass}" style="cursor:pointer;" title="Klicken zum Kopieren. Details für ${escapeHtml(item.rawInput)} anzeigen">${escapeHtml(item.rawInput)}</span>
-            <span class="pending-sendnr">${escapeHtml(item.sendnr)}</span>
-        </div>
-    </li>`;
-// ...
+            const listItems = sortedItems.map(item => {
+                const hasDunkelalarm = dunkelalarmedNumbers.has(item.rawInput);
+                const alarmClass = hasDunkelalarm ? 'has-dunkelalarm' : '';
+                return `
+                <li>
+                    <div class="pending-item-details">
+                        <span class="pending-vse hu-value ${alarmClass}" style="cursor:pointer;" title="Klicken zum Kopieren. Details für ${escapeHtml(item.rawInput)} anzeigen">${escapeHtml(item.rawInput)}</span>
+                        <span class="pending-sendnr">${escapeHtml(item.sendnr)}</span>
+                    </div>
+                </li>`;
             }).join('');
             return html + `<ul class="hu-list vvl-list">${listItems}</ul>`;
         } else {
@@ -604,13 +610,17 @@ const listItems = sortedItems.map(item => {
     dunkelalarmHusListContainerEl.innerHTML = dunkelalarmArray.map(data => generateHtmlForOrderGroup(data, generateHuListHtml(data.items, data.scannedItems), true)).join('') || '<p class="no-open-hus-message">Keine Einträge mit Status "Dunkelalarm" gefunden.</p>';
     
     // ERWEITERTE HTML-GENERIERUNG FÜR DEN "ÜBERZÄHLIG"-TAB
-    let ueberzaehligHtml = ueberzaehligArray.map(data => generateHtmlForOrderGroup(data, generateHuListHtml(data.items, data.scannedItems), true)).join('');
+    
+    // ===== ÄNDERUNG HIER =====
+    // Wir rufen nicht mehr `generateHtmlForOrderGroup` auf, sondern generieren direkt die Listen.
+    // Das entfernt die Titel (`hu-order-title`).
+    let ueberzaehligHtml = ueberzaehligArray.map(data => generateHuListHtml(data.items, data.scannedItems)).join('');
+    // ===== ENDE DER ÄNDERUNG =====
 
     console.log("Verdächtige Paare gefunden:", suspiciousPairs);
     if (suspiciousPairs.length > 0) {
         ueberzaehligHtml += `<h3 style="margin-top: 20px; color: var(--danger-color); border-top: 2px solid #eee; padding-top: 15px;">Mögliche Tippfehler (Verdachte):</h3>`;
         suspiciousPairs.forEach((pair, index) => {
-            // HIER WIRD DIE NEUE FUNKTION AUFGERUFEN
             const diffHtml = highlightDifference(pair.surplus.rawInput, pair.expected);
 
             ueberzaehligHtml += `
@@ -624,7 +634,7 @@ const listItems = sortedItems.map(item => {
             `;
         });
     }
-    // Setzt den finalen HTML-Code (inkl. Verdachtsfälle) oder die "Nichts gefunden"-Nachricht
+    
     ueberzaehligHusListContainerEl.innerHTML = ueberzaehligHtml || '<p class="no-open-hus-message">Keine überzähligen Scans gefunden.</p>';
 
     // 6. Initialen Zustand der Tabs setzen
