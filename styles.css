@@ -77,7 +77,19 @@
 .summary .over, .summary-cell .over {color:red;font-weight:bold}
     table{width:100%;border-collapse:collapse;margin-top:20px} thead{display:none} tr{display:block;margin-bottom:15px;border:1px solid var(--border-color);border-radius:8px;padding:12px;background-color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.1)} td{display:block;text-align:right;border:none;border-bottom:1px dotted #eee;padding:8px 0;position:relative;padding-left:40%;min-height:24px;font-size:.95em} td:last-child{border-bottom:none} td::before{content:attr(data-label);position:absolute;left:0;width:38%;padding-right:10px;white-space:nowrap;text-align:left;font-weight:bold;color:#555} td.summary-cell span,td.summary-cell strong{display:block} td.actions-cell{text-align:center;padding-left:0;padding-top:10px}
     td.actions-cell button.edit-btn{background-color:#6c757d} td.actions-cell button.edit-btn:hover{background-color:#5a6268} body.batch-mode-active td.actions-cell button.edit-btn{display:none}
-    td.actions-cell button{background-color:var(--secondary-color);color:white;border:none;padding:8px 10px;border-radius:5px;cursor:pointer;font-size:.9em;margin:3px;transition:background-color .2s;min-width:70px} td.actions-cell button:hover,td.actions-cell button:active{background-color:var(--secondary-hover)}
+    td.actions-cell button {
+        background-color: var(--secondary-color);
+        color: white;
+        border: none;
+        padding: 8px 10px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: .9em;
+        /* margin: 3px; <-- Diese Zeile wird entfernt */
+        transition: background-color .2s;
+        min-width: 70px;
+    }
+     td.actions-cell button:hover,td.actions-cell button:active{background-color:var(--secondary-hover)}
     
    
     .modal-content{background-color:#fefefe;margin:auto;padding:20px;border:1px solid #888;border-radius:8px;width:90%;max-width:450px;box-shadow:0 4px 8px rgba(0,0,0,.2);position:relative}
@@ -1145,7 +1157,74 @@ body.modal-open {
     font-weight: bold;
     color: var(--secondary-hover);
 }
-/* --- START DER ÄNDERUNG --- */
+
+/* =============================================================== */
+/* HIER DEN NEUEN CODE EINFÜGEN                                     */
+/* =============================================================== */
+/* ===== NEU: Stile für QR-Code in der Tabelle ===== */
+
+/* Die neue Spalte standardmäßig (auf Mobilgeräten) komplett ausblenden */
+th.qr-code-header,
+td.qr-code-cell {
+    display: none;
+}
+
+/* Der Container für den QR-Code, um ihn zu zentrieren */
+.qr-code-cell div {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 5px 0;
+}
+
+/* Media Query für "Desktop"-Ansichten (Bildschirme breiter als 992px) */
+@media (min-width: 992px) {
+    /* Ändert das Layout der Tabelle zurück zu einer klassischen Tabellenansicht */
+    thead {
+        display: table-header-group;
+    }
+    tbody tr {
+        display: table-row;
+        margin-bottom: 0;
+        border: none;
+        box-shadow: none;
+        border-bottom: 1px solid #ddd;
+    }
+    tbody tr:last-child {
+        border-bottom: none;
+    }
+    td {
+        display: table-cell;
+        text-align: left;
+        border-bottom: none;
+        padding: 8px;
+        position: static;
+        padding-left: 8px; /* Padding zurücksetzen */
+        vertical-align: middle;
+    }
+    /* Das "data-label" aus der mobilen Ansicht auf dem Desktop ausblenden */
+    td::before {
+        display: none;
+    }
+
+    /* Die QR-Code Spalte auf dem Desktop sichtbar machen und formatieren */
+    th.qr-code-header,
+    td.qr-code-cell {
+        display: table-cell;
+        width: 80px; /* Eine feste Breite für die Spalte */
+        vertical-align: middle;
+        text-align: center;
+        padding: 5px;
+    }
+    
+    .actions-cell {
+        width: 220px;
+        /* text-align: right; <-- Alte Eigenschaft wird ersetzt durch: */
+        display: flex; /* Macht die Zelle zu einem Flexbox-Container */
+        justify-content: flex-end; /* Richtet die Buttons rechts aus */
+        align-items: center; /* Zentriert die Buttons vertikal in der Zelle */
+        gap: 6px; /* Fügt einen sauberen Abstand von 6px zwischen den Buttons hinzu */
+    }
 
 /* Macht die HU-Nummer im Detail-Modal klickbar und fügt visuelles Feedback hinzu */
 #huDetailsContent #huDetailsNumber {
