@@ -127,9 +127,9 @@
         </div>
         <div id="currentShipmentDetails">Geben Sie eine Sendungsnummer ein...</div>
 
-        <table>
+       <table>
             <thead>
-                <tr><th>HAWB.</th><th>Übersicht</th><th>Letzte Änd.</th><th>Aktionen</th></tr>
+                <tr><th>HAWB.</th><th>Übersicht</th><th>Letzte Änd.</th><th>Aktionen</th><th class="qr-code-header">QR-Code</th></tr>
             </thead>
             <tbody id="shipmentTableBody"></tbody>
         </table>
@@ -226,6 +226,7 @@
         </div>
     </form>
 </div>
+
 <div id="suspicionModal" class="modal-overlay">
     <div class="modal-content" style="max-width: 450px;">
         <h3>Korrekturvorschlag</h3>
@@ -246,7 +247,7 @@
     </div>
 </div>
 <!-- =============================================================== -->
-<!-- 3. SKRIPTE UND ANDERE BODY-ELEMENTE (am Ende)                 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <!-- =============================================================== -->
 
 <script src="script.js"></script>
