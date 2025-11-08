@@ -350,6 +350,9 @@ const suspicionDeclineBtnEl = document.getElementById('suspicionDeclineBtn');
     let currentBatchGlobalNote = null;
     let isBatchNotePromptRequired = true;
     let pendingFirstBatchScanData = null;
+    let suspicionQueue = []; // Speichert die Liste der Verdachtsfälle
+    let currentSuspicionIndex = 0; // Speichert, welcher Vorschlag gerade angezeigt wird
+    
 
 
         // --- Hilfsfunktionen: Persistenz ---
@@ -393,98 +396,119 @@ function hideLoader() {
 }
 // ERSETZEN SIE DIE ALTE FUNKTION MIT DIESER NEUEN VERSION
 
+// ERSETZEN SIE DIE ALTE findSimilarExpectedHu FUNKTION MIT DIESER NEUEN VERSION
+
 /**
- * Findet eine einzelne, sehr ähnliche HU und gibt gezielt den Eintrag
+ * Findet ALLE ähnlichen HUs in den Listen und gibt für jede den Eintrag
  * mit den Detaildaten (wie grossWeight) zurück.
  * @param {string} scannedHu Die gescannte, unerwartete HU.
- * @returns {object|null} Das gefundene, ähnliche HU-Item-Objekt mit allen Details oder null.
+ * @returns {Array<object>} Ein Array von HU-Item-Objekten mit allen Details oder ein leeres Array.
  */
-function findSimilarExpectedHu(scannedHu) {
+function findAllSimilarExpectedHus(scannedHu) {
     const shipments = loadShipments();
     const upperScannedHu = scannedHu.toUpperCase();
-    let correctHuNumber = null;
-    let parentShipmentForHu = null;
+    const similarItemsWithDetails = [];
+    const foundCorrectHuNumbers = new Set(); // Verhindert doppelte Vorschläge
 
-    // Schritt 1: Finde die korrekte HU-Nummer durch Ähnlichkeitssuche in allen HU-Listen.
+    // Schritt 1: Finde alle potenziell korrekten HU-Nummern durch Ähnlichkeitssuche.
     for (const baseNumber in shipments) {
         const shipment = shipments[baseNumber];
         if (shipment.isHuListOrder && shipment.scannedItems) {
-            // Finde den ersten ähnlichen Eintrag, um die korrekte HU-Nummer zu ermitteln.
-            const similarItem = shipment.scannedItems.find(item => 
-                areStringsSimilar(upperScannedHu, item.rawInput.toUpperCase())
-            );
-            if (similarItem) {
-                correctHuNumber = similarItem.rawInput;
-                parentShipmentForHu = shipment;
-                break; // Ähnlichkeit gefunden, Schleife über Sendungen abbrechen.
-            }
+            shipment.scannedItems.forEach(item => {
+                if (areStringsSimilar(upperScannedHu, item.rawInput.toUpperCase())) {
+                    if (!foundCorrectHuNumbers.has(item.rawInput.toUpperCase())) {
+                        foundCorrectHuNumbers.add(item.rawInput.toUpperCase());
+                    }
+                }
+            });
         }
     }
 
-    // Wenn keine Ähnlichkeit gefunden wurde, abbrechen.
-    if (!correctHuNumber || !parentShipmentForHu) {
-        return null;
+    // Wenn keine Ähnlichkeiten gefunden wurden, abbrechen.
+    if (foundCorrectHuNumbers.size === 0) {
+        return [];
     }
 
-    // Schritt 2: Jetzt, wo wir die korrekte HU-Nummer kennen, suchen wir in der zugehörigen Sendung
-    // gezielt nach dem Eintrag, der die Detaildaten (insbesondere grossWeight) enthält.
-    
-    // Finde alle Einträge, die zu dieser korrekten HU-Nummer gehören.
-    const allItemsForCorrectHu = parentShipmentForHu.scannedItems.filter(
-        item => item.rawInput.toUpperCase() === correctHuNumber.toUpperCase()
-    );
+    // Schritt 2: Für jede gefundene korrekte HU-Nummer, hole den "Master-Eintrag" mit den Details.
+    foundCorrectHuNumbers.forEach(correctHu => {
+        // Erneute Suche in allen Sendungen nach dem Master-Eintrag für diese HU
+        for (const baseNumber in shipments) {
+            const shipment = shipments[baseNumber];
+            if (shipment.isHuListOrder && shipment.scannedItems) {
+                 const allItemsForThisHu = shipment.scannedItems.filter(
+                    i => i.rawInput.toUpperCase() === correctHu
+                );
 
-    // Bevorzuge den Eintrag, der explizit die 'grossWeight'-Eigenschaft hat.
-    const itemWithDetails = allItemsForCorrectHu.find(item => item.hasOwnProperty('grossWeight') && item.grossWeight);
+                const itemWithDetails = allItemsForThisHu.find(i => i.hasOwnProperty('grossWeight') && i.grossWeight);
+                
+                if (itemWithDetails) {
+                    similarItemsWithDetails.push(itemWithDetails);
+                    break; // Nächste correctHu bearbeiten
+                } else if (allItemsForThisHu.length > 0) {
+                    // Fallback: Nimm den ersten Eintrag, wenn keiner explizit Gewicht hat
+                    similarItemsWithDetails.push(allItemsForThisHu[0]);
+                    break; // Nächste correctHu bearbeiten
+                }
+            }
+        }
+    });
 
-    if (itemWithDetails) {
-        return itemWithDetails; // Perfekt, den Eintrag mit den Details gefunden!
-    }
-
-    // Fallback: Wenn kein Eintrag explizit Gewicht hat, nimm den allerersten Eintrag für diese HU.
-    // Das ist normalerweise der ursprüngliche Eintrag aus dem Import.
-    if (allItemsForCorrectHu.length > 0) {
-        return allItemsForCorrectHu[0];
-    }
-    
-    return null; // Sollte nicht passieren, aber sicher ist sicher.
+    return similarItemsWithDetails;
 }
+// ERSETZEN SIE DIE ALTE showSuspicionModal FUNKTION MIT DIESER NEUEN VERSION
+
 /**
- * Zeigt das Modal mit dem Korrekturvorschlag an.
- * @param {string} scannedInput Die tatsächlich gescannte HU.
- * @param {object} expectedItem Das vermutete, korrekte HU-Item.
+ * Zeigt den aktuellen Korrekturvorschlag aus der Warteschlange an.
+ * @param {string} scannedInput Die ursprünglich gescannte HU.
  * @param {number} batchIndex Der Index des Items im aktuellen Batch.
  */
-function showSuspicionModal(scannedInput, expectedItem, batchIndex) {
+function showSuspicionModal(scannedInput, batchIndex) {
+    // Prüfen, ob noch Vorschläge in der Warteschlange sind
+    if (currentSuspicionIndex >= suspicionQueue.length) {
+        closeSuspicionModal(); // Keine Vorschläge mehr, Modal schließen
+        return;
+    }
+
+    const expectedItem = suspicionQueue[currentSuspicionIndex];
+    
+    // UI des Modals aktualisieren
     suspicionScannedHuEl.textContent = scannedInput;
     suspicionExpectedHuEl.textContent = expectedItem.rawInput;
     
-    // Frage zusammenbauen. Fallback, falls kein Gewicht vorhanden ist.
     const weight = expectedItem.grossWeight;
     suspicionQuestionEl.textContent = weight 
         ? `Handelt es sich um die Sendung mit Gewicht: ${weight}?`
         : `Ist dies die korrekte Sendungsnummer?`;
 
+    // Metadaten für die Aktionen speichern
     suspicionBatchIndexEl.value = batchIndex;
     suspicionExpectedHuValueEl.value = expectedItem.rawInput;
 
-    suspicionModalEl.classList.add('visible');
-    document.body.classList.add('modal-open');
+    // Button-Text anpassen, wenn es der letzte Vorschlag ist
+    if (currentSuspicionIndex === suspicionQueue.length - 1) {
+        suspicionDeclineBtnEl.textContent = 'Nein, beibehalten';
+    } else {
+        suspicionDeclineBtnEl.textContent = 'Nein, nächsten Vorschlag anzeigen';
+    }
+
+    // Modal anzeigen, falls es noch nicht sichtbar ist
+    if (!suspicionModalEl.classList.contains('visible')) {
+        suspicionModalEl.classList.add('visible');
+        document.body.classList.add('modal-open');
+    }
 }
 
-/**
- * Schließt das Korrekturvorschlag-Modal und setzt die Werte zurück.
- */
 function closeSuspicionModal() {
     if (suspicionModalEl.classList.contains('visible')) {
         suspicionModalEl.classList.remove('visible');
         document.body.classList.remove('modal-open');
-        // Werte zurücksetzen für den nächsten Durchlauf
-        suspicionBatchIndexEl.value = '';
-        suspicionExpectedHuValueEl.value = '';
-        focusShipmentInput();
     }
+    // Wichtig: Warteschlange und Index für den nächsten Durchlauf zurücksetzen
+    suspicionQueue = [];
+    currentSuspicionIndex = 0;
+    focusShipmentInput();
 }
+
 // =========================================================================
 // ERSETZEN SIE IHRE GESAMTE showOpenHusSummary FUNKTION MIT DIESER
 // =========================================================================
@@ -1448,6 +1472,8 @@ detailsHtml += `${numberPart}<span class="hu-value" style="cursor:pointer;" titl
 
 // --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESER NEUEN VERSION ---
 
+// ERSETZEN SIE IHRE KOMPLETTE, ALTE renderTable-FUNKTION MIT DIESER NEUEN VERSION
+
 function renderTable() {
     const shipments = loadShipments();
     tableBodyEl.innerHTML = '';
@@ -1457,11 +1483,8 @@ function renderTable() {
             if (!shipment) return;
             const row = tableBodyEl.insertRow();
             
-            // NEU: Füge die baseNumber als data-Attribut zur ganzen Zeile hinzu.
-            // Das macht das Abgreifen beim Klick viel einfacher.
             row.dataset.basenumber = baseNumber;
 
-            
             const securityCount = calculateCurrentCountedPieces(shipment.scannedItems || []);
             const receiptCount = calculateGoodsReceiptCount(shipment.scannedItems || []);
             const expected = shipment.totalPiecesExpected;
@@ -1511,6 +1534,36 @@ function renderTable() {
                 <button class="pdf-btn" data-basenumber="${escapeHtml(baseNumber)}" ${pdfButtonData}>PDF</button>
                 <button class="delete-btn main-delete-btn" data-basenumber="${escapeHtml(baseNumber)}">Löschen</button>
             `;
+            
+            // ===============================================================
+            // HIER WIRD DER QR-CODE ERSTELLT
+            // ===============================================================
+            const qrCell = row.insertCell();
+            qrCell.classList.add('qr-code-cell');
+            qrCell.setAttribute('data-label', 'QR-Code'); // Für mobile Ansicht, obwohl versteckt
+            
+            // Erstelle einen eindeutigen Container für den QR-Code
+            const qrContainerId = 'qrcode-' + baseNumber.replace(/[^a-zA-Z0-9]/g, ''); // Bereinige ID
+            qrCell.innerHTML = `<div id="${qrContainerId}"></div>`;
+
+            // Generiere den QR-Code, nachdem das Element im DOM ist
+            setTimeout(() => {
+                // Prüfe, ob das Element noch existiert, bevor der QR-Code gezeichnet wird
+                const qrContainer = document.getElementById(qrContainerId);
+                if (qrContainer) {
+                    new QRCode(qrContainer, {
+                        text: baseNumber,
+                        width: 60,
+                        height: 60,
+                        colorDark: "#000000",
+                        colorLight: "#ffffff",
+                        correctLevel: QRCode.CorrectLevel.L // Niedrige Fehlerkorrektur, gut für einfache Texte
+                    });
+                }
+            }, 0); // setTimeout mit 0 verzögert die Ausführung minimal, aber genug
+            // ===============================================================
+            // ENDE DER QR-CODE-LOGIK
+            // ===============================================================
         });
     updateEditButtonVisibilityInTable();
     filterTable(shipmentNumberInputEl.value);
@@ -2140,9 +2193,11 @@ function showBatchScanFeedback(scanNumber, isExpected, carrierInfo = null) {
 // --- ENDE DER ÄNDERUNG: showBatchScanFeedback Funktion angepasst (Land in neue Zeile) ---
 // ERSETZEN SIE IHRE GESAMTE 'addToBatch' FUNKTION MIT DIESER VERSION
 
+// ERSETZEN SIE IHRE GESAMTE 'addToBatch' FUNKTION MIT DIESER VERSION
+
 function addToBatch() {
     // Wenn das Verdachts-Modal offen ist und ein neuer Scan kommt, wird es geschlossen.
-    // Das gilt als implizite "Nein"-Antwort.
+    // Das gilt als implizite "Nein"-Antwort für alle verbleibenden Vorschläge.
     if (suspicionModalEl.classList.contains('visible')) {
         closeSuspicionModal();
     }
@@ -2161,7 +2216,7 @@ function addToBatch() {
     const scanTimestamp = new Date().toISOString();
     const isCurrentHuExpected = isHuExpected(processedRawInput);
 
-    // Sound-Logik (bleibt wie sie ist und wird vor dem Modal ausgelöst)
+    // Sound-Logik
     if (unexpectedHuSoundToggleEl && unexpectedHuSoundToggleEl.checked) {
         const parentHawb = findShipmentByHuNumber(processedRawInput);
         const isNachlieferungHu = parentHawb && parentHawb.toUpperCase() === 'NACHLIEFERUNG';
@@ -2189,34 +2244,36 @@ function addToBatch() {
         return;
     }
 
-    // ===== HIER BEGINNT DIE NEUE VERDACHTS-LOGIK =====
+    // ===== HIER BEGINNT DIE ÜBERARBEITETE VERDACHTS-LOGIK =====
     if (!isCurrentHuExpected) {
-        const similarItem = findSimilarExpectedHu(processedRawInput);
-        if (similarItem) {
+        const similarItems = findAllSimilarExpectedHus(processedRawInput);
+        if (similarItems.length > 0) {
             // Verdacht gefunden!
-            // Zuerst den gescannten Wert zum Batch hinzufügen, damit der User ihn sieht
+            suspicionQueue = similarItems;
+            currentSuspicionIndex = 0;
+
+            // Zuerst den gescannten Wert zum Batch hinzufügen
             const tempBatchItem = {
                 rawInput: processedRawInput,
                 scanTimestamp: scanTimestamp,
                 note: currentBatchGlobalNote 
             };
             currentBatch.unshift(tempBatchItem);
-            updateBatchUI(); // UI sofort aktualisieren
+            updateBatchUI();
             
-            // Jetzt das Modal anzeigen, um die Korrektur anzubieten
-            // Das Item ist an Index 0, da wir unshift() verwendet haben.
-            showSuspicionModal(processedRawInput, similarItem, 0);
+            // Modal mit dem ersten Vorschlag anzeigen
+            showSuspicionModal(processedRawInput, 0);
 
             // Eingabefeld leeren und beenden. Die weitere Logik passiert im Modal.
             shipmentNumberInputEl.value = '';
             updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
             clearError();
-            return; // Wichtig: Funktion hier beenden
+            return;
         }
     }
-    // ===== ENDE DER NEUEN VERDACHTS-LOGIK =====
+    // ===== ENDE DER ÜBERARBEITETEN VERDACHTS-LOGIK =====
 
-    // Standard-Verhalten: HU zum Batch hinzufügen (wenn kein Verdacht bestand)
+    // Standard-Verhalten: HU zum Batch hinzufügen
     const batchItem = {
         rawInput: processedRawInput,
         scanTimestamp: scanTimestamp,
@@ -2231,6 +2288,9 @@ function addToBatch() {
     clearError();
     focusShipmentInput();
 }
+    // ===== ENDE DER NEUEN VERDACHTS-LOGIK =====
+
+
 
         function confirmAndAddFirstBatchItemWithNote() {
             const newNote = batchNoteInputEl.value.trim() || null;
@@ -3687,9 +3747,16 @@ noteEditFormEl.addEventListener('submit', (e) => {
     });
     
     suspicionDeclineBtnEl.addEventListener('click', () => {
-        // Es ist nichts zu tun, der ursprüngliche Scan bleibt erhalten.
-        closeSuspicionModal();
+        // Zum nächsten Vorschlag in der Warteschlange gehen
+        currentSuspicionIndex++;
+        
+        const scannedInput = suspicionScannedHuEl.textContent;
+        const batchIndex = parseInt(suspicionBatchIndexEl.value, 10);
+    
+        // Nächsten Vorschlag anzeigen (die Funktion prüft selbst, ob es noch einen gibt)
+        showSuspicionModal(scannedInput, batchIndex);
     });
+    
     
     // Schließt das Modal auch, wenn daneben geklickt wird
     suspicionModalEl.addEventListener('click', (e) => {
