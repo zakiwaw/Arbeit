@@ -64,7 +64,7 @@
     #currentShipmentDetails li .editable-note{cursor:pointer;text-decoration-style:dotted;color:#007bff;margin-left:5px;font-size:.9em;font-style:italic}
     #currentShipmentDetails li .add-note-link{cursor:pointer;color:#007bff;font-size:.9em;text-decoration:none;padding-left:10px;font-style:italic}
     #currentShipmentDetails li .editable-note:hover,#currentShipmentDetails li .add-note-link:hover{color:#0056b3;text-decoration:underline;text-decoration-style:solid}
-    /* Die Regel ::before wird nicht mehr benötigt und kann gelöscht werden */
+    /* Die Regel ::before wird nicht mehr benÃ¶tigt und kann gelÃ¶scht werden */
 
 
     #currentShipmentDetails li .note-display{display:inline;padding-left:0;margin-top:0;font-style:italic;color:#448}
@@ -122,27 +122,27 @@
 }
 
 .status-select-wrapper {
-    flex-grow: 1; /* Erlaubt dem Select-Wrapper (mit Label), den verfügbaren Platz einzunehmen */
+    flex-grow: 1; /* Erlaubt dem Select-Wrapper (mit Label), den verfÃ¼gbaren Platz einzunehmen */
 }
 
-/* Überschreibt die Breite für mainActionButton, wenn er im neuen Container ist */
-/* --- START DER ÄNDERUNG --- */
+/* Ãberschreibt die Breite fÃ¼r mainActionButton, wenn er im neuen Container ist */
+/* --- START DER ÃNDERUNG --- */
 
-/* Überschreibt die Breite und Höhe für mainActionButton, wenn er im neuen Container ist */
+/* Ãberschreibt die Breite und HÃ¶he fÃ¼r mainActionButton, wenn er im neuen Container ist */
 .status-and-button-container > #mainActionButton {
-    width: auto; /* Behält die automatische Breitenanpassung bei */
+    width: auto; /* BehÃ¤lt die automatische Breitenanpassung bei */
     flex-shrink: 0; /* Verhindert, dass der Button schrumpft */
-    height: 44px; /* Angleichen an die Höhe des Select-Feldes (war 48px) */
+    height: 44px; /* Angleichen an die HÃ¶he des Select-Feldes (war 48px) */
     padding-top: 10px; /* Vertikales Padding anpassen (war 12px) */
     padding-bottom: 10px; /* Vertikales Padding anpassen (war 12px) */
-    /* padding-left und padding-right (15px) bleiben unverändert von .main-action-button */
-    line-height: normal; /* Stellt sicher, dass line-height die Zentrierung nicht stört, falls es woanders gesetzt wurde */
-    /* Die Schriftgröße (font-size: 1.1em) wird von .main-action-button geerbt */
+    /* padding-left und padding-right (15px) bleiben unverÃ¤ndert von .main-action-button */
+    line-height: normal; /* Stellt sicher, dass line-height die Zentrierung nicht stÃ¶rt, falls es woanders gesetzt wurde */
+    /* Die SchriftgrÃ¶Ãe (font-size: 1.1em) wird von .main-action-button geerbt */
 }
-    /* --- START: NEUE STILE FÜR MEHRERE NOTIZEN --- */
+    /* --- START: NEUE STILE FÃR MEHRERE NOTIZEN --- */
     #currentShipmentDetails .notes-container {
         margin-top: 5px;
-        padding-left: 15px; /* Einrückung für den gesamten Notiz-Block */
+        padding-left: 15px; /* EinrÃ¼ckung fÃ¼r den gesamten Notiz-Block */
         display: flex;
         flex-direction: column;
         gap: 3px;
@@ -150,7 +150,7 @@
     #currentShipmentDetails .note-item {
         display: flex;
         align-items: center;
-        gap: 8px; /* Abstand zwischen Notiztext und Löschen-Button */
+        gap: 8px; /* Abstand zwischen Notiztext und LÃ¶schen-Button */
     }
 #currentShipmentDetails .note-item .note-prefix {
     font-weight: bold;
@@ -158,7 +158,7 @@
     margin-right: 4px; /* Kleiner Abstand zum Notiztext */
 }
     #currentShipmentDetails .note-item .editable-note {
-        flex-grow: 1; /* Notiztext nimmt verfügbaren Platz ein */
+        flex-grow: 1; /* Notiztext nimmt verfÃ¼gbaren Platz ein */
     }
     #currentShipmentDetails .note-item .delete-note-btn {
         background-color: #e7e7e7;
@@ -180,8 +180,8 @@
         color: white;
         border-color: var(--danger-hover);
     }
-    /* --- ENDE: NEUE STILE FÜR MEHRERE NOTIZEN --- */
-/* --- ENDE DER ÄNDERUNG --- */
+    /* --- ENDE: NEUE STILE FÃR MEHRERE NOTIZEN --- */
+/* --- ENDE DER ÃNDERUNG --- */
 #newTotalSection.warning-existing {
     background-color: #f2dede; /* Heller Rotton */
     border-color: #ebccd1;
@@ -195,7 +195,7 @@
 
 
     #pendingHuList.partial {
-        border-color: orange; /* Orange für "teilweise bearbeitet" */
+        border-color: orange; /* Orange fÃ¼r "teilweise bearbeitet" */
     }
     #pendingHuList h4 {
         margin-top: 0;
@@ -207,7 +207,7 @@
         list-style-type: none;
         padding: 0;
         margin: 0;
-        max-height: 120px; /* Limitiert die Höhe und macht die Liste scrollbar */
+        max-height: 120px; /* Limitiert die HÃ¶he und macht die Liste scrollbar */
         overflow-y: auto;
         font-family: monospace;
         font-size: 0.95em;
@@ -219,10 +219,10 @@
     #pendingHuList li:last-child {
         border-bottom: none;
     }
-    /* --- ENDE: NEUE STILE FÜR OFFENE HU-LISTE --- */
+    /* --- ENDE: NEUE STILE FÃR OFFENE HU-LISTE --- */
 /* IN DER DATEI DSV_LFS.html, INNERHALB DES <style>-TAGS */
 
-/* --- START: NEUE STILE FÜR OFFENE HU-ZUSAMMENFASSUNG --- */
+/* --- START: NEUE STILE FÃR OFFENE HU-ZUSAMMENFASSUNG --- */
 #openHusListContainer .hu-order-group {
     margin-bottom: 15px;
     border-left: 3px solid var(--info-color);
@@ -253,14 +253,14 @@
 /* --- ENDE: NEUE STILE --- */
 /* IN DER DATEI DSV_LFS.html, INNERHALB DES <style>-TAGS */
 
-/* --- START: NEUES DESIGN FÜR SEITENMENÜ --- */
+/* --- START: NEUES DESIGN FÃR SEITENMENÃ --- */
 .side-menu .side-menu-list {
     list-style: none;
     padding: 0;
     margin: 0 0 15px 0; /* Abstand nach unten zur Statusmeldung */
     display: flex;
     flex-direction: column;
-    gap: 8px; /* Abstand zwischen den Menüpunkten */
+    gap: 8px; /* Abstand zwischen den MenÃ¼punkten */
 }
 
 .side-menu .menu-action-item {
@@ -272,7 +272,7 @@
     font-weight: 500; /* Etwas dickere Schrift */
     color: #333;
     background-color: transparent;
-    border: 1px solid transparent; /* Platzhalter für den Hover-Effekt */
+    border: 1px solid transparent; /* Platzhalter fÃ¼r den Hover-Effekt */
     transition: all 0.2s ease-in-out;
     cursor: pointer;
 }
@@ -282,7 +282,7 @@
     border-color: #e0e0e0;
 }
 
-/* Stil für die Icons */
+/* Stil fÃ¼r die Icons */
 .side-menu .menu-action-item svg {
     width: 22px;
     height: 22px;
@@ -291,9 +291,9 @@
     fill: currentColor; /* Icon nimmt die Textfarbe an */
 }
 
-/* Spezielle Hover-Effekte für bestimmte Aktionen */
+/* Spezielle Hover-Effekte fÃ¼r bestimmte Aktionen */
 
-/* Primäre Aktion: Senden */
+/* PrimÃ¤re Aktion: Senden */
 .side-menu .menu-action-item.action-primary:hover {
     background-color: #eef8ff;
     color: var(--secondary-hover);
@@ -307,7 +307,7 @@
     border-color: var(--warning-color);
 }
 
-/* Destruktive Aktion: Zurücksetzen */
+/* Destruktive Aktion: ZurÃ¼cksetzen */
 .side-menu .menu-action-item.action-reset {
     /* Kein spezieller Grundzustand, nur der Hover ist anders */
 }
@@ -317,12 +317,12 @@
     border-color: var(--danger-hover);
 }
 
-/* Die alten Button-Stile im Menü werden nicht mehr gebraucht */
+/* Die alten Button-Stile im MenÃ¼ werden nicht mehr gebraucht */
 .side-menu .main-action-button {
     display: none; /* Versteckt die alten Buttons, falls sie noch da sind */
 }
 
-/* Besserer Stil für die Statusmeldung */
+/* Besserer Stil fÃ¼r die Statusmeldung */
 .side-menu #sheetStatus {
     margin-top: 10px;
     padding: 10px;
@@ -333,29 +333,29 @@
     text-align: center;
     border: 1px solid #eee;
 }
-/* --- ENDE: NEUES DESIGN FÜR SEITENMENÜ --- */
-/* --- START: NEUE STILE FÜR MODAL-TABS --- */
+/* --- ENDE: NEUES DESIGN FÃR SEITENMENÃ --- */
+/* --- START: NEUE STILE FÃR MODAL-TABS --- */
 .modal-tabs {
     display: flex;
     margin-bottom: 15px;
     border-bottom: 2px solid #eee;
     
-    /* NEU: Horizontales Scrollen aktivieren, wenn der Inhalt überläuft */
+    /* NEU: Horizontales Scrollen aktivieren, wenn der Inhalt Ã¼berlÃ¤uft */
     overflow-x: auto;
-    /* NEU: Verhindert, dass die Buttons in die nächste Zeile umbrechen */
+    /* NEU: Verhindert, dass die Buttons in die nÃ¤chste Zeile umbrechen */
     flex-wrap: nowrap;
 
-    /* Optional: Verbessert das Scroll-Gefühl auf iOS */
+    /* Optional: Verbessert das Scroll-GefÃ¼hl auf iOS */
     -webkit-overflow-scrolling: touch;
 
-    /* Optional: Gestaltet die Scrollleiste unauffälliger */
+    /* Optional: Gestaltet die Scrollleiste unauffÃ¤lliger */
     scrollbar-width: thin;
     scrollbar-color: #ccc transparent;
 }
 .modal-tab-btn {
-    /* ÄNDERUNG: 'flex: 1;' wird entfernt, damit die Buttons nicht mehr gezwungen werden, den Platz auszufüllen */
+    /* ÃNDERUNG: 'flex: 1;' wird entfernt, damit die Buttons nicht mehr gezwungen werden, den Platz auszufÃ¼llen */
     
-    padding: 10px 15px; /* Etwas mehr seitliches Padding für besseres Aussehen */
+    padding: 10px 15px; /* Etwas mehr seitliches Padding fÃ¼r besseres Aussehen */
     font-size: 0.95em;
     font-weight: 500;
     text-align: center;
@@ -372,7 +372,7 @@
     white-space: nowrap;
 }
 .modal-tabs::-webkit-scrollbar {
-    height: 4px; /* Höhe der Scrollleiste */
+    height: 4px; /* HÃ¶he der Scrollleiste */
 }
 .modal-tabs::-webkit-scrollbar-thumb {
     background-color: #ccc; /* Farbe des Scroll-Balkens */
@@ -388,42 +388,42 @@ modal-tabs::-webkit-scrollbar-track
     font-weight: bold;
     border-bottom-color: var(--primary-color);
 }
-/* --- ENDE: NEUE STILE FÜR MODAL-TABS --- */
-/* --- START: NEUE STILE FÜR VOLLBILD-MODAL --- */
+/* --- ENDE: NEUE STILE FÃR MODAL-TABS --- */
+/* --- START: NEUE STILE FÃR VOLLBILD-MODAL --- */
 
-/* Diese Klasse wird per JavaScript zum <body> hinzugefügt, wenn ein Modal offen ist */
+/* Diese Klasse wird per JavaScript zum <body> hinzugefÃ¼gt, wenn ein Modal offen ist */
 body.modal-open {
     overflow: hidden; /* Verhindert das Scrollen des Hintergrunds */
 }
 
-/* Passt das Aussehen des Modal-Inhalts an, um den Bildschirm auszufüllen */
+/* Passt das Aussehen des Modal-Inhalts an, um den Bildschirm auszufÃ¼llen */
 .modal-content {
     width: 100%;
     height: 100%;
-    max-width: 100%; /* Überschreibt die alte Breitenbegrenzung */
+    max-width: 100%; /* Ãberschreibt die alte Breitenbegrenzung */
     margin: 0;
     border: none;
-    border-radius: 0; /* Entfernt abgerundete Ecken für den Vollbild-Look */
+    border-radius: 0; /* Entfernt abgerundete Ecken fÃ¼r den Vollbild-Look */
     box-shadow: none;
     
     /* Flexbox-Layout, um Header, Inhalt und Footer besser zu steuern */
     display: flex;
     flex-direction: column;
-    padding: 15px; /* Etwas Padding für den Inhalt */
+    padding: 15px; /* Etwas Padding fÃ¼r den Inhalt */
     box-sizing: border-box;
 }
 
-/* Sorgt dafür, dass der scrollbare Bereich im Modal den verfügbaren Platz einnimmt */
+/* Sorgt dafÃ¼r, dass der scrollbare Bereich im Modal den verfÃ¼gbaren Platz einnimmt */
 #openHusListContainer, 
 #missingReceiptHusListContainer,
 #editModal .form-group,
 #importHuModal .form-group:nth-of-type(2) /* Zielt auf den Container der Textarea */ {
     flex-grow: 1; /* Dieser Bereich dehnt sich aus */
     overflow-y: auto; /* Nur dieser Bereich wird scrollbar, nicht das ganze Modal */
-    min-height: 0; /* Wichtiger Fix für Flexbox-Scrolling */
+    min-height: 0; /* Wichtiger Fix fÃ¼r Flexbox-Scrolling */
 }
 
-/* Stellt sicher, dass die Textarea im Import-Modal den ganzen Platz ausfüllt */
+/* Stellt sicher, dass die Textarea im Import-Modal den ganzen Platz ausfÃ¼llt */
 #huListTextarea {
     flex-grow: 1;
     height: 100%;
@@ -434,8 +434,8 @@ body.modal-open {
     flex-shrink: 0;
     margin-top: 15px;
 }
-/* --- ENDE: NEUE STILE FÜR VOLLBILD-MODAL --- */
-/* --- NEU: Styling für perfekt ausgerichtete Listen im Modal --- */
+/* --- ENDE: NEUE STILE FÃR VOLLBILD-MODAL --- */
+/* --- NEU: Styling fÃ¼r perfekt ausgerichtete Listen im Modal --- */
 #openHusListContainer .hu-list li,
 #missingReceiptHusListContainer .hu-list li,
 #dunkelalarmHusListContainer .hu-list li {
@@ -444,8 +444,8 @@ body.modal-open {
     padding: 3px 0; /* Etwas mehr vertikaler Abstand */
 }
 
-/* --- Styling für perfekt ausgerichtete Listen --- */
-/* Gilt für Modal UND Detailansicht */
+/* --- Styling fÃ¼r perfekt ausgerichtete Listen --- */
+/* Gilt fÃ¼r Modal UND Detailansicht */
 #openHusListContainer .hu-list li,
 #missingReceiptHusListContainer .hu-list li,
 #dunkelalarmHusListContainer .hu-list li,
@@ -455,7 +455,7 @@ body.modal-open {
     padding: 3px 0;
 }
 
-/* Basis-Styling für die Positionsnummer */
+/* Basis-Styling fÃ¼r die Positionsnummer */
 #openHusListContainer .hu-list .position-number,
 #missingReceiptHusListContainer .hu-list .position-number,
 #dunkelalarmHusListContainer .hu-list .position-number,
@@ -467,10 +467,10 @@ body.modal-open {
     color: #888;
 }
 
-/* --- HIER IST DIE SPEZIFISCHE ÜBERSCHREIBUNG --- */
-/* Diese Regel erhöht den Abstand NUR für die pendingHuList in der Detailansicht */
+/* --- HIER IST DIE SPEZIFISCHE ÃBERSCHREIBUNG --- */
+/* Diese Regel erhÃ¶ht den Abstand NUR fÃ¼r die pendingHuList in der Detailansicht */
 #pendingHuList .hu-list .position-number {
-    padding-right: 1.5em; /* Größerer Abstand */
+    padding-right: 1.5em; /* GrÃ¶Ãerer Abstand */
 }
 .batch-sound-toggle-container {
     display: flex;
@@ -485,17 +485,17 @@ body.modal-open {
     font-weight: normal;
     cursor: pointer;
 }
-/* --- NEU: Layout für zweizeilige Scan-Einträge --- */
+/* --- NEU: Layout fÃ¼r zweizeilige Scan-EintrÃ¤ge --- */
 #currentShipmentDetails li {
     display: flex;
     flex-wrap: wrap; /* Erlaubt den Zeilenumbruch */
     align-items: center;
     position: relative;
-    padding-right: 70px; /* Platz für den Storno-Button */
+    padding-right: 70px; /* Platz fÃ¼r den Storno-Button */
 }
 
 #currentShipmentDetails .scan-main-info {
-    flex-grow: 1; /* Nimmt den verfügbaren Platz in der ersten Zeile ein */
+    flex-grow: 1; /* Nimmt den verfÃ¼gbaren Platz in der ersten Zeile ein */
     white-space: nowrap; /* Verhindert Zeilenumbruch innerhalb dieser Zeile */
     overflow: hidden;
     text-overflow: ellipsis; /* ... falls es doch zu lang wird */
@@ -503,7 +503,7 @@ body.modal-open {
 
 #currentShipmentDetails .scan-actions-and-notes {
     flex-basis: 100%; /* Erzwingt, dass dieser Block immer eine neue Zeile beginnt */
-    padding-left: 1.5em; /* Kleine Einrückung für die Notizen */
+    padding-left: 1.5em; /* Kleine EinrÃ¼ckung fÃ¼r die Notizen */
     padding-top: 4px; /* Etwas Abstand nach oben */
 }
 /* INNERHALB des <style> Tags */
@@ -519,7 +519,7 @@ body.modal-open {
     margin-left: 8px;
 }
 
-/* --- NEU: Styling für die tabellarische Pending-Liste --- */
+/* --- NEU: Styling fÃ¼r die tabellarische Pending-Liste --- */
 .pending-list-header {
     display: flex;
     justify-content: space-between;
@@ -563,16 +563,16 @@ body.modal-open {
     font-style: italic;
     font-size: 0.95em;
 }
-/* --- NEU: Styling für VVL-Anzeige im "Offene HUs"-Modal --- */
+/* --- NEU: Styling fÃ¼r VVL-Anzeige im "Offene HUs"-Modal --- */
 
-/* Titel-Formatierung für VVL */
+/* Titel-Formatierung fÃ¼r VVL */
 .hu-order-group .hu-order-title small {
     font-weight: normal;
     font-size: 0.9em;
     color: #555;
 }
 
-/* Kopfzeile für die VVL-Tabelle */
+/* Kopfzeile fÃ¼r die VVL-Tabelle */
 .hu-list-header {
     display: flex;
     font-weight: bold;
@@ -589,7 +589,7 @@ body.modal-open {
     flex: 1; /* Sendnr-Spalte bekommt weniger Platz */
 }
 
-/* Styling für die Zeilen in der VVL-Tabelle */
+/* Styling fÃ¼r die Zeilen in der VVL-Tabelle */
 .hu-list.vvl-list li {
     padding: 4px 0 4px 5px;
     border-bottom: 1px dotted #eee;
@@ -613,9 +613,9 @@ body.modal-open {
     color: #666;
     font-size: 0.95em;
 }
-/* --- NEU & OPTIMIERT: Einheitliches Tabellen-Layout für offene Positionen --- */
+/* --- NEU & OPTIMIERT: Einheitliches Tabellen-Layout fÃ¼r offene Positionen --- */
 
-/* Gemeinsamer Stil für die Kopfzeile in der Detailansicht und im Modal */
+/* Gemeinsamer Stil fÃ¼r die Kopfzeile in der Detailansicht und im Modal */
 .pending-list-header,
 .hu-list-header {
     display: flex;
@@ -637,7 +637,7 @@ body.modal-open {
     text-align: left;
 }
 
-/* Gemeinsamer Stil für Listeneinträge */
+/* Gemeinsamer Stil fÃ¼r ListeneintrÃ¤ge */
 #pendingHuList .hu-list li,
 .hu-order-group .hu-list.vvl-list li {
     padding: 4px 8px;
@@ -648,7 +648,7 @@ body.modal-open {
 }
 
 
-/* Gemeinsamer Stil für die zweispaltige Zeile */
+/* Gemeinsamer Stil fÃ¼r die zweispaltige Zeile */
 .pending-item-details,
 .vvl-item-row {
     display: flex;
@@ -656,7 +656,7 @@ body.modal-open {
     width: 100%;
 }
 
-/* Gemeinsamer Stil für die VSE-Spalte */
+/* Gemeinsamer Stil fÃ¼r die VSE-Spalte */
 .pending-item-details .pending-vse,
 .vvl-item-row .vvl-vse {
     flex-basis: 55%;
@@ -665,7 +665,7 @@ body.modal-open {
     font-weight: bold;
 }
 
-/* Gemeinsamer Stil für die Sendnr-Spalte */
+/* Gemeinsamer Stil fÃ¼r die Sendnr-Spalte */
 .pending-item-details .pending-sendnr,
 .vvl-item-row .vvl-sendnr {
     flex-basis: 45%;
@@ -675,10 +675,10 @@ body.modal-open {
     font-style: italic;
     font-size: 0.95em;
 }
-/* --- START DER ÄNDERUNG: Batch Scan Feedback Modal --- */
+/* --- START DER ÃNDERUNG: Batch Scan Feedback Modal --- */
 
-/* --- START DER ÄNDERUNG: Batch Scan Feedback Modal Stile --- */
-/* --- START DER ÄNDERUNG: Batch Scan Feedback Modal Stile --- */
+/* --- START DER ÃNDERUNG: Batch Scan Feedback Modal Stile --- */
+/* --- START DER ÃNDERUNG: Batch Scan Feedback Modal Stile --- */
 #batchScanFeedbackModal .modal-content {
     background-color: black;
     padding: 20px;
@@ -693,7 +693,7 @@ body.modal-open {
     color: black;
     margin-bottom: 20px;
 }
-/* --- START DER ÄNDERUNG: Close-Button Icon Stil --- */
+/* --- START DER ÃNDERUNG: Close-Button Icon Stil --- */
 .close-modal-icon-btn {
     position: absolute; /* Absolut positioniert innerhalb des .modal-content */
     top: 15px; /* Abstand vom oberen Rand */
@@ -702,35 +702,35 @@ body.modal-open {
     border: none; /* Kein Rahmen */
     color: #bbb; /* Standardfarbe des Icons */
     cursor: pointer;
-    font-size: 1.8em; /* Größe des Icons */
+    font-size: 1.8em; /* GrÃ¶Ãe des Icons */
     padding: 0;
-    width: 30px; /* Breite für Click-Bereich */
-    height: 30px; /* Höhe für Click-Bereich */
-    display: flex; /* Flexbox für Zentrierung des SVG */
+    width: 30px; /* Breite fÃ¼r Click-Bereich */
+    height: 30px; /* HÃ¶he fÃ¼r Click-Bereich */
+    display: flex; /* Flexbox fÃ¼r Zentrierung des SVG */
     justify-content: center;
     align-items: center;
-    transition: color 0.2s, transform 0.2s; /* Übergang für Hover-Effekt */
-    z-index: 10; /* Sicherstellen, dass es über anderen Inhalten liegt */
+    transition: color 0.2s, transform 0.2s; /* Ãbergang fÃ¼r Hover-Effekt */
+    z-index: 10; /* Sicherstellen, dass es Ã¼ber anderen Inhalten liegt */
 }
 
 .close-modal-icon-btn:hover {
-    color: white; /* Weißer auf Schwarz bei Hover */
-    transform: scale(1.1); /* Leicht vergrößern bei Hover */
+    color: white; /* WeiÃer auf Schwarz bei Hover */
+    transform: scale(1.1); /* Leicht vergrÃ¶Ãern bei Hover */
 }
 
 .close-modal-icon-btn svg {
     fill: currentColor; /* SVG-Farbe folgt der Textfarbe des Buttons */
-    width: 24px; /* Größe des SVG-Icons */
+    width: 24px; /* GrÃ¶Ãe des SVG-Icons */
     height: 24px;
 }
-/* --- ENDE DER ÄNDERUNG: Close-Button Icon Stil --- */
+/* --- ENDE DER ÃNDERUNG: Close-Button Icon Stil --- */
 
 /* Optional: Titel des Modals leicht anpassen, damit er nicht mit dem X-Icon kollidiert */
 #batchScanFeedbackModal h3 {
-    padding-right: 40px; /* Platz für das X-Icon schaffen */
+    padding-right: 40px; /* Platz fÃ¼r das X-Icon schaffen */
     text-align: center;
 }
-/* --- START DER ÄNDERUNG: Batch Scan Feedback Modal Stile (Font Sizing Vorbereitung) --- */
+/* --- START DER ÃNDERUNG: Batch Scan Feedback Modal Stile (Font Sizing Vorbereitung) --- */
 #batchScanFeedbackModal .modal-content {
     background-color: black;
     padding: 20px;
@@ -743,12 +743,12 @@ body.modal-open {
 
 
 
-/* --- START DER ÄNDERUNG: feedbackScanNumber responsive Schriftgröße --- */
+/* --- START DER ÃNDERUNG: feedbackScanNumber responsive SchriftgrÃ¶Ãe --- */
 #feedbackScanNumber {
     /* Vorherige Eigenschaften beibehalten: */
     font-weight: bold;
     text-align: center;
-    word-break: break-all; /* Wichtig, damit lange Nummern umbrechen, falls nötig */
+    word-break: break-all; /* Wichtig, damit lange Nummern umbrechen, falls nÃ¶tig */
     color: lime;
     background-color: black;
     padding: 10px 0px;
@@ -756,8 +756,8 @@ body.modal-open {
     margin-bottom: 10px;
     min-width: 80%;
 
-    /* NEU: Responsive Schriftgröße */
-    /* clamp(minimale Größe, responsive Größe (vw), maximale Größe) */
+    /* NEU: Responsive SchriftgrÃ¶Ãe */
+    /* clamp(minimale GrÃ¶Ãe, responsive GrÃ¶Ãe (vw), maximale GrÃ¶Ãe) */
     /* Hier: min. 1.8em, skaliert mit 8vw (8% der Viewport-Breite), max. 3.5em */
     font-size: clamp(2.5em, 8vw, 3.5em);
     
@@ -768,34 +768,34 @@ body.modal-open {
     line-height: 1.2; /* Etwas kleinerer Zeilenabstand */
 }
 
-/* Anpassung für unerwartete Scans, falls noch nicht erfolgt */
+/* Anpassung fÃ¼r unerwartete Scans, falls noch nicht erfolgt */
 #feedbackScanNumber.unexpected {
     color: red;
 }
-/* --- ENDE DER ÄNDERUNG: feedbackScanNumber responsive Schriftgröße --- */
+/* --- ENDE DER ÃNDERUNG: feedbackScanNumber responsive SchriftgrÃ¶Ãe --- */
 
-/* --- START DER ÄNDERUNG: feedbackCarrier linksbündig --- */
+/* --- START DER ÃNDERUNG: feedbackCarrier linksbÃ¼ndig --- */
 #feedbackCarrier {
     font-size: 1.0em;
     color: #ccc;
-    text-align: left; /* GEÄNDERT */
+    text-align: left; /* GEÃNDERT */
     word-break: break-all;
     font-style: italic;
     margin-top: 5px;
-    width: 100%; /* Sicherstellen, dass es die volle Breite einnimmt, um linksbündig zu wirken */
-    padding-left: 20px; /* Optional: Leichte Einrückung von links, passend zum Padding des Modals */
-    padding-right: 20px; /* Optional: Auch rechts ein Padding für Symmetrie, wenn breiter */
+    width: 100%; /* Sicherstellen, dass es die volle Breite einnimmt, um linksbÃ¼ndig zu wirken */
+    padding-left: 20px; /* Optional: Leichte EinrÃ¼ckung von links, passend zum Padding des Modals */
+    padding-right: 20px; /* Optional: Auch rechts ein Padding fÃ¼r Symmetrie, wenn breiter */
     box-sizing: border-box; /* Sicherstellen, dass Padding in der Breite enthalten ist */
 }
-/* --- ENDE DER ÄNDERUNG: feedbackCarrier linksbündig --- */
-/* --- ENDE DER ÄNDERUNG: Batch Scan Feedback Modal --- */
-/* --- NEU: Styling für Positionen mit Dunkelalarm in der "Offene HUs"-Ansicht --- */
+/* --- ENDE DER ÃNDERUNG: feedbackCarrier linksbÃ¼ndig --- */
+/* --- ENDE DER ÃNDERUNG: Batch Scan Feedback Modal --- */
+/* --- NEU: Styling fÃ¼r Positionen mit Dunkelalarm in der "Offene HUs"-Ansicht --- */
 .hu-value.has-dunkelalarm,
 .pending-vse.has-dunkelalarm {
     color: var(--danger-color);
     font-weight: bold;
 }
-/* --- NEU: Styling für die VVL-Anzeige in der Haupttabelle --- */
+/* --- NEU: Styling fÃ¼r die VVL-Anzeige in der Haupttabelle --- */
 .vvl-table-entry {
     font-size: 0.9em;
     line-height: 1.4;
@@ -805,7 +805,7 @@ body.modal-open {
     font-weight: normal;
     color: #666;
 }
-/* --- NEU: Styling für die Trennlinie in der "Übersicht"-Spalte --- */
+/* --- NEU: Styling fÃ¼r die Trennlinie in der "Ãbersicht"-Spalte --- */
 .summary-cell {
     padding-top: 12px; /* Etwas mehr Platz oben */
     padding-bottom: 12px; /* Etwas mehr Platz unten */
@@ -817,10 +817,10 @@ body.modal-open {
     margin: 8px 0; /* Vertikaler Abstand oben und unten */
 }
 
-/* --- NEU: Styling für Tab-Notification-Badges (Vorschlag 1) --- */
+/* --- NEU: Styling fÃ¼r Tab-Notification-Badges (Vorschlag 1) --- */
 .modal-tab-btn {
-    position: relative; /* Wichtig für die Positionierung des Badges */
-    padding-right: 25px; /* Etwas mehr Platz für den Badge */
+    position: relative; /* Wichtig fÃ¼r die Positionierung des Badges */
+    padding-right: 25px; /* Etwas mehr Platz fÃ¼r den Badge */
 }
 
 .tab-badge {
@@ -834,7 +834,7 @@ body.modal-open {
     font-weight: bold;
     padding: 2px 6px;
     border-radius: 10px; /* Macht es zu einer Pille */
-    min-width: 10px; /* Sorgt dafür, dass auch eine '1' gut aussieht */
+    min-width: 10px; /* Sorgt dafÃ¼r, dass auch eine '1' gut aussieht */
     text-align: center;
     line-height: 1.2;
     transition: transform 0.2s ease-in-out;
@@ -842,10 +842,10 @@ body.modal-open {
 
 /* Versteckt den Badge, wenn er leer ist */
 .tab-badge.hidden {
-    transform: translateY(-50%) scale(0); /* Schöner Ausblend-Effekt */
+    transform: translateY(-50%) scale(0); /* SchÃ¶ner Ausblend-Effekt */
     opacity: 0;
 }
-/* ===== NEUE STILE FÜR DEN LADE-SPINNER ===== */
+/* ===== NEUE STILE FÃR DEN LADE-SPINNER ===== */
 
 /* Das Overlay, das den gesamten Bildschirm abdeckt */
 .loading-overlay {
@@ -854,19 +854,19 @@ body.modal-open {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(255, 255, 255, 0.7); /* Leicht durchsichtiger weißer Hintergrund */
+    background-color: rgba(255, 255, 255, 0.7); /* Leicht durchsichtiger weiÃer Hintergrund */
     display: flex; /* Zentriert den Spinner */
     justify-content: center;
     align-items: center;
-    z-index: 9999; /* Stellt sicher, dass es über allem anderen liegt */
+    z-index: 9999; /* Stellt sicher, dass es Ã¼ber allem anderen liegt */
     
-    /* Standardmäßig unsichtbar */
+    /* StandardmÃ¤Ãig unsichtbar */
     visibility: hidden;
     opacity: 0;
     transition: opacity 0.3s, visibility 0.3s;
 }
 
-/* Sichtbarer Zustand für das Overlay */
+/* Sichtbarer Zustand fÃ¼r das Overlay */
 .loading-overlay.visible {
     visibility: visible;
     opacity: 1;
@@ -882,7 +882,7 @@ body.modal-open {
     animation: spin 1s linear infinite; /* Die Dreh-Animation */
 }
 
-/* Die Keyframe-Animation für die Drehung */
+/* Die Keyframe-Animation fÃ¼r die Drehung */
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
@@ -890,17 +890,17 @@ body.modal-open {
 /* ===== ENDE DER NEUEN SPINNER-STILE ===== */
 /* ===== ENDE DER NEUEN SPINNER-STILE ===== */
 
-/* --- START: NEUE STILE FÜR HU-DETAIL-MODAL --- */
-/* NEU: Diese Regel überschreibt die Zentrierung NUR für das HU-Detail-Modal */
+/* --- START: NEUE STILE FÃR HU-DETAIL-MODAL --- */
+/* NEU: Diese Regel Ã¼berschreibt die Zentrierung NUR fÃ¼r das HU-Detail-Modal */
 #huDetailsModal {
     align-items: flex-start; /* Richtet das Modal oben aus statt in der Mitte */
-    padding-top: 20px;       /* Fügt einen kleinen Abstand zum oberen Bildschirmrand hinzu */
+    padding-top: 20px;       /* FÃ¼gt einen kleinen Abstand zum oberen Bildschirmrand hinzu */
 }
 
 #huDetailsModal .modal-content {
-    max-width: 400px; /* Eine passende Breite für das kleine Info-Modal */
+    max-width: 400px; /* Eine passende Breite fÃ¼r das kleine Info-Modal */
     width: 90%;
-    height: auto; /* Höhe passt sich dem Inhalt an */
+    height: auto; /* HÃ¶he passt sich dem Inhalt an */
     max-height: 80vh;
     border-radius: 8px; /* Ecken wieder abrunden */
 }
@@ -927,24 +927,24 @@ body.modal-open {
     font-size: 1.05em;
     word-break: break-all;
 }
-/* --- ENDE: NEUE STILE FÜR HU-DETAIL-MODAL --- */
-/* ===== START DER ÄNDERUNG: Stile für die neue Detailansicht ===== */
+/* --- ENDE: NEUE STILE FÃR HU-DETAIL-MODAL --- */
+/* ===== START DER ÃNDERUNG: Stile fÃ¼r die neue Detailansicht ===== */
 
 /* Versteckt die Hauptansicht, wenn die Detailansicht aktiv ist */
 #mainView.hidden {
     display: none;
 }
 
-/* Container für die Detailansicht */
+/* Container fÃ¼r die Detailansicht */
 .detail-view-container {
-    display: none; /* Standardmäßig versteckt */
+    display: none; /* StandardmÃ¤Ãig versteckt */
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
     background-color: #f4f4f4; /* Gleicher Hintergrund wie body */
-    z-index: 100; /* Liegt über dem normalen Inhalt, aber unter Modals */
+    z-index: 100; /* Liegt Ã¼ber dem normalen Inhalt, aber unter Modals */
     flex-direction: column;
 }
 
@@ -961,7 +961,7 @@ body.modal-open {
     flex-grow: 1; /* Nimmt den restlichen Platz ein */
 }
 
-/* Zurück-Button */
+/* ZurÃ¼ck-Button */
 .detail-view-header .back-button {
     background: none;
     border: none;
@@ -978,32 +978,32 @@ body.modal-open {
 
 /* Scrollbarer Inhaltsbereich */
 .detail-view-content {
-    flex-grow: 1; /* Füllt den restlichen Platz aus */
+    flex-grow: 1; /* FÃ¼llt den restlichen Platz aus */
     overflow-y: auto; /* Macht den Inhalt scrollbar */
     padding: 10px;
 }
 
-/* Wir "stehlen" das Styling von #currentShipmentDetails für unsere neue Ansicht */
+/* Wir "stehlen" das Styling von #currentShipmentDetails fÃ¼r unsere neue Ansicht */
 .detail-view-content #currentShipmentDetails {
     margin-top: 0; /* Kein extra Abstand oben */
 }
-/* ===== ENDE DER ÄNDERUNG ===== */
-/* Fügen Sie dies am Ende Ihrer styles.css Datei hinzu */
+/* ===== ENDE DER ÃNDERUNG ===== */
+/* FÃ¼gen Sie dies am Ende Ihrer styles.css Datei hinzu */
 
 /* =============================================================== */
-/* NEU: Stile für die Master-Detail-Ansicht                        */
+/* NEU: Stile fÃ¼r die Master-Detail-Ansicht                        */
 /* =============================================================== */
 
 /* =============================================================== */
-/* KORREKTE STILE FÜR ANSICHTEN & MODALS                           */
+/* KORREKTE STILE FÃR ANSICHTEN & MODALS                           */
 /* =============================================================== */
 
-/* Versteckt ein Element zuverlässig */
+/* Versteckt ein Element zuverlÃ¤ssig */
 .hidden {
     display: none !important;
 }
 
-/* Container für die Detailansicht */
+/* Container fÃ¼r die Detailansicht */
 #detailView {
     position: fixed;
     top: 0;
@@ -1017,11 +1017,11 @@ body.modal-open {
     box-sizing: border-box;
 }
 
-/* Das Overlay für ALLE Modals */
+/* Das Overlay fÃ¼r ALLE Modals */
 .modal-overlay {
     display: none;
     position: fixed;
-    z-index: 9000; /* Extrem hoher Wert, um über allem zu liegen */
+    z-index: 9000; /* Extrem hoher Wert, um Ã¼ber allem zu liegen */
     left: 0;
     top: 0;
     width: 100%;
@@ -1039,7 +1039,7 @@ body.modal-open {
     display: flex;
     align-items: center;
     margin-bottom: 0px;
-    position: sticky; /* Hält den Header beim Scrollen oben */
+    position: sticky; /* HÃ¤lt den Header beim Scrollen oben */
     top: 0;
     background-color: #f4f4f4;
     padding-top: 10px;
@@ -1075,13 +1075,13 @@ body.modal-open {
     margin-top: 0;
     border-style: solid; /* Macht den Rahmen durchgezogen statt gestrichelt */
 }
-/* ===== NEU: Styling für klickbaren Titel zum Kopieren ===== */
+/* ===== NEU: Styling fÃ¼r klickbaren Titel zum Kopieren ===== */
 #currentShipmentDetails #shipmentDetailTitle:hover {
     color: var(--primary-color); /* Hebt den Text farblich hervor */
-    text-decoration: underline;  /* Unterstreicht den Text beim Überfahren mit der Maus */
+    text-decoration: underline;  /* Unterstreicht den Text beim Ãberfahren mit der Maus */
     text-decoration-style: dotted;
 }
-/* ===== NEU: Styling für "Kopiert!"-Meldung bei HU-Nummern ===== */
+/* ===== NEU: Styling fÃ¼r "Kopiert!"-Meldung bei HU-Nummern ===== */
 
 /* Positioniert das Pseudo-Element relativ zur HU-Nummer */
 #currentShipmentDetails .hu-value {
@@ -1112,7 +1112,7 @@ body.modal-open {
     animation: fade-in-out 1.5s ease-in-out;
 }
 
-/* Die Keyframe-Animation für das Ein- und Ausblenden */
+/* Die Keyframe-Animation fÃ¼r das Ein- und Ausblenden */
 @keyframes fade-in-out {
     0% {
         opacity: 0;
@@ -1159,17 +1159,17 @@ body.modal-open {
 }
 
 /* =============================================================== */
-/* HIER DEN NEUEN CODE EINFÜGEN                                     */
+/* HIER DEN NEUEN CODE EINFÃGEN                                     */
 /* =============================================================== */
-/* ===== NEU: Stile für QR-Code in der Tabelle ===== */
+/* ===== NEU: Stile fÃ¼r QR-Code in der Tabelle ===== */
 
-/* Die neue Spalte standardmäßig (auf Mobilgeräten) komplett ausblenden */
+/* Die neue Spalte standardmÃ¤Ãig (auf MobilgerÃ¤ten) komplett ausblenden */
 th.qr-code-header,
 td.qr-code-cell {
     display: none;
 }
 
-/* Der Container für den QR-Code, um ihn zu zentrieren */
+/* Der Container fÃ¼r den QR-Code, um ihn zu zentrieren */
 .qr-code-cell div {
     display: flex;
     justify-content: center;
@@ -1177,9 +1177,9 @@ td.qr-code-cell {
     padding: 5px 0;
 }
 
-/* Media Query für "Desktop"-Ansichten (Bildschirme breiter als 992px) */
+/* Media Query fÃ¼r "Desktop"-Ansichten (Bildschirme breiter als 992px) */
 @media (min-width: 992px) {
-    /* Ändert das Layout der Tabelle zurück zu einer klassischen Tabellenansicht */
+    /* Ãndert das Layout der Tabelle zurÃ¼ck zu einer klassischen Tabellenansicht */
     thead {
         display: table-header-group;
     }
@@ -1199,7 +1199,7 @@ td.qr-code-cell {
         border-bottom: none;
         padding: 8px;
         position: static;
-        padding-left: 8px; /* Padding zurücksetzen */
+        padding-left: 8px; /* Padding zurÃ¼cksetzen */
         vertical-align: middle;
     }
     /* Das "data-label" aus der mobilen Ansicht auf dem Desktop ausblenden */
@@ -1211,7 +1211,7 @@ td.qr-code-cell {
     th.qr-code-header,
     td.qr-code-cell {
         display: table-cell;
-        width: 80px; /* Eine feste Breite für die Spalte */
+        width: 80px; /* Eine feste Breite fÃ¼r die Spalte */
         vertical-align: middle;
         text-align: center;
         padding: 5px;
@@ -1223,13 +1223,13 @@ td.qr-code-cell {
         display: flex; /* Macht die Zelle zu einem Flexbox-Container */
         justify-content: flex-end; /* Richtet die Buttons rechts aus */
         align-items: center; /* Zentriert die Buttons vertikal in der Zelle */
-        gap: 6px; /* Fügt einen sauberen Abstand von 6px zwischen den Buttons hinzu */
+        gap: 6px; /* FÃ¼gt einen sauberen Abstand von 6px zwischen den Buttons hinzu */
     }
 
-/* Macht die HU-Nummer im Detail-Modal klickbar und fügt visuelles Feedback hinzu */
+/* Macht die HU-Nummer im Detail-Modal klickbar und fÃ¼gt visuelles Feedback hinzu */
 #huDetailsContent #huDetailsNumber {
     cursor: pointer;
-    position: relative; /* Wichtig für die "Kopiert!"-Meldung */
+    position: relative; /* Wichtig fÃ¼r die "Kopiert!"-Meldung */
     transition: background-color 0.2s;
 }
 
@@ -1237,7 +1237,7 @@ td.qr-code-cell {
     background-color: #e9e9e9; /* Leichter Hover-Effekt */
 }
 
-/* Stil für die "Kopiert!"-Meldung (verwendet die existierende Animation) */
+/* Stil fÃ¼r die "Kopiert!"-Meldung (verwendet die existierende Animation) */
 #huDetailsContent #huDetailsNumber.copied::after {
     content: 'Kopiert!';
     position: absolute;
@@ -1255,8 +1255,8 @@ td.qr-code-cell {
     animation: fade-in-out 1.5s ease-in-out;
 }
 
-/* --- ENDE DER ÄNDERUNG --- */
-/* ===== NEU: STIL FÜR BLINKENDE ZEICHEN BEI HU-VERDACHTSFÄLLEN ===== */
+/* --- ENDE DER ÃNDERUNG --- */
+/* ===== NEU: STIL FÃR BLINKENDE ZEICHEN BEI HU-VERDACHTSFÃLLEN ===== */
 
 /* Die Keyframe-Animation, die das Blinken erzeugt */
 @keyframes blink {
@@ -1281,8 +1281,20 @@ td.qr-code-cell {
     animation-duration: 1.5s; /* Dauer eines Blink-Zyklus */
     animation-iteration-count: infinite; /* Endloses Blinken */
 }
-
-
-
-
-
+.truck-switch-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+.truck-switch-row:last-child {
+    border-bottom: none;
+}
+.truck-switch-label {
+    font-size: 0.85em;
+    color: #333;
+    flex: 1;
+    margin-right: 10px;
+    word-break: break-all;
+}
