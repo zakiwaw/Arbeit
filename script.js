@@ -143,7 +143,7 @@ const suspicionDeclineBtnEl = document.getElementById('suspicionDeclineBtn');
                         }
                         const hus = huListText.split(/[\s\n\r]+/).map(hu => hu.trim().toUpperCase()).filter(hu => hu.length > 0);
                         if (hus.length === 0) {
-                            alert("Keine gültigen HU-Nummern in der Liste gefunden.");
+                            alert("Keine gÃ¼ltigen HU-Nummern in der Liste gefunden.");
                             return { success: false };
                         }
         
@@ -184,18 +184,18 @@ const suspicionDeclineBtnEl = document.getElementById('suspicionDeclineBtn');
                         let message = '';
                         let messageType = 'green';
                         if (addedCount > 0 && duplicateCount === 0) {
-                            message = `${addedCount} neue HU(s) zum Auftrag ${mainOrderNumber} hinzugefügt.`;
+                            message = `${addedCount} neue HU(s) zum Auftrag ${mainOrderNumber} hinzugefÃ¼gt.`;
                         } else if (addedCount > 0 && duplicateCount > 0) {
-                            message = `${addedCount} neue HU(s) hinzugefügt, ${duplicateCount} Duplikate übersprungen.`;
+                            message = `${addedCount} neue HU(s) hinzugefÃ¼gt, ${duplicateCount} Duplikate Ã¼bersprungen.`;
                             messageType = 'orange';
                         } else if (addedCount === 0 && duplicateCount > 0) {
-                            alert(`Import für ${mainOrderNumber}:\n\nKeine neuen HUs gefunden. Alle ${duplicateCount} eingegebenen HUs sind bereits im Auftrag vorhanden.`);
+                            alert(`Import fÃ¼r ${mainOrderNumber}:\n\nKeine neuen HUs gefunden. Alle ${duplicateCount} eingegebenen HUs sind bereits im Auftrag vorhanden.`);
                         }
                         
                         return { success: true, message: message, messageType: messageType, baseNumber: mainOrderNumber };
                     }
         
-                    // Listener für den "Importieren & Speichern"-Button (schließt das Modal)
+                    // Listener fÃ¼r den "Importieren & Speichern"-Button (schlieÃt das Modal)
                     saveHuListButtonEl.addEventListener('click', () => {
                         const result = saveAndProcessHuListData();
                         if (result.success) {
@@ -209,7 +209,7 @@ const suspicionDeclineBtnEl = document.getElementById('suspicionDeclineBtn');
                         }
                     });
         
-                    // Listener für den neuen "+"-Button (speichert und leert die Felder)
+                    // Listener fÃ¼r den neuen "+"-Button (speichert und leert die Felder)
                     addAndContinueHuButtonEl.addEventListener('click', () => {
                         const result = saveAndProcessHuListData();
                         if (result.success) {
@@ -217,7 +217,7 @@ const suspicionDeclineBtnEl = document.getElementById('suspicionDeclineBtn');
                             if (result.message) {
                                displayError(result.message, result.messageType, 5000);
                             }
-                            // Felder für die nächste Eingabe leeren
+                            // Felder fÃ¼r die nÃ¤chste Eingabe leeren
                             mainOrderNumberInputEl.value = '';
                             huListTextareaEl.value = '';
                             mainOrderNumberInputEl.focus();
@@ -228,6 +228,7 @@ const suspicionDeclineBtnEl = document.getElementById('suspicionDeclineBtn');
     const WEB_APP_URL_BACKEND = 'https://script.google.com/macros/s/AKfycbyBtlm37WxzXdFCDjQuSIWfnQiTny6gwrmXuoq_cacGY9_bkqZxuuW7aJEqLuHJhWYg/exec'; // Mail_13
     const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzudnkXw5mJu-l85XYtIOhTY-eahic4IYNKYyi1MsPk3jLxH9tmNWbOuv8-z0-saGAuEQ/exec';
     const LOCAL_STORAGE_KEY = 'frachtSicherungMobile_V8_18_Refactored';
+const TRUCK_STORAGE_KEY = 'frachtTruckStates';
     const SUFFIX_LENGTH = 4;
     const MITARBEITER_NAME = "Zakaria Bisbiss";
     const RAC_NUMMER = "DE/RA/00889-07";
@@ -241,18 +242,18 @@ const suspicionDeclineBtnEl = document.getElementById('suspicionDeclineBtn');
         "294": "DSV",
         "334": "DHL",
         "341": "DWF",
-        "355201": "Kühne + Nagel",
+        "355201": "KÃ¼hne + Nagel",
         "360": "Maersk",
         "381": "DSV",
         "524": "DSV",
-        "541": "Kühne + Nagel",
+        "541": "KÃ¼hne + Nagel",
         "595": "DSV",
         "602201": "DSV",
         "603": "DSV",
         "607": "Maersk",
         "608": "WWS Freight",
         "613": "DSV",
-        "615": "Kühne + Nagel",
+        "615": "KÃ¼hne + Nagel",
         "631": "Maersk",
         "637": "DSV",
         "726": "DHL",
@@ -283,7 +284,7 @@ const suspicionDeclineBtnEl = document.getElementById('suspicionDeclineBtn');
         "815": "DHL",
         "817": "DSV",
         "819202": "DHL",
-        "824": "Kühne + Nagel",
+        "824": "KÃ¼hne + Nagel",
         "862": "DSV",
         "865": "DHL",
         "868": "WWS Freight",
@@ -297,33 +298,33 @@ const suspicionDeclineBtnEl = document.getElementById('suspicionDeclineBtn');
         "959203": "DHL",
         "981": "DHL",
         "981299": "DHL",
-        "985202": "Kühne + Nagel",
+        "985202": "KÃ¼hne + Nagel",
         "996001": "DB Schenker",
         "9969726": "DB Schenker",
         "9969729": "DB Schenker",
-        "9974021": "Kühne + Nagel",
-        "9974024": "Kühne + Nagel",
-        "9974029": "Kühne + Nagel",
-        "9974051": "Kühne + Nagel",
-        "9974054": "Kühne + Nagel",
-        "9974071": "Kühne + Nagel",
-        "9974074": "Kühne + Nagel",
-        "9974079": "Kühne + Nagel",
-        "9974101": "Kühne + Nagel",
-        "9974104": "Kühne + Nagel",
-        "9974109": "Kühne + Nagel",
-        "9974141": "Kühne + Nagel",
-        "9974144": "Kühne + Nagel",
-        "9974149": "Kühne + Nagel",
-        "9974221": "Kühne + Nagel",
-        "9974224": "Kühne + Nagel",
-        "9974229": "Kühne + Nagel",
-        "9974251": "Kühne + Nagel",
-        "9974261": "Kühne + Nagel",
-        "9974264": "Kühne + Nagel",
-        "9974269": "Kühne + Nagel",
-        "9975001": "Kühne + Nagel",
-        "9975006": "Kühne + Nagel",
+        "9974021": "KÃ¼hne + Nagel",
+        "9974024": "KÃ¼hne + Nagel",
+        "9974029": "KÃ¼hne + Nagel",
+        "9974051": "KÃ¼hne + Nagel",
+        "9974054": "KÃ¼hne + Nagel",
+        "9974071": "KÃ¼hne + Nagel",
+        "9974074": "KÃ¼hne + Nagel",
+        "9974079": "KÃ¼hne + Nagel",
+        "9974101": "KÃ¼hne + Nagel",
+        "9974104": "KÃ¼hne + Nagel",
+        "9974109": "KÃ¼hne + Nagel",
+        "9974141": "KÃ¼hne + Nagel",
+        "9974144": "KÃ¼hne + Nagel",
+        "9974149": "KÃ¼hne + Nagel",
+        "9974221": "KÃ¼hne + Nagel",
+        "9974224": "KÃ¼hne + Nagel",
+        "9974229": "KÃ¼hne + Nagel",
+        "9974251": "KÃ¼hne + Nagel",
+        "9974261": "KÃ¼hne + Nagel",
+        "9974264": "KÃ¼hne + Nagel",
+        "9974269": "KÃ¼hne + Nagel",
+        "9975001": "KÃ¼hne + Nagel",
+        "9975006": "KÃ¼hne + Nagel",
         "998": "DSV",
         "9994951": "DB Schenker",
         "9994954": "DB Schenker",
@@ -350,10 +351,68 @@ const suspicionDeclineBtnEl = document.getElementById('suspicionDeclineBtn');
     let currentBatchGlobalNote = null;
     let isBatchNotePromptRequired = true;
     let pendingFirstBatchScanData = null;
-    let suspicionQueue = []; // Speichert die Liste der Verdachtsfälle
+    let suspicionQueue = []; // Speichert die Liste der VerdachtsfÃ¤lle
     let currentSuspicionIndex = 0; // Speichert, welcher Vorschlag gerade angezeigt wird
     
 
+function loadTrucks() {
+    const data = localStorage.getItem(TRUCK_STORAGE_KEY);
+    return data ? JSON.parse(data) : {};
+}
+function saveTrucks(trucks) {
+    localStorage.setItem(TRUCK_STORAGE_KEY, JSON.stringify(trucks));
+}
+function registerTruck(truckId, label) {
+    const trucks = loadTrucks();
+    if (!trucks[truckId]) {
+        trucks[truckId] = { label: label, active: true };
+        saveTrucks(trucks);
+    }
+}
+function isTruckActive(truckId) {
+    if (!truckId) return true;
+    const trucks = loadTrucks();
+    if (!trucks[truckId]) return true;
+    return trucks[truckId].active !== false;
+}
+function getTruckIdForShipment(shipment) {
+    if (!shipment) return null;
+    if (shipment.parentOrderNumber) return 'VVL_' + shipment.parentOrderNumber;
+    if (shipment.truckId) return shipment.truckId;
+    return null;
+}
+function renderTruckSwitches() {
+    const container = document.getElementById('truck-switches-container');
+    if (!container) return;
+    const trucks = loadTrucks();
+    const keys = Object.keys(trucks);
+    if (keys.length === 0) {
+        container.innerHTML = '<p style="color:#888;font-size:0.85em;margin:8px 0">Noch keine LKW importiert.</p>';
+        return;
+    }
+    container.innerHTML = keys.map(truckId => {
+        const truck = trucks[truckId];
+        const isActive = truck.active !== false;
+        return `<div class="truck-switch-row">
+            <span class="truck-switch-label">${escapeHtml(truck.label)}</span>
+            <label class="batch-toggle-switch">
+                <input type="checkbox" ${isActive ? 'checked' : ''} data-truck-id="${escapeHtml(truckId)}">
+                <span class="batch-slider"></span>
+            </label>
+        </div>`;
+    }).join('');
+    container.querySelectorAll('input[data-truck-id]').forEach(cb => {
+        cb.addEventListener('change', function() {
+            const trucks = loadTrucks();
+            if (trucks[this.dataset.truckId]) {
+                trucks[this.dataset.truckId].active = this.checked;
+                saveTrucks(trucks);
+                renderTable();
+            }
+        });
+    });
+}
+// --- ENDE LKW-VERWALTUNG ---
 
         // --- Hilfsfunktionen: Persistenz ---
         function loadShipments() {
@@ -375,14 +434,14 @@ const suspicionDeclineBtnEl = document.getElementById('suspicionDeclineBtn');
             });
             return shipments;
         }
-// In der Nähe von calculateCurrentCountedPieces einfügen
+// In der NÃ¤he von calculateCurrentCountedPieces einfÃ¼gen
 
 function calculateGoodsReceiptCount(scannedItems) {
     if (!Array.isArray(scannedItems)) return 0;
     return scannedItems.filter(item => item.status === 'Wareneingang' && !item.isCancelled).length;
 }
 
-// --- NEUE HILFSFUNKTIONEN FÜR DEN LADE-SPINNER ---
+// --- NEUE HILFSFUNKTIONEN FÃR DEN LADE-SPINNER ---
 function showLoader() {
     if (loadingOverlayEl) {
         loadingOverlayEl.classList.add('visible');
@@ -399,8 +458,8 @@ function hideLoader() {
 // ERSETZEN SIE DIE ALTE findSimilarExpectedHu FUNKTION MIT DIESER NEUEN VERSION
 
 /**
- * Findet ALLE ähnlichen HUs in den Listen und gibt für jede den Eintrag
- * mit den Detaildaten (wie grossWeight) zurück.
+ * Findet ALLE Ã¤hnlichen HUs in den Listen und gibt fÃ¼r jede den Eintrag
+ * mit den Detaildaten (wie grossWeight) zurÃ¼ck.
  * @param {string} scannedHu Die gescannte, unerwartete HU.
  * @returns {Array<object>} Ein Array von HU-Item-Objekten mit allen Details oder ein leeres Array.
  */
@@ -408,9 +467,9 @@ function findAllSimilarExpectedHus(scannedHu) {
     const shipments = loadShipments();
     const upperScannedHu = scannedHu.toUpperCase();
     const similarItemsWithDetails = [];
-    const foundCorrectHuNumbers = new Set(); // Verhindert doppelte Vorschläge
+    const foundCorrectHuNumbers = new Set(); // Verhindert doppelte VorschlÃ¤ge
 
-    // Schritt 1: Finde alle potenziell korrekten HU-Nummern durch Ähnlichkeitssuche.
+    // Schritt 1: Finde alle potenziell korrekten HU-Nummern durch Ãhnlichkeitssuche.
     for (const baseNumber in shipments) {
         const shipment = shipments[baseNumber];
         if (shipment.isHuListOrder && shipment.scannedItems) {
@@ -424,14 +483,14 @@ function findAllSimilarExpectedHus(scannedHu) {
         }
     }
 
-    // Wenn keine Ähnlichkeiten gefunden wurden, abbrechen.
+    // Wenn keine Ãhnlichkeiten gefunden wurden, abbrechen.
     if (foundCorrectHuNumbers.size === 0) {
         return [];
     }
 
-    // Schritt 2: Für jede gefundene korrekte HU-Nummer, hole den "Master-Eintrag" mit den Details.
+    // Schritt 2: FÃ¼r jede gefundene korrekte HU-Nummer, hole den "Master-Eintrag" mit den Details.
     foundCorrectHuNumbers.forEach(correctHu => {
-        // Erneute Suche in allen Sendungen nach dem Master-Eintrag für diese HU
+        // Erneute Suche in allen Sendungen nach dem Master-Eintrag fÃ¼r diese HU
         for (const baseNumber in shipments) {
             const shipment = shipments[baseNumber];
             if (shipment.isHuListOrder && shipment.scannedItems) {
@@ -443,11 +502,11 @@ function findAllSimilarExpectedHus(scannedHu) {
                 
                 if (itemWithDetails) {
                     similarItemsWithDetails.push(itemWithDetails);
-                    break; // Nächste correctHu bearbeiten
+                    break; // NÃ¤chste correctHu bearbeiten
                 } else if (allItemsForThisHu.length > 0) {
                     // Fallback: Nimm den ersten Eintrag, wenn keiner explizit Gewicht hat
                     similarItemsWithDetails.push(allItemsForThisHu[0]);
-                    break; // Nächste correctHu bearbeiten
+                    break; // NÃ¤chste correctHu bearbeiten
                 }
             }
         }
@@ -459,13 +518,13 @@ function findAllSimilarExpectedHus(scannedHu) {
 
 /**
  * Zeigt den aktuellen Korrekturvorschlag aus der Warteschlange an.
- * @param {string} scannedInput Die ursprünglich gescannte HU.
+ * @param {string} scannedInput Die ursprÃ¼nglich gescannte HU.
  * @param {number} batchIndex Der Index des Items im aktuellen Batch.
  */
 function showSuspicionModal(scannedInput, batchIndex) {
-    // Prüfen, ob noch Vorschläge in der Warteschlange sind
+    // PrÃ¼fen, ob noch VorschlÃ¤ge in der Warteschlange sind
     if (currentSuspicionIndex >= suspicionQueue.length) {
-        closeSuspicionModal(); // Keine Vorschläge mehr, Modal schließen
+        closeSuspicionModal(); // Keine VorschlÃ¤ge mehr, Modal schlieÃen
         return;
     }
 
@@ -480,7 +539,7 @@ function showSuspicionModal(scannedInput, batchIndex) {
         ? `Handelt es sich um die Sendung mit Gewicht: ${weight}?`
         : `Ist dies die korrekte Sendungsnummer?`;
 
-    // Metadaten für die Aktionen speichern
+    // Metadaten fÃ¼r die Aktionen speichern
     suspicionBatchIndexEl.value = batchIndex;
     suspicionExpectedHuValueEl.value = expectedItem.rawInput;
 
@@ -488,7 +547,7 @@ function showSuspicionModal(scannedInput, batchIndex) {
     if (currentSuspicionIndex === suspicionQueue.length - 1) {
         suspicionDeclineBtnEl.textContent = 'Nein, beibehalten';
     } else {
-        suspicionDeclineBtnEl.textContent = 'Nein, nächsten Vorschlag anzeigen';
+        suspicionDeclineBtnEl.textContent = 'Nein, nÃ¤chsten Vorschlag anzeigen';
     }
 
     // Modal anzeigen, falls es noch nicht sichtbar ist
@@ -503,7 +562,7 @@ function closeSuspicionModal() {
         suspicionModalEl.classList.remove('visible');
         document.body.classList.remove('modal-open');
     }
-    // Wichtig: Warteschlange und Index für den nächsten Durchlauf zurücksetzen
+    // Wichtig: Warteschlange und Index fÃ¼r den nÃ¤chsten Durchlauf zurÃ¼cksetzen
     suspicionQueue = [];
     currentSuspicionIndex = 0;
     focusShipmentInput();
@@ -525,7 +584,7 @@ function showOpenHusSummary() {
 
     const processedUeberzaehligHus = new Set();
 
-    // 1. Zuerst eine Liste aller erwarteten HUs aus allen HU-Listen-Aufträgen erstellen
+    // 1. Zuerst eine Liste aller erwarteten HUs aus allen HU-Listen-AuftrÃ¤gen erstellen
     const expectedHuSet = new Set();
     Object.values(shipments).forEach(shipment => {
         if (shipment.isHuListOrder && shipment.scannedItems) {
@@ -537,9 +596,10 @@ function showOpenHusSummary() {
         }
     });
 
-    // 2. Alle Sendungen durchgehen und die Daten für die Tabs sammeln
+    // 2. Alle Sendungen durchgehen und die Daten fÃ¼r die Tabs sammeln
     Object.keys(shipments).forEach(baseNumber => {
         const shipment = shipments[baseNumber];
+ if (!isTruckActive(getTruckIdForShipment(shipment))) return;
 
         // Dunkelalarm-Logik
         if (shipment.scannedItems && shipment.scannedItems.length > 0) {
@@ -553,7 +613,7 @@ function showOpenHusSummary() {
             }
         }
 
-        // ERWEITERTE LOGIK FÜR ÜBERZÄHLIGE SCANS
+        // ERWEITERTE LOGIK FÃR ÃBERZÃHLIGE SCANS
         if (shipment.scannedItems && shipment.scannedItems.length > 0) {
             const allUeberzaehligItems = shipment.scannedItems.filter(item =>
                 item.status !== 'Anstehend' &&
@@ -597,7 +657,7 @@ function showOpenHusSummary() {
             }
         }
 
-        // Logik für HU-Listen-Aufträge (Offene Sicherung & Fehlende WE)
+        // Logik fÃ¼r HU-Listen-AuftrÃ¤ge (Offene Sicherung & Fehlende WE)
         if (shipment.isHuListOrder && shipment.scannedItems && shipment.scannedItems.length > 0) {
             const manifestSlots = shipment.scannedItems.filter(item =>
                 item.status === 'Anstehend' || securityClearanceStatuses.includes(item.status)
@@ -659,7 +719,7 @@ function showOpenHusSummary() {
         ueberzaehligBadge.classList.toggle('hidden', totalUeberzaehlig === 0);
     }
 
-    // 4. HTML für die Listen generieren
+    // 4. HTML fÃ¼r die Listen generieren
     const sortByCountryAndOrder = (a, b) => (a.destinationCountry || 'zz').localeCompare(b.destinationCountry || 'zz') || (a.orderNumber || a.hawb).localeCompare(b.orderNumber || a.hawb);
     const generateHuListHtml = (items, allScannedItemsForContext) => {
         if (!items || items.length === 0) return '';
@@ -678,7 +738,7 @@ function showOpenHusSummary() {
                 return `
                 <li>
                     <div class="pending-item-details">
-                        <span class="pending-vse hu-value ${alarmClass}" style="cursor:pointer;" title="Klicken zum Kopieren. Details für ${escapeHtml(item.rawInput)} anzeigen">${escapeHtml(item.rawInput)}</span>
+                        <span class="pending-vse hu-value ${alarmClass}" style="cursor:pointer;" title="Klicken zum Kopieren. Details fÃ¼r ${escapeHtml(item.rawInput)} anzeigen">${escapeHtml(item.rawInput)}</span>
                         <span class="pending-sendnr">${escapeHtml(item.sendnr)}</span>
                     </div>
                 </li>`;
@@ -691,7 +751,7 @@ function showOpenHusSummary() {
                 const positionHtml = isManOrderContext && item.position ? `<span class="position-number">${item.position}.</span>` : ``;
                 const hasDunkelalarm = dunkelalarmedNumbers.has(item.rawInput);
                 const alarmClass = hasDunkelalarm ? 'has-dunkelalarm' : '';
-               return `<li>${positionHtml}<span class="hu-value ${alarmClass}" style="cursor:pointer;" title="Details für ${escapeHtml(item.rawInput)} anzeigen">${escapeHtml(item.rawInput)}</span></li>`;
+               return `<li>${positionHtml}<span class="hu-value ${alarmClass}" style="cursor:pointer;" title="Details fÃ¼r ${escapeHtml(item.rawInput)} anzeigen">${escapeHtml(item.rawInput)}</span></li>`;
             }).join('');
             return `<ul class="hu-list">${listItems}</ul>`;
         }
@@ -727,28 +787,28 @@ function showOpenHusSummary() {
     const dunkelalarmArray = Object.values(dunkelalarmItemsByOrder).sort(sortByCountryAndOrder);
     const ueberzaehligArray = Object.values(ueberzaehligItemsByOrder).sort(sortByCountryAndOrder);
 
-    openHusListContainerEl.innerHTML = openSecurityHusByOrder.map(order => generateHtmlForOrderGroup(order, generateHuListHtml(order.pendingHus, order.scannedItems))).join('') || '<p class="no-open-hus-message">Glückwunsch! Alle HUs sind sicherheitstechnisch bearbeitet.</p>';
+    openHusListContainerEl.innerHTML = openSecurityHusByOrder.map(order => generateHtmlForOrderGroup(order, generateHuListHtml(order.pendingHus, order.scannedItems))).join('') || '<p class="no-open-hus-message">GlÃ¼ckwunsch! Alle HUs sind sicherheitstechnisch bearbeitet.</p>';
     missingReceiptHusListContainerEl.innerHTML = missingReceiptHusByOrder.map(order => generateHtmlForOrderGroup(order, generateHuListHtml(order.pendingHus, order.scannedItems))).join('') || '<p class="no-open-hus-message">Perfekt! Alle HUs wurden im Wareneingang erfasst.</p>';
-    dunkelalarmHusListContainerEl.innerHTML = dunkelalarmArray.map(data => generateHtmlForOrderGroup(data, generateHuListHtml(data.items, data.scannedItems), true)).join('') || '<p class="no-open-hus-message">Keine Einträge mit Status "Dunkelalarm" gefunden.</p>';
+    dunkelalarmHusListContainerEl.innerHTML = dunkelalarmArray.map(data => generateHtmlForOrderGroup(data, generateHuListHtml(data.items, data.scannedItems), true)).join('') || '<p class="no-open-hus-message">Keine EintrÃ¤ge mit Status "Dunkelalarm" gefunden.</p>';
     
-    // ERWEITERTE HTML-GENERIERUNG FÜR DEN "ÜBERZÄHLIG"-TAB
+    // ERWEITERTE HTML-GENERIERUNG FÃR DEN "ÃBERZÃHLIG"-TAB
     
-    // ===== ÄNDERUNG HIER =====
+    // ===== ÃNDERUNG HIER =====
     // Wir rufen nicht mehr `generateHtmlForOrderGroup` auf, sondern generieren direkt die Listen.
     // Das entfernt die Titel (`hu-order-title`).
     let ueberzaehligHtml = ueberzaehligArray.map(data => generateHuListHtml(data.items, data.scannedItems)).join('');
-    // ===== ENDE DER ÄNDERUNG =====
+    // ===== ENDE DER ÃNDERUNG =====
 
-    console.log("Verdächtige Paare gefunden:", suspiciousPairs);
+    console.log("VerdÃ¤chtige Paare gefunden:", suspiciousPairs);
     if (suspiciousPairs.length > 0) {
-        ueberzaehligHtml += `<h3 style="margin-top: 20px; color: var(--danger-color); border-top: 2px solid #eee; padding-top: 15px;">Mögliche Tippfehler (Verdachte):</h3>`;
+        ueberzaehligHtml += `<h3 style="margin-top: 20px; color: var(--danger-color); border-top: 2px solid #eee; padding-top: 15px;">MÃ¶gliche Tippfehler (Verdachte):</h3>`;
         suspiciousPairs.forEach((pair, index) => {
             const diffHtml = highlightDifference(pair.surplus.rawInput, pair.expected);
 
             ueberzaehligHtml += `
                 <div class="hu-order-group" style="border-left-color: var(--warning-color); padding-left: 10px; margin-bottom: 10px;">
                     <ul class="hu-list" style="font-family: monospace; padding-left: 5px; list-style-type: none;">
-<li><strong style="color: #333;">Gescant: </strong>&nbsp;<span class="hu-value has-dunkelalarm" style="cursor:pointer;" title="Klicken zum Kopieren. Details für ${escapeHtml(pair.surplus.rawInput)} anzeigen">${diffHtml.html1}</span></li>
+<li><strong style="color: #333;">Gescant: </strong>&nbsp;<span class="hu-value has-dunkelalarm" style="cursor:pointer;" title="Klicken zum Kopieren. Details fÃ¼r ${escapeHtml(pair.surplus.rawInput)} anzeigen">${diffHtml.html1}</span></li>
                         <li><strong style="color: #333;">Erwartet:</strong>&nbsp;<span class="hu-value" style="cursor:pointer;" title="Klicken zum Kopieren">${diffHtml.html2}</span></li>
                     </ul>
                     ${index < suspiciousPairs.length - 1 ? '<hr style="margin: 5px 0; border: none; border-top: 1px dashed #ccc;">' : ''}
@@ -757,7 +817,7 @@ function showOpenHusSummary() {
         });
     }
     
-    ueberzaehligHusListContainerEl.innerHTML = ueberzaehligHtml || '<p class="no-open-hus-message">Keine überzähligen Scans gefunden.</p>';
+    ueberzaehligHusListContainerEl.innerHTML = ueberzaehligHtml || '<p class="no-open-hus-message">Keine Ã¼berzÃ¤hligen Scans gefunden.</p>';
 
     // 6. Initialen Zustand der Tabs setzen
     showOpenSecurityHusBtnEl.classList.add('active');
@@ -780,8 +840,8 @@ function showOpenHusSummary() {
         
         
         
-// --- ENDE DER ÄNDERUNG ---
-// --- ENDE DER ÄNDERUNG ---
+// --- ENDE DER ÃNDERUNG ---
+// --- ENDE DER ÃNDERUNG ---
         // --- START: NEUE HILFSFUNKTION ---
         function calculateXryKombiCount(scannedItems) {
             if (!Array.isArray(scannedItems)) return 0;
@@ -852,26 +912,27 @@ function isHuExpected(huNumber) {
     if (!upperHu) return true;
 
     const shipments = loadShipments();
-    let hasAnyHuListOrder = false; // Flag, um zu prüfen, ob es überhaupt Listen gibt
+    let hasAnyHuListOrder = false; // Flag, um zu prÃ¼fen, ob es Ã¼berhaupt Listen gibt
 
-    // Zuerst prüfen, ob es überhaupt HU-Listen-Aufträge gibt
+    // Zuerst prÃ¼fen, ob es Ã¼berhaupt HU-Listen-AuftrÃ¤ge gibt
     for (const baseNumber in shipments) {
         if (shipments[baseNumber].isHuListOrder) {
             hasAnyHuListOrder = true;
-            break; // Sobald einer gefunden wurde, können wir die Schleife verlassen
+            break; // Sobald einer gefunden wurde, kÃ¶nnen wir die Schleife verlassen
         }
     }
 
     // --- HIER IST DIE NEUE LOGIK ---
-    // Wenn es keine HU-Listen gibt, ist JEDE HU quasi "erwartet" (löst keinen Fehler aus)
+    // Wenn es keine HU-Listen gibt, ist JEDE HU quasi "erwartet" (lÃ¶st keinen Fehler aus)
     if (!hasAnyHuListOrder) {
         return true;
     }
     // --- ENDE DER NEUEN LOGIK ---
 
-    // Wenn es HU-Listen gibt, prüfen wir jetzt, ob die HU auf einer davon steht
+    // Wenn es HU-Listen gibt, prÃ¼fen wir jetzt, ob die HU auf einer davon steht
     for (const baseNumber in shipments) {
         const shipment = shipments[baseNumber];
+  if (!isTruckActive(getTruckIdForShipment(shipment))) continue;
         if (shipment.isHuListOrder && shipment.scannedItems) {
             if (shipment.scannedItems.some(item => item.rawInput.toUpperCase() === upperHu)) {
                 return true; // Gefunden! HU wird erwartet.
@@ -883,15 +944,15 @@ function isHuExpected(huNumber) {
     return false;
 }
 /**
- * Kürzt lange Spediteurnamen für eine saubere Anzeige basierend auf vordefinierten Regeln.
- * @param {string} fullName Der vollständige Name des Spediteurs.
- * @returns {string} Der gekürzte Name oder der Originalname, falls keine Regel zutrifft.
+ * KÃ¼rzt lange Spediteurnamen fÃ¼r eine saubere Anzeige basierend auf vordefinierten Regeln.
+ * @param {string} fullName Der vollstÃ¤ndige Name des Spediteurs.
+ * @returns {string} Der gekÃ¼rzte Name oder der Originalname, falls keine Regel zutrifft.
  */
 /**
- * Spielt den Fehlerton für eine definierte Dauer (500ms) ab.
+ * Spielt den Fehlerton fÃ¼r eine definierte Dauer (500ms) ab.
  */
 /**
- * Spielt den Fehlerton für eine definierte Dauer (500ms) mit maximaler Lautstärke ab.
+ * Spielt den Fehlerton fÃ¼r eine definierte Dauer (500ms) mit maximaler LautstÃ¤rke ab.
  */
 function playShortErrorSound() {
     if (errorSoundEl) {
@@ -906,7 +967,7 @@ function playShortErrorSound() {
     }
 }
 
-// NEUE FUNKTION HINZUFÜGEN
+// NEUE FUNKTION HINZUFÃGEN
 function playNachlieferungSound() {
     if (nachlieferungSoundEl) {
         nachlieferungSoundEl.volume = 1.0;
@@ -930,7 +991,7 @@ function shortenForwarderName(fullName) {
 
     const lowerCaseName = fullName.toLowerCase();
 
-    if (lowerCaseName.includes('kühne + nagel') || lowerCaseName.includes('kühne')) return 'Kühne + Nagel';
+    if (lowerCaseName.includes('kÃ¼hne + nagel') || lowerCaseName.includes('kÃ¼hne')) return 'KÃ¼hne + Nagel';
     if (lowerCaseName.includes('dhl') || lowerCaseName.includes('danmar')) return 'DHL';
     if (lowerCaseName.includes('ups')) return 'UPS';
     if (lowerCaseName.includes('maersk') || lowerCaseName.includes('senator')) return 'Maersk';
@@ -944,15 +1005,15 @@ function shortenForwarderName(fullName) {
     if (lowerCaseName.includes('hermes')) return 'HERMES';
     if (lowerCaseName.includes('wws') || lowerCaseName.includes('wws freight')) return 'WWS';
     if (lowerCaseName.includes('tra')) return 'TRA';
-    // --- NEUE EINTRÄGE AUS DER EXCEL-LISTE ---
+    // --- NEUE EINTRÃGE AUS DER EXCEL-LISTE ---
     if (lowerCaseName.includes('geodis')) return 'Geodis';
     if (lowerCaseName.includes('dwf')) return 'DWF';
 
-    // Wenn keine Regel zutrifft, den Originalnamen zurückgeben
+    // Wenn keine Regel zutrifft, den Originalnamen zurÃ¼ckgeben
     return fullName;
 }
 /**
- * Vergleicht zwei Strings und gibt true zurück, wenn sie die gleiche Länge haben
+ * Vergleicht zwei Strings und gibt true zurÃ¼ck, wenn sie die gleiche LÃ¤nge haben
  * und sich an genau einer Position unterscheiden.
  * @param {string} str1 Der erste String.
  * @param {string} str2 Der zweite String.
@@ -960,7 +1021,7 @@ function shortenForwarderName(fullName) {
  */
 function areStringsSimilar(str1, str2) {
     if (str1.length !== str2.length) {
-        return false; // Müssen die gleiche Länge haben
+        return false; // MÃ¼ssen die gleiche LÃ¤nge haben
     }
     let diffCount = 0;
     for (let i = 0; i < str1.length; i++) {
@@ -972,16 +1033,16 @@ function areStringsSimilar(str1, str2) {
             return false;
         }
     }
-    // Gibt nur dann true zurück, wenn exakt ein Unterschied gefunden wurde
+    // Gibt nur dann true zurÃ¼ck, wenn exakt ein Unterschied gefunden wurde
     return diffCount === 1;
 }
 
 /**
- * Vergleicht zwei Strings und gibt HTML zurück, bei dem das unterschiedliche Zeichen
- * mit der Klasse 'blinking-char' umhüllt ist.
+ * Vergleicht zwei Strings und gibt HTML zurÃ¼ck, bei dem das unterschiedliche Zeichen
+ * mit der Klasse 'blinking-char' umhÃ¼llt ist.
  * @param {string} str1 Der erste String.
  * @param {string} str2 Der zweite String.
- * @returns {object} Ein Objekt mit {html1, html2} für die beiden HTML-Strings.
+ * @returns {object} Ein Objekt mit {html1, html2} fÃ¼r die beiden HTML-Strings.
  */
 function highlightDifference(str1, str2) {
     let html1 = '';
@@ -1000,15 +1061,15 @@ function highlightDifference(str1, str2) {
     return { html1, html2 };
 }
 /**
- * Findet den Spediteur für eine gegebene HU-Nummer, wenn sie in einem HU-Listen-Auftrag existiert.
- * @param {string} huNumber Die zu prüfende HU-Nummer.
- * @returns {string|null} Den gekürzten Spediteurnamen oder null, wenn nicht gefunden.
+ * Findet den Spediteur fÃ¼r eine gegebene HU-Nummer, wenn sie in einem HU-Listen-Auftrag existiert.
+ * @param {string} huNumber Die zu prÃ¼fende HU-Nummer.
+ * @returns {string|null} Den gekÃ¼rzten Spediteurnamen oder null, wenn nicht gefunden.
  */
-// --- START DER ÄNDERUNG: findCarrierForHu Funktion angepasst ---
+// --- START DER ÃNDERUNG: findCarrierForHu Funktion angepasst ---
 /**
- * Findet den Spediteur und das Zielland für eine gegebene HU-Nummer,
+ * Findet den Spediteur und das Zielland fÃ¼r eine gegebene HU-Nummer,
  * wenn sie in einem HU-Listen-Auftrag existiert.
- * @param {string} huNumber Die zu prüfende HU-Nummer.
+ * @param {string} huNumber Die zu prÃ¼fende HU-Nummer.
  * @returns {object|null} Ein Objekt { carrier: string, country: string } oder null, wenn nicht gefunden.
  */
 function findCarrierForHu(huNumber) {
@@ -1020,7 +1081,7 @@ function findCarrierForHu(huNumber) {
         if (shipment.isHuListOrder && shipment.scannedItems) {
             const foundItem = shipment.scannedItems.find(item => item.rawInput.toUpperCase() === upperHuNumber);
             if (foundItem) {
-                // Wenn der übergeordnete Auftrag einen Spediteur und ein Zielland hat, gib beides zurück
+                // Wenn der Ã¼bergeordnete Auftrag einen Spediteur und ein Zielland hat, gib beides zurÃ¼ck
                 if (shipment.freightForwarder || shipment.destinationCountry) {
                     return {
                         carrier: shipment.freightForwarder ? shortenForwarderName(shipment.freightForwarder) : null,
@@ -1033,8 +1094,8 @@ function findCarrierForHu(huNumber) {
     }
     return null; // HU nicht in einem HU-Listen-Auftrag gefunden
 }
-// --- ENDE DER ÄNDERUNG: findCarrierForHu Funktion angepasst ---
-// --- ENDE DER ÄNDERUNG: Neue Hilfsfunktion für Spediteur-Info ---
+// --- ENDE DER ÃNDERUNG: findCarrierForHu Funktion angepasst ---
+// --- ENDE DER ÃNDERUNG: Neue Hilfsfunktion fÃ¼r Spediteur-Info ---
         // --- Hilfsfunktionen: UI & Fehler ---
         function clearError() { errorDisplayEl.textContent = ''; }
         function displayError(message, color = 'red', autoClearTimeout = null) {
@@ -1055,7 +1116,7 @@ function findCarrierForHu(huNumber) {
 
 // --- START: NEUE HILFSFUNKTION ZUM PARSEN VON HU-DATEN ---
 /**
- * Parst einen HU-String, der zusätzliche, mit | getrennte Daten enthalten kann.
+ * Parst einen HU-String, der zusÃ¤tzliche, mit | getrennte Daten enthalten kann.
  * @param {string} huString Der zu parsende String (z.B. "1 09250929101E|box|10x10|5kg").
  * @returns {object} Ein Objekt mit den extrahierten Daten.
  */
@@ -1078,43 +1139,43 @@ function parseComplexHuString(huString) {
 }
 // --- ENDE: NEUE HILFSFUNKTION ---
 /**
- * Passt die Schriftgröße eines HTML-Elements dynamisch an, damit sein Inhalt in einen Container passt.
+ * Passt die SchriftgrÃ¶Ãe eines HTML-Elements dynamisch an, damit sein Inhalt in einen Container passt.
  * @param {HTMLElement} element Das zu skalierende Element (z.B. feedbackScanNumberEl).
  * @param {HTMLElement} container Das Elternelement, dessen Breite als Referenz dient (z.B. batchScanFeedbackModalEl.querySelector('.modal-content')).
- * @param {number} initialFontSize Der Startwert für die Schriftgröße in px (z.B. 56 für 3.5em bei 16px body font-size).
- * @param {number} minFontSize Die minimale Schriftgröße, die nicht unterschritten werden soll (in px).
- * @param {number} paddingPercent Optionaler Padding-Anteil (z.B. 0.1 für 10% links/rechts).
+ * @param {number} initialFontSize Der Startwert fÃ¼r die SchriftgrÃ¶Ãe in px (z.B. 56 fÃ¼r 3.5em bei 16px body font-size).
+ * @param {number} minFontSize Die minimale SchriftgrÃ¶Ãe, die nicht unterschritten werden soll (in px).
+ * @param {number} paddingPercent Optionaler Padding-Anteil (z.B. 0.1 fÃ¼r 10% links/rechts).
  */
 
 function fitTextToContainer(element, container, initialFontSize, minFontSize, paddingPercent = 0.05) {
-    // Setzen Sie die Schriftgröße zuerst auf den maximalen Wert.
+    // Setzen Sie die SchriftgrÃ¶Ãe zuerst auf den maximalen Wert.
     element.style.fontSize = `${initialFontSize}px`;
 
-    // Berücksichtigen Sie das Padding des Containers oder des Elements selbst
+    // BerÃ¼cksichtigen Sie das Padding des Containers oder des Elements selbst
     const containerStyle = getComputedStyle(container);
     const containerWidth = container.clientWidth - parseFloat(containerStyle.paddingLeft) - parseFloat(containerStyle.paddingRight);
 
     let currentFontSize = initialFontSize;
     const maxTextWidth = containerWidth * (1 - (paddingPercent * 2)); // Beispiel: 10% Padding links/rechts
 
-    // Reduzieren Sie die Schriftgröße, bis der Text passt oder die minimale Größe erreicht ist.
+    // Reduzieren Sie die SchriftgrÃ¶Ãe, bis der Text passt oder die minimale GrÃ¶Ãe erreicht ist.
     while (element.scrollWidth > maxTextWidth && currentFontSize > minFontSize) {
         currentFontSize -= 1; // Schrittweise verringern
         element.style.fontSize = `${currentFontSize}px`;
     }
 }
-// --- ENDE DER ÄNDERUNG: Dynamisches Font-Sizing Hilfsfunktion ---
+// --- ENDE DER ÃNDERUNG: Dynamisches Font-Sizing Hilfsfunktion ---
         function focusShipmentInput() {
             const isModalVisible = (sel) => document.querySelector(sel)?.classList.contains('visible');
-            // ANFORDERUNG 2: Das neue HU-Import-Modal zur Prüfung hinzufügen
+            // ANFORDERUNG 2: Das neue HU-Import-Modal zur PrÃ¼fung hinzufÃ¼gen
             if (isModalVisible('#editModal') || isModalVisible('#batchNoteModal') || isModalVisible('#importHuModal') ||
                 (sideMenuEl && sideMenuEl.classList.contains('open')) ||
                 (newTotalSectionEl && newTotalSectionEl.classList.contains('visible')) ||
                 document.querySelector('#currentShipmentDetails .inline-note-editor')) {
-                return; // Kein Fokus, wenn ein Modal, Menü oder Editor aktiv ist
+                return; // Kein Fokus, wenn ein Modal, MenÃ¼ oder Editor aktiv ist
             }
             if (shipmentNumberInputEl && !shipmentNumberInputEl.disabled) {
-                shipmentNumberInputEl.inputMode = 'none'; // Für Scanner
+                shipmentNumberInputEl.inputMode = 'none'; // FÃ¼r Scanner
                 setTimeout(() => shipmentNumberInputEl.focus(), 0);
             }
         }
@@ -1159,7 +1220,7 @@ function fitTextToContainer(element, container, initialFontSize, minFontSize, pa
                  isValidFormat = false;
             }
 
-            return { baseNumber, suffix, isValidFormat, raw, isSuffixFormat }; // <-- NEUES FELD ZURÜCKGEBEN
+            return { baseNumber, suffix, isValidFormat, raw, isSuffixFormat }; // <-- NEUES FELD ZURÃCKGEBEN
         }
         function findShipmentByNoteContent(searchText) {
             const shipments = loadShipments();
@@ -1171,12 +1232,12 @@ function fitTextToContainer(element, container, initialFontSize, minFontSize, pa
                     const shipment = shipments[baseNumber];
                     if (shipment.scannedItems && Array.isArray(shipment.scannedItems)) {
                         for (const item of shipment.scannedItems) {
-                            // *** ÄNDERUNG HIER ***
-                            // Überprüft, ob das 'notes'-Array existiert und durchsucht es.
+                            // *** ÃNDERUNG HIER ***
+                            // ÃberprÃ¼ft, ob das 'notes'-Array existiert und durchsucht es.
                             if (item.notes && Array.isArray(item.notes)) {
                                 for (const note of item.notes) {
                                     if (note && note.trim().toUpperCase() === upperSearchText) {
-                                        // Treffer gefunden! Gib die HAWB zurück.
+                                        // Treffer gefunden! Gib die HAWB zurÃ¼ck.
                                         return baseNumber;
                                     }
                                 }
@@ -1194,11 +1255,13 @@ function fitTextToContainer(element, container, initialFontSize, minFontSize, pa
 
             for (const baseNumber in shipments) {
                 const shipment = shipments[baseNumber];
-                // Suche nur in Aufträgen, die als HU-Listen-Auftrag markiert sind!
+ if (!isTruckActive(getTruckIdForShipment(shipment))) continue;
+
+                // Suche nur in AuftrÃ¤gen, die als HU-Listen-Auftrag markiert sind!
                 if (shipment.isHuListOrder && shipment.scannedItems && Array.isArray(shipment.scannedItems)) {
                     const foundItem = shipment.scannedItems.find(item => item.rawInput.toUpperCase() === upperHuNumber);
                     if (foundItem) {
-                        return baseNumber; // Treffer! Gib die HAWB/Auftragsnummer zurück.
+                        return baseNumber; // Treffer! Gib die HAWB/Auftragsnummer zurÃ¼ck.
                     }
                 }
             }
@@ -1235,7 +1298,7 @@ function fitTextToContainer(element, container, initialFontSize, minFontSize, pa
 
             const showNoteButton = NOTE_ALLOWED_STATUSES.includes(selectedStatus) && !isBatchModeActive;
             noteToggleButtonEl.style.display = showNoteButton ? 'flex' : 'none';
-            if (!showNoteButton) { // Wenn Button nicht sichtbar, Notizeingabe schließen
+            if (!showNoteButton) { // Wenn Button nicht sichtbar, Notizeingabe schlieÃen
                 resetSingleScanNoteInputState();
             }
         }
@@ -1256,9 +1319,9 @@ function fitTextToContainer(element, container, initialFontSize, minFontSize, pa
             }
         }
 
-        // Hilfsfunktion zur Bestimmung der CSS-Klasse für Zähler
+        // Hilfsfunktion zur Bestimmung der CSS-Klasse fÃ¼r ZÃ¤hler
         function getStatusClass(count, expected) {
-            // Wenn keine Erwartung gesetzt ist oder die Zählung 0 ist, keine Farbe (Standard schwarz)
+            // Wenn keine Erwartung gesetzt ist oder die ZÃ¤hlung 0 ist, keine Farbe (Standard schwarz)
             if (expected === null || expected === undefined || count === 0) {
                 return ''; 
             }
@@ -1266,7 +1329,7 @@ function fitTextToContainer(element, container, initialFontSize, minFontSize, pa
                 return 'mismatch'; // Orange
             }
             if (count === expected) {
-                return 'ok'; // Grün
+                return 'ok'; // GrÃ¼n
             }
             if (count > expected) {
                 return 'over'; // Rot
@@ -1305,15 +1368,15 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
     removeActiveInlineNoteEditor();
 
     // DIES IST DIE ENTSCHEIDENDE LOGIK:
-    // Prüft, welche Ansicht (Haupt- oder Detailansicht) aktiv ist
-    // und wählt das richtige Element aus, um die Details hineinzuschreiben.
+    // PrÃ¼ft, welche Ansicht (Haupt- oder Detailansicht) aktiv ist
+    // und wÃ¤hlt das richtige Element aus, um die Details hineinzuschreiben.
     const isDetailViewVisible = !detailViewEl.classList.contains('hidden');
     const displayTarget = isDetailViewVisible
         ? detailViewContentEl.querySelector('#currentShipmentDetails') // Ziel in der Detailansicht
         : currentDetailsDivEl;                                      // Ziel in der Hauptansicht
 
     if (!displayTarget) {
-        console.error("Fehler: Konnte kein Anzeige-Element für Details finden. Stellen Sie sicher, dass die HTML-Struktur korrekt ist.");
+        console.error("Fehler: Konnte kein Anzeige-Element fÃ¼r Details finden. Stellen Sie sicher, dass die HTML-Struktur korrekt ist.");
         return;
     }
 
@@ -1321,13 +1384,13 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
     const shipment = baseNumberToDisplay ? shipments[baseNumberToDisplay] : null;
 
     if (!baseNumberToDisplay || !shipment) {
-        displayTarget.innerHTML = 'Geben Sie eine Sendungsnummer ein oder wählen Sie eine aus der Liste.';
+        displayTarget.innerHTML = 'Geben Sie eine Sendungsnummer ein oder wÃ¤hlen Sie eine aus der Liste.';
         displayTarget.style.borderColor = '#aac';
         return;
     }
     
     // Ab hier ist der Code identisch zur Originalfunktion, aber alle
-    // Änderungen werden auf die `displayTarget` Variable angewendet.
+    // Ãnderungen werden auf die `displayTarget` Variable angewendet.
 
     let detailsHtml = '';
 
@@ -1349,14 +1412,14 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
         }
         detailsHtml += `<hr style="border: none; border-top: 1px dotted #ccc; margin: 8px 0;">`;
     } else {
-        // --- START DER ÄNDERUNG ---
-        // ID, data-Attribut und Titel für die Kopierfunktion hinzugefügt.
-        // Der style-Tag sorgt für einen "Klick"-Cursor.
+        // --- START DER ÃNDERUNG ---
+        // ID, data-Attribut und Titel fÃ¼r die Kopierfunktion hinzugefÃ¼gt.
+        // Der style-Tag sorgt fÃ¼r einen "Klick"-Cursor.
         detailsHtml += `<strong id="shipmentDetailTitle" 
                                 style="cursor:pointer;" 
                                 title="Klicken, um '${escapeHtml(baseNumberToDisplay)}' zu kopieren" 
-                                data-hawb="${escapeHtml(baseNumberToDisplay)}">Details für ${escapeHtml(baseNumberToDisplay)}:</strong>`;
-        // --- ENDE DER ÄNDERUNG ---
+                                data-hawb="${escapeHtml(baseNumberToDisplay)}">Details fÃ¼r ${escapeHtml(baseNumberToDisplay)}:</strong>`;
+        // --- ENDE DER ÃNDERUNG ---
     }
 
     if (shipment.isHuListOrder) {
@@ -1410,10 +1473,10 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
 //... innerhalb der Funktion displayCurrentShipmentDetails ...
 let numberPart = isManOrder && item.position ? `<span class="position-number">${item.position}.</span> ` : '';
 let sendnrHtml = item.sendnr ? `<span class="sendnr-display"> (${escapeHtml(item.sendnr)})</span>` : '';
-// --- START DER ÄNDERUNG ---
-// Cursor und Titel hinzugefügt, um Klickbarkeit zu signalisieren
-detailsHtml += `${numberPart}<span class="hu-value" style="cursor:pointer;" title="Klicken zum Kopieren">${escapeHtml(item.rawInput)}</span>${sendnrHtml} → <span class="status">${escapeHtml(item.status)}</span>${item.isCombination ? ` <span class="combo">(Kombi)</span>` : ''}`;
-// --- ENDE DER ÄNDERUNG ---
+// --- START DER ÃNDERUNG ---
+// Cursor und Titel hinzugefÃ¼gt, um Klickbarkeit zu signalisieren
+detailsHtml += `${numberPart}<span class="hu-value" style="cursor:pointer;" title="Klicken zum Kopieren">${escapeHtml(item.rawInput)}</span>${sendnrHtml} â <span class="status">${escapeHtml(item.status)}</span>${item.isCombination ? ` <span class="combo">(Kombi)</span>` : ''}`;
+// --- ENDE DER ÃNDERUNG ---
 //...
         if (isCancelled) {
             const cancelDt = item.cancelledTimestamp ? new Date(item.cancelledTimestamp) : null;
@@ -1430,14 +1493,14 @@ detailsHtml += `${numberPart}<span class="hu-value" style="cursor:pointer;" titl
                 if (isCancelled) {
                     notesListHtml += `<div class="note-item" style="color:var(--cancelled-color);">- ${escapeHtml(note)}</div>`;
                 } else {
-                    notesListHtml += `<div class="note-item"><span class="note-prefix">Notiz:</span><span class="editable-note" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" data-note-index="${index}" title="Notiz bearbeiten">${escapeHtml(note)}</span><button class="delete-note-btn" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" data-note-index="${index}" title="Notiz löschen">×</button></div>`;
+                    notesListHtml += `<div class="note-item"><span class="note-prefix">Notiz:</span><span class="editable-note" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" data-note-index="${index}" title="Notiz bearbeiten">${escapeHtml(note)}</span><button class="delete-note-btn" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" data-note-index="${index}" title="Notiz lÃ¶schen">Ã</button></div>`;
                 }
             });
             notesListHtml += '</div>';
             detailsHtml += notesListHtml;
         }
         if (!isCancelled) {
-            detailsHtml += `<a href="#" class="add-note-link" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" title="Weitere Notiz hinzufügen">Notiz hinzufügen</a>`;
+            detailsHtml += `<a href="#" class="add-note-link" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" title="Weitere Notiz hinzufÃ¼gen">Notiz hinzufÃ¼gen</a>`;
         }
         detailsHtml += `<div class="inline-note-editor-placeholder"></div>`;
         detailsHtml += `</div>`;
@@ -1481,6 +1544,8 @@ function renderTable() {
         .forEach(baseNumber => {
             const shipment = shipments[baseNumber];
             if (!shipment) return;
+ if (!isTruckActive(getTruckIdForShipment(shipment))) return;
+
             const row = tableBodyEl.insertRow();
             
             row.dataset.basenumber = baseNumber;
@@ -1522,9 +1587,9 @@ function renderTable() {
                 <strong class="${securityClass}">Sich.: ${securityCount}/${expectedText}</strong>
             `;
             
-            row.insertCell().outerHTML = `<td data-label="Übersicht" class="summary-cell">${summaryHtml}</td>`;
+            row.insertCell().outerHTML = `<td data-label="Ãbersicht" class="summary-cell">${summaryHtml}</td>`;
             
-            row.insertCell().outerHTML = `<td data-label="Letzte Änd.">${shipment.lastModified ? new Date(shipment.lastModified).toLocaleString('de-DE') : '-'}</td>`;
+            row.insertCell().outerHTML = `<td data-label="Letzte Ãnd.">${shipment.lastModified ? new Date(shipment.lastModified).toLocaleString('de-DE') : '-'}</td>`;
             
             const actionsCell = row.insertCell();
             actionsCell.setAttribute('data-label', 'Aktionen');
@@ -1532,7 +1597,7 @@ function renderTable() {
             actionsCell.innerHTML = `
                 <button class="edit-btn" data-basenumber="${escapeHtml(baseNumber)}" title="Sendung ${escapeHtml(baseNumber)} bearbeiten">Edit</button>
                 <button class="pdf-btn" data-basenumber="${escapeHtml(baseNumber)}" ${pdfButtonData}>PDF</button>
-                <button class="delete-btn main-delete-btn" data-basenumber="${escapeHtml(baseNumber)}">Löschen</button>
+                <button class="delete-btn main-delete-btn" data-basenumber="${escapeHtml(baseNumber)}">LÃ¶schen</button>
             `;
             
             // ===============================================================
@@ -1540,15 +1605,15 @@ function renderTable() {
             // ===============================================================
             const qrCell = row.insertCell();
             qrCell.classList.add('qr-code-cell');
-            qrCell.setAttribute('data-label', 'QR-Code'); // Für mobile Ansicht, obwohl versteckt
+            qrCell.setAttribute('data-label', 'QR-Code'); // FÃ¼r mobile Ansicht, obwohl versteckt
             
-            // Erstelle einen eindeutigen Container für den QR-Code
+            // Erstelle einen eindeutigen Container fÃ¼r den QR-Code
             const qrContainerId = 'qrcode-' + baseNumber.replace(/[^a-zA-Z0-9]/g, ''); // Bereinige ID
             qrCell.innerHTML = `<div id="${qrContainerId}"></div>`;
 
             // Generiere den QR-Code, nachdem das Element im DOM ist
             setTimeout(() => {
-                // Prüfe, ob das Element noch existiert, bevor der QR-Code gezeichnet wird
+                // PrÃ¼fe, ob das Element noch existiert, bevor der QR-Code gezeichnet wird
                 const qrContainer = document.getElementById(qrContainerId);
                 if (qrContainer) {
                     new QRCode(qrContainer, {
@@ -1557,10 +1622,10 @@ function renderTable() {
                         height: 60,
                         colorDark: "#000000",
                         colorLight: "#ffffff",
-                        correctLevel: QRCode.CorrectLevel.L // Niedrige Fehlerkorrektur, gut für einfache Texte
+                        correctLevel: QRCode.CorrectLevel.L // Niedrige Fehlerkorrektur, gut fÃ¼r einfache Texte
                     });
                 }
-            }, 0); // setTimeout mit 0 verzögert die Ausführung minimal, aber genug
+            }, 0); // setTimeout mit 0 verzÃ¶gert die AusfÃ¼hrung minimal, aber genug
             // ===============================================================
             // ENDE DER QR-CODE-LOGIK
             // ===============================================================
@@ -1586,11 +1651,11 @@ function showDetailView(baseNumber) {
 
 
 function hideDetailView() {
-    // 1. Ansichten zurückschalten
+    // 1. Ansichten zurÃ¼ckschalten
     detailViewEl.classList.add('hidden');
     mainViewEl.classList.remove('hidden');
 
-    // 2. Zur gespeicherten Scroll-Position zurückkehren
+    // 2. Zur gespeicherten Scroll-Position zurÃ¼ckkehren
     window.scrollTo(0, lastScrollPosition);
     focusShipmentInput(); // Fokus wieder auf das Eingabefeld setzen
 }
@@ -1599,8 +1664,8 @@ function hideDetailView() {
 
 
         function updateEditButtonVisibilityInTable() {
-            // Dies wird über CSS body.batch-mode-active td.actions-cell button.edit-btn { display: none; } gesteuert.
-            // Diese Funktion könnte für komplexere Logik dienen, ist hier aber implizit durch CSS.
+            // Dies wird Ã¼ber CSS body.batch-mode-active td.actions-cell button.edit-btn { display: none; } gesteuert.
+            // Diese Funktion kÃ¶nnte fÃ¼r komplexere Logik dienen, ist hier aber implizit durch CSS.
              document.body.classList.toggle('batch-mode-active', isBatchModeActive);
         }
 
@@ -1627,9 +1692,9 @@ function hideDetailView() {
                     const fullCellText = (cell.textContent || cell.innerText).toUpperCase();
                     const cellBaseNumber = fullCellText.split('+')[0].trim();
                     let showRow = false;
-                    if (inputHasSuffix) { // Bei Suffix genaue Übereinstimmung des Basenumbers
+                    if (inputHasSuffix) { // Bei Suffix genaue Ãbereinstimmung des Basenumbers
                         if (cellBaseNumber === inputBaseNumber) showRow = true;
-                    } else { // Ohne Suffix, Präfix-Suche
+                    } else { // Ohne Suffix, PrÃ¤fix-Suche
                         if (cellBaseNumber.startsWith(inputBaseNumber)) showRow = true;
                     }
                     row.style.display = showRow ? '' : 'none';
@@ -1649,14 +1714,14 @@ function hideDetailView() {
 
 // --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESER FINALEN KORREKTUR ---
 
-// --- START DER ÄNDERUNG: Die komplette Funktion wird aktualisiert (mit WE-Prüfung) ---
+// --- START DER ÃNDERUNG: Die komplette Funktion wird aktualisiert (mit WE-PrÃ¼fung) ---
 // --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESER NEUEN VERSION ---
 
 function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFromCheckbox) {
     const statusesThatTriggerWE = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
 
     const { baseNumber, suffix, isValidFormat, raw: processedRawInput, isSuffixFormat } = processShipmentNumber(rawInputToSave);
-    if (!isValidFormat) { return { success: false, waitingForTotal: false, message: `Ungültiges Format: ${escapeHtml(rawInputToSave)}` }; }
+    if (!isValidFormat) { return { success: false, waitingForTotal: false, message: `UngÃ¼ltiges Format: ${escapeHtml(rawInputToSave)}` }; }
 
     // --- START DER AKTUALISIERTEN SOUND-LOGIK ---
     if (unexpectedHuSoundToggleEl && unexpectedHuSoundToggleEl.checked) {
@@ -1664,7 +1729,7 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
         const parentHawbByHu = findShipmentByHuNumber(processedRawInput);
         const isNachlieferungHu = parentHawbByHu && parentHawbByHu.toUpperCase() === 'NACHLIEFERUNG';
 
-        // Fall 1: HU gehört zu einer Nachlieferung -> spiele den Nachlieferung-Sound
+        // Fall 1: HU gehÃ¶rt zu einer Nachlieferung -> spiele den Nachlieferung-Sound
         if (isNachlieferungHu) {
             playNachlieferungSound();
         } 
@@ -1678,9 +1743,9 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
     const shipments = loadShipments();
     const parentHawb = findShipmentByHuNumber(processedRawInput);
 
-    // ... (der restliche Code der Funktion bleibt unverändert) ...
+    // ... (der restliche Code der Funktion bleibt unverÃ¤ndert) ...
     
-    // --- LOGIK FÜR HU-LISTEN-AUFTRÄGE ---
+    // --- LOGIK FÃR HU-LISTEN-AUFTRÃGE ---
     if (parentHawb) {
         const parentShipment = shipments[parentHawb];
         const now = new Date();
@@ -1697,7 +1762,7 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
         if (isFinalClearanceScan) {
             const anstehendIndex = parentShipment.scannedItems.findIndex(i => i.rawInput.toUpperCase() === processedRawInput.toUpperCase() && i.status === 'Anstehend' && !i.isCancelled);
             if (anstehendIndex === -1) { 
-                return { success: false, waitingForTotal: false, message: `FEHLER: Für HU ${escapeHtml(processedRawInput)} ist keine offene Sicherung mehr möglich.` }; 
+                return { success: false, waitingForTotal: false, message: `FEHLER: FÃ¼r HU ${escapeHtml(processedRawInput)} ist keine offene Sicherung mehr mÃ¶glich.` }; 
             }
             const itemToUpdate = parentShipment.scannedItems[anstehendIndex];
             itemToUpdate.status = statusToUse;
@@ -1713,7 +1778,7 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
             }
             if (currentScansOfType >= packageLimitForThisHu) {
                 const scanTypeText = isNewScanKombi ? 'Kombi-Sicherung' : statusToUse;
-                return { success: false, waitingForTotal: false, message: `FEHLER: Limit (${packageLimitForThisHu}) für '${scanTypeText}' bei HU ${escapeHtml(processedRawInput)} erreicht.` };
+                return { success: false, waitingForTotal: false, message: `FEHLER: Limit (${packageLimitForThisHu}) fÃ¼r '${scanTypeText}' bei HU ${escapeHtml(processedRawInput)} erreicht.` };
             }
             const existingItemIndex = parentShipment.scannedItems.findIndex(i => i.rawInput.toUpperCase() === processedRawInput.toUpperCase());
             if (existingItemIndex === -1) { return { success: false, waitingForTotal: false, message: `FEHLER: HU ${escapeHtml(processedRawInput)} nicht im Auftrag ${parentHawb} gefunden.` }; }
@@ -1751,19 +1816,19 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
         saveShipments(shipments);
         resetSingleScanNoteInputState();
         setTimeout(() => displayCurrentShipmentDetails(parentHawb), 0);
-        return { success: true, waitingForTotal: false, message: `Vorgang '${statusToUse}${isNewScanKombi ? ' (Kombi)' : ''}' für HU ${escapeHtml(processedRawInput)} erfasst.` };
+        return { success: true, waitingForTotal: false, message: `Vorgang '${statusToUse}${isNewScanKombi ? ' (Kombi)' : ''}' fÃ¼r HU ${escapeHtml(processedRawInput)} erfasst.` };
     }
 
-    // --- LOGIK FÜR NORMALE SENDUNGEN (NICHT-HU-LISTEN) ---
+    // --- LOGIK FÃR NORMALE SENDUNGEN (NICHT-HU-LISTEN) ---
     if (shipments[baseNumber] && shipments[baseNumber].isHuListOrder) {
-        return { success: false, waitingForTotal: false, message: `FEHLER: ${baseNumber} ist ein HU-Auftrag. Bitte scannen Sie eine der zugehörigen HU/VSE-Nummern.` };
+        return { success: false, waitingForTotal: false, message: `FEHLER: ${baseNumber} ist ein HU-Auftrag. Bitte scannen Sie eine der zugehÃ¶rigen HU/VSE-Nummern.` };
     }
     if (!shipments[baseNumber]) {
         const tempIsCombination = (statusToUse === 'XRY' && !isBatchModeActive && isCombinationFromCheckbox);
         const tempFinalIsCombination = NON_COUNTING_STATUSES.includes(statusToUse) ? false : tempIsCombination;
         pendingScanDataForNewShipment = { baseNumber, rawInput: processedRawInput, status: statusToUse, isCombination: tempFinalIsCombination, note: noteInputEl.value.trim() || null, timestamp: new Date().toISOString(), suffix };
-        newTotalLabelEl.textContent = `Erwartete Gesamtstückzahl für NEUE Sendung ${escapeHtml(baseNumber)}:`; newTotalInputEl.value = ''; newTotalSectionEl.classList.remove('warning-existing'); toggleMainInputControls(false); newTotalInputEl.focus();
-        return { success: false, waitingForTotal: true, message: `Bitte Gesamtstückzahl für ${escapeHtml(baseNumber)} eingeben oder überspringen.` };
+        newTotalLabelEl.textContent = `Erwartete GesamtstÃ¼ckzahl fÃ¼r NEUE Sendung ${escapeHtml(baseNumber)}:`; newTotalInputEl.value = ''; newTotalSectionEl.classList.remove('warning-existing'); toggleMainInputControls(false); newTotalInputEl.focus();
+        return { success: false, waitingForTotal: true, message: `Bitte GesamtstÃ¼ckzahl fÃ¼r ${escapeHtml(baseNumber)} eingeben oder Ã¼berspringen.` };
     }
     
     const shipment = shipments[baseNumber];
@@ -1773,32 +1838,32 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
         const existingItemsForThisSuffix = shipment.scannedItems.filter(item => !item.isCancelled && item.rawInput.toUpperCase() === processedRawInput.toUpperCase());
         const isNewScanCounting = EXCLUSIVE_SECURITY_STATUSES.includes(statusToUse) && !isCombination;
         if (isNewScanCounting && existingItemsForThisSuffix.some(item => EXCLUSIVE_SECURITY_STATUSES.includes(item.status) && !item.isCombination)) {
-            return { success: false, message: `FEHLER: Packstück ${escapeHtml(processedRawInput)} wurde bereits final gesichert.` };
+            return { success: false, message: `FEHLER: PackstÃ¼ck ${escapeHtml(processedRawInput)} wurde bereits final gesichert.` };
         }
         if (isCombination && existingItemsForThisSuffix.some(item => item.isCombination)) {
-            return { success: false, message: `FEHLER: Packstück ${escapeHtml(processedRawInput)} wurde bereits als Kombi-Sicherung erfasst.` };
+            return { success: false, message: `FEHLER: PackstÃ¼ck ${escapeHtml(processedRawInput)} wurde bereits als Kombi-Sicherung erfasst.` };
         }
         if (statusToUse === 'Dunkelalarm' && existingItemsForThisSuffix.some(item => item.status === 'Dunkelalarm')) {
-            return { success: false, message: `FEHLER: Packstück ${escapeHtml(processedRawInput)} wurde bereits als Dunkelalarm erfasst.` };
+            return { success: false, message: `FEHLER: PackstÃ¼ck ${escapeHtml(processedRawInput)} wurde bereits als Dunkelalarm erfasst.` };
         }
         if (statusToUse === 'Wareneingang' && existingItemsForThisSuffix.some(item => item.status === 'Wareneingang')) {
-            return { success: false, message: `FEHLER: Für Packstück ${escapeHtml(processedRawInput)} wurde bereits der Wareneingang erfasst.` };
+            return { success: false, message: `FEHLER: FÃ¼r PackstÃ¼ck ${escapeHtml(processedRawInput)} wurde bereits der Wareneingang erfasst.` };
         }
     }
 
     const expectedTotal = shipment.totalPiecesExpected;
     const existingNonCancelled = (shipment.scannedItems || []).filter(item => !item.isCancelled);
     if (isCombination && expectedTotal !== null && calculateXryKombiCount(existingNonCancelled) >= expectedTotal) {
-        return { success: false, waitingForTotal: false, message: `Limit (${expectedTotal}) für XRY Kombi bei ${baseNumber} erreicht.` };
+        return { success: false, waitingForTotal: false, message: `Limit (${expectedTotal}) fÃ¼r XRY Kombi bei ${baseNumber} erreicht.` };
     }
     if (statusToUse === 'Dunkelalarm' && expectedTotal !== null && calculateDunkelalarmCount(existingNonCancelled) >= expectedTotal) {
-        return { success: false, waitingForTotal: false, message: `Limit (${expectedTotal}) für Dunkelalarm bei ${baseNumber} erreicht.` };
+        return { success: false, waitingForTotal: false, message: `Limit (${expectedTotal}) fÃ¼r Dunkelalarm bei ${baseNumber} erreicht.` };
     }
     if (statusToUse === 'Wareneingang' && expectedTotal !== null && calculateGoodsReceiptCount(existingNonCancelled) >= expectedTotal) {
-        return { success: false, waitingForTotal: false, message: `Limit (${expectedTotal}) für Wareneingang bei ${baseNumber} erreicht.` };
+        return { success: false, waitingForTotal: false, message: `Limit (${expectedTotal}) fÃ¼r Wareneingang bei ${baseNumber} erreicht.` };
     }
     if (!isCombination && !NON_COUNTING_STATUSES.includes(statusToUse) && expectedTotal !== null && calculateCurrentCountedPieces(existingNonCancelled) >= expectedTotal) {
-        return { success: false, waitingForTotal: false, message: `Limit (${expectedTotal}) für normale Scans bei ${baseNumber} erreicht.` };
+        return { success: false, waitingForTotal: false, message: `Limit (${expectedTotal}) fÃ¼r normale Scans bei ${baseNumber} erreicht.` };
     }
 
     const now = new Date();
@@ -1831,7 +1896,7 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
     if (updatedShipment && updatedShipment.totalPiecesExpected !== null && calculateCurrentCountedPieces(updatedShipment.scannedItems) === updatedShipment.totalPiecesExpected && !notifiedCompletions.has(baseNumber)) {
         notifyShipmentCompletion(updatedShipment);
     }
-    return { success: true, waitingForTotal: false, message: `${processedRawInput} (${statusToUse}) zu ${baseNumber} hinzugefügt.` };
+    return { success: true, waitingForTotal: false, message: `${processedRawInput} (${statusToUse}) zu ${baseNumber} hinzugefÃ¼gt.` };
 }
 
         
@@ -1840,7 +1905,7 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
         
         
         
-            // --- ANFANG DER ÄNDERUNG FÜR BUTTON-LOGIK ---
+            // --- ANFANG DER ÃNDERUNG FÃR BUTTON-LOGIK ---
             function resetNewTotalSectionUI() {
                 toggleMainInputControls(true);
                 newTotalSectionEl.classList.remove('warning-existing');
@@ -1861,7 +1926,7 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
                         if (!isNaN(parsedNum) && parsedNum > 0) {
                             newTotalExpected = parsedNum;
                         } else {
-                            alert("Ungültige Eingabe für Stückzahl. Bitte eine positive Zahl eingeben oder Feld leer lassen.");
+                            alert("UngÃ¼ltige Eingabe fÃ¼r StÃ¼ckzahl. Bitte eine positive Zahl eingeben oder Feld leer lassen.");
                             newTotalInputEl.focus();
                             return;
                         }
@@ -1872,11 +1937,11 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
                         shipments[baseNumber].totalPiecesExpected = newTotalExpected;
                         shipments[baseNumber].lastModified = new Date().toISOString();
                         saveShipments(shipments);
-                        displayError(`Stückzahl für ${escapeHtml(baseNumber)} aktualisiert.`, 'green', 3000);
+                        displayError(`StÃ¼ckzahl fÃ¼r ${escapeHtml(baseNumber)} aktualisiert.`, 'green', 3000);
                         renderTable();
                         displayCurrentShipmentDetails(baseNumber);
                     }
-                    pendingTotalUpdateInfo = null; // Status zurücksetzen
+                    pendingTotalUpdateInfo = null; // Status zurÃ¼cksetzen
                     resetNewTotalSectionUI();
 
                 } else {
@@ -1889,15 +1954,15 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
                 if (pendingTotalUpdateInfo) {
                     // Fall: Aktualisierung einer bestehenden Sendung abbrechen
                     displayError('Aktualisierung abgebrochen.', 'orange', 2000);
-                    pendingTotalUpdateInfo = null; // Status zurücksetzen
+                    pendingTotalUpdateInfo = null; // Status zurÃ¼cksetzen
                     resetNewTotalSectionUI();
-                    displayCurrentShipmentDetails(shipmentNumberInputEl.value); // Zeige Details der ursprünglichen Eingabe
+                    displayCurrentShipmentDetails(shipmentNumberInputEl.value); // Zeige Details der ursprÃ¼nglichen Eingabe
                 } else {
-                    // Fall: Neue Sendung ohne Stückzahl erstellen (bisherige Logik)
+                    // Fall: Neue Sendung ohne StÃ¼ckzahl erstellen (bisherige Logik)
                     completeNewShipmentSave(null);
                 }
             });
-            // --- ENDE DER ÄNDERUNG FÜR BUTTON-LOGIK ---
+            // --- ENDE DER ÃNDERUNG FÃR BUTTON-LOGIK ---
 
             newTotalInputEl.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); confirmNewTotalBtnEl.click(); }});
         function completeNewShipmentSave(totalValueInput) {
@@ -1910,7 +1975,7 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
                 if (!isNaN(parsedTotal) && parsedTotal > 0) {
                     totalExpectedPieces = parsedTotal;
                 } else {
-                    alert("Ungültige Eingabe für Stückzahl. Wird als 'N/A' gespeichert.");
+                    alert("UngÃ¼ltige Eingabe fÃ¼r StÃ¼ckzahl. Wird als 'N/A' gespeichert.");
                 }
             }
 
@@ -1940,7 +2005,7 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
             displayCurrentShipmentDetails(baseNumber);
             
             const totalMsgPart = totalExpectedPieces !== null ? ` mit ${totalExpectedPieces} erwarteten Stk.` : '';
-            displayError(`${escapeHtml(rawInput)} hinzugefügt (Sendung ${escapeHtml(baseNumber)} neu erstellt${totalMsgPart}).`, 'green', 3000);
+            displayError(`${escapeHtml(rawInput)} hinzugefÃ¼gt (Sendung ${escapeHtml(baseNumber)} neu erstellt${totalMsgPart}).`, 'green', 3000);
 
             const finalCount = calculateCurrentCountedPieces(shipments[baseNumber].scannedItems);
             if (totalExpectedPieces !== null && finalCount === totalExpectedPieces && !notifiedCompletions.has(baseNumber)) {
@@ -1975,7 +2040,7 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
         
             const baseNumber = targetElement.dataset.basenumber;
             const itemTimestamp = targetElement.dataset.timestamp;
-            const noteIndex = targetElement.dataset.noteIndex; // Kann undefined sein (beim Hinzufügen)
+            const noteIndex = targetElement.dataset.noteIndex; // Kann undefined sein (beim HinzufÃ¼gen)
             const isEditing = noteIndex !== undefined;
             
             // Finde das gescannte Item, um die Nummer anzuzeigen
@@ -1989,7 +2054,7 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
 
             noteEditBaseNumberEl.value = baseNumber;
             noteEditTimestampEl.value = itemTimestamp;
-            noteEditNoteIndexEl.value = isEditing ? noteIndex : ''; // Leerer String für "neu"
+            noteEditNoteIndexEl.value = isEditing ? noteIndex : ''; // Leerer String fÃ¼r "neu"
             noteEditTextareaEl.value = currentNote;
         
             // Modal anzeigen
@@ -2019,9 +2084,9 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
                 if (noteText) {
                     item.notes[noteIndex] = noteText; // Aktualisieren
                 } else {
-                    item.notes.splice(noteIndex, 1); // Löschen, wenn leer gespeichert wird
+                    item.notes.splice(noteIndex, 1); // LÃ¶schen, wenn leer gespeichert wird
                 }
-            } else { // Hinzufügen einer neuen Notiz
+            } else { // HinzufÃ¼gen einer neuen Notiz
                 if (noteText) {
                     if (!Array.isArray(item.notes)) item.notes = [];
                     item.notes.push(noteText);
@@ -2037,7 +2102,7 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
         function requestDeleteNote(baseNumber, itemTimestamp, noteIndex) {
             const shipments = loadShipments();
             const noteToDelete = shipments[baseNumber]?.scannedItems?.find(i => i.timestamp === itemTimestamp)?.notes[noteIndex];
-            if(confirm(`Notiz "${noteToDelete}" wirklich löschen?`)) {
+            if(confirm(`Notiz "${noteToDelete}" wirklich lÃ¶schen?`)) {
                  const item = shipments[baseNumber].scannedItems.find(i => i.timestamp === itemTimestamp);
                  item.notes.splice(noteIndex, 1);
                  shipments[baseNumber].lastModified = new Date().toISOString();
@@ -2057,19 +2122,19 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
 
             if (isBatchModeActive) {
                 batchStatus = securityStatusSelectEl.value;
-                // Kombi-Checkbox-Status für Batch bei Aktivierung übernehmen
+                // Kombi-Checkbox-Status fÃ¼r Batch bei Aktivierung Ã¼bernehmen
                 batchIsCombination = (securityStatusSelectEl.value === 'XRY' && comboCheckboxEl.checked);
                 const comboText = batchIsCombination ? ' (Kombi)' : '';
                 const statusLabel = `${batchStatus}${comboText}`;
 
                 batchModeStatusLabelEl.textContent = statusLabel;
                 batchStatusDisplayEl.textContent = `Aktiv (${statusLabel})`;
-                mainActionButtonEl.textContent = 'Zum Batch hinzufügen';
+                mainActionButtonEl.textContent = 'Zum Batch hinzufÃ¼gen';
                 batchAreaEl.classList.add('visible');
                 securityStatusSelectEl.disabled = true;
                 comboCheckboxEl.disabled = true; // Auch Kombi-Checkbox im Batch sperren
                 
-                batchNoteToggleEl.checked = false; // <-- HIER IST DIE HINZUGEFÜGTE ZEILE
+                batchNoteToggleEl.checked = false; // <-- HIER IST DIE HINZUGEFÃGTE ZEILE
                 currentBatch = [];
                 currentBatchGlobalNote = null;
                 isBatchNotePromptRequired = true; // Batch-Notiz-Modal soll beim ersten Scan im neuen Batch kommen
@@ -2079,14 +2144,14 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
             } else {
                 if (currentBatch.length > 0) {
                     if (!confirm("Batch-Modus deaktivieren? Nicht gespeicherte Scans im aktuellen Batch gehen verloren!")) {
-                        batchModeToggleEl.checked = true; // Zurücksetzen, wenn User abbricht
+                        batchModeToggleEl.checked = true; // ZurÃ¼cksetzen, wenn User abbricht
                         isBatchModeActive = true; // Status beibehalten
                         document.body.classList.toggle('batch-mode-active', true);
                         return;
                     }
                 }
                 batchStatusDisplayEl.textContent = 'Inaktiv';
-                mainActionButtonEl.textContent = 'Hinzufügen';
+                mainActionButtonEl.textContent = 'HinzufÃ¼gen';
                 batchAreaEl.classList.remove('visible');
                 securityStatusSelectEl.disabled = false;
                 comboCheckboxEl.disabled = securityStatusSelectEl.value !== 'XRY'; // Entsperren, wenn XRY
@@ -2116,17 +2181,17 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
                 removeBtn.classList.add('remove-batch-item');
                 removeBtn.title = `${escapeHtml(batchItem.rawInput)} aus Batch entfernen`;
                 removeBtn.onclick = () => {
-                    // --- START DER ÄNDERUNG ---
+                    // --- START DER ÃNDERUNG ---
                     if (confirm(`Soll "${escapeHtml(batchItem.rawInput)}" aus dem Batch entfernt werden?`)) {
                         currentBatch.splice(index, 1);
                         updateBatchUI();
                         if (currentBatch.length === 0) { // Wenn Batch leer wird
-                            isBatchNotePromptRequired = true; // Für nächsten Batch wieder Modal
+                            isBatchNotePromptRequired = true; // FÃ¼r nÃ¤chsten Batch wieder Modal
                             currentBatchGlobalNote = null;
                             updateCurrentBatchNoteDisplay();
                         }
                     }
-                    // --- ENDE DER ÄNDERUNG ---
+                    // --- ENDE DER ÃNDERUNG ---
                 };
                 li.appendChild(removeBtn);
                 batchListEl.appendChild(li);
@@ -2145,29 +2210,29 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
                 currentBatchNoteDisplayEl.style.display = 'none';
             }
         }
-// --- START DER ÄNDERUNG: Neue Funktion zum Anzeigen des Batch Scan Feedback Modals ---
-// --- START DER ÄNDERUNG: showBatchScanFeedback Funktion angepasst ---
-// --- START DER ÄNDERUNG: showBatchScanFeedback Funktion angepasst (mit Font Sizing) ---
-// --- START DER ÄNDERUNG: showBatchScanFeedback Funktion angepasst ---
-// --- START DER ÄNDERUNG: showBatchScanFeedback Funktion angepasst (Land in neue Zeile) ---
+// --- START DER ÃNDERUNG: Neue Funktion zum Anzeigen des Batch Scan Feedback Modals ---
+// --- START DER ÃNDERUNG: showBatchScanFeedback Funktion angepasst ---
+// --- START DER ÃNDERUNG: showBatchScanFeedback Funktion angepasst (mit Font Sizing) ---
+// --- START DER ÃNDERUNG: showBatchScanFeedback Funktion angepasst ---
+// --- START DER ÃNDERUNG: showBatchScanFeedback Funktion angepasst (Land in neue Zeile) ---
 function showBatchScanFeedback(scanNumber, isExpected, carrierInfo = null) {
     if (!batchScanFeedbackModalEl) return;
 
     feedbackScanNumberEl.textContent = scanNumber;
     
     // Aufbau des Carrier/Country Strings mit Zeilenumbruch
-    let carrierAndCountryHtml = ''; // Ändern zu Html, da wir <br> verwenden
+    let carrierAndCountryHtml = ''; // Ãndern zu Html, da wir <br> verwenden
     if (carrierInfo && (carrierInfo.carrier || carrierInfo.country)) {
         let parts = [];
         if (carrierInfo.carrier) {
             parts.push(`Spediteur: ${carrierInfo.carrier}`);
         }
         if (carrierInfo.country) {
-            // Füge <br> hinzu, wenn es bereits einen Spediteur gibt
+            // FÃ¼ge <br> hinzu, wenn es bereits einen Spediteur gibt
             // oder wenn nur das Land angezeigt wird.
             parts.push(`Land: ${carrierInfo.country}`);
         }
-        // Füge <br> nur dann ein, wenn sowohl Spediteur als auch Land vorhanden sind.
+        // FÃ¼ge <br> nur dann ein, wenn sowohl Spediteur als auch Land vorhanden sind.
         carrierAndCountryHtml = parts.join('<br>'); 
     }
     feedbackCarrierEl.innerHTML = carrierAndCountryHtml; // innerHTML statt textContent verwenden
@@ -2190,14 +2255,14 @@ function showBatchScanFeedback(scanNumber, isExpected, carrierInfo = null) {
         closeBatchScanFeedbackModalButtonEl.focus();
     }, 100);
 }
-// --- ENDE DER ÄNDERUNG: showBatchScanFeedback Funktion angepasst (Land in neue Zeile) ---
+// --- ENDE DER ÃNDERUNG: showBatchScanFeedback Funktion angepasst (Land in neue Zeile) ---
 // ERSETZEN SIE IHRE GESAMTE 'addToBatch' FUNKTION MIT DIESER VERSION
 
 // ERSETZEN SIE IHRE GESAMTE 'addToBatch' FUNKTION MIT DIESER VERSION
 
 function addToBatch() {
     // Wenn das Verdachts-Modal offen ist und ein neuer Scan kommt, wird es geschlossen.
-    // Das gilt als implizite "Nein"-Antwort für alle verbleibenden Vorschläge.
+    // Das gilt als implizite "Nein"-Antwort fÃ¼r alle verbleibenden VorschlÃ¤ge.
     if (suspicionModalEl.classList.contains('visible')) {
         closeSuspicionModal();
     }
@@ -2208,7 +2273,7 @@ function addToBatch() {
     const upperRawInput = rawInputFromField.toUpperCase();
     const { isValidFormat, raw: processedRawInput } = processShipmentNumber(upperRawInput);
     if (!isValidFormat) {
-        displayError(`Ungültiges Format für Batch-Eingabe: ${escapeHtml(rawInputFromField)}`);
+        displayError(`UngÃ¼ltiges Format fÃ¼r Batch-Eingabe: ${escapeHtml(rawInputFromField)}`);
         focusShipmentInput();
         return;
     }
@@ -2234,7 +2299,7 @@ function addToBatch() {
         showBatchScanFeedback(processedRawInput, isCurrentHuExpected, carrier);
     }
     
-    // Logik für Notiz-Popup beim ersten Scan
+    // Logik fÃ¼r Notiz-Popup beim ersten Scan
     if (isBatchModeActive && currentBatch.length === 0 && isBatchNotePromptRequired && batchNoteToggleEl.checked) {
         pendingFirstBatchScanData = { rawInput: processedRawInput, scanTimestamp: scanTimestamp };
         batchNoteInputEl.value = currentBatchGlobalNote || ''; 
@@ -2244,7 +2309,7 @@ function addToBatch() {
         return;
     }
 
-    // ===== HIER BEGINNT DIE ÜBERARBEITETE VERDACHTS-LOGIK =====
+    // ===== HIER BEGINNT DIE ÃBERARBEITETE VERDACHTS-LOGIK =====
     if (!isCurrentHuExpected) {
         const similarItems = findAllSimilarExpectedHus(processedRawInput);
         if (similarItems.length > 0) {
@@ -2252,7 +2317,7 @@ function addToBatch() {
             suspicionQueue = similarItems;
             currentSuspicionIndex = 0;
 
-            // Zuerst den gescannten Wert zum Batch hinzufügen
+            // Zuerst den gescannten Wert zum Batch hinzufÃ¼gen
             const tempBatchItem = {
                 rawInput: processedRawInput,
                 scanTimestamp: scanTimestamp,
@@ -2271,9 +2336,9 @@ function addToBatch() {
             return;
         }
     }
-    // ===== ENDE DER ÜBERARBEITETEN VERDACHTS-LOGIK =====
+    // ===== ENDE DER ÃBERARBEITETEN VERDACHTS-LOGIK =====
 
-    // Standard-Verhalten: HU zum Batch hinzufügen
+    // Standard-Verhalten: HU zum Batch hinzufÃ¼gen
     const batchItem = {
         rawInput: processedRawInput,
         scanTimestamp: scanTimestamp,
@@ -2340,7 +2405,7 @@ function skipNoteAndAddFirstBatchItem() {
 // --- ERSETZEN Sie die alte Funktion durch diese Version ---
 
         function skipNoteAndAddFirstBatchItem() {
-            currentBatchGlobalNote = null; // Globale Notiz für zukünftige Scans entfernen
+            currentBatchGlobalNote = null; // Globale Notiz fÃ¼r zukÃ¼nftige Scans entfernen
 
             // *** DIE WICHTIGE NEUE LOGIK ***
             // Entferne die Notiz von ALLEN bereits vorhandenen Items im Batch
@@ -2354,7 +2419,7 @@ function skipNoteAndAddFirstBatchItem() {
             updateBatchUI(); // UI aktualisieren, um die entfernten Notizen zu reflektieren
             batchNoteToggleEl.checked = false; // Schalter nach Benutzung immer deaktivieren
 
-            // Nur wenn ein Scan auf die Verarbeitung wartet, wird er hinzugefügt.
+            // Nur wenn ein Scan auf die Verarbeitung wartet, wird er hinzugefÃ¼gt.
             if (pendingFirstBatchScanData) {
                 const batchItem = { ...pendingFirstBatchScanData, note: null };
                 currentBatch.push(batchItem);
@@ -2371,7 +2436,7 @@ function skipNoteAndAddFirstBatchItem() {
 
 // --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESER KORRIGIERTEN VERSION ---
 
-// --- START DER ÄNDERUNG: Die komplette Funktion wird aktualisiert ---
+// --- START DER ÃNDERUNG: Die komplette Funktion wird aktualisiert ---
 // --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESER NEUEN VERSION ---
 
 function saveBatch() {
@@ -2392,7 +2457,7 @@ function saveBatch() {
         
         const parentHawb = findShipmentByHuNumber(rawInputFromBatch);
 
-        // --- LOGIK FÜR HU-LISTEN-AUFTRÄGE ---
+        // --- LOGIK FÃR HU-LISTEN-AUFTRÃGE ---
         if (parentHawb) {
             const parentShipment = shipmentsWorkingCopy[parentHawb];
             const isNewScanKombi = (batchStatus === 'XRY' && batchIsCombination);
@@ -2407,7 +2472,7 @@ function saveBatch() {
             if (isFinalClearanceScan) {
                 const anstehendIndex = parentShipment.scannedItems.findIndex(i => i.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase() && i.status === 'Anstehend' && !i.isCancelled);
                 if (anstehendIndex === -1) {
-                    errorCount++; errorMessages.push(`Alle (${packageLimitForThisHu}) Packstücke für HU ${rawInputFromBatch} bereits final erfasst.`); return;
+                    errorCount++; errorMessages.push(`Alle (${packageLimitForThisHu}) PackstÃ¼cke fÃ¼r HU ${rawInputFromBatch} bereits final erfasst.`); return;
                 }
                 const itemToUpdate = parentShipment.scannedItems[anstehendIndex];
                 itemToUpdate.status = batchStatus; itemToUpdate.timestamp = scanTimestamp;
@@ -2423,7 +2488,7 @@ function saveBatch() {
 
                 if (currentScansOfType >= packageLimitForThisHu) {
                     const scanTypeText = isNewScanKombi ? 'Kombi-Sicherung' : batchStatus;
-                    errorCount++; errorMessages.push(`Limit (${packageLimitForThisHu}) für '${scanTypeText}' bei HU ${rawInputFromBatch} erreicht.`); return;
+                    errorCount++; errorMessages.push(`Limit (${packageLimitForThisHu}) fÃ¼r '${scanTypeText}' bei HU ${rawInputFromBatch} erreicht.`); return;
                 }
 
                 const originalItem = parentShipment.scannedItems.find(i => i.rawInput.toUpperCase() === rawInputFromBatch.toUpperCase());
@@ -2453,10 +2518,10 @@ function saveBatch() {
             return;
         }
         
-        // --- LOGIK FÜR NORMALE SENDUNGEN (NICHT-HU-LISTEN) ---
+        // --- LOGIK FÃR NORMALE SENDUNGEN (NICHT-HU-LISTEN) ---
         const { baseNumber, isValidFormat, raw: processedRawInput, isSuffixFormat } = processShipmentNumber(rawInputFromBatch);
         if (!isValidFormat) {
-            errorCount++; errorMessages.push(`Ungültiges Format: ${escapeHtml(rawInputFromBatch)}`); return;
+            errorCount++; errorMessages.push(`UngÃ¼ltiges Format: ${escapeHtml(rawInputFromBatch)}`); return;
         }
         if (!shipmentsWorkingCopy[baseNumber]) {
             newBaseShipments.add(baseNumber);
@@ -2484,7 +2549,7 @@ function saveBatch() {
         const expectedTotal = shipmentToUpdate.totalPiecesExpected;
         if (!NON_COUNTING_STATUSES.includes(batchStatus) && !batchIsCombination && expectedTotal !== null) {
             if (calculateCurrentCountedPieces(shipmentToUpdate.scannedItems) >= expectedTotal) {
-                errorCount++; errorMessages.push(`Limit (${expectedTotal}) für ${escapeHtml(baseNumber)} erreicht bei Scan ${escapeHtml(processedRawInput)}`); return;
+                errorCount++; errorMessages.push(`Limit (${expectedTotal}) fÃ¼r ${escapeHtml(baseNumber)} erreicht bei Scan ${escapeHtml(processedRawInput)}`); return;
             }
         }
         const newScanItem = {
@@ -2520,9 +2585,9 @@ function saveBatch() {
         }
     });
     
-    let alertMessage = `Batch Verarbeitung:\n- Erfolgreich: ${successCount}\n- Fehler/Übersprungen: ${errorCount}`;
+    let alertMessage = `Batch Verarbeitung:\n- Erfolgreich: ${successCount}\n- Fehler/Ãbersprungen: ${errorCount}`;
     if (newBaseShipments.size > 0) {
-        alertMessage += `\n- Neue Sendungen erstellt für: ${[...newBaseShipments].join(', ')}`;
+        alertMessage += `\n- Neue Sendungen erstellt fÃ¼r: ${[...newBaseShipments].join(', ')}`;
     }
     if (errorMessages.length > 0) {
         alertMessage += `\n\nDetails:\n- ${errorMessages.join('\n- ')}`;
@@ -2551,7 +2616,7 @@ function saveBatch() {
 
 
 
-        // --- Sonstige Aktionen (Löschen, PDF, Edit Modal) ---
+        // --- Sonstige Aktionen (LÃ¶schen, PDF, Edit Modal) ---
         function deleteShipment(baseNumber) {
             const shipments = loadShipments();
             if (shipments[baseNumber]) {
@@ -2559,7 +2624,7 @@ function saveBatch() {
                 saveShipments(shipments);
                 renderTable();
                 const currentInputBase = processShipmentNumber(shipmentNumberInputEl.value).baseNumber;
-                if (currentInputBase === baseNumber) { // Wenn gelöschte Sendung angezeigt wurde
+                if (currentInputBase === baseNumber) { // Wenn gelÃ¶schte Sendung angezeigt wurde
                     displayCurrentShipmentDetails('');
                 } else {
                     displayCurrentShipmentDetails(currentInputBase);
@@ -2568,16 +2633,16 @@ function saveBatch() {
             }
             focusShipmentInput();
         }
-        // --- START: NEUE HILFSFUNKTION FÜR DUNKELALARM ---
+        // --- START: NEUE HILFSFUNKTION FÃR DUNKELALARM ---
         function calculateDunkelalarmCount(scannedItems) {
             if (!Array.isArray(scannedItems)) return 0;
-            // Zählt nur nicht-stornierte Scans mit dem Status "Dunkelalarm"
+            // ZÃ¤hlt nur nicht-stornierte Scans mit dem Status "Dunkelalarm"
             return scannedItems.filter(item => 
                 item.status === 'Dunkelalarm' && 
                 !item.isCancelled
             ).length;
         }
-        // --- ENDE: NEUE HILFSFUNKTION FÜR DUNKELALARM ---
+        // --- ENDE: NEUE HILFSFUNKTION FÃR DUNKELALARM ---
         function requestCancelScanItem(baseNumber, itemTimestamp) {
             if (confirm(`Soll dieser Scan-Eintrag wirklich storniert werden?\nZeit: ${new Date(itemTimestamp).toLocaleString('de-DE')}`)) {
                 cancelScanItem(baseNumber, itemTimestamp);
@@ -2602,7 +2667,7 @@ function saveBatch() {
                     const newPlaceholderItem = {
                         rawInput: itemToCancel.rawInput, // Die gleiche HU-Nummer
                         status: 'Anstehend',
-                        timestamp: now.toISOString(), // Neuer Zeitstempel für den Platzhalter
+                        timestamp: now.toISOString(), // Neuer Zeitstempel fÃ¼r den Platzhalter
                         isCombination: false,
                         notes: [],
                         isCancelled: false,
@@ -2636,7 +2701,7 @@ function saveBatch() {
             
             editModalEl.classList.add('visible');
             document.body.classList.add('modal-open');
-            // NEU: Diese Zeile auskommentieren, um die Tastatur zu unterdrücken.
+            // NEU: Diese Zeile auskommentieren, um die Tastatur zu unterdrÃ¼cken.
             // editTotalPiecesExpectedInputEl.focus();
         }
         function closeEditModal() {
@@ -2658,7 +2723,7 @@ function saveBatch() {
                 if (!isNaN(parsedNum) && parsedNum > 0) {
                     newTotalExpected = parsedNum;
                 } else {
-                    alert("Ungültige Eingabe für Stückzahl. Bitte eine positive Zahl eingeben oder Feld leer lassen.");
+                    alert("UngÃ¼ltige Eingabe fÃ¼r StÃ¼ckzahl. Bitte eine positive Zahl eingeben oder Feld leer lassen.");
                     editTotalPiecesExpectedInputEl.focus(); return;
                 }
             }
@@ -2671,7 +2736,7 @@ function saveBatch() {
             if (manualReceiptCountStr !== '') {
                 const manualReceiptCount = parseInt(manualReceiptCountStr, 10);
                 if (isNaN(manualReceiptCount) || manualReceiptCount < 0) {
-                    alert("Ungültige Eingabe für Anzahl Wareneingang. Bitte eine positive Zahl eingeben.");
+                    alert("UngÃ¼ltige Eingabe fÃ¼r Anzahl Wareneingang. Bitte eine positive Zahl eingeben.");
                     editGoodsReceiptCountInputEl.focus();
                     return;
                 }
@@ -2680,9 +2745,9 @@ function saveBatch() {
 
                 for (let i = 0; i < manualReceiptCount; i++) {
                     shipments[baseNumber].scannedItems.push({
-                        // --- ÄNDERUNG HIER ---
+                        // --- ÃNDERUNG HIER ---
                         rawInput: baseNumber, // Anstatt 'Manuell erfasst' wird die Sendungsnummer verwendet
-                        // --- ENDE DER ÄNDERUNG ---
+                        // --- ENDE DER ÃNDERUNG ---
                         status: 'Wareneingang',
                         timestamp: new Date().toISOString(),
                         isCombination: false,
@@ -2699,7 +2764,7 @@ function saveBatch() {
             closeEditModal();
             renderTable();
             displayCurrentShipmentDetails(baseNumber);
-            displayError(`Änderungen für ${escapeHtml(baseNumber)} gespeichert.`, 'green', 2500);
+            displayError(`Ãnderungen fÃ¼r ${escapeHtml(baseNumber)} gespeichert.`, 'green', 2500);
 
             const finalCount = calculateCurrentCountedPieces(shipments[baseNumber].scannedItems);
             if (newTotalExpected !== null && finalCount === newTotalExpected && !notifiedCompletions.has(baseNumber)) {
@@ -2708,14 +2773,14 @@ function saveBatch() {
         }
         // --- script.js ---
 
-// Fügen Sie DIESE NEUE KONSTANTE HIER OBEN IM SKRIPT EIN,
-// idealerweise in der Nähe anderer Konstanten wie WEB_APP_URL, LOCAL_STORAGE_KEY etc.
-// ERSETZEN SIE DEN PLATZHALTER MIT IHREM TATSÄCHLICHEN BASE64-STRING!
+// FÃ¼gen Sie DIESE NEUE KONSTANTE HIER OBEN IM SKRIPT EIN,
+// idealerweise in der NÃ¤he anderer Konstanten wie WEB_APP_URL, LOCAL_STORAGE_KEY etc.
+// ERSETZEN SIE DEN PLATZHALTER MIT IHREM TATSÃCHLICHEN BASE64-STRING!
 const FIRMENLOGO_BASE64 = 'data:image/png;base64,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'; // Beispiel-Placeholder, ERSETZEN!
 
 // ... (bestehender Code VOR der generatePdf Funktion) ...
 
-// --- START DER ÄNDERUNG: Die komplette generatePdf Funktion wird aktualisiert ---
+// --- START DER ÃNDERUNG: Die komplette generatePdf Funktion wird aktualisiert ---
 function generatePdfInBrowser(event) {
     // Holen der Sendungs- und ggf. VVL-Nummer aus den data-Attributen des geklickten Buttons
     const clickedBaseNumber = event.target.dataset.basenumber;
@@ -2739,7 +2804,7 @@ function generatePdfInBrowser(event) {
     }
 
     if (shipmentsToProcess.length === 0) {
-        displayError(`Keine Scans für ${parentOrderNumber || clickedBaseNumber} für PDF gefunden.`);
+        displayError(`Keine Scans fÃ¼r ${parentOrderNumber || clickedBaseNumber} fÃ¼r PDF gefunden.`);
         return;
     }
     
@@ -2796,12 +2861,12 @@ function generatePdfInBrowser(event) {
             doc.setTextColor(subHeaderColor);
             doc.setFontSize(10);
             doc.setFont('courier', 'bold');
-            doc.text(`Gesamtübersicht Vorverladeliste ${parentOrderNumber}:`, 14, currentY); currentY += 6;
+            doc.text(`GesamtÃ¼bersicht Vorverladeliste ${parentOrderNumber}:`, 14, currentY); currentY += 6;
             
             doc.setTextColor(textColor);
             doc.setFontSize(9);
             doc.setFont('courier', 'normal');
-            doc.text(`Erwartete Gesamtstücke: ${vvlTotalExpected > 0 ? vvlTotalExpected : 'N/A'}`, 18, currentY); currentY += 4;
+            doc.text(`Erwartete GesamtstÃ¼cke: ${vvlTotalExpected > 0 ? vvlTotalExpected : 'N/A'}`, 18, currentY); currentY += 4;
             doc.text(`WE erfasst: ${vvlReceiptScansCount} von ${vvlTotalExpected > 0 ? vvlTotalExpected : 'N/A'} Stk.`, 18, currentY); currentY += 4;
             doc.text(`Sich. erfasst: ${vvlSecurityScansCount} von ${vvlTotalExpected > 0 ? vvlTotalExpected : 'N/A'} Stk.`, 18, currentY); currentY += 4;
             doc.text(`Dunkelalarm: ${vvlDunkelalarmCount} Stk.`, 18, currentY); currentY += 8;
@@ -2811,7 +2876,7 @@ function generatePdfInBrowser(event) {
             if (currentY + 60 > doc.internal.pageSize.height) { 
                 doc.addPage();
                 currentY = 15;
-                 if (FIRMENLOGO_BASE64 && FIRMENLOGO_BASE64 !== 'data:image/png;base64,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') { // Platzhalter für Base64
+                 if (FIRMENLOGO_BASE64 && FIRMENLOGO_BASE64 !== 'data:image/png;base64,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') { // Platzhalter fÃ¼r Base64
                     doc.addImage(
                         FIRMENLOGO_BASE64, 
                         'PNG', 
@@ -2858,7 +2923,7 @@ function generatePdfInBrowser(event) {
                     if (currentY + estimatedLines + 15 > doc.internal.pageSize.height) { 
                         doc.addPage();
                         currentY = 15;
-                        if (FIRMENLOGO_BASE64 && FIRMENLOGO_BASE64 !== 'data:image/png;base64,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') { // Platzhalter für Base64
+                        if (FIRMENLOGO_BASE64 && FIRMENLOGO_BASE64 !== 'data:image/png;base64,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') { // Platzhalter fÃ¼r Base64
                             doc.addImage(
                                 FIRMENLOGO_BASE64, 
                                 'PNG', 
@@ -2956,7 +3021,7 @@ function generatePdfInBrowser(event) {
                 doc.setTextColor(textColor);
                 doc.setFontSize(9);
                 doc.setFont('courier', 'italic');
-                doc.text("Keine erfassten Scans für diesen Auftrag.", 14, currentY);
+                doc.text("Keine erfassten Scans fÃ¼r diesen Auftrag.", 14, currentY);
                 currentY += 8;
             }
             currentY += 5;
@@ -2993,10 +3058,10 @@ function generatePdfInBrowser(event) {
                 });
                 summaryString += "SPX by " + summaryParts.join(', ');
             } else {
-                summaryString += "Keine zählende Sicherungsmethode angewendet.";
+                summaryString += "Keine zÃ¤hlende Sicherungsmethode angewendet.";
             }
         } else {
-            summaryString += "Keine zählende Sicherungsmethode angewendet.";
+            summaryString += "Keine zÃ¤hlende Sicherungsmethode angewendet.";
         }
         
         doc.setTextColor(subHeaderColor);
@@ -3006,12 +3071,12 @@ function generatePdfInBrowser(event) {
         doc.text(summaryString, 14, currentY);
 
         // doc.output('dataurlnewwindow'); // PDF im Browser anzeigen (deaktiviert)
-        clearError(); // Fehlermeldung löschen
+        clearError(); // Fehlermeldung lÃ¶schen
     } catch (error) { 
         console.error("PDF Fehler:", error); 
-        displayError("Fehler beim Erstellen/Öffnen des PDFs: " + error.message);
+        displayError("Fehler beim Erstellen/Ãffnen des PDFs: " + error.message);
     }
-    // focusShipmentInput(); // Fokus nicht sofort zurücksetzen, da das Senden asynchron ist
+    // focusShipmentInput(); // Fokus nicht sofort zurÃ¼cksetzen, da das Senden asynchron ist
 }
     
 // --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESER NEUEN VERSION ---
@@ -3048,7 +3113,7 @@ async function sendPdfEmailViaBackend(event) {
     }
 
     if (shipmentsToProcess.length === 0) {
-        displayError(`Keine Scans für ${parentOrderNumber || clickedBaseNumber} für PDF gefunden.`);
+        displayError(`Keine Scans fÃ¼r ${parentOrderNumber || clickedBaseNumber} fÃ¼r PDF gefunden.`);
         pdfButton.disabled = false;
         pdfButton.textContent = originalText;
         return;
@@ -3100,14 +3165,14 @@ async function sendPdfEmailViaBackend(event) {
     }
 }
 
-        // --- START DER ÄNDERUNG: Neue Hilfsfunktion ---
+        // --- START DER ÃNDERUNG: Neue Hilfsfunktion ---
         /**
-         * Ermittelt alle HU-Nummern einer HU-Liste, für die noch kein Wareneingang erfasst wurde.
+         * Ermittelt alle HU-Nummern einer HU-Liste, fÃ¼r die noch kein Wareneingang erfasst wurde.
          * @param {object} shipment Das Sendungs-Objekt.
          * @returns {Array<object>} Eine Liste der fehlenden HU-Items (mit rawInput, sendnr, position etc.).
          */
         function getMissingReceiptHusForShipment(shipment) {
-            // Nur für HU-Listen-Aufträge relevant
+            // Nur fÃ¼r HU-Listen-AuftrÃ¤ge relevant
             if (!shipment.isHuListOrder || !shipment.scannedItems) {
                 return [];
             }
@@ -3119,7 +3184,7 @@ async function sendPdfEmailViaBackend(event) {
                 !item.isCancelled && (item.status === 'Anstehend' || securityClearanceStatuses.includes(item.status))
             );
 
-            // Zählt, wie oft jede HU mit Status "Wareneingang" gescannt wurde
+            // ZÃ¤hlt, wie oft jede HU mit Status "Wareneingang" gescannt wurde
             const receiptCounts = shipment.scannedItems
                 .filter(item => item.status === 'Wareneingang' && !item.isCancelled)
                 .reduce((acc, item) => {
@@ -3127,12 +3192,12 @@ async function sendPdfEmailViaBackend(event) {
                     return acc;
                 }, {});
             
-            const tempReceiptCounts = {...receiptCounts}; // Eine Kopie, da wir die Zählungen ändern werden
+            const tempReceiptCounts = {...receiptCounts}; // Eine Kopie, da wir die ZÃ¤hlungen Ã¤ndern werden
 
             const missingReceiptHus = [];
             manifestSlots.forEach(slot => {
                 const hu = slot.rawInput;
-                // Wenn ein Wareneingang für diese HU existiert, "verbrauchen" wir ihn
+                // Wenn ein Wareneingang fÃ¼r diese HU existiert, "verbrauchen" wir ihn
                 if (tempReceiptCounts[hu] && tempReceiptCounts[hu] > 0) {
                     tempReceiptCounts[hu]--;
                 } else {
@@ -3143,7 +3208,7 @@ async function sendPdfEmailViaBackend(event) {
 
             return missingReceiptHus;
         }
-        // --- ENDE DER ÄNDERUNG: Neue Hilfsfunktion ---
+        // --- ENDE DER ÃNDERUNG: Neue Hilfsfunktion ---
 
 // ... (Rest des bestehenden Codes) ...
         // --- Google Sheet & E-Mail Integration ---
@@ -3163,8 +3228,8 @@ async function sendPdfEmailViaBackend(event) {
                 }
                 const response = await fetch(WEB_APP_URL, {
                     method: 'POST', mode: 'cors', cache: 'no-cache',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // text/plain für Gas POST
-                    body: JSON.stringify({action: "saveAllData", payload: shipmentsData}) // Struktur für Gas
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // text/plain fÃ¼r Gas POST
+                    body: JSON.stringify({action: "saveAllData", payload: shipmentsData}) // Struktur fÃ¼r Gas
                 });
                 if (!response.ok) throw new Error(`Server Verbindung: ${response.status} ${response.statusText}`);
                 const result = await response.json();
@@ -3187,13 +3252,13 @@ async function sendPdfEmailViaBackend(event) {
 
         async function notifyShipmentCompletion(shipmentObject) {
             const baseNumber = shipmentObject.hawb;
-            if (!baseNumber) { console.error("Konnte HAWB für Benachrichtigung nicht ermitteln."); return; }
+            if (!baseNumber) { console.error("Konnte HAWB fÃ¼r Benachrichtigung nicht ermitteln."); return; }
             if (!WEB_APP_URL || WEB_APP_URL.includes('YOUR_DEPLOYED_WEB_APP_URL_HERE')) {
                 console.warn("Web App URL fehlt, keine Abschluss-Benachrichtigung."); return;
             }
             if (notifiedCompletions.has(baseNumber)) return; // Bereits benachrichtigt
 
-            console.log(`Sende Abschluss-Benachrichtigung für ${baseNumber}...`);
+            console.log(`Sende Abschluss-Benachrichtigung fÃ¼r ${baseNumber}...`);
             notifiedCompletions.add(baseNumber); // Als benachrichtigt markieren
             
             const notificationData = { action: 'shipmentComplete', shipmentData: shipmentObject };
@@ -3206,15 +3271,15 @@ async function sendPdfEmailViaBackend(event) {
                 if (!response.ok) throw new Error(`Server Fehler (Mail): ${response.status} ${response.statusText}`);
                 const result = await response.json();
                 if (result.status === 'success') {
-                    console.log(`Abschluss-Benachrichtigung für ${baseNumber} erfolgreich gesendet.`);
+                    console.log(`Abschluss-Benachrichtigung fÃ¼r ${baseNumber} erfolgreich gesendet.`);
                     displayError(`Sendung ${escapeHtml(baseNumber)} abgeschlossen! Benachrichtigung gesendet.`, 'blue', 4000);
                 } else {
                     throw new Error(`Apps Script Fehler (Mail): ${result.message || 'Unbekannt'}`);
                 }
             } catch (error) {
-                console.error(`Fehler beim Senden der Abschluss-Benachrichtigung für ${baseNumber}:`, error);
-                notifiedCompletions.delete(baseNumber); // Bei Fehler wieder freigeben für erneuten Versuch
-                displayError(`Fehler beim Senden der Mail für ${escapeHtml(baseNumber)}.`);
+                console.error(`Fehler beim Senden der Abschluss-Benachrichtigung fÃ¼r ${baseNumber}:`, error);
+                notifiedCompletions.delete(baseNumber); // Bei Fehler wieder freigeben fÃ¼r erneuten Versuch
+                displayError(`Fehler beim Senden der Mail fÃ¼r ${escapeHtml(baseNumber)}.`);
             }
         }
 
@@ -3226,7 +3291,7 @@ async function sendPdfEmailViaBackend(event) {
             }
             const shipmentsData = loadShipments();
             if (Object.keys(shipmentsData).length === 0) {
-                sheetStatusEl.textContent = 'Keine Daten für Zusammenfassung.'; sheetStatusEl.style.color = 'blue';
+                sheetStatusEl.textContent = 'Keine Daten fÃ¼r Zusammenfassung.'; sheetStatusEl.style.color = 'blue';
                 setTimeout(() => { if(sheetStatusEl.style.color === 'blue') sheetStatusEl.textContent = ''; }, 3000); return;
             }
             sheetStatusEl.textContent = 'Sende E-Mail-Zusammenfassung...'; sheetStatusEl.style.color = '#f0ad4e';
@@ -3255,7 +3320,7 @@ async function sendPdfEmailViaBackend(event) {
             }
         }
 
-            // --- START: Doppelklick-Logik für manuelle Eingabe im HU-Modal ---
+            // --- START: Doppelklick-Logik fÃ¼r manuelle Eingabe im HU-Modal ---
             function enableManualInputOnDoubleClick(event) {
                 const element = event.target;
                 element.removeAttribute('readonly');
@@ -3269,18 +3334,19 @@ async function sendPdfEmailViaBackend(event) {
             mainOrderNumberInputEl.addEventListener('dblclick', enableManualInputOnDoubleClick);
             huListTextareaEl.addEventListener('dblclick', enableManualInputOnDoubleClick);
             // --- ENDE: Doppelklick-Logik ---
-        // --- Seitenmenü ---
-        function openSideMenu() { removeActiveInlineNoteEditor(); sideMenuEl.classList.add('open'); menuOverlayEl.classList.add('visible'); }
+        // --- SeitenmenÃ¼ ---
+        function openSideMenu() { removeActiveInlineNoteEditor(); sideMenuEl.classList.add('open'); if (sideMenuEl.classList.contains('open')) renderTruckSwitches();
+ menuOverlayEl.classList.add('visible'); }
         function closeSideMenu() { sideMenuEl.classList.remove('open'); menuOverlayEl.classList.remove('visible'); sheetStatusEl.textContent = ''; focusShipmentInput(); }
-            // --- START: Doppelklick-Logik für manuelle Eingabe im HU-Modal ---
+            // --- START: Doppelklick-Logik fÃ¼r manuelle Eingabe im HU-Modal ---
             function enableManualInput(event) {
                 const element = event.target;
                 element.removeAttribute('readonly');
                 element.setAttribute('inputmode', 'text'); // Tastatur anfordern
-                // Kleiner Timeout, damit der Browser die Änderung verarbeiten kann, bevor der Fokus gesetzt wird
+                // Kleiner Timeout, damit der Browser die Ãnderung verarbeiten kann, bevor der Fokus gesetzt wird
                 setTimeout(() => {
                     element.focus();
-                    element.select(); // Text markieren für einfaches Überschreiben
+                    element.select(); // Text markieren fÃ¼r einfaches Ãberschreiben
                 }, 50);
             }
 
@@ -3291,7 +3357,7 @@ async function sendPdfEmailViaBackend(event) {
                 sideMenuEl.classList.remove('open');
                 menuOverlayEl.classList.remove('visible');
 
-                // Inputmode für Scanner zurücksetzen
+                // Inputmode fÃ¼r Scanner zurÃ¼cksetzen
                 mainOrderNumberInputEl.inputMode = 'none';
                 huListTextareaEl.inputMode = 'none';
 
@@ -3299,7 +3365,7 @@ async function sendPdfEmailViaBackend(event) {
                 huListTextareaEl.value = '';
                 importHuModalEl.classList.add('visible');
                 document.body.classList.add('modal-open');
-                // NEU: Diese Zeile auskommentieren, um das automatische Öffnen der Tastatur zu verhindern.
+                // NEU: Diese Zeile auskommentieren, um das automatische Ãffnen der Tastatur zu verhindern.
                 // mainOrderNumberInputEl.focus(); 
             });
 
@@ -3317,14 +3383,14 @@ async function sendPdfEmailViaBackend(event) {
 function setupEventListeners() {
 
     // ===============================================================
-    // NEU: Listener für die Master-Detail-Ansicht
+    // NEU: Listener fÃ¼r die Master-Detail-Ansicht
     // ===============================================================
 
-    // Listener für den "Zurück"-Button in der Detailansicht
+    // Listener fÃ¼r den "ZurÃ¼ck"-Button in der Detailansicht
     backToMainViewBtnEl.addEventListener('click', hideDetailView);
 
-    // ÄNDERUNG: Klick-Verhalten der Tabelle wurde überarbeitet
-// ÄNDERUNG: Klick-Verhalten der Tabelle wurde überarbeitet
+    // ÃNDERUNG: Klick-Verhalten der Tabelle wurde Ã¼berarbeitet
+// ÃNDERUNG: Klick-Verhalten der Tabelle wurde Ã¼berarbeitet
 tableBodyEl.addEventListener('click', (event) => {
     const target = event.target;
     const row = target.closest('tr');
@@ -3333,21 +3399,21 @@ tableBodyEl.addEventListener('click', (event) => {
     const baseNumber = row.dataset.basenumber;
     if (!baseNumber) return;
 
-    // Fall 1: Klick auf einen Aktions-Button (Edit, PDF, Löschen)
+    // Fall 1: Klick auf einen Aktions-Button (Edit, PDF, LÃ¶schen)
     if (target.closest('button')) {
         if (target.classList.contains('edit-btn') && !isBatchModeActive) {
             openEditModal(baseNumber);
         } else if (target.classList.contains('pdf-btn')) {
             sendPdfEmailViaBackend(event); 
         } else if (target.classList.contains('main-delete-btn')) {
-            if (confirm(`Sendung ${escapeHtml(baseNumber)} wirklich löschen?`)) {
+            if (confirm(`Sendung ${escapeHtml(baseNumber)} wirklich lÃ¶schen?`)) {
                 deleteShipment(baseNumber);
             }
         }
         return; // Wichtig: Verarbeitung hier beenden
     }
     
-    // --- START DER ÄNDERUNG ---
+    // --- START DER ÃNDERUNG ---
     // Finde die genaue Zelle, die geklickt wurde.
     const cell = target.closest('td');
 
@@ -3357,7 +3423,7 @@ tableBodyEl.addEventListener('click', (event) => {
         showDetailView(baseNumber);
     }
     // Klicks auf andere Zellen (die keine Buttons sind) tun nun nichts mehr.
-    // --- ENDE DER ÄNDERUNG ---
+    // --- ENDE DER ÃNDERUNG ---
 });
 
 
@@ -3378,7 +3444,7 @@ document.addEventListener('click', (event) => {
         event.preventDefault();
         requestDeleteNote(target.dataset.basenumber, target.dataset.timestamp, target.dataset.noteIndex);
     }
-    // --- START DER ÄNDERUNG ---
+    // --- START DER ÃNDERUNG ---
     // Neue Bedingung, um den Klick auf den Titel abzufangen
 //... innerhalb von document.addEventListener('click', ...)
 else if (target.id === 'shipmentDetailTitle') {
@@ -3392,17 +3458,17 @@ else if (target.id === 'shipmentDetailTitle') {
         });
     }
 }
-// --- START DER ÄNDERUNG ---
-// Neue Bedingung für Klicks auf eine HU/VSE-Nummer
+// --- START DER ÃNDERUNG ---
+// Neue Bedingung fÃ¼r Klicks auf eine HU/VSE-Nummer
 else if (target.closest('.hu-value')) {
     const huElement = target.closest('.hu-value'); // Finde das Elternelement mit der Klasse
     const huToCopy = huElement.textContent.trim(); // Extrahiere den reinen Text
     
     if (huToCopy && navigator.clipboard) {
         navigator.clipboard.writeText(huToCopy).then(() => {
-            // Füge die Klasse hinzu, um die CSS-Animation auszulösen
+            // FÃ¼ge die Klasse hinzu, um die CSS-Animation auszulÃ¶sen
             huElement.classList.add('copied');
-            // Entferne die Klasse nach der Animation, damit sie erneut ausgelöst werden kann
+            // Entferne die Klasse nach der Animation, damit sie erneut ausgelÃ¶st werden kann
             setTimeout(() => {
                 huElement.classList.remove('copied');
             }, 1500); // 1.5 Sekunden, passend zur CSS-Animation
@@ -3412,8 +3478,8 @@ else if (target.closest('.hu-value')) {
     }
 }
 
-// --- ENDE DER ÄNDERUNG ---
-    // --- ENDE DER ÄNDERUNG ---
+// --- ENDE DER ÃNDERUNG ---
+    // --- ENDE DER ÃNDERUNG ---
 });
     
     // ===============================================================
@@ -3450,7 +3516,7 @@ else if (target.closest('.hu-value')) {
         updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
 
         if (currentValue.startsWith('FRT_MULTI_V1')) {
-            if (!confirm("Ein Multi-Auftrags-QR-Code wurde erkannt.\n\nMöchtest du alle darin enthaltenen Aufträge jetzt importieren?")) {
+            if (!confirm("Ein Multi-Auftrags-QR-Code wurde erkannt.\n\nMÃ¶chtest du alle darin enthaltenen AuftrÃ¤ge jetzt importieren?")) {
                 shipmentNumberInputEl.value = ''; 
                 return;
             }
@@ -3458,6 +3524,9 @@ else if (target.closest('.hu-value')) {
             const shipments = loadShipments();
             const now = new Date().toISOString();
             let addedCount = 0, duplicateCount = 0, processedOrders = [];
+const batchTruckId = 'MAN_' + Date.now();
+const batchTruckLabel = 'MAN ' + new Date().toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit', year:'2-digit'}) + ' ' + new Date().toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
+registerTruck(batchTruckId, batchTruckLabel);
 
             parts.forEach(orderData => {
                 const [metaAndOrder, huData] = orderData.split('|||');
@@ -3477,7 +3546,9 @@ else if (target.closest('.hu-value')) {
                         newShipment.freightForwarder = metaParts[1];
                         newShipment.destinationCountry = metaParts[2];
                         newShipment.plsoNumber = metaParts[3];
+newShipment.truckId = batchTruckId;
                     }
+
                     shipments[orderNumber] = newShipment;
                     hus.forEach((huString, index) => {
                         const huData = parseComplexHuString(huString);
@@ -3492,13 +3563,13 @@ else if (target.closest('.hu-value')) {
                 }
             });
             saveShipments(shipments);
-            alert(`Multi-Import abgeschlossen:\n- Verarbeitete Aufträge: ${processedOrders.length}\n- Neue HUs hinzugefügt: ${addedCount}`);
+            alert(`Multi-Import abgeschlossen:\n- Verarbeitete AuftrÃ¤ge: ${processedOrders.length}\n- Neue HUs hinzugefÃ¼gt: ${addedCount}`);
             location.reload();
             return;
         } 
         
         else if (currentValue.startsWith('FRT_VVL_V1')) {
-            if (!confirm("Eine Vorverladeliste wurde erkannt.\n\nMöchtest du alle darin enthaltenen Kundenaufträge jetzt importieren?")) {
+            if (!confirm("Eine Vorverladeliste wurde erkannt.\n\nMÃ¶chtest du alle darin enthaltenen KundenauftrÃ¤ge jetzt importieren?")) {
                 shipmentNumberInputEl.value = ''; 
                 return;
             }
@@ -3517,7 +3588,7 @@ else if (target.closest('.hu-value')) {
                 const [kundennr, vorverladelisteNr] = meta.split('|');
                 const positionen = huData.split(' ').filter(Boolean);
                 processedVVLs.add(vorverladelisteNr);
-
+registerTruck('VVL_' + vorverladelisteNr, 'VVL ' + vorverladelisteNr);
                 if (!shipments[kundennr]) {
                     newOrders.add(kundennr);
                     shipments[kundennr] = {
@@ -3559,7 +3630,7 @@ else if (target.closest('.hu-value')) {
                 }
             });
             saveShipments(shipments);
-            alert(`Import der Vorverladeliste(n) [${[...processedVVLs].join(', ')}] abgeschlossen:\n\n- ${addedPositionsCount} neue Positionen importiert.\n- ${newOrders.size} neue Aufträge angelegt.\n- ${updatedOrders.size} Aufträge aktualisiert.`);
+            alert(`Import der Vorverladeliste(n) [${[...processedVVLs].join(', ')}] abgeschlossen:\n\n- ${addedPositionsCount} neue Positionen importiert.\n- ${newOrders.size} neue AuftrÃ¤ge angelegt.\n- ${updatedOrders.size} AuftrÃ¤ge aktualisiert.`);
             location.reload();
             return;
         }
@@ -3574,7 +3645,7 @@ else if (target.closest('.hu-value')) {
         const parentHawbByHu = findShipmentByHuNumber(currentValue);
         if (parentHawbByHu) {
             baseNumberToShow = parentHawbByHu;
-            displayError(`VSE '${escapeHtml(currentValue)}' gehört zu Kundennr: ${escapeHtml(baseNumberToShow)}`, 'blue', 3500);
+            displayError(`VSE '${escapeHtml(currentValue)}' gehÃ¶rt zu Kundennr: ${escapeHtml(baseNumberToShow)}`, 'blue', 3500);
         } else if (shipments[processedDirectBase.toUpperCase()]) {
             baseNumberToShow = processedDirectBase.toUpperCase();
             clearError();
@@ -3582,7 +3653,7 @@ else if (target.closest('.hu-value')) {
             const parentHawbByNote = findShipmentByNoteContent(currentValue);
             if (parentHawbByNote) {
                 baseNumberToShow = parentHawbByNote;
-                displayError(`Notiz '${escapeHtml(currentValue)}' gefunden für HAWB: ${escapeHtml(baseNumberToShow)}`, 'blue', 3500);
+                displayError(`Notiz '${escapeHtml(currentValue)}' gefunden fÃ¼r HAWB: ${escapeHtml(baseNumberToShow)}`, 'blue', 3500);
             }
         }
         displayCurrentShipmentDetails(baseNumberToShow || processedDirectBase);
@@ -3601,24 +3672,24 @@ else if (target.closest('.hu-value')) {
     });
 
     shipmentNumberInputEl.addEventListener('blur', () => {
-        // Setzt den Modus IMMER zurück in den Scanner-Modus, wenn der Fokus verloren geht.
-        // So ist das Feld für den nächsten Scan bereit.
+        // Setzt den Modus IMMER zurÃ¼ck in den Scanner-Modus, wenn der Fokus verloren geht.
+        // So ist das Feld fÃ¼r den nÃ¤chsten Scan bereit.
         shipmentNumberInputEl.inputMode = 'none';
     
-        // Bestehende Logik für den Batch-Modus beibehalten: Sofort neu fokussieren.
+        // Bestehende Logik fÃ¼r den Batch-Modus beibehalten: Sofort neu fokussieren.
         if (isBatchModeActive) {
             setTimeout(focusShipmentInput, 10);
         }
     });
-// NEU: Event Listener für das Absenden des Haupt-Formulars (Enter-Taste auf Tastatur)
+// NEU: Event Listener fÃ¼r das Absenden des Haupt-Formulars (Enter-Taste auf Tastatur)
 // ... in der Funktion setupEventListeners() ...
 
-// NEU: Listener für Doppelklick auf das Haupt-Eingabefeld, um die Tastatur zu öffnen
+// NEU: Listener fÃ¼r Doppelklick auf das Haupt-Eingabefeld, um die Tastatur zu Ã¶ffnen
 shipmentNumberInputEl.addEventListener('dblclick', () => {
-    // Ändert den inputMode, um die Standard-Tastatur des Geräts anzufordern
+    // Ãndert den inputMode, um die Standard-Tastatur des GerÃ¤ts anzufordern
     shipmentNumberInputEl.inputMode = 'text'; 
     
-    // Ein kurzer Timeout stellt sicher, dass der Browser die Änderung verarbeitet hat,
+    // Ein kurzer Timeout stellt sicher, dass der Browser die Ãnderung verarbeitet hat,
     // bevor wir versuchen, den Fokus erneut zu setzen.
     setTimeout(() => {
         shipmentNumberInputEl.focus(); // Erneut fokussieren, um die Tastatur sicher zu triggern
@@ -3640,27 +3711,27 @@ mainInputFormEl.addEventListener('submit', (event) => {
     });
     noteInputFormEl.addEventListener('submit', (e) => {
         e.preventDefault(); // Verhindert Neuladen der Seite
-        focusShipmentInput(); // Setzt den Fokus zurück auf das Haupt-Eingabefeld
+        focusShipmentInput(); // Setzt den Fokus zurÃ¼ck auf das Haupt-Eingabefeld
     });
     
 // in setupEventListeners()
 
-// KORRIGIERTER Listener für das Absenden des Notiz-Bearbeitungs-Modals (ersetzt BEIDE alten Blöcke)
+// KORRIGIERTER Listener fÃ¼r das Absenden des Notiz-Bearbeitungs-Modals (ersetzt BEIDE alten BlÃ¶cke)
 noteEditFormEl.addEventListener('submit', (e) => {
     e.preventDefault(); // Verhindert Neuladen der Seite
-    noteEditTextareaEl.blur(); // Tastatur schließen
+    noteEditTextareaEl.blur(); // Tastatur schlieÃen
 
-    // Die Speicherlogik wird DIREKT hier ausgeführt, anstatt einen weiteren Klick auszulösen.
+    // Die Speicherlogik wird DIREKT hier ausgefÃ¼hrt, anstatt einen weiteren Klick auszulÃ¶sen.
     const baseNumber = noteEditBaseNumberEl.value;
     const timestamp = noteEditTimestampEl.value;
     const noteIndex = noteEditNoteIndexEl.value === '' ? undefined : parseInt(noteEditNoteIndexEl.value, 10);
     const newNoteValue = noteEditTextareaEl.value;
 
     saveOrUpdateNote(baseNumber, timestamp, noteIndex, newNoteValue); // Speichert die Notiz EINMAL
-    closeNoteEditModal(); // Schließt das Modal
+    closeNoteEditModal(); // SchlieÃt das Modal
 });
 
-// Der separate 'click'-Listener für saveNoteEditButtonEl wird komplett entfernt.
+// Der separate 'click'-Listener fÃ¼r saveNoteEditButtonEl wird komplett entfernt.
 
     
     comboCheckboxEl.addEventListener('change', focusShipmentInput);
@@ -3736,7 +3807,7 @@ noteEditFormEl.addEventListener('submit', (e) => {
         const batchIndex = parseInt(suspicionBatchIndexEl.value, 10);
         const expectedHu = suspicionExpectedHuValueEl.value;
     
-        // Prüfen, ob die Werte gültig sind
+        // PrÃ¼fen, ob die Werte gÃ¼ltig sind
         if (!isNaN(batchIndex) && currentBatch[batchIndex] && expectedHu) {
             // Die HU im Batch-Array ersetzen
             currentBatch[batchIndex].rawInput = expectedHu;
@@ -3747,33 +3818,33 @@ noteEditFormEl.addEventListener('submit', (e) => {
     });
     
     suspicionDeclineBtnEl.addEventListener('click', () => {
-        // Zum nächsten Vorschlag in der Warteschlange gehen
+        // Zum nÃ¤chsten Vorschlag in der Warteschlange gehen
         currentSuspicionIndex++;
         
         const scannedInput = suspicionScannedHuEl.textContent;
         const batchIndex = parseInt(suspicionBatchIndexEl.value, 10);
     
-        // Nächsten Vorschlag anzeigen (die Funktion prüft selbst, ob es noch einen gibt)
+        // NÃ¤chsten Vorschlag anzeigen (die Funktion prÃ¼ft selbst, ob es noch einen gibt)
         showSuspicionModal(scannedInput, batchIndex);
     });
     
     
-    // Schließt das Modal auch, wenn daneben geklickt wird
+    // SchlieÃt das Modal auch, wenn daneben geklickt wird
     suspicionModalEl.addEventListener('click', (e) => {
         if (e.target === suspicionModalEl) {
             closeSuspicionModal();
         }
     });
-    // Seitenmenü
+    // SeitenmenÃ¼
     menuToggleBtnEl.addEventListener('click', (e) => { e.stopPropagation(); sideMenuEl.classList.contains('open') ? closeSideMenu() : openSideMenu(); });
     
     menuOverlayEl.addEventListener('click', closeSideMenu);
     sendToSheetButtonEl.addEventListener('click', sendDataToSheet);
     resetDataButtonEl.addEventListener('click', async () => {
         removeActiveInlineNoteEditor();
-        if (confirm("WARNUNG!\n\nMöchtest du wirklich ALLE erfassten Sendungsdaten auf diesem Gerät UND auf dem Server unwiderruflich löschen?")) {
+        if (confirm("WARNUNG!\n\nMÃ¶chtest du wirklich ALLE erfassten Sendungsdaten auf diesem GerÃ¤t UND auf dem Server unwiderruflich lÃ¶schen?")) {
             showLoader(); 
-            sheetStatusEl.textContent = 'Lösche Daten auf dem Server...';
+            sheetStatusEl.textContent = 'LÃ¶sche Daten auf dem Server...';
             sheetStatusEl.style.color = 'orange';
             try {
                 const response = await fetch(WEB_APP_URL, {
@@ -3787,14 +3858,14 @@ noteEditFormEl.addEventListener('submit', (e) => {
                 localStorage.removeItem(LOCAL_STORAGE_KEY);
                 location.reload(); 
             } catch (error) {
-                console.error("Fehler beim Zurücksetzen der Daten:", error);
+                console.error("Fehler beim ZurÃ¼cksetzen der Daten:", error);
                 sheetStatusEl.textContent = `Fehler: ${error.message}`;
                 sheetStatusEl.style.color = 'red';
-                alert("Die Daten konnten auf dem Server nicht gelöscht werden. Bitte prüfen Sie Ihre Verbindung.");
+                alert("Die Daten konnten auf dem Server nicht gelÃ¶scht werden. Bitte prÃ¼fen Sie Ihre Verbindung.");
                 hideLoader();
             }
         } else {
-            sheetStatusEl.textContent = 'Zurücksetzen abgebrochen.';
+            sheetStatusEl.textContent = 'ZurÃ¼cksetzen abgebrochen.';
             sheetStatusEl.style.color = 'blue';
             setTimeout(() => { if (sheetStatusEl.textContent.includes('abgebrochen')) sheetStatusEl.textContent = ''; }, 3000);
         }
@@ -3912,7 +3983,7 @@ showUeberzaehligHusBtnEl.addEventListener('click', () => {
 
     batchFeedbackToggleEl.addEventListener('change', () => {
         if (!isBatchModeActive && batchFeedbackToggleEl.checked) {
-            alert("Scan-Feedback-Popup ist nur im Batch-Modus verfügbar. Bitte aktivieren Sie zuerst den Batch-Modus.");
+            alert("Scan-Feedback-Popup ist nur im Batch-Modus verfÃ¼gbar. Bitte aktivieren Sie zuerst den Batch-Modus.");
             batchFeedbackToggleEl.checked = false;
         }
     });
@@ -3969,9 +4040,9 @@ showUeberzaehligHusBtnEl.addEventListener('click', () => {
     });
 
 } // Ende der setupEventListeners Funktion
-            // --- ENDE DER ÄNDERUNG: Event Listener für Batch Scan Feedback Toggle und Close Button ---
+            // --- ENDE DER ÃNDERUNG: Event Listener fÃ¼r Batch Scan Feedback Toggle und Close Button ---
 
-            // --- START: NEUE LOGIK FÜR HU-DETAIL-MODAL ---
+            // --- START: NEUE LOGIK FÃR HU-DETAIL-MODAL ---
             
             // Hilfsfunktion zum Finden eines Items anhand der HU-Nummer
             function findShipmentAndItemByHu(huNumber) {
@@ -3989,7 +4060,7 @@ showUeberzaehligHusBtnEl.addEventListener('click', () => {
                 return null;
             }
 
-            // Funktion zum Öffnen des Modals
+            // Funktion zum Ãffnen des Modals
             function openHuDetailsModal(event) {
                 const target = event.target.closest('.hu-value, .pending-vse');
                 if (!target) return;
@@ -4008,7 +4079,7 @@ showUeberzaehligHusBtnEl.addEventListener('click', () => {
                 }
             }
 
-            // Event Listeners für die drei Listen im "Offene HUs"-Modal
+            // Event Listeners fÃ¼r die drei Listen im "Offene HUs"-Modal
             openHusListContainerEl.addEventListener('click', openHuDetailsModal);
             missingReceiptHusListContainerEl.addEventListener('click', openHuDetailsModal);
             dunkelalarmHusListContainerEl.addEventListener('click', openHuDetailsModal);
@@ -4019,7 +4090,7 @@ showUeberzaehligHusBtnEl.addEventListener('click', () => {
                     const huToCopy = e.target.textContent.trim();
                     if (huToCopy && huToCopy !== 'N/A' && navigator.clipboard) {
                         navigator.clipboard.writeText(huToCopy).then(() => {
-                            // CSS-Klasse für visuelles Feedback hinzufügen
+                            // CSS-Klasse fÃ¼r visuelles Feedback hinzufÃ¼gen
                             e.target.classList.add('copied');
                             // Klasse nach der Animation wieder entfernen
                             setTimeout(() => {
@@ -4032,7 +4103,7 @@ showUeberzaehligHusBtnEl.addEventListener('click', () => {
                     return; // Verhindert, dass das Modal geschlossen wird
                 }
             
-                // Bestehende Logik zum Schließen des Modals
+                // Bestehende Logik zum SchlieÃen des Modals
                 if (e.target === huDetailsModalEl || e.target.closest('[data-close-modal="huDetailsModal"]')) {
                     huDetailsModalEl.classList.remove('visible');
                     document.body.classList.remove('modal-open');
@@ -4041,7 +4112,7 @@ showUeberzaehligHusBtnEl.addEventListener('click', () => {
 
 
 // =========================================================================
-// HIER IST DIE KORREKTUR: Die fehlenden Zeilen werden hinzugefügt
+// HIER IST DIE KORREKTUR: Die fehlenden Zeilen werden hinzugefÃ¼gt
 // =========================================================================
 initializeApp();
 
@@ -4061,7 +4132,7 @@ function attemptLockOrientation() {
     screen.orientation.lock(screen.orientation.type)
       .then(() => console.log('Bildschirmausrichtung gesperrt: ' + screen.orientation.type))
       .catch((error) => console.error('Sperren der Bildschirmausrichtung fehlgeschlagen:', error));
-  } else { console.warn('Screen Orientation Lock API nicht unterstützt.'); }
+  } else { console.warn('Screen Orientation Lock API nicht unterstÃ¼tzt.'); }
 }
 // window.addEventListener('load', attemptLockOrientation);
 */
