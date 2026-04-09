@@ -778,7 +778,7 @@ function showOpenHusSummary() {
     const dunkelalarmArray = Object.values(dunkelalarmItemsByOrder).sort(sortByCountryAndOrder);
     const ueberzaehligArray = Object.values(ueberzaehligItemsByOrder).sort(sortByCountryAndOrder);
 
-    openHusListContainerEl.innerHTML = openSecurityHusByOrder.map(order => generateHtmlForOrderGroup(order, generateHuListHtml(order.pendingHus, order.scannedItems))).join('') || '<p class="no-open-hus-message">GlÃ¼ckwunsch! Alle HUs sind sicherheitstechnisch bearbeitet.</p>';
+    openHusListContainerEl.innerHTML = openSecurityHusByOrder.map(order => generateHtmlForOrderGroup(order, generateHuListHtml(order.pendingHus, order.scannedItems))).join('') || '<p class="no-open-hus-message">Glückwunsch! Alle HUs sind sicherheitstechnisch bearbeitet.</p>';
     missingReceiptHusListContainerEl.innerHTML = missingReceiptHusByOrder.map(order => generateHtmlForOrderGroup(order, generateHuListHtml(order.pendingHus, order.scannedItems))).join('') || '<p class="no-open-hus-message">Perfekt! Alle HUs wurden im Wareneingang erfasst.</p>';
     dunkelalarmHusListContainerEl.innerHTML = dunkelalarmArray.map(data => generateHtmlForOrderGroup(data, generateHuListHtml(data.items, data.scannedItems), true)).join('') || '<p class="no-open-hus-message">Keine EintrÃ¤ge mit Status "Dunkelalarm" gefunden.</p>';
     
@@ -1482,7 +1482,7 @@ detailsHtml += `${numberPart}<span class="hu-value" style="cursor:pointer;" titl
                 if (isCancelled) {
                     notesListHtml += `<div class="note-item" style="color:var(--cancelled-color);">- ${escapeHtml(note)}</div>`;
                 } else {
-                    notesListHtml += `<div class="note-item"><span class="note-prefix">Notiz:</span><span class="editable-note" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" data-note-index="${index}" title="Notiz bearbeiten">${escapeHtml(note)}</span><button class="delete-note-btn" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" data-note-index="${index}" title="Notiz lÃ¶schen">Ã</button></div>`;
+                    notesListHtml += `<div class="note-item"><span class="note-prefix">Notiz:</span><span class="editable-note" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" data-note-index="${index}" title="Notiz bearbeiten">${escapeHtml(note)}</span><button class="delete-note-btn" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" data-note-index="${index}" title="Notiz L\u00F6schen">Ã</button></div>`;
                 }
             });
             notesListHtml += '</div>';
@@ -3890,7 +3890,7 @@ noteEditFormEl.addEventListener('submit', (e) => {
                 console.error("Fehler beim ZurÃ¼cksetzen der Daten:", error);
                 sheetStatusEl.textContent = `Fehler: ${error.message}`;
                 sheetStatusEl.style.color = 'red';
-                alert("Die Daten konnten auf dem Server nicht gelÃ¶scht werden. Bitte prÃ¼fen Sie Ihre Verbindung.");
+                alert("Die Daten konnten auf dem Server nicht gelöscht werden. Bitte prÃ¼fen Sie Ihre Verbindung.");
                 hideLoader();
             }
         } else {
