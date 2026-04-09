@@ -3438,7 +3438,7 @@ tableBodyEl.addEventListener('click', (event) => {
         } else if (target.classList.contains('pdf-btn')) {
             sendPdfEmailViaBackend(event); 
         } else if (target.classList.contains('main-delete-btn')) {
-            if (confirm(`Sendung ${escapeHtml(baseNumber)} wirklich lÃ¶schen?`)) {
+            if (confirm(`Sendung ${escapeHtml(baseNumber)} wirklich löschen?`)) {
                 deleteShipment(baseNumber);
             }
         }
