@@ -1860,8 +1860,8 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
         const tempIsCombination = (statusToUse === 'XRY' && !isBatchModeActive && isCombinationFromCheckbox);
         const tempFinalIsCombination = NON_COUNTING_STATUSES.includes(statusToUse) ? false : tempIsCombination;
         pendingScanDataForNewShipment = { baseNumber, rawInput: processedRawInput, status: statusToUse, isCombination: tempFinalIsCombination, note: noteInputEl.value.trim() || null, timestamp: new Date().toISOString(), suffix };
-        newTotalLabelEl.textContent = `Erwartete GesamtstÃ¼ckzahl fÃ¼r NEUE Sendung ${escapeHtml(baseNumber)}:`; newTotalInputEl.value = ''; newTotalSectionEl.classList.remove('warning-existing'); toggleMainInputControls(false); newTotalInputEl.focus();
-        return { success: false, waitingForTotal: true, message: `Bitte GesamtstÃ¼ckzahl fÃ¼r ${escapeHtml(baseNumber)} eingeben oder Ã¼berspringen.` };
+        newTotalLabelEl.textContent = `Erwartete gesamtstückzahl für NEUE Sendung ${escapeHtml(baseNumber)}:`; newTotalInputEl.value = ''; newTotalSectionEl.classList.remove('warning-existing'); toggleMainInputControls(false); newTotalInputEl.focus();
+        return { success: false, waitingForTotal: true, message: `Bitte gesamtstückzahl für ${escapeHtml(baseNumber)} eingeben oder Ã¼berspringen.` };
     }
     
     const shipment = shipments[baseNumber];
@@ -2899,7 +2899,7 @@ function generatePdfInBrowser(event) {
             doc.setTextColor(textColor);
             doc.setFontSize(9);
             doc.setFont('courier', 'normal');
-            doc.text(`Erwartete GesamtstÃ¼cke: ${vvlTotalExpected > 0 ? vvlTotalExpected : 'N/A'}`, 18, currentY); currentY += 4;
+            doc.text(`Erwartete Gesamtstücke: ${vvlTotalExpected > 0 ? vvlTotalExpected : 'N/A'}`, 18, currentY); currentY += 4;
             doc.text(`WE erfasst: ${vvlReceiptScansCount} von ${vvlTotalExpected > 0 ? vvlTotalExpected : 'N/A'} Stk.`, 18, currentY); currentY += 4;
             doc.text(`Sich. erfasst: ${vvlSecurityScansCount} von ${vvlTotalExpected > 0 ? vvlTotalExpected : 'N/A'} Stk.`, 18, currentY); currentY += 4;
             doc.text(`Dunkelalarm: ${vvlDunkelalarmCount} Stk.`, 18, currentY); currentY += 8;
