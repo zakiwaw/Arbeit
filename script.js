@@ -580,6 +580,8 @@ function showOpenHusSummary() {
     const expectedHuSet = new Set();
     Object.values(shipments).forEach(shipment => {
         if (shipment.isHuListOrder && shipment.scannedItems) {
+                        if (!isLkwActive(shipment.truckId)) return; // NEU: LKW deaktiviert -> komplett ignorieren
+
             shipment.scannedItems.forEach(item => {
                 if (item.status === 'Anstehend' || securityClearanceStatuses.includes(item.status)) {
                    expectedHuSet.add(item.rawInput.toUpperCase());
@@ -591,6 +593,7 @@ function showOpenHusSummary() {
     // 2. Alle Sendungen durchgehen und die Daten fÃ¼r die Tabs sammeln
     Object.keys(shipments).forEach(baseNumber => {
         const shipment = shipments[baseNumber];
+        if (!isLkwActive(shipment.truckId)) return; // NEU: LKW deaktiviert -> ausblenden
 
         // Dunkelalarm-Logik
         if (shipment.scannedItems && shipment.scannedItems.length > 0) {
@@ -903,18 +906,24 @@ function isHuExpected(huNumber) {
     if (!upperHu) return true;
 
     const shipments = loadShipments();
-    let hasAnyHuListOrder = false; // Flag, um zu prÃ¼fen, ob es Ã¼berhaupt Listen gibt
 
-    // Zuerst prÃ¼fen, ob es Ã¼berhaupt HU-Listen-AuftrÃ¤ge gibt
+    // Zuerst prüfen, ob es überhaupt HU-Listen-Aufträge gibt
     for (const baseNumber in shipments) {
         const shipment = shipments[baseNumber];
         if (shipment.isHuListOrder && shipment.scannedItems) {
-            if (!isLkwActive(shipment.truckId)) continue; // deaktivierter LKW â Ã¼berspringen
+            // NEU: Wenn der LKW deaktiviert ist, wird er hier komplett übersprungen
+            if (!isLkwActive(shipment.truckId)) continue; 
+            
             if (shipment.scannedItems.some(item => item.rawInput.toUpperCase() === upperHu)) {
                 return true;
             }
         }
     }
+
+    // Die HU wurde in keiner der existierenden und aktiven Listen gefunden. Sie ist "unerwartet".
+    return false;
+}
+
 
 
     // Wenn es HU-Listen gibt, prÃ¼fen wir jetzt, ob die HU auf einer davon steht
