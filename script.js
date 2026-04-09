@@ -205,7 +205,7 @@ const suspicionDeclineBtnEl = document.getElementById('suspicionDeclineBtn');
                             message = `${addedCount} neue HU(s) hinzugefÃ¼gt, ${duplicateCount} Duplikate Ã¼bersprungen.`;
                             messageType = 'orange';
                         } else if (addedCount === 0 && duplicateCount > 0) {
-                            alert(`Import fÃ¼r ${mainOrderNumber}:\n\nKeine neuen HUs gefunden. Alle ${duplicateCount} eingegebenen HUs sind bereits im Auftrag vorhanden.`);
+                            alert(`Import für ${mainOrderNumber}:\n\nKeine neuen HUs gefunden. Alle ${duplicateCount} eingegebenen HUs sind bereits im Auftrag vorhanden.`);
                         }
                         
                         return { success: true, message: message, messageType: messageType, baseNumber: mainOrderNumber };
