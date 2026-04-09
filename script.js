@@ -1641,8 +1641,8 @@ function renderLkwMenu() {
     Object.entries(trucks).forEach(([truckId, info]) => {
         const isActive = lkwStatus[truckId] !== false;
         let label = truckId;
-        if (truckId.startsWith('VVL-'))        label = 'ð VW: ' + truckId.replace('VVL-', '');
-        else if (truckId === 'MAN-legacy')      label = 'ð MAN (importiert)';
+        if (truckId.startsWith('VVL-'))        label = '\u{1F69A} VW: ' + truckId.replace('VVL-', '');
+        else if (truckId === 'MAN-legacy')      label = '\u{1F69B} MAN (importiert)';
         else if (truckId.startsWith('MAN-')) {
             const ts = parseInt(truckId.replace('MAN-', ''));
             label = 'ð MAN: ' + (isNaN(ts) ? truckId : new Date(ts).toLocaleString('de-DE', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'}));
