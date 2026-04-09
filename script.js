@@ -1578,7 +1578,7 @@ function renderTable() {
             
             row.insertCell().outerHTML = `<td data-label="\u00DCbersicht" class="summary-cell">${summaryHtml}</td>`;
             
-            row.insertCell().outerHTML = `<td data-label="Letzte Ãnd.">${shipment.lastModified ? new Date(shipment.lastModified).toLocaleString('de-DE') : '-'}</td>`;
+            row.insertCell().outerHTML = `<td data-label="Letzte Änd.">${shipment.lastModified ? new Date(shipment.lastModified).toLocaleString('de-DE') : '-'}</td>`;
             
             const actionsCell = row.insertCell();
             actionsCell.setAttribute('data-label', 'Aktionen');
