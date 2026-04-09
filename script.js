@@ -111,12 +111,28 @@ const suspicionDeclineBtnEl = document.getElementById('suspicionDeclineBtn');
     async function initializeApp() {
         showLoader(); // <<<< NEU: Lade-Spinner anzeigen
         const initialShipments = await loadDataFromServer();
+// LKW-Status vom Server laden und lokal cachen
+    try {
+        const lkwRes = await fetch(WEBAPPURL, {
+            method: 'POST', mode: 'cors', cache: 'no-cache',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: 'loadLkwStatus' })
+        });
+        const lkwResult = await lkwRes.json();
+        if (lkwResult.status === 'success') {
+            localStorage.setItem(LKWSTATUSKEY, JSON.stringify(lkwResult.data));
+        }
+    } catch(e) {
+        console.warn('LKW-Status vom Server konnte nicht geladen werden. Nutze lokalen Cache.', e);
+    }
+
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(initialShipments));
     
         renderTable();
         isBatchModeActive = batchModeToggleEl.checked;
         sessionFirstSuffixScans = {};
         notifiedCompletions = new Set();
+	renderLkwMenu();
         
         resetSingleScanNoteInputState();
         toggleBatchMode(isBatchModeActive);
@@ -226,9 +242,9 @@ const suspicionDeclineBtnEl = document.getElementById('suspicionDeclineBtn');
 
     // --- Konstanten & Konfiguration ---
     const WEB_APP_URL_BACKEND = 'https://script.google.com/macros/s/AKfycbyBtlm37WxzXdFCDjQuSIWfnQiTny6gwrmXuoq_cacGY9_bkqZxuuW7aJEqLuHJhWYg/exec'; // Mail_13
-    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzudnkXw5mJu-l85XYtIOhTY-eahic4IYNKYyi1MsPk3jLxH9tmNWbOuv8-z0-saGAuEQ/exec';
+    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbw_ug_levQ7LuOn27CijAdkabnz5utME2aEeN6s560RzSb8lKCsSo5VT4nyOebRJnd0gw/exec';
     const LOCAL_STORAGE_KEY = 'frachtSicherungMobile_V8_18_Refactored';
-const TRUCK_STORAGE_KEY = 'frachtTruckStates';
+const LKWSTATUSKEY = 'frachtLkwStatusV1';
     const SUFFIX_LENGTH = 4;
     const MITARBEITER_NAME = "Zakaria Bisbiss";
     const RAC_NUMMER = "DE/RA/00889-07";
@@ -355,64 +371,6 @@ const TRUCK_STORAGE_KEY = 'frachtTruckStates';
     let currentSuspicionIndex = 0; // Speichert, welcher Vorschlag gerade angezeigt wird
     
 
-function loadTrucks() {
-    const data = localStorage.getItem(TRUCK_STORAGE_KEY);
-    return data ? JSON.parse(data) : {};
-}
-function saveTrucks(trucks) {
-    localStorage.setItem(TRUCK_STORAGE_KEY, JSON.stringify(trucks));
-}
-function registerTruck(truckId, label) {
-    const trucks = loadTrucks();
-    if (!trucks[truckId]) {
-        trucks[truckId] = { label: label, active: true };
-        saveTrucks(trucks);
-    }
-}
-function isTruckActive(truckId) {
-    if (!truckId) return true;
-    const trucks = loadTrucks();
-    if (!trucks[truckId]) return true;
-    return trucks[truckId].active !== false;
-}
-function getTruckIdForShipment(shipment) {
-    if (!shipment) return null;
-    if (shipment.parentOrderNumber) return 'VVL_' + shipment.parentOrderNumber;
-    if (shipment.truckId) return shipment.truckId;
-    return null;
-}
-function renderTruckSwitches() {
-    const container = document.getElementById('truck-switches-container');
-    if (!container) return;
-    const trucks = loadTrucks();
-    const keys = Object.keys(trucks);
-    if (keys.length === 0) {
-        container.innerHTML = '<p style="color:#888;font-size:0.85em;margin:8px 0">Noch keine LKW importiert.</p>';
-        return;
-    }
-    container.innerHTML = keys.map(truckId => {
-        const truck = trucks[truckId];
-        const isActive = truck.active !== false;
-        return `<div class="truck-switch-row">
-            <span class="truck-switch-label">${escapeHtml(truck.label)}</span>
-            <label class="batch-toggle-switch">
-                <input type="checkbox" ${isActive ? 'checked' : ''} data-truck-id="${escapeHtml(truckId)}">
-                <span class="batch-slider"></span>
-            </label>
-        </div>`;
-    }).join('');
-    container.querySelectorAll('input[data-truck-id]').forEach(cb => {
-        cb.addEventListener('change', function() {
-            const trucks = loadTrucks();
-            if (trucks[this.dataset.truckId]) {
-                trucks[this.dataset.truckId].active = this.checked;
-                saveTrucks(trucks);
-                renderTable();
-            }
-        });
-    });
-}
-// --- ENDE LKW-VERWALTUNG ---
 
         // --- Hilfsfunktionen: Persistenz ---
         function loadShipments() {
@@ -432,8 +390,42 @@ function renderTruckSwitches() {
                     });
                 }
             });
+// Migration: truckId fÃ¼r Ã¤ltere EintrÃ¤ge
+    Object.values(shipments).forEach(shipment => {
+        if (!shipment.truckId) {
+            if (shipment.parentOrderNumber) {
+                shipment.truckId = 'VVL-' + shipment.parentOrderNumber;
+            } else if (shipment.freightForwarder) {
+                shipment.truckId = 'MAN-legacy';
+            }
+        }
+    });
+
             return shipments;
         }
+function loadLkwStatus() {
+    const data = localStorage.getItem(LKWSTATUSKEY);
+    return data ? JSON.parse(data) : {};
+}
+async function saveLkwStatus(status) {
+    localStorage.setItem(LKWSTATUSKEY, JSON.stringify(status));
+    try {
+        await fetch(WEBAPPURL, {
+            method: 'POST', mode: 'cors', cache: 'no-cache',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: 'saveLkwStatus', payload: status })
+        });
+    } catch(e) {
+        console.warn('LKW-Status Server-Sync fehlgeschlagen:', e);
+    }
+}
+
+function isLkwActive(truckId) {
+    if (!truckId) return true; // alte Daten ohne truckId â immer aktiv
+    const status = loadLkwStatus();
+    return status[truckId] !== false; // Standard: aktiv
+}
+
 // In der NÃ¤he von calculateCurrentCountedPieces einfÃ¼gen
 
 function calculateGoodsReceiptCount(scannedItems) {
@@ -599,7 +591,6 @@ function showOpenHusSummary() {
     // 2. Alle Sendungen durchgehen und die Daten fÃ¼r die Tabs sammeln
     Object.keys(shipments).forEach(baseNumber => {
         const shipment = shipments[baseNumber];
- if (!isTruckActive(getTruckIdForShipment(shipment))) return;
 
         // Dunkelalarm-Logik
         if (shipment.scannedItems && shipment.scannedItems.length > 0) {
@@ -916,23 +907,19 @@ function isHuExpected(huNumber) {
 
     // Zuerst prÃ¼fen, ob es Ã¼berhaupt HU-Listen-AuftrÃ¤ge gibt
     for (const baseNumber in shipments) {
-        if (shipments[baseNumber].isHuListOrder) {
-            hasAnyHuListOrder = true;
-            break; // Sobald einer gefunden wurde, kÃ¶nnen wir die Schleife verlassen
+        const shipment = shipments[baseNumber];
+        if (shipment.isHuListOrder && shipment.scannedItems) {
+            if (!isLkwActive(shipment.truckId)) continue; // deaktivierter LKW â Ã¼berspringen
+            if (shipment.scannedItems.some(item => item.rawInput.toUpperCase() === upperHu)) {
+                return true;
+            }
         }
     }
 
-    // --- HIER IST DIE NEUE LOGIK ---
-    // Wenn es keine HU-Listen gibt, ist JEDE HU quasi "erwartet" (lÃ¶st keinen Fehler aus)
-    if (!hasAnyHuListOrder) {
-        return true;
-    }
-    // --- ENDE DER NEUEN LOGIK ---
 
     // Wenn es HU-Listen gibt, prÃ¼fen wir jetzt, ob die HU auf einer davon steht
     for (const baseNumber in shipments) {
         const shipment = shipments[baseNumber];
-  if (!isTruckActive(getTruckIdForShipment(shipment))) continue;
         if (shipment.isHuListOrder && shipment.scannedItems) {
             if (shipment.scannedItems.some(item => item.rawInput.toUpperCase() === upperHu)) {
                 return true; // Gefunden! HU wird erwartet.
@@ -1255,13 +1242,15 @@ function fitTextToContainer(element, container, initialFontSize, minFontSize, pa
 
             for (const baseNumber in shipments) {
                 const shipment = shipments[baseNumber];
- if (!isTruckActive(getTruckIdForShipment(shipment))) continue;
-
                 // Suche nur in AuftrÃ¤gen, die als HU-Listen-Auftrag markiert sind!
                 if (shipment.isHuListOrder && shipment.scannedItems && Array.isArray(shipment.scannedItems)) {
                     const foundItem = shipment.scannedItems.find(item => item.rawInput.toUpperCase() === upperHuNumber);
                     if (foundItem) {
-                        return baseNumber; // Treffer! Gib die HAWB/Auftragsnummer zurÃ¼ck.
+                // LKW deaktiviert â HU wird als unbekannt behandelt
+                if (!isLkwActive(shipment.truckId)) return null;
+                return baseNumber;
+            
+
                     }
                 }
             }
@@ -1544,7 +1533,7 @@ function renderTable() {
         .forEach(baseNumber => {
             const shipment = shipments[baseNumber];
             if (!shipment) return;
- if (!isTruckActive(getTruckIdForShipment(shipment))) return;
+ if (!isLkwActive(shipment.truckId)) return; // LKW deaktiviert â Zeile ausblenden
 
             const row = tableBodyEl.insertRow();
             
@@ -1632,6 +1621,50 @@ function renderTable() {
         });
     updateEditButtonVisibilityInTable();
     filterTable(shipmentNumberInputEl.value);
+}
+function renderLkwMenu() {
+    const container = document.getElementById('lkw-menu-container');
+    if (!container) return;
+    const shipments = loadShipments();
+    const lkwStatus = loadLkwStatus();
+    const trucks = {};
+    Object.values(shipments).forEach(s => {
+        if (!s.truckId) return;
+        if (!trucks[s.truckId]) trucks[s.truckId] = { count: 0 };
+        trucks[s.truckId].count++;
+    });
+    if (Object.keys(trucks).length === 0) {
+        container.innerHTML = '<li style="font-size:0.82em;color:#999;padding:4px 12px;">Keine LKWs importiert</li>';
+        return;
+    }
+    let html = '';
+    Object.entries(trucks).forEach(([truckId, info]) => {
+        const isActive = lkwStatus[truckId] !== false;
+        let label = truckId;
+        if (truckId.startsWith('VVL-'))        label = 'ð VW: ' + truckId.replace('VVL-', '');
+        else if (truckId === 'MAN-legacy')      label = 'ð MAN (importiert)';
+        else if (truckId.startsWith('MAN-')) {
+            const ts = parseInt(truckId.replace('MAN-', ''));
+            label = 'ð MAN: ' + (isNaN(ts) ? truckId : new Date(ts).toLocaleString('de-DE', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'}));
+        }
+        html += `<li class="lkw-menu-item">
+            <span class="lkw-label" title="${truckId}">${label} <small>(${info.count})</small></span>
+            <label class="batch-toggle-switch">
+                <input type="checkbox" class="lkw-toggle" data-truckid="${truckId}" ${isActive ? 'checked' : ''}>
+                <span class="batch-slider"></span>
+            </label>
+        </li>`;
+    });
+    container.innerHTML = html;
+    container.querySelectorAll('.lkw-toggle').forEach(toggle => {
+        toggle.addEventListener('change', async () => {
+            const status = loadLkwStatus();
+            status[toggle.dataset.truckid] = toggle.checked;
+            await saveLkwStatus(status);
+            renderTable();
+        });
+
+    });
 }
 
 function showDetailView(baseNumber) {
@@ -3335,8 +3368,7 @@ async function sendPdfEmailViaBackend(event) {
             huListTextareaEl.addEventListener('dblclick', enableManualInputOnDoubleClick);
             // --- ENDE: Doppelklick-Logik ---
         // --- SeitenmenÃ¼ ---
-        function openSideMenu() { removeActiveInlineNoteEditor(); sideMenuEl.classList.add('open'); if (sideMenuEl.classList.contains('open')) renderTruckSwitches();
- menuOverlayEl.classList.add('visible'); }
+        function openSideMenu() { removeActiveInlineNoteEditor(); sideMenuEl.classList.add('open'); menuOverlayEl.classList.add('visible'); }
         function closeSideMenu() { sideMenuEl.classList.remove('open'); menuOverlayEl.classList.remove('visible'); sheetStatusEl.textContent = ''; focusShipmentInput(); }
             // --- START: Doppelklick-Logik fÃ¼r manuelle Eingabe im HU-Modal ---
             function enableManualInput(event) {
@@ -3524,10 +3556,7 @@ else if (target.closest('.hu-value')) {
             const shipments = loadShipments();
             const now = new Date().toISOString();
             let addedCount = 0, duplicateCount = 0, processedOrders = [];
-const batchTruckId = 'MAN_' + Date.now();
-const batchTruckLabel = 'MAN ' + new Date().toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit', year:'2-digit'}) + ' ' + new Date().toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
-registerTruck(batchTruckId, batchTruckLabel);
-
+const manTruckId = 'MAN-' + Date.now();
             parts.forEach(orderData => {
                 const [metaAndOrder, huData] = orderData.split('|||');
                 if (!metaAndOrder || !huData) return;
@@ -3541,14 +3570,13 @@ registerTruck(batchTruckId, batchTruckLabel);
                     const newShipment = {
                         hawb: orderNumber, lastModified: now, totalPiecesExpected: hus.length,
                         scannedItems: [], mitarbeiter: MITARBEITER_NAME, isHuListOrder: true,
+truckId: manTruckId,
                     };
                     if (hasFullMeta) {
                         newShipment.freightForwarder = metaParts[1];
                         newShipment.destinationCountry = metaParts[2];
                         newShipment.plsoNumber = metaParts[3];
-newShipment.truckId = batchTruckId;
                     }
-
                     shipments[orderNumber] = newShipment;
                     hus.forEach((huString, index) => {
                         const huData = parseComplexHuString(huString);
@@ -3588,13 +3616,14 @@ newShipment.truckId = batchTruckId;
                 const [kundennr, vorverladelisteNr] = meta.split('|');
                 const positionen = huData.split(' ').filter(Boolean);
                 processedVVLs.add(vorverladelisteNr);
-registerTruck('VVL_' + vorverladelisteNr, 'VVL ' + vorverladelisteNr);
+
                 if (!shipments[kundennr]) {
                     newOrders.add(kundennr);
                     shipments[kundennr] = {
                         hawb: kundennr, lastModified: now, totalPiecesExpected: positionen.length,
                         scannedItems: [], mitarbeiter: MITARBEITER_NAME, isHuListOrder: true,
-                        parentOrderNumber: vorverladelisteNr
+                        parentOrderNumber: vorverladelisteNr,
+truckId: 'VVL-' + vorverladelisteNr,
                     };
                     if (KUNDENNR_CARRIER_MAP[kundennr]) {
                         shipments[kundennr].freightForwarder = KUNDENNR_CARRIER_MAP[kundennr];
