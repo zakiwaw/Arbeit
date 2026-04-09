@@ -2162,7 +2162,7 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
 
                 batchModeStatusLabelEl.textContent = statusLabel;
                 batchStatusDisplayEl.textContent = `Aktiv (${statusLabel})`;
-                mainActionButtonEl.textContent = 'Zum Batch hinzufÃ¼gen';
+                mainActionButtonEl.textContent = 'Zum Batch hinzufügen';
                 batchAreaEl.classList.add('visible');
                 securityStatusSelectEl.disabled = true;
                 comboCheckboxEl.disabled = true; // Auch Kombi-Checkbox im Batch sperren
