@@ -2184,7 +2184,7 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
                     }
                 }
                 batchStatusDisplayEl.textContent = 'Inaktiv';
-                mainActionButtonEl.textContent = 'HinzufÃ¼gen';
+                mainActionButtonEl.textContent = 'Hinzuf\u00FCgen';
                 batchAreaEl.classList.remove('visible');
                 securityStatusSelectEl.disabled = false;
                 comboCheckboxEl.disabled = securityStatusSelectEl.value !== 'XRY'; // Entsperren, wenn XRY
