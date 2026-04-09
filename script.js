@@ -1634,7 +1634,8 @@ function renderLkwMenu() {
         trucks[s.truckId].count++;
     });
     if (Object.keys(trucks).length === 0) {
-        container.innerHTML = '<li style="font-size:0.82em;color:#999;padding:4px 12px;">Keine LKWs importiert</li>';
+        container.innerHTML = '<li style="font-size:0.82em;color:#999;padding:4px 12px;list-style:none;">Keine LKWs importiert</li>'
+;
         return;
     }
     let html = '';
