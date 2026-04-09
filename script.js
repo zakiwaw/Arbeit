@@ -1625,13 +1625,24 @@ function renderLkwMenu() {
     const shipments = loadShipments();
     const lkwStatus = loadLkwStatus();
     const trucks = {};
+
+    // NEU: Zähle die Anzahl der HUs (Einzel-Sendungen) statt der Aufträge
     Object.values(shipments).forEach(s => {
         if (!s.truckId) return;
         if (!trucks[s.truckId]) trucks[s.truckId] = { count: 0 };
-        trucks[s.truckId].count++;
+
+        if (s.isHuListOrder && Array.isArray(s.scannedItems)) {
+            // Bei HU-Aufträgen zählen wir die einzelnen HUs im Array
+            trucks[s.truckId].count += s.scannedItems.length;
+        } else {
+            // Bei normalen Sendungen zählen wir weiterhin +1
+            trucks[s.truckId].count++;
+        }
     });
-    
+
     if (Object.keys(trucks).length === 0) {
+// ... der restliche Code von renderLkwMenu() bleibt unverändert
+
         container.innerHTML = '<li style="font-size:0.82em;color:#999;padding:4px 12px;list-style:none;">Keine LKWs importiert</li>';
         return;
     }
