@@ -1658,13 +1658,14 @@ function renderLkwMenu() {
             manCount++;
         }
 
-        html += `<li class="lkw-menu-item" style="list-style: none; display: flex; justify-content: space-between; align-items: center; flex-wrap: nowrap; gap: 10px;">
-            <span class="lkw-label" title="${truckId}" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex-grow: 1;">${label} <small>(${info.count})</small></span>
+                html += `<li class="lkw-menu-item">
+            <span class="lkw-label" title="${truckId}">${label} <small>(${info.count})</small></span>
             <label class="batch-toggle-switch" style="flex-shrink: 0; margin-bottom: 0;">
                 <input type="checkbox" class="lkw-toggle" data-truckid="${truckId}" ${isActive ? 'checked' : ''}>
                 <span class="batch-slider"></span>
             </label>
         </li>`;
+
     });
     container.innerHTML = html;
 
