@@ -926,19 +926,7 @@ function isHuExpected(huNumber) {
 
 
 
-    // Wenn es HU-Listen gibt, prÃ¼fen wir jetzt, ob die HU auf einer davon steht
-    for (const baseNumber in shipments) {
-        const shipment = shipments[baseNumber];
-        if (shipment.isHuListOrder && shipment.scannedItems) {
-            if (shipment.scannedItems.some(item => item.rawInput.toUpperCase() === upperHu)) {
-                return true; // Gefunden! HU wird erwartet.
-            }
-        }
-    }
     
-    // Die HU wurde in keiner der existierenden Listen gefunden. Sie ist "unerwartet".
-    return false;
-}
 /**
  * KÃ¼rzt lange Spediteurnamen fÃ¼r eine saubere Anzeige basierend auf vordefinierten Regeln.
  * @param {string} fullName Der vollstÃ¤ndige Name des Spediteurs.
