@@ -1464,7 +1464,7 @@ let numberPart = isManOrder && item.position ? `<span class="position-number">${
 let sendnrHtml = item.sendnr ? `<span class="sendnr-display"> (${escapeHtml(item.sendnr)})</span>` : '';
 // --- START DER ÃNDERUNG ---
 // Cursor und Titel hinzugefÃ¼gt, um Klickbarkeit zu signalisieren
-detailsHtml += `${numberPart}<span class="hu-value" style="cursor:pointer;" title="Klicken zum Kopieren">${escapeHtml(item.rawInput)}</span>${sendnrHtml} â <span class="status">${escapeHtml(item.status)}</span>${item.isCombination ? ` <span class="combo">(Kombi)</span>` : ''}`;
+detailsHtml += `${numberPart}<span class="hu-value" style="cursor:pointer;" title="Klicken zum Kopieren">${escapeHtml(item.rawInput)}</span>${sendnrHtml} \u2192 <span class="status">${escapeHtml(item.status)}</span>${item.isCombination ? ` <span class="combo">(Kombi)</span>` : ''}`;
 // --- ENDE DER ÃNDERUNG ---
 //...
         if (isCancelled) {
