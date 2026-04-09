@@ -143,19 +143,18 @@
 
 <div id="side-menu" class="side-menu">
     <h3>Optionen</h3>
-<div style="padding: 0 10px 10px;">
-    <h4 style="margin: 0 0 8px; font-size: 0.9em; color: #555; text-transform: uppercase; letter-spacing: 0.05em;">🚛 Aktive LKW</h4>
-    <div id="truck-switches-container"></div>
-    <hr style="border: none; border-top: 1px solid #eee; margin: 12px 0;">
-</div>
-  
- <ul class="side-menu-list">
+    <ul class="side-menu-list">
         <li><a href="#" id="importHuListButton" class="menu-action-item action-warning"><svg viewBox="0 0 24 24"><path d="M9,16V10H5L12,3L19,10H15V16H9M5,20V18H19V20H5Z" /></svg><span>HU-Liste importieren</span></a></li>
         <li><a href="#" id="showOpenHusButton" class="menu-action-item"><svg viewBox="0 0 24 24"><path d="M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z" /></svg><span>Offene HUs anzeigen</span></a></li>
         <li><a href="#" id="sendToSheetButton" class="menu-action-item action-primary"><svg viewBox="0 0 24 24"><path d="M17,13L12,18L7,13H10V9H14V13M19.35,10.03C18.67,6.59 15.64,4 12,4C9.11,4 6.6,5.64 5.35,8.03C2.34,8.36 0,10.9 0,14A6,6 0 0,0 6,20H19A5,5 0 0,0 24,15C24,12.36 21.95,10.22 19.35,10.03Z" /></svg><span>An Google Sheet Senden</span></a></li>
         <li><a href="#" id="sendSummaryEmailButton" class="menu-action-item action-warning"><svg viewBox="0 0 24 24"><path d="M20,8L12,13L4,8V6L12,11L20,6M20,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V6C22,4.89 21.1,4 20,4Z" /></svg><span>Zusammenfassung per E-Mail</span></a></li>
         <li><a href="#" id="resetDataButton" class="menu-action-item action-reset"><svg viewBox="0 0 24 24"><path d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" /></svg><span>Alles Zurücksetzen</span></a></li>
     </ul>
+   <div id="lkw-section">
+        <h4 class="lkw-section-title">Aktive LKW</h4>
+        <ul id="lkw-menu-container" class="lkw-list"></ul>
+    </div>
+
     <div id="sheetStatus"></div>
 </div>
 <div id="menu-overlay" class="menu-overlay"></div>
