@@ -1633,53 +1633,87 @@ function renderLkwMenu() {
         if (!trucks[s.truckId]) trucks[s.truckId] = { count: 0 };
         trucks[s.truckId].count++;
     });
+    
     if (Object.keys(trucks).length === 0) {
-        container.innerHTML = '<li style="font-size:0.82em;color:#999;padding:4px 12px;list-style:none;">Keine LKWs importiert</li>'
-;
+        container.innerHTML = '<li style="font-size:0.82em;color:#999;padding:4px 12px;list-style:none;">Keine LKWs importiert</li>';
         return;
     }
-            // WICHTIG: Setzt den Abstand der Liste (<ul>) auf 0, damit die Punkte links verschwinden!
+
+    // Füge die CSS-Animation für den Lauftext automatisch in die Seite ein, falls noch nicht da
+    if (!document.getElementById('vw-marquee-style')) {
+        const style = document.createElement('style');
+        style.id = 'vw-marquee-style';
+        style.innerHTML = `
+            @keyframes scrollVwNumber {
+                0%, 15% { transform: translateX(0); }
+                85%, 100% { transform: translateX(calc(-100% + 90px)); } /* Scrollt bis zum Ende der Nummer */
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    // Setzt das Menü komplett an den linken Rand (entfernt Punkte und Einrückung)
     container.style.paddingLeft = '0';
     container.style.margin = '0';
 
     let html = '';
     let manCount = 1;
     
-        Object.entries(trucks).forEach(([truckId, info]) => {
+    Object.entries(trucks).forEach(([truckId, info]) => {
         const isActive = lkwStatus[truckId] !== false;
-        let label = truckId;
+        
+        let prefix = '';
+        let scrollingText = '';
         let isVw = false;
         
         if (truckId.startsWith('VVL-')) {
-            label = '\u{1F69A} VW: ' + truckId.replace('VVL-', '');
+            prefix = '\u{1F69A} VW: ';
+            scrollingText = truckId.replace('VVL-', ''); // Nur die Nummer
             isVw = true;
         }
         else if (truckId === 'MAN-legacy') {
-            label = '\u{1F69B} MAN (importiert)';
+            prefix = '\u{1F69B} MAN (importiert)';
         }
         else if (truckId.startsWith('MAN-')) {
-            label = '\u{1F69B} MAN ' + manCount;
+            prefix = '\u{1F69B} MAN ' + manCount;
             manCount++;
         }
 
-        // Wenn es VW ist und der Text extrem lang ist (mehr als ca. 18 Zeichen nach "VW: "),
-        // bekommt er die Scrolling-Klasse. Ansonsten verhält er sich normal.
-        const scrollClass = (isVw && label.length > 20) ? 'needs-scroll' : '';
+        // Animation nur aktivieren, wenn es ein VW ist und die Nummer lang ist (ab ca. 12 Zeichen)
+        const animationStyle = (isVw && scrollingText.length > 11) 
+            ? 'animation: scrollVwNumber 4s linear infinite alternate;' 
+            : '';
 
-        html += `<li class="lkw-menu-item" style="list-style: none; display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 8px 0; border-bottom: 1px solid #f5f5f5;">
-            <div class="scrolling-text-container" title="${truckId}">
-                <span class="scrolling-text ${scrollClass}">${label} <small>(${info.count})</small></span>
+        html += `<li class="lkw-menu-item" style="list-style: none; display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 8px 0; border-bottom: 1px solid #f5f5f5; flex-wrap: nowrap; overflow: hidden;">
+            
+            <!-- Der linke Bereich mit Text (flexibel, aber bricht niemals um) -->
+            <div style="display: flex; align-items: center; flex-grow: 1; min-width: 0; padding-right: 15px; overflow: hidden;">
+                
+                <!-- 1. Festes Prefix (z.B. "VW: " oder "MAN 1") -->
+                <span style="flex-shrink: 0; white-space: pre;">${prefix}</span>
+                
+                <!-- 2. Die Nummer (nur bei VW vorhanden), die sich bewegt -->
+                ${scrollingText ? `
+                <div style="flex-grow: 1; overflow: hidden; min-width: 0; position: relative; margin-left: 2px;">
+                    <span style="display: inline-block; white-space: nowrap; ${animationStyle}">${scrollingText}</span>
+                </div>
+                ` : ''}
+                
+                <!-- 3. Fester Zähler in Klammern (z.B. "(1)") -->
+                <small style="flex-shrink: 0; margin-left: 5px;">(${info.count})</small>
             </div>
+
+            <!-- Der rechte Bereich mit dem Schalter (schrumpft niemals) -->
             <label class="batch-toggle-switch" style="flex-shrink: 0; margin-bottom: 0;">
                 <input type="checkbox" class="lkw-toggle" data-truckid="${truckId}" ${isActive ? 'checked' : ''}>
                 <span class="batch-slider"></span>
             </label>
+            
         </li>`;
     });
-
+    
     container.innerHTML = html;
-
-
+    
     container.querySelectorAll('.lkw-toggle').forEach(toggle => {
         toggle.addEventListener('change', async () => {
             const status = loadLkwStatus();
@@ -1687,9 +1721,9 @@ function renderLkwMenu() {
             await saveLkwStatus(status);
             renderTable();
         });
-
     });
 }
+
 
 function showDetailView(baseNumber) {
     // 1. Aktuelle Scroll-Position der Hauptseite speichern
