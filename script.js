@@ -1586,7 +1586,7 @@ function renderTable() {
             actionsCell.innerHTML = `
                 <button class="edit-btn" data-basenumber="${escapeHtml(baseNumber)}" title="Sendung ${escapeHtml(baseNumber)} bearbeiten">Edit</button>
                 <button class="pdf-btn" data-basenumber="${escapeHtml(baseNumber)}" ${pdfButtonData}>PDF</button>
-                <button class="delete-btn main-delete-btn" data-basenumber="${escapeHtml(baseNumber)}">LÃ¶schen</button>
+                <button class="delete-btn main-delete-btn" data-basenumber="${escapeHtml(baseNumber)}">L\u00F6schen</button>
             `;
             
             // ===============================================================
@@ -2135,7 +2135,7 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
         function requestDeleteNote(baseNumber, itemTimestamp, noteIndex) {
             const shipments = loadShipments();
             const noteToDelete = shipments[baseNumber]?.scannedItems?.find(i => i.timestamp === itemTimestamp)?.notes[noteIndex];
-            if(confirm(`Notiz "${noteToDelete}" wirklich lÃ¶schen?`)) {
+            if(confirm(`Notiz "${noteToDelete}" wirklich l\u00F6schen?`)) {
                  const item = shipments[baseNumber].scannedItems.find(i => i.timestamp === itemTimestamp);
                  item.notes.splice(noteIndex, 1);
                  shipments[baseNumber].lastModified = new Date().toISOString();
@@ -3871,7 +3871,7 @@ noteEditFormEl.addEventListener('submit', (e) => {
     sendToSheetButtonEl.addEventListener('click', sendDataToSheet);
     resetDataButtonEl.addEventListener('click', async () => {
         removeActiveInlineNoteEditor();
-        if (confirm("WARNUNG!\n\nMÃ¶chtest du wirklich ALLE erfassten Sendungsdaten auf diesem GerÃ¤t UND auf dem Server unwiderruflich lÃ¶schen?")) {
+        if (confirm("WARNUNG!\n\n M\u00F6schtest du wirklich ALLE erfassten Sendungsdaten auf diesem Ger\u00E4t UND auf dem Server unwiderruflich L\u00F6schen?")) {
             showLoader(); 
             sheetStatusEl.textContent = 'LÃ¶sche Daten auf dem Server...';
             sheetStatusEl.style.color = 'orange';
