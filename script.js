@@ -1576,7 +1576,7 @@ function renderTable() {
                 <strong class="${securityClass}">Sich.: ${securityCount}/${expectedText}</strong>
             `;
             
-            row.insertCell().outerHTML = `<td data-label="\u00FCersicht" class="summary-cell">${summaryHtml}</td>`;
+            row.insertCell().outerHTML = `<td data-label="\u00DCbersicht" class="summary-cell">${summaryHtml}</td>`;
             
             row.insertCell().outerHTML = `<td data-label="Letzte Ãnd.">${shipment.lastModified ? new Date(shipment.lastModified).toLocaleString('de-DE') : '-'}</td>`;
             
