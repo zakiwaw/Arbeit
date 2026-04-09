@@ -1638,25 +1638,36 @@ function renderLkwMenu() {
 ;
         return;
     }
-    let html = '';
+        let html = '';
+    let manCount = 1; // Zähler nur für MAN
+    
     Object.entries(trucks).forEach(([truckId, info]) => {
         const isActive = lkwStatus[truckId] !== false;
         let label = truckId;
-        if (truckId.startsWith('VVL-'))        label = '\u{1F69A} VW: ' + truckId.replace('VVL-', '');
-        else if (truckId === 'MAN-legacy')      label = '\u{1F69B} MAN (importiert)';
-        else if (truckId.startsWith('MAN-')) {
-            const ts = parseInt(truckId.replace('MAN-', ''));
-            label = '\u{1F69B} MAN: ' + (isNaN(ts) ? truckId : new Date(ts).toLocaleString('de-DE', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'}));
+        
+        if (truckId.startsWith('VVL-')) {
+            // VW bleibt genau wie vorher, nur mit dem sicheren Emoji-Code
+            label = '\u{1F69A} VW: ' + truckId.replace('VVL-', '');
         }
-        html += `<li class="lkw-menu-item" style="list-style: none;">
-            <span class="lkw-label" title="${truckId}">${label} <small>(${info.count})</small></span>
-            <label class="batch-toggle-switch">
+        else if (truckId === 'MAN-legacy') {
+            label = '\u{1F69B} MAN (importiert)';
+        }
+        else if (truckId.startsWith('MAN-')) {
+            // MAN zählt jetzt einfach hoch: MAN 1, MAN 2, etc.
+            label = '\u{1F69B} MAN ' + manCount;
+            manCount++;
+        }
+
+        html += `<li class="lkw-menu-item" style="list-style: none; display: flex; justify-content: space-between; align-items: center; flex-wrap: nowrap; gap: 10px;">
+            <span class="lkw-label" title="${truckId}" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex-grow: 1;">${label} <small>(${info.count})</small></span>
+            <label class="batch-toggle-switch" style="flex-shrink: 0; margin-bottom: 0;">
                 <input type="checkbox" class="lkw-toggle" data-truckid="${truckId}" ${isActive ? 'checked' : ''}>
                 <span class="batch-slider"></span>
             </label>
         </li>`;
     });
     container.innerHTML = html;
+
     container.querySelectorAll('.lkw-toggle').forEach(toggle => {
         toggle.addEventListener('change', async () => {
             const status = loadLkwStatus();
