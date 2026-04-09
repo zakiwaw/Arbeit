@@ -729,7 +729,7 @@ function showOpenHusSummary() {
                 return `
                 <li>
                     <div class="pending-item-details">
-                        <span class="pending-vse hu-value ${alarmClass}" style="cursor:pointer;" title="Klicken zum Kopieren. Details fÃ¼r ${escapeHtml(item.rawInput)} anzeigen">${escapeHtml(item.rawInput)}</span>
+                        <span class="pending-vse hu-value ${alarmClass}" style="cursor:pointer;" title="Klicken zum Kopieren. Details f\u00FCr ${escapeHtml(item.rawInput)} anzeigen">${escapeHtml(item.rawInput)}</span>
                         <span class="pending-sendnr">${escapeHtml(item.sendnr)}</span>
                     </div>
                 </li>`;
@@ -1489,7 +1489,7 @@ detailsHtml += `${numberPart}<span class="hu-value" style="cursor:pointer;" titl
             detailsHtml += notesListHtml;
         }
         if (!isCancelled) {
-            detailsHtml += `<a href="#" class="add-note-link" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" title="Weitere Notiz hinzufÃ¼gen">Notiz hinzufÃ¼gen</a>`;
+            detailsHtml += `<a href="#" class="add-note-link" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" title="Weitere Notiz hinzuf\u00FCgen">Notiz hinzuf\u00FCgen</a>`;
         }
         detailsHtml += `<div class="inline-note-editor-placeholder"></div>`;
         detailsHtml += `</div>`;
