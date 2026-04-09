@@ -1639,20 +1639,18 @@ function renderLkwMenu() {
         return;
     }
 
-    // Füge die CSS-Animation für den Lauftext automatisch in die Seite ein, falls noch nicht da
     if (!document.getElementById('vw-marquee-style')) {
         const style = document.createElement('style');
         style.id = 'vw-marquee-style';
         style.innerHTML = `
             @keyframes scrollVwNumber {
                 0%, 15% { transform: translateX(0); }
-                85%, 100% { transform: translateX(calc(-100% + 90px)); } /* Scrollt bis zum Ende der Nummer */
+                85%, 100% { transform: translateX(calc(-100% + 90px)); }
             }
         `;
         document.head.appendChild(style);
     }
 
-    // Setzt das Menü komplett an den linken Rand (entfernt Punkte und Einrückung)
     container.style.paddingLeft = '0';
     container.style.margin = '0';
 
@@ -1668,7 +1666,7 @@ function renderLkwMenu() {
         
         if (truckId.startsWith('VVL-')) {
             prefix = '\u{1F69A} VW: ';
-            scrollingText = truckId.replace('VVL-', ''); // Nur die Nummer
+            scrollingText = truckId.replace('VVL-', '');
             isVw = true;
         }
         else if (truckId === 'MAN-legacy') {
@@ -1679,32 +1677,24 @@ function renderLkwMenu() {
             manCount++;
         }
 
-        // Animation nur aktivieren, wenn es ein VW ist und die Nummer lang ist (ab ca. 12 Zeichen)
         const animationStyle = (isVw && scrollingText.length > 11) 
             ? 'animation: scrollVwNumber 4s linear infinite alternate;' 
             : '';
 
-        html += `<li class="lkw-menu-item" style="list-style: none; display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 8px 0; border-bottom: 1px solid #f5f5f5; flex-wrap: nowrap; overflow: hidden;">
+        // Wir fügen hier die Klasse 'lkw-longpress-target' und data-truckid hinzu
+        html += `<li class="lkw-menu-item lkw-longpress-target" data-truckid="${truckId}" style="list-style: none; display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 8px 0; border-bottom: 1px solid #f5f5f5; flex-wrap: nowrap; overflow: hidden; user-select: none; -webkit-user-select: none;">
             
-            <!-- Der linke Bereich mit Text (flexibel, aber bricht niemals um) -->
-            <div style="display: flex; align-items: center; flex-grow: 1; min-width: 0; padding-right: 15px; overflow: hidden;">
-                
-                <!-- 1. Festes Prefix (z.B. "VW: " oder "MAN 1") -->
+            <div style="display: flex; align-items: center; flex-grow: 1; min-width: 0; padding-right: 15px; overflow: hidden; pointer-events: none;">
                 <span style="flex-shrink: 0; white-space: pre;">${prefix}</span>
-                
-                <!-- 2. Die Nummer (nur bei VW vorhanden), die sich bewegt -->
                 ${scrollingText ? `
                 <div style="flex-grow: 1; overflow: hidden; min-width: 0; position: relative; margin-left: 2px;">
                     <span style="display: inline-block; white-space: nowrap; ${animationStyle}">${scrollingText}</span>
                 </div>
                 ` : ''}
-                
-                <!-- 3. Fester Zähler in Klammern (z.B. "(1)") -->
                 <small style="flex-shrink: 0; margin-left: 5px;">(${info.count})</small>
             </div>
 
-            <!-- Der rechte Bereich mit dem Schalter (schrumpft niemals) -->
-            <label class="batch-toggle-switch" style="flex-shrink: 0; margin-bottom: 0;">
+            <label class="batch-toggle-switch" style="flex-shrink: 0; margin-bottom: 0;" onclick="event.stopPropagation()">
                 <input type="checkbox" class="lkw-toggle" data-truckid="${truckId}" ${isActive ? 'checked' : ''}>
                 <span class="batch-slider"></span>
             </label>
@@ -1714,15 +1704,93 @@ function renderLkwMenu() {
     
     container.innerHTML = html;
     
+    // Toggle Switch Event Listener (wie vorher)
     container.querySelectorAll('.lkw-toggle').forEach(toggle => {
-        toggle.addEventListener('change', async () => {
+        toggle.addEventListener('change', async (e) => {
             const status = loadLkwStatus();
-            status[toggle.dataset.truckid] = toggle.checked;
+            status[e.target.dataset.truckid] = e.target.checked;
             await saveLkwStatus(status);
             renderTable();
         });
     });
+
+    // --- NEU: LONG PRESS LOGIK FÜR LÖSCHEN & UMBENENNEN ---
+    let longPressTimer;
+    container.querySelectorAll('.lkw-longpress-target').forEach(item => {
+        
+        const startPress = (e) => {
+            // Verhindert Long-Press, wenn man den Schalter selbst berührt
+            if (e.target.closest('.batch-toggle-switch')) return; 
+            
+            const targetTruckId = item.dataset.truckid;
+            
+            longPressTimer = setTimeout(() => {
+                // Was passieren soll, wenn lange gedrückt wird:
+                if (window.navigator && window.navigator.vibrate) navigator.vibrate(50); // Leichtes Vibrieren auf Android
+
+                const action = confirm(`Möchtest du den LKW löschen?\n\n[OK] = LKW & alle Scans löschen\n[Abbrechen] = LKW umbenennen`);
+                
+                let currentShipments = loadShipments();
+
+                if (action) {
+                    // LÖSCHEN
+                    const finalConfirm = confirm(`ACHTUNG: Willst du wirklich ALLE Sendungen für diesen LKW aus dem System entfernen?`);
+                    if (finalConfirm) {
+                        for (let baseNumber in currentShipments) {
+                            if (currentShipments[baseNumber].truckId === targetTruckId) {
+                                delete currentShipments[baseNumber];
+                            }
+                        }
+                        saveShipments(currentShipments);
+                        renderTable();
+                        renderLkwMenu();
+                        displayError('LKW gelöscht.', 'green', 2000);
+                    }
+                } else {
+                    // UMBENENNEN
+                    const newName = prompt(`Neuen Namen für den LKW eingeben:\n(z.B. MAN-12345 oder VVL-Test)`, targetTruckId);
+                    if (newName && newName.trim() !== '' && newName !== targetTruckId) {
+                        for (let baseNumber in currentShipments) {
+                            if (currentShipments[baseNumber].truckId === targetTruckId) {
+                                currentShipments[baseNumber].truckId = newName.trim();
+                            }
+                        }
+                        // LKW Status (Toggle) mit umziehen
+                        const status = loadLkwStatus();
+                        if (status[targetTruckId] !== undefined) {
+                            status[newName.trim()] = status[targetTruckId];
+                            delete status[targetTruckId];
+                            saveLkwStatus(status);
+                        }
+                        
+                        saveShipments(currentShipments);
+                        renderTable();
+                        renderLkwMenu();
+                        displayError('LKW umbenannt.', 'green', 2000);
+                    }
+                }
+            }, 800); // 800 Millisekunden = 0.8 Sekunden gedrückt halten
+        };
+
+        const cancelPress = () => {
+            clearTimeout(longPressTimer);
+        };
+
+        // Touch-Events für Handys
+        item.addEventListener('touchstart', startPress, {passive: true});
+        item.addEventListener('touchend', cancelPress);
+        item.addEventListener('touchmove', cancelPress);
+        
+        // Maus-Events für Desktop/Testen
+        item.addEventListener('mousedown', startPress);
+        item.addEventListener('mouseup', cancelPress);
+        item.addEventListener('mouseleave', cancelPress);
+        
+        // Verhindern, dass auf Handys beim langen Drücken das Menü kopiert wird
+        item.addEventListener('contextmenu', e => { e.preventDefault(); });
+    });
 }
+
 
 
 function showDetailView(baseNumber) {
