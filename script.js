@@ -1576,7 +1576,7 @@ function renderTable() {
                 <strong class="${securityClass}">Sich.: ${securityCount}/${expectedText}</strong>
             `;
             
-            row.insertCell().outerHTML = `<td data-label="Ãbersicht" class="summary-cell">${summaryHtml}</td>`;
+            row.insertCell().outerHTML = `<td data-label="\u00FCersicht" class="summary-cell">${summaryHtml}</td>`;
             
             row.insertCell().outerHTML = `<td data-label="Letzte Ãnd.">${shipment.lastModified ? new Date(shipment.lastModified).toLocaleString('de-DE') : '-'}</td>`;
             
@@ -2894,7 +2894,7 @@ function generatePdfInBrowser(event) {
             doc.setTextColor(subHeaderColor);
             doc.setFontSize(10);
             doc.setFont('courier', 'bold');
-            doc.text(`GesamtÃ¼bersicht Vorverladeliste ${parentOrderNumber}:`, 14, currentY); currentY += 6;
+            doc.text(`Gesamt\u00FCersicht Vorverladeliste ${parentOrderNumber}:`, 14, currentY); currentY += 6;
             
             doc.setTextColor(textColor);
             doc.setFontSize(9);
