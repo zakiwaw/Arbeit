@@ -1645,12 +1645,14 @@ function renderLkwMenu() {
     let html = '';
     let manCount = 1;
     
-    Object.entries(trucks).forEach(([truckId, info]) => {
+        Object.entries(trucks).forEach(([truckId, info]) => {
         const isActive = lkwStatus[truckId] !== false;
         let label = truckId;
+        let isVw = false;
         
         if (truckId.startsWith('VVL-')) {
             label = '\u{1F69A} VW: ' + truckId.replace('VVL-', '');
+            isVw = true;
         }
         else if (truckId === 'MAN-legacy') {
             label = '\u{1F69B} MAN (importiert)';
@@ -1660,17 +1662,21 @@ function renderLkwMenu() {
             manCount++;
         }
 
-        // Hier sind alle Styles hart eincodiert, sodass es auf jedem Handy 100% klappt:
-        html += `<li class="lkw-menu-item" style="list-style: none; display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 5px 0; border-bottom: 1px solid #f5f5f5;">
-            <span class="lkw-label" title="${truckId}" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; padding-right: 15px; flex-grow: 1;">
-                ${label} <small>(${info.count})</small>
-            </span>
+        // Wenn es VW ist und der Text extrem lang ist (mehr als ca. 18 Zeichen nach "VW: "),
+        // bekommt er die Scrolling-Klasse. Ansonsten verhält er sich normal.
+        const scrollClass = (isVw && label.length > 20) ? 'needs-scroll' : '';
+
+        html += `<li class="lkw-menu-item" style="list-style: none; display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 8px 0; border-bottom: 1px solid #f5f5f5;">
+            <div class="scrolling-text-container" title="${truckId}">
+                <span class="scrolling-text ${scrollClass}">${label} <small>(${info.count})</small></span>
+            </div>
             <label class="batch-toggle-switch" style="flex-shrink: 0; margin-bottom: 0;">
                 <input type="checkbox" class="lkw-toggle" data-truckid="${truckId}" ${isActive ? 'checked' : ''}>
                 <span class="batch-slider"></span>
             </label>
         </li>`;
     });
+
     container.innerHTML = html;
 
 
