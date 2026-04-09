@@ -1638,36 +1638,41 @@ function renderLkwMenu() {
 ;
         return;
     }
-        let html = '';
-    let manCount = 1; // Zähler nur für MAN
+            // WICHTIG: Setzt den Abstand der Liste (<ul>) auf 0, damit die Punkte links verschwinden!
+    container.style.paddingLeft = '0';
+    container.style.margin = '0';
+
+    let html = '';
+    let manCount = 1;
     
     Object.entries(trucks).forEach(([truckId, info]) => {
         const isActive = lkwStatus[truckId] !== false;
         let label = truckId;
         
         if (truckId.startsWith('VVL-')) {
-            // VW bleibt genau wie vorher, nur mit dem sicheren Emoji-Code
             label = '\u{1F69A} VW: ' + truckId.replace('VVL-', '');
         }
         else if (truckId === 'MAN-legacy') {
             label = '\u{1F69B} MAN (importiert)';
         }
         else if (truckId.startsWith('MAN-')) {
-            // MAN zählt jetzt einfach hoch: MAN 1, MAN 2, etc.
             label = '\u{1F69B} MAN ' + manCount;
             manCount++;
         }
 
-                html += `<li class="lkw-menu-item">
-            <span class="lkw-label" title="${truckId}">${label} <small>(${info.count})</small></span>
+        // Hier sind alle Styles hart eincodiert, sodass es auf jedem Handy 100% klappt:
+        html += `<li class="lkw-menu-item" style="list-style: none; display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 5px 0; border-bottom: 1px solid #f5f5f5;">
+            <span class="lkw-label" title="${truckId}" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; padding-right: 15px; flex-grow: 1;">
+                ${label} <small>(${info.count})</small>
+            </span>
             <label class="batch-toggle-switch" style="flex-shrink: 0; margin-bottom: 0;">
                 <input type="checkbox" class="lkw-toggle" data-truckid="${truckId}" ${isActive ? 'checked' : ''}>
                 <span class="batch-slider"></span>
             </label>
         </li>`;
-
     });
     container.innerHTML = html;
+
 
     container.querySelectorAll('.lkw-toggle').forEach(toggle => {
         toggle.addEventListener('change', async () => {
