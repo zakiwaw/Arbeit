@@ -1646,7 +1646,7 @@ function renderLkwMenu() {
         else if (truckId === 'MAN-legacy')      label = '\u{1F69B} MAN (importiert)';
         else if (truckId.startsWith('MAN-')) {
             const ts = parseInt(truckId.replace('MAN-', ''));
-            label = '\u{1F69B} MAN: ' + (isNaN(ts) ? truckId : new Date(ts).toLocaleString('de-DE', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'}));
+            label = '🚛 MAN: ' + (isNaN(ts) ? truckId : new Date(ts).toLocaleString('de-DE', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'}));
         }
         html += `<li class="lkw-menu-item">
             <span class="lkw-label" title="${truckId}">${label} <small>(${info.count})</small></span>
