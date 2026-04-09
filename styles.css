@@ -1327,3 +1327,27 @@ td.qr-code-cell {
 }
 
 .lkw-label small { color: #bbb; font-size: 0.85em; }
+/* Animation für den Lauftext */
+@keyframes scrollText {
+    0%, 15% { transform: translateX(0); }
+    85%, 100% { transform: translateX(calc(-100% + 150px)); } /* 150px ist ungefähr der Platz, den wir haben */
+}
+
+.scrolling-text-container {
+    overflow: hidden;
+    white-space: nowrap;
+    min-width: 0;
+    flex-grow: 1;
+    position: relative;
+    padding-right: 15px;
+}
+
+.scrolling-text {
+    display: inline-block;
+    /* Animation läuft nur, wenn wir per JavaScript eine Klasse setzen */
+}
+
+.scrolling-text.needs-scroll {
+    animation: scrollText 4s linear infinite alternate;
+}
+
