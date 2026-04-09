@@ -742,7 +742,7 @@ function showOpenHusSummary() {
                 const positionHtml = isManOrderContext && item.position ? `<span class="position-number">${item.position}.</span>` : ``;
                 const hasDunkelalarm = dunkelalarmedNumbers.has(item.rawInput);
                 const alarmClass = hasDunkelalarm ? 'has-dunkelalarm' : '';
-               return `<li>${positionHtml}<span class="hu-value ${alarmClass}" style="cursor:pointer;" title="Details fÃ¼r ${escapeHtml(item.rawInput)} anzeigen">${escapeHtml(item.rawInput)}</span></li>`;
+               return `<li>${positionHtml}<span class="hu-value ${alarmClass}" style="cursor:pointer;" title="Details f\u00FCr ${escapeHtml(item.rawInput)} anzeigen">${escapeHtml(item.rawInput)}</span></li>`;
             }).join('');
             return `<ul class="hu-list">${listItems}</ul>`;
         }
@@ -799,7 +799,7 @@ function showOpenHusSummary() {
             ueberzaehligHtml += `
                 <div class="hu-order-group" style="border-left-color: var(--warning-color); padding-left: 10px; margin-bottom: 10px;">
                     <ul class="hu-list" style="font-family: monospace; padding-left: 5px; list-style-type: none;">
-<li><strong style="color: #333;">Gescant: </strong>&nbsp;<span class="hu-value has-dunkelalarm" style="cursor:pointer;" title="Klicken zum Kopieren. Details fÃ¼r ${escapeHtml(pair.surplus.rawInput)} anzeigen">${diffHtml.html1}</span></li>
+<li><strong style="color: #333;">Gescant: </strong>&nbsp;<span class="hu-value has-dunkelalarm" style="cursor:pointer;" title="Klicken zum Kopieren. Details f\u00FCr ${escapeHtml(pair.surplus.rawInput)} anzeigen">${diffHtml.html1}</span></li>
                         <li><strong style="color: #333;">Erwartet:</strong>&nbsp;<span class="hu-value" style="cursor:pointer;" title="Klicken zum Kopieren">${diffHtml.html2}</span></li>
                     </ul>
                     ${index < suspiciousPairs.length - 1 ? '<hr style="margin: 5px 0; border: none; border-top: 1px dashed #ccc;">' : ''}
@@ -1365,7 +1365,7 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
         : currentDetailsDivEl;                                      // Ziel in der Hauptansicht
 
     if (!displayTarget) {
-        console.error("Fehler: Konnte kein Anzeige-Element fÃ¼r Details finden. Stellen Sie sicher, dass die HTML-Struktur korrekt ist.");
+        console.error("Fehler: Konnte kein Anzeige-Element f\u00FCr Details finden. Stellen Sie sicher, dass die HTML-Struktur korrekt ist.");
         return;
     }
 
@@ -1407,7 +1407,7 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
         detailsHtml += `<strong id="shipmentDetailTitle" 
                                 style="cursor:pointer;" 
                                 title="Klicken, um '${escapeHtml(baseNumberToDisplay)}' zu kopieren" 
-                                data-hawb="${escapeHtml(baseNumberToDisplay)}">Details fÃ¼r ${escapeHtml(baseNumberToDisplay)}:</strong>`;
+                                data-hawb="${escapeHtml(baseNumberToDisplay)}">Details f\u00FCr ${escapeHtml(baseNumberToDisplay)}:</strong>`;
         // --- ENDE DER ÃNDERUNG ---
     }
 
@@ -1482,7 +1482,7 @@ detailsHtml += `${numberPart}<span class="hu-value" style="cursor:pointer;" titl
                 if (isCancelled) {
                     notesListHtml += `<div class="note-item" style="color:var(--cancelled-color);">- ${escapeHtml(note)}</div>`;
                 } else {
-                    notesListHtml += `<div class="note-item"><span class="note-prefix">Notiz:</span><span class="editable-note" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" data-note-index="${index}" title="Notiz bearbeiten">${escapeHtml(note)}</span><button class="delete-note-btn" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" data-note-index="${index}" title="Notiz L\u00F6schen">Ã</button></div>`;
+                    notesListHtml += `<div class="note-item"><span class="note-prefix">Notiz:</span><span class="editable-note" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" data-note-index="${index}" title="Notiz bearbeiten">${escapeHtml(note)}</span><button class="delete-note-btn" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" data-note-index="${index}" title="Notiz L\u00F6schen">\u{1F5D1}</button></div>`;
                 }
             });
             notesListHtml += '</div>';
