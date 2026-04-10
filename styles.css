@@ -1289,12 +1289,16 @@ td.qr-code-cell {
     padding-bottom: 10px;
 }
 .lkw-section-title {
-    font-size: 0.78em;
-    color: #999;
-    padding: 0 12px 6px;
-    margin: 0;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: nowrap;
+}
+.lkw-total-count {
+    font-size: 0.8em;
+    color: #555;
+    font-weight: 600;
+    white-space: nowrap;
 }
 .lkw-list {
     list-style: none;
