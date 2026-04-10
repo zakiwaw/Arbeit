@@ -2479,22 +2479,34 @@ function addToBatch() {
         return;
     }
 
-    const scanTimestamp = new Date().toISOString();
+        const scanTimestamp = new Date().toISOString();
     const isCurrentHuExpected = isHuExpected(processedRawInput);
 
     // Sound-Logik
     if (unexpectedHuSoundToggleEl && unexpectedHuSoundToggleEl.checked) {
+        // 1. Wir holen den Namen (die Variable heißt "parentHawb")
         const parentHawb = findShipmentByHuNumber(processedRawInput);
-            // NEU: Prüft zuverlässig, ob "NACHLIEFERUNG" im Text steckt (deckt "Nachlieferung", "Nachlieferung 1", "Man 1 Nachlieferung" ab)
-        console.log("Der Auftrag heißt:", parentHawbByHu);
-    const isNachlieferungHu = parentHawbByHu && parentHawbByHu.toUpperCase().indexOf('NACHLIEFERUNG') !== -1;
+        
+        console.log("Der Auftrag heißt:", parentHawb);
+        
+        // 2. Wir prüfen genau diese Variable "parentHawb"
+        const isNachlieferungHu = parentHawb && parentHawb.toUpperCase().indexOf('NACHLIEFERUNG') !== -1;
 
         if (isNachlieferungHu) {
             playNachlieferungSound();
+            
+            // 3. SOFORTIGER ABBRUCH: Die HU wird NICHT gespeichert oder gezählt!
+            return { 
+                success: false, 
+                waitingForTotal: false, 
+                message: `ACHTUNG: Nachlieferung! HU ${escapeHtml(processedRawInput)} wird nicht verarbeitet.` 
+            };
+            
         } else if (!isCurrentHuExpected) {
             playShortErrorSound();
         }
     }
+
     
     // Optionales Feedback-Popup
     if (batchFeedbackToggleEl && batchFeedbackToggleEl.checked) {
