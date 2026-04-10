@@ -151,23 +151,41 @@ const suspicionDeclineBtnEl = document.getElementById('suspicionDeclineBtn');
     
                     // Wiederverwendbare Funktion zum Speichern der HU-Liste
                     function saveAndProcessHuListData() {
-                        const mainOrderNumber = mainOrderNumberInputEl.value.trim().toUpperCase();
-                        const huListText = huListTextareaEl.value.trim();
+    let mainOrderNumber = mainOrderNumberInputEl.value.trim().toUpperCase();
+    const huListText = huListTextareaEl.value.trim();
+
+    if (!mainOrderNumber || !huListText) {
+        alert("Bitte Auftragsnummer und mindestens eine HU-Nummer eingeben.");
+        return { success: false };
+    }
+
+    const hus = huListText.split('\n').map(hu => hu.trim().toUpperCase()).filter(hu => hu.length > 0);
+    if (hus.length === 0) {
+        alert("Keine gültigen HU-Nummern in der Liste gefunden.");
+        return { success: false };
+    }
+
+    const shipments = loadShipments();
+
+    // --- START: AUTOMATISCHE UMBENENNUNG FÜR NACHLIEFERUNGEN ---
+    if (mainOrderNumber.includes('NACHLIEFERUNG')) {
+        let suffixNum = 1;
+        let proposedName = mainOrderNumber;
         
-                        if (!mainOrderNumber || !huListText) {
-                            alert("Bitte Auftragsnummer und mindestens eine HU-Nummer eingeben.");
-                            return { success: false };
-                        }
-                        const hus = huListText.split(/[\s\n\r]+/).map(hu => hu.trim().toUpperCase()).filter(hu => hu.length > 0);
-                        if (hus.length === 0) {
-                            alert("Keine gÃ¼ltigen HU-Nummern in der Liste gefunden.");
-                            return { success: false };
-                        }
-        
-                        const shipments = loadShipments();
-                        const now = new Date().toISOString();
-                        let addedCount = 0;
-                        let duplicateCount = 0;
+        // Solange der Name im System bereits existiert, zähle hoch
+        while (shipments[proposedName]) {
+            proposedName = `NACHLIEFERUNG ${suffixNum}`;
+            suffixNum++;
+        }
+        // Überschreibe den Namen mit dem neuen, einzigartigen Namen
+        mainOrderNumber = proposedName;
+    }
+    // --- ENDE: AUTOMATISCHE UMBENENNUNG ---
+
+    const now = new Date().toISOString();
+    let addedCount = 0;
+    let duplicateCount = 0;
+
         
                         if (!shipments[mainOrderNumber]) {
                             shipments[mainOrderNumber] = {
