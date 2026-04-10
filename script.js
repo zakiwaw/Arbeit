@@ -3741,11 +3741,27 @@ else if (target.closest('.hu-value')) {
             // --- ENDE NEUE LOGIK ---
 
 
+            
+            
             parts.forEach(orderData => {
-                const [metaAndOrder, huData] = orderData.split('|||');
-                if (!metaAndOrder || !huData) return;
-                const metaParts = metaAndOrder.split('|');
-                const orderNumber = metaParts[0];
+            const [metaAndOrder, huData] = orderData.split('||');
+            if (!metaAndOrder || !huData) return;
+            
+            const metaParts = metaAndOrder.split('|');
+            let orderNumber = metaParts[0];
+
+            // --- START: AUTOMATISCHE UMBENENNUNG FÜR NACHLIEFERUNGEN ---
+            if (orderNumber.toUpperCase().includes('NACHLIEFERUNG')) {
+                let suffixNum = 1;
+                let proposedName = orderNumber;
+                
+                while (shipments[proposedName]) {
+                    proposedName = `NACHLIEFERUNG ${suffixNum}`;
+                    suffixNum++;
+                }
+                orderNumber = proposedName;
+            }
+                
                 const hasFullMeta = metaParts.length >= 4;
                 processedOrders.push(orderNumber);
                 const hus = huData.split('~~~').filter(Boolean);
