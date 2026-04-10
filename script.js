@@ -2486,6 +2486,7 @@ function addToBatch() {
     if (unexpectedHuSoundToggleEl && unexpectedHuSoundToggleEl.checked) {
         const parentHawb = findShipmentByHuNumber(processedRawInput);
             // NEU: Prüft zuverlässig, ob "NACHLIEFERUNG" im Text steckt (deckt "Nachlieferung", "Nachlieferung 1", "Man 1 Nachlieferung" ab)
+        console.log("Der Auftrag heißt:", parentHawbByHu);
     const isNachlieferungHu = parentHawbByHu && parentHawbByHu.toUpperCase().indexOf('NACHLIEFERUNG') !== -1;
 
         if (isNachlieferungHu) {
