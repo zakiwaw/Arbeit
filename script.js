@@ -1918,24 +1918,32 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
     const statusesThatTriggerWE = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
 
     const { baseNumber, suffix, isValidFormat, raw: processedRawInput, isSuffixFormat } = processShipmentNumber(rawInputToSave);
-    if (!isValidFormat) { return { success: false, waitingForTotal: false, message: `UngÃ¼ltiges Format: ${escapeHtml(rawInputToSave)}` }; }
+    if (!isValidFormat) { return { success: false, waitingForTotal: false, message: `Ungültiges Format: ${escapeHtml(rawInputToSave)}` }; }
 
     // --- START DER AKTUALISIERTEN SOUND-LOGIK ---
     if (unexpectedHuSoundToggleEl && unexpectedHuSoundToggleEl.checked) {
         
-                const isCurrentHuExpected = isHuExpected(processedRawInput);
-        console.log("Der Auftrag heißt:", parentHawbByHu);
-    const isNachlieferungHu = parentHawbByHu && parentHawbByHu.toUpperCase().indexOf('NACHLIEFERUNG') !== -1;
-
-
+        const isCurrentHuExpected = isHuExpected(processedRawInput);
         
+        // DIESE ZEILE HAT BEI IHNEN GEFEHLT: Wir müssen den Auftrag erst im System suchen!
+        const parentHawbByHu = findShipmentByHuNumber(processedRawInput);
+        
+        console.log("Der Auftrag heißt:", parentHawbByHu);
+        
+        // Jetzt weiß das System, was parentHawbByHu ist und kann danach suchen:
+        const isNachlieferungHu = parentHawbByHu && parentHawbByHu.toUpperCase().indexOf('NACHLIEFERUNG') !== -1;
 
-        // Fall 1: HU gehÃ¶rt zu einer Nachlieferung -> spiele den Nachlieferung-Sound
         if (isNachlieferungHu) {
             playNachlieferungSound();
-        } 
-        // Fall 2: HU ist unerwartet (und keine Nachlieferung) -> spiele den Fehler-Sound
-        else if (!isCurrentHuExpected) {
+            
+            // SOFORTIGER ABBRUCH: Die HU wird nicht gespeichert oder gezählt!
+            return { 
+                success: false, 
+                waitingForTotal: false, 
+                message: `ACHTUNG: Nachlieferung! HU ${escapeHtml(processedRawInput)} wird nicht verarbeitet.` 
+            };
+            
+        } else if (!isCurrentHuExpected) {
             playShortErrorSound();
         }
     }
