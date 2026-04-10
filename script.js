@@ -1669,24 +1669,30 @@ function renderLkwMenu() {
     Object.entries(trucks).forEach(([truckId, info]) => {
         const isActive = lkwStatus[truckId] !== false;
         
-        let prefix = "";
-let scrollingText = "";
-let isVw = false;
+                let prefix = "";
+        let scrollingText = "";
+        let isVw = false;
 
-if (truckId.startsWith("VVL-")) {
-    prefix = "🚚 VW ";
-    scrollingText = truckId.replace("VVL-", "");
-    isVw = true;
-} else if (truckId === "MAN-legacy") {
-    prefix = "🚛 MAN importiert";
-} else if (truckId.startsWith("MAN-")) {
-    prefix = "🚛 MAN " + manCount;
-    manCount++;
-} else {
-    // NEU: Fallback für manuell umbenannte LKWs mit echtem Emoji
-    prefix = "🚚 "; // Echtes Emoji direkt in den String einfügen
-    scrollingText = truckId; 
-}
+        if (truckId.startsWith("VVL-")) {
+            prefix = "🚚 VW ";
+            scrollingText = truckId.replace("VVL-", "");
+            isVw = true;
+        } else if (truckId === "MAN-legacy") {
+            prefix = "🚛 MAN importiert";
+        } else if (truckId.startsWith("MAN-")) {
+            // Altes System: Zählt nur alte, dynamische Einträge hoch
+            prefix = "🚛 MAN " + manCount;
+            manCount++;
+        } else if (truckId.startsWith("MAN ")) {
+            // NEU: Richtiges Icon für das neue System mit festen MAN-Nummern
+            prefix = "🚛 ";
+            scrollingText = truckId;
+        } else {
+            // Fallback für alle anderen manuell umbenannten LKWs
+            prefix = "🚚 ";
+            scrollingText = truckId; 
+        }
+
 
 
         
@@ -3693,10 +3699,27 @@ else if (target.closest('.hu-value')) {
                 return;
             }
             const parts = currentValue.split(';;;').slice(1);
-            const shipments = loadShipments();
+            
+                        const shipments = loadShipments();
             const now = new Date().toISOString();
             let addedCount = 0, duplicateCount = 0, processedOrders = [];
-const manTruckId = 'MAN-' + Date.now();
+            
+            // --- START NEUE LOGIK FÜR FESTE MAN-NUMMERN ---
+            let maxMan = 0;
+            Object.values(shipments).forEach(s => {
+                // Wir suchen nach der höchsten bereits existierenden "MAN X" Nummer
+                if (s.truckId && s.truckId.startsWith('MAN ')) {
+                    const num = parseInt(s.truckId.replace('MAN ', ''), 10);
+                    if (!isNaN(num) && num > maxMan) {
+                        maxMan = num;
+                    }
+                }
+            });
+            // Der neue LKW bekommt dauerhaft die nächsthöhere Nummer (z.B. "MAN 3")
+            const manTruckId = 'MAN ' + (maxMan + 1);
+            // --- ENDE NEUE LOGIK ---
+
+
             parts.forEach(orderData => {
                 const [metaAndOrder, huData] = orderData.split('|||');
                 if (!metaAndOrder || !huData) return;
