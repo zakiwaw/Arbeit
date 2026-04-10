@@ -1924,8 +1924,10 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
     if (unexpectedHuSoundToggleEl && unexpectedHuSoundToggleEl.checked) {
         
                 const isCurrentHuExpected = isHuExpected(processedRawInput);
-    const parentHawbByHu = findShipmentByHuNumber(processedRawInput);
-    
+        console.log("Der Auftrag heißt:", parentHawbByHu);
+    const isNachlieferungHu = parentHawbByHu && parentHawbByHu.toUpperCase().indexOf('NACHLIEFERUNG') !== -1;
+
+
         // NEU: Prüft zuverlässig, ob "NACHLIEFERUNG" im Text steckt (deckt "Nachlieferung", "Nachlieferung 1", "Man 1 Nachlieferung" ab)
     const isNachlieferungHu = parentHawbByHu && parentHawbByHu.toUpperCase().indexOf('NACHLIEFERUNG') !== -1;
 
