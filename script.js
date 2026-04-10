@@ -1669,22 +1669,25 @@ function renderLkwMenu() {
     Object.entries(trucks).forEach(([truckId, info]) => {
         const isActive = lkwStatus[truckId] !== false;
         
-        let prefix = '';
-        let scrollingText = '';
-        let isVw = false;
-        
-        if (truckId.startsWith('VVL-')) {
-            prefix = '\u{1F69A} VW: ';
-            scrollingText = truckId.replace('VVL-', '');
-            isVw = true;
-        }
-        else if (truckId === 'MAN-legacy') {
-            prefix = '\u{1F69B} MAN (importiert)';
-        }
-        else if (truckId.startsWith('MAN-')) {
-            prefix = '\u{1F69B} MAN ' + manCount;
-            manCount++;
-        }
+        let prefix = ""; // Standardmäßig leer setzen statt undefined
+let scrollingText = "";
+let isVw = false;
+
+if (truckId.startsWith("VVL-")) {
+    prefix = "\u1F69A VW ";
+    scrollingText = truckId.replace("VVL-", "");
+    isVw = true;
+} else if (truckId === "MAN-legacy") {
+    prefix = "\u1F69B MAN importiert";
+} else if (truckId.startsWith("MAN-")) {
+    prefix = "\u1F69B MAN " + manCount;
+    manCount++;
+} else {
+    // NEU: Fallback für manuell umbenannte LKWs
+    prefix = "\u1F69A "; // Standard-LKW-Icon
+    scrollingText = truckId; // Den kompletten neuen Namen anzeigen
+}
+
         
 
         const animationStyle = (isVw && scrollingText.length > 11) 
