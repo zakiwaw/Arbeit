@@ -1928,9 +1928,7 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
     const isNachlieferungHu = parentHawbByHu && parentHawbByHu.toUpperCase().indexOf('NACHLIEFERUNG') !== -1;
 
 
-        // NEU: Prüft zuverlässig, ob "NACHLIEFERUNG" im Text steckt (deckt "Nachlieferung", "Nachlieferung 1", "Man 1 Nachlieferung" ab)
-    const isNachlieferungHu = parentHawbByHu && parentHawbByHu.toUpperCase().indexOf('NACHLIEFERUNG') !== -1;
-
+        
 
         // Fall 1: HU gehÃ¶rt zu einer Nachlieferung -> spiele den Nachlieferung-Sound
         if (isNachlieferungHu) {
@@ -2487,7 +2485,8 @@ function addToBatch() {
     // Sound-Logik
     if (unexpectedHuSoundToggleEl && unexpectedHuSoundToggleEl.checked) {
         const parentHawb = findShipmentByHuNumber(processedRawInput);
-        const isNachlieferungHu = parentHawb && parentHawb.toUpperCase() === 'NACHLIEFERUNG';
+            // NEU: Prüft zuverlässig, ob "NACHLIEFERUNG" im Text steckt (deckt "Nachlieferung", "Nachlieferung 1", "Man 1 Nachlieferung" ab)
+    const isNachlieferungHu = parentHawbByHu && parentHawbByHu.toUpperCase().indexOf('NACHLIEFERUNG') !== -1;
 
         if (isNachlieferungHu) {
             playNachlieferungSound();
