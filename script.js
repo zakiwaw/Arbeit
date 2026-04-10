@@ -3767,7 +3767,7 @@ else if (target.closest('.hu-value')) {
             
             
             parts.forEach(orderData => {
-            const [metaAndOrder, huData] = orderData.split('||');
+            const [metaAndOrder, huData] = orderData.split('|||');
             if (!metaAndOrder || !huData) return;
             
             const metaParts = metaAndOrder.split('|');
