@@ -1926,8 +1926,8 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
                 const isCurrentHuExpected = isHuExpected(processedRawInput);
     const parentHawbByHu = findShipmentByHuNumber(processedRawInput);
     
-    // Fall 1: HU gehört zu einer Nachlieferung - spiele den Nachlieferung-Sound
-    const isNachlieferungHu = parentHawbByHu && parentHawbByHu.toUpperCase() === 'NACHLIEFERUNG';
+        // NEU: Prüft zuverlässig, ob "NACHLIEFERUNG" im Text steckt (deckt "Nachlieferung", "Nachlieferung 1", "Man 1 Nachlieferung" ab)
+    const isNachlieferungHu = parentHawbByHu && parentHawbByHu.toUpperCase().indexOf('NACHLIEFERUNG') !== -1;
 
 
         // Fall 1: HU gehÃ¶rt zu einer Nachlieferung -> spiele den Nachlieferung-Sound
