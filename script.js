@@ -146,6 +146,21 @@ const suspicionDeclineBtnEl = document.getElementById('suspicionDeclineBtn');
         console.log(`Fracht Tracker ${document.title.split('(')[1].split(')')[0]} initialized.`);
         hideLoader(); // <<<< NEU: Lade-Spinner verstecken, wenn alles fertig ist
     }
+function renameShipment(oldId, newId) {
+    // 1. Daten vom alten Key zum neuen Key verschieben
+    const data = JSON.parse(localStorage.getItem(oldId));
+    localStorage.setItem(newId, JSON.stringify(data));
+    localStorage.removeItem(oldId);
+
+    // 2. DAS IST DER WICHTIGE TEIL:
+    if (state.currentShipmentId === oldId) {
+        state.currentShipmentId = newId; // Update die aktive Referenz
+    }
+
+    // 3. Ansicht neu zeichnen
+    renderTable();
+    showDetailView(newId); 
+}
 
     
                     // Wiederverwendbare Funktion zum Speichern der HU-Liste
