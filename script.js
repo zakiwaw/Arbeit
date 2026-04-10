@@ -1684,9 +1684,7 @@ function renderLkwMenu() {
             prefix = '\u{1F69B} MAN ' + manCount;
             manCount++;
         }
-        prefix = '\u{1F69B ';
-            scrollingText = truckId;
-        }
+        
 
         const animationStyle = (isVw && scrollingText.length > 11) 
             ? 'animation: scrollVwNumber 4s linear infinite alternate;' 
