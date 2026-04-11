@@ -3889,9 +3889,9 @@ truckId: 'VVL-' + vorverladelisteNr,
         }
 
         if (isBatchModeActive) {
-            if (currentValue.length > 0) mainActionButtonEl.click();
-            return;
-        }
+    return; // Submit-Event (Enter) übernimmt das Auslösen
+}
+
         const shipments = loadShipments();
         const { baseNumber: processedDirectBase } = processShipmentNumber(currentValue);
         let baseNumberToShow = null;
