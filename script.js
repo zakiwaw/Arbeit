@@ -1646,18 +1646,28 @@ function renderLkwMenu() {
     const trucks = {};
 
     // NEU: Zähle die Anzahl der HUs (Einzel-Sendungen) statt der Aufträge
-    Object.values(shipments).forEach(s => {
-        if (!s.truckId) return;
-        if (!trucks[s.truckId]) trucks[s.truckId] = { count: 0 };
+    // In renderLkwMenu():
+Object.values(shipments).forEach(s => {
+    if (!s.truckId) return;
+    if (!trucks[s.truckId]) trucks[s.truckId] = { count: 0 };
 
-        if (s.isHuListOrder && Array.isArray(s.scannedItems)) {
-            // Bei HU-Aufträgen zählen wir die einzelnen HUs im Array
-            trucks[s.truckId].count += s.scannedItems.length;
-        } else {
-            // Bei normalen Sendungen zählen wir weiterhin +1
-            trucks[s.truckId].count++;
-        }
-    });
+    if (s.isHuListOrder && Array.isArray(s.scannedItems)) {
+        // ✅ KORREKTUR: Zähle nur die ursprünglichen Manifest-Positionen.
+        // Das sind alle Einträge, die entweder noch "Anstehend" sind
+        // ODER einen exklusiven Sicherheitsstatus haben (XRY, ETD, EDD),
+        // also die Plätze, die beim Import als "Anstehend" angelegt wurden.
+        // Wareneingangs-Scans, Kombi-Scans, Stornos und Dunkelalarm
+        // werden NICHT mitgezählt.
+        const securityClearanceStatuses = ['XRY', 'ETD', 'EDD'];
+        const manifestCount = s.scannedItems.filter(item =>
+            !item.isCancelled &&
+            (item.status === 'Anstehend' || securityClearanceStatuses.includes(item.status))
+        ).length;
+        trucks[s.truckId].count += manifestCount;
+    } else {
+        trucks[s.truckId].count++;
+    }
+});
 
     if (Object.keys(trucks).length === 0) {
 // ... der restliche Code von renderLkwMenu() bleibt unverändert
