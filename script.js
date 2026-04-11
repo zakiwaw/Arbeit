@@ -3889,8 +3889,7 @@ truckId: 'VVL-' + vorverladelisteNr,
         }
 
         if (isBatchModeActive) {
-    if (currentValue.length > 0) addToBatch();
-    return;
+    return; // Nichts tun, Submit-Event übernimmt
 }
 
 
@@ -3953,9 +3952,9 @@ shipmentNumberInputEl.addEventListener('dblclick', () => {
 });
 mainInputFormEl.addEventListener('submit', event => {
     event.preventDefault();
-    if (isBatchModeActive) return; // input-Listener hat es schon ausgelöst
     if (mainActionButtonEl) mainActionButtonEl.click();
 });
+
 
     securityStatusSelectEl.addEventListener('change', () => {
         updateNoteAndComboVisibility();
