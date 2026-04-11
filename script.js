@@ -3731,19 +3731,24 @@ else if (target.closest('.hu-value')) {
             let addedCount = 0, duplicateCount = 0, processedOrders = [];
             
             // --- START NEUE LOGIK FÜR FESTE MAN-NUMMERN ---
-            let maxMan = 0;
-            Object.values(shipments).forEach(s => {
-                // Wir suchen nach der höchsten bereits existierenden "MAN X" Nummer
-                if (s.truckId && s.truckId.startsWith('MAN ')) {
-                    const num = parseInt(s.truckId.replace('MAN ', ''), 10);
-                    if (!isNaN(num) && num > maxMan) {
-                        maxMan = num;
-                    }
-                }
-            });
-            // Der neue LKW bekommt dauerhaft die nächsthöhere Nummer (z.B. "MAN 3")
-            const manTruckId = 'MAN ' + (maxMan + 1);
-            // --- ENDE NEUE LOGIK ---
+            // --- NEU (ERSETZEN MIT) ---
+let maxMan = 0;
+Object.values(shipments).forEach(s => {
+    // Prüfe das UNVERÄNDERLICHE Feld originalManNumber
+    if (typeof s.originalManNumber === 'number' && s.originalManNumber > maxMan) {
+        maxMan = s.originalManNumber;
+    }
+    // Fallback für alte Daten ohne originalManNumber: truckId prüfen
+    else if (s.truckId && s.truckId.startsWith('MAN ') && typeof s.originalManNumber === 'undefined') {
+        const num = parseInt(s.truckId.replace('MAN ', ''), 10);
+        if (!isNaN(num) && num > maxMan) {
+            maxMan = num;
+        }
+    }
+});
+const newManNumber = maxMan + 1;
+const manTruckId = 'MAN ' + newManNumber;
+
 
 
             
@@ -3772,11 +3777,13 @@ else if (target.closest('.hu-value')) {
                 const hus = huData.split('~~~').filter(Boolean);
 
                 if (!shipments[orderNumber]) {
-                    const newShipment = {
-                        hawb: orderNumber, lastModified: now, totalPiecesExpected: hus.length,
-                        scannedItems: [], mitarbeiter: MITARBEITER_NAME, isHuListOrder: true,
-truckId: manTruckId,
-                    };
+    const newShipment = {
+        hawb: orderNumber, lastModified: now, totalPiecesExpected: hus.length,
+        scannedItems: [], mitarbeiter: MITARBEITER_NAME, isHuListOrder: true,
+        truckId: manTruckId,
+        originalManNumber: newManNumber, // <-- NEU: Unveränderliche Nummer
+    };
+
                     if (hasFullMeta) {
                         newShipment.freightForwarder = metaParts[1];
                         newShipment.destinationCountry = metaParts[2];
