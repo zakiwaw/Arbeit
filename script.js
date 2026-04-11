@@ -1651,23 +1651,18 @@ Object.values(shipments).forEach(s => {
     if (!s.truckId) return;
     if (!trucks[s.truckId]) trucks[s.truckId] = { count: 0 };
 
-    if (s.isHuListOrder && Array.isArray(s.scannedItems)) {
-        // ✅ KORREKTUR: Zähle nur die ursprünglichen Manifest-Positionen.
-        // Das sind alle Einträge, die entweder noch "Anstehend" sind
-        // ODER einen exklusiven Sicherheitsstatus haben (XRY, ETD, EDD),
-        // also die Plätze, die beim Import als "Anstehend" angelegt wurden.
-        // Wareneingangs-Scans, Kombi-Scans, Stornos und Dunkelalarm
-        // werden NICHT mitgezählt.
-        const securityClearanceStatuses = ['XRY', 'ETD', 'EDD'];
-        const manifestCount = s.scannedItems.filter(item =>
-            !item.isCancelled &&
-            (item.status === 'Anstehend' || securityClearanceStatuses.includes(item.status))
-        ).length;
-        trucks[s.truckId].count += manifestCount;
+    if (s.isHuListOrder) {
+        // ✅ KORREKTUR: Verwende totalPiecesExpected, da diese Zahl exakt
+        // die Anzahl der beim Import angelegten HU-Positionen widerspiegelt.
+        // Sie wird beim Import gesetzt und nur bei explizitem Hinzufügen
+        // neuer HUs erhöht. Kombi-Scans, Wareneingangs-Scans, Stornos etc.
+        // verändern diese Zahl NICHT.
+        trucks[s.truckId].count += (s.totalPiecesExpected || 0);
     } else {
         trucks[s.truckId].count++;
     }
 });
+
 
     if (Object.keys(trucks).length === 0) {
 // ... der restliche Code von renderLkwMenu() bleibt unverändert
