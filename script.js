@@ -2488,79 +2488,78 @@ function addToBatch() {
         console.log("Der Auftrag heißt:", parentHawb);
         
         // Sound-Logik
-const scanTimestamp = new Date().toISOString();
-const isCurrentHuExpected = isHuExpected(processedRawInput);
+    const scanTimestamp = new Date().toISOString();
+    const isCurrentHuExpected = isHuExpected(processedRawInput);
 
-// Sound-Logik
-if (unexpectedHuSoundToggleEl && unexpectedHuSoundToggleEl.checked) {
-    const parentHawb = findShipmentByHuNumber(processedRawInput);
-    const isNachlieferungHu = parentHawb && parentHawb.toUpperCase().indexOf('NACHLIEFERUNG') !== -1;
+    // Sound-Logik
+    if (unexpectedHuSoundToggleEl && unexpectedHuSoundToggleEl.checked) {
+        const parentHawb = findShipmentByHuNumber(processedRawInput);
+        const isNachlieferungHu = parentHawb && parentHawb.toUpperCase().indexOf('NACHLIEFERUNG') !== -1;
 
-    if (isNachlieferungHu) {
-        playNachlieferungSound();
-    } else if (!isCurrentHuExpected) {
-        playShortErrorSound();
-    }
-}
-
-
-
-            // 3. SOFORTIGER ABBRUCH: Die HU wird NICHT gespeichert oder gezählt!
-            return { 
-                success: false, 
-                waitingForTotal: false, 
-                message: `ACHTUNG: Nachlieferung! HU ${escapeHtml(processedRawInput)} wird nicht verarbeitet.` 
-            };
-            
+        if (isNachlieferungHu) {
+            playNachlieferungSound();
         } else if (!isCurrentHuExpected) {
             playShortErrorSound();
         }
     }
 
-    
     // Optionales Feedback-Popup
     if (batchFeedbackToggleEl && batchFeedbackToggleEl.checked) {
         const carrier = findCarrierForHu(processedRawInput);
         showBatchScanFeedback(processedRawInput, isCurrentHuExpected, carrier);
     }
-    
-    // Logik fÃ¼r Notiz-Popup beim ersten Scan
+
+    // Logik für Notiz-Popup beim ersten Scan
     if (isBatchModeActive && currentBatch.length === 0 && isBatchNotePromptRequired && batchNoteToggleEl.checked) {
         pendingFirstBatchScanData = { rawInput: processedRawInput, scanTimestamp: scanTimestamp };
-        batchNoteInputEl.value = currentBatchGlobalNote || ''; 
+        batchNoteInputEl.value = currentBatchGlobalNote || '';
         batchNoteModalEl.classList.add('visible');
         document.body.classList.add('modal-open');
         batchNoteInputEl.focus();
         return;
     }
 
-    // ===== HIER BEGINNT DIE ÃBERARBEITETE VERDACHTS-LOGIK =====
+    // ===== VERDACHTS-LOGIK =====
     if (!isCurrentHuExpected) {
         const similarItems = findAllSimilarExpectedHus(processedRawInput);
         if (similarItems.length > 0) {
-            // Verdacht gefunden!
             suspicionQueue = similarItems;
             currentSuspicionIndex = 0;
 
-            // Zuerst den gescannten Wert zum Batch hinzufÃ¼gen
             const tempBatchItem = {
                 rawInput: processedRawInput,
                 scanTimestamp: scanTimestamp,
-                note: currentBatchGlobalNote 
+                note: currentBatchGlobalNote
             };
             currentBatch.unshift(tempBatchItem);
             updateBatchUI();
-            
-            // Modal mit dem ersten Vorschlag anzeigen
+
             showSuspicionModal(processedRawInput, 0);
 
-            // Eingabefeld leeren und beenden. Die weitere Logik passiert im Modal.
             shipmentNumberInputEl.value = '';
             updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
             clearError();
             return;
         }
     }
+    // ===== ENDE VERDACHTS-LOGIK =====
+
+    // Standard: HU zum Batch hinzufügen
+    const batchItem = {
+        rawInput: processedRawInput,
+        scanTimestamp: scanTimestamp,
+        note: currentBatchGlobalNote
+    };
+
+    currentBatch.unshift(batchItem);
+
+    updateBatchUI();
+    shipmentNumberInputEl.value = '';
+    updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
+    clearError();
+    focusShipmentInput();
+}
+
     // ===== ENDE DER ÃBERARBEITETEN VERDACHTS-LOGIK =====
 
     // Standard-Verhalten: HU zum Batch hinzufÃ¼gen
