@@ -1936,16 +1936,7 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
         if (isNachlieferungHu) {
             playNachlieferungSound();
             
-            // SOFORTIGER ABBRUCH: Die HU wird nicht gespeichert oder gezählt!
-            return { 
-                success: false, 
-                waitingForTotal: false, 
-                message: `ACHTUNG: Nachlieferung! HU ${escapeHtml(processedRawInput)} wird nicht verarbeitet.` 
-            };
-            
-        } else if (!isCurrentHuExpected) {
-            playShortErrorSound();
-        }
+                   }
     }
     // --- ENDE DER AKTUALISIERTEN SOUND-LOGIK ---
 
@@ -2503,16 +2494,7 @@ function addToBatch() {
         if (isNachlieferungHu) {
             playNachlieferungSound();
             
-            // 3. SOFORTIGER ABBRUCH: Die HU wird NICHT gespeichert oder gezählt!
-            return { 
-                success: false, 
-                waitingForTotal: false, 
-                message: `ACHTUNG: Nachlieferung! HU ${escapeHtml(processedRawInput)} wird nicht verarbeitet.` 
-            };
-            
-        } else if (!isCurrentHuExpected) {
-            playShortErrorSound();
-        }
+                  }
     }
 
     
@@ -4388,4 +4370,3 @@ function attemptLockOrientation() {
 }
 // window.addEventListener('load', attemptLockOrientation);
 */
-
