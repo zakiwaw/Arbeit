@@ -1921,32 +1921,25 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
     if (!isValidFormat) { return { success: false, waitingForTotal: false, message: `Ungültiges Format: ${escapeHtml(rawInputToSave)}` }; }
 
     // --- START DER AKTUALISIERTEN SOUND-LOGIK ---
-    if (unexpectedHuSoundToggleEl && unexpectedHuSoundToggleEl.checked) {
-        
-        const isCurrentHuExpected = isHuExpected(processedRawInput);
-        
-        // DIESE ZEILE HAT BEI IHNEN GEFEHLT: Wir müssen den Auftrag erst im System suchen!
-        const parentHawbByHu = findShipmentByHuNumber(processedRawInput);
-        
-        console.log("Der Auftrag heißt:", parentHawbByHu);
-        
-        // Jetzt weiß das System, was parentHawbByHu ist und kann danach suchen:
-        const isNachlieferungHu = parentHawbByHu && parentHawbByHu.toUpperCase().indexOf('NACHLIEFERUNG') !== -1;
+    const parentHawbByHu = findShipmentByHuNumber(processedRawInput);
+const isNachlieferungHu = parentHawbByHu && parentHawbByHu.toUpperCase().indexOf('NACHLIEFERUNG') !== -1;
 
-        if (isNachlieferungHu) {
-            playNachlieferungSound();
-            
-            // SOFORTIGER ABBRUCH: Die HU wird nicht gespeichert oder gezählt!
-            return { 
-                success: false, 
-                waitingForTotal: false, 
-                message: `ACHTUNG: Nachlieferung! HU ${escapeHtml(processedRawInput)} wird nicht verarbeitet.` 
-            };
-            
-        } else if (!isCurrentHuExpected) {
-            playShortErrorSound();
-        }
+if (isNachlieferungHu) {
+    playNachlieferungSound();
+    return { 
+        success: false, 
+        waitingForTotal: false, 
+        message: `ACHTUNG: Nachlieferung! HU ${escapeHtml(processedRawInput)} wird nicht verarbeitet.` 
+    };
+}
+
+if (unexpectedHuSoundToggleEl && unexpectedHuSoundToggleEl.checked) {
+    const isCurrentHuExpected = isHuExpected(processedRawInput);
+    if (!isCurrentHuExpected) {
+        playShortErrorSound();
     }
+}
+
     // --- ENDE DER AKTUALISIERTEN SOUND-LOGIK ---
 
     const shipments = loadShipments();
