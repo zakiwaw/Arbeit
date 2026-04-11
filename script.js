@@ -1926,11 +1926,14 @@ const isNachlieferungHu = parentHawbByHu && parentHawbByHu.toUpperCase().indexOf
 
 if (isNachlieferungHu) {
     playNachlieferungSound();
+    shipmentNumberInputEl.value = '';          // ← NEU
+    updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl); // ← NEU
     return { 
         success: false, 
         waitingForTotal: false, 
         message: `ACHTUNG: Nachlieferung! HU ${escapeHtml(processedRawInput)} wird nicht verarbeitet.` 
     };
+
 }
 
 if (unexpectedHuSoundToggleEl && unexpectedHuSoundToggleEl.checked) {
