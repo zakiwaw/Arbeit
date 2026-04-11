@@ -2487,12 +2487,19 @@ function addToBatch() {
         
         console.log("Der Auftrag heißt:", parentHawb);
         
-        // 2. Wir prüfen genau diese Variable "parentHawb"
-        const isNachlieferungHu = parentHawb && parentHawb.toUpperCase().indexOf('NACHLIEFERUNG') !== -1;
+        // Sound-Logik
+if (unexpectedHuSoundToggleEl && unexpectedHuSoundToggleEl.checked) {
+    const parentHawb = findShipmentByHuNumber(processedRawInput);
+    const isNachlieferungHu = parentHawb && parentHawb.toUpperCase().indexOf('NACHLIEFERUNG') !== -1;
 
-        if (isNachlieferungHu) {
-            playNachlieferungSound();
-            
+    if (isNachlieferungHu) {
+        playNachlieferungSound();
+        // ✅ KEIN return hier - Funktion läuft weiter und fügt HU zum Batch hinzu
+    } else if (!isCurrentHuExpected) {
+        playShortErrorSound();
+    }
+}
+
             // 3. SOFORTIGER ABBRUCH: Die HU wird NICHT gespeichert oder gezählt!
             return { 
                 success: false, 
