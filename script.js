@@ -3950,16 +3950,12 @@ shipmentNumberInputEl.addEventListener('dblclick', () => {
         shipmentNumberInputEl.focus(); // Erneut fokussieren, um die Tastatur sicher zu triggern
     }, 50);
 });
-mainInputFormEl.addEventListener('submit', (event) => {
-    // 1. Verhindern, dass die Seite durch die Formular-Aktion neu geladen wird
+mainInputFormEl.addEventListener('submit', event => {
     event.preventDefault();
-    
-    // 2. Den Klick auf den Haupt-Aktionsbutton simulieren.
-    //    Dies stellt sicher, dass die bestehende Logik (Einzelscan vs. Batch-Modus) korrekt verwendet wird.
-    if (mainActionButtonEl) {
-        mainActionButtonEl.click();
-    }
+    if (isBatchModeActive) return; // input-Listener hat es schon ausgelöst
+    if (mainActionButtonEl) mainActionButtonEl.click();
 });
+
     securityStatusSelectEl.addEventListener('change', () => {
         updateNoteAndComboVisibility();
         focusShipmentInput();
