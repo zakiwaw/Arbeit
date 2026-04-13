@@ -1,5 +1,5 @@
 
-const { jsPDF } = window.jspdf;
+const { jsPDF } = window.jspdf; // 13.04.2026
 
 document.addEventListener('DOMContentLoaded', function() {
 
