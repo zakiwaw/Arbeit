@@ -1123,6 +1123,18 @@ function findCarrierForHu(huNumber) {
  * @param {string} huString Der zu parsende String (z.B. "1 09250929101E|box|10x10|5kg").
  * @returns {object} Ein Objekt mit den extrahierten Daten.
  */
+
+function normalizeVwDimensions(length, width, height) {
+    const clean = (value) => {
+        const raw = String(value || '').replace(/mm/gi, '').trim();
+        if (!raw) return '0';
+        const parsed = parseInt(raw, 10);
+        return Number.isNaN(parsed) ? raw : String(parsed);
+    };
+
+    return `${clean(length)}x${clean(width)}x${clean(height)} MM`;
+}
+
 function parseComplexHuString(huString) {
     const parts = huString.split('|');
     const mainPart = parts[0].trim();
@@ -3812,74 +3824,150 @@ const manTruckId = 'MAN ' + newManNumber;
             location.reload();
             return;
         } 
-        
-        else if (currentValue.startsWith('FRT_VVL_V1')) {
-            if (!confirm("Eine Vorverladeliste wurde erkannt.\n\nMÃ¶chtest du alle darin enthaltenen KundenauftrÃ¤ge jetzt importieren?")) {
-                shipmentNumberInputEl.value = ''; 
-                return;
-            }
-            const parts = currentValue.split(';;;').slice(1);
-            const shipments = loadShipments();
-            const now = new Date().toISOString();
-            let addedPositionsCount = 0;
-            let newOrders = new Set();
-            let updatedOrders = new Set();
-            let processedVVLs = new Set();
+      
 
-            parts.forEach(orderData => {
-                const [meta, huData] = orderData.split('|||');
-                if (!meta || !huData) return;
 
-                const [kundennr, vorverladelisteNr] = meta.split('|');
-                const positionen = huData.split(' ').filter(Boolean);
-                processedVVLs.add(vorverladelisteNr);
 
-                if (!shipments[kundennr]) {
-                    newOrders.add(kundennr);
-                    shipments[kundennr] = {
-                        hawb: kundennr, lastModified: now, totalPiecesExpected: positionen.length,
-                        scannedItems: [], mitarbeiter: MITARBEITER_NAME, isHuListOrder: true,
-                        parentOrderNumber: vorverladelisteNr,
-truckId: 'VVL-' + vorverladelisteNr,
+
+
+
+
+  
+else if (currentValue.startsWith('FRT_VVL_V1')) {
+    if (!confirm("Eine Vorverladeliste wurde erkannt.\n\nMöchtest du alle darin enthaltenen Kundenaufträge jetzt importieren?")) {
+        shipmentNumberInputEl.value = '';
+        return;
+    }
+
+    const parts = currentValue.split(';;;').slice(1);
+    const shipments = loadShipments();
+    const now = new Date().toISOString();
+    let addedPositionsCount = 0;
+    let newOrders = new Set();
+    let updatedOrders = new Set();
+    let processedVVLs = new Set();
+
+    parts.forEach(orderData => {
+        const [meta, huData] = orderData.split('|||');
+        if (!meta || !huData) return;
+
+        const [kundennr, vorverladelisteNr] = meta.split('|');
+        const positionen = huData.split('~~~').filter(Boolean);
+        processedVVLs.add(vorverladelisteNr);
+
+        const parseVvlPosition = (pos) => {
+            const [mainPart, grossWeightRaw = 'N/A', dimensionsRaw = 'N/A'] = pos.split('|').map(part => part.trim());
+            const [vse, sendnr] = mainPart.split(':').map(part => part.trim());
+
+            const grossWeight = grossWeightRaw && grossWeightRaw !== 'N/A'
+                ? (grossWeightRaw.toUpperCase().includes('KG') ? grossWeightRaw.toUpperCase() : `${grossWeightRaw} KG`)
+                : 'N/A';
+
+            let dimensions = 'N/A';
+            if (dimensionsRaw && dimensionsRaw !== 'N/A') {
+                const dimParts = dimensionsRaw
+                    .replace(/mm/gi, '')
+                    .split('x')
+                    .map(part => part.trim());
+
+                if (dimParts.length === 3) {
+                    const clean = (value) => {
+                        const parsed = parseInt(value, 10);
+                        return Number.isNaN(parsed) ? value : String(parsed);
                     };
-                    if (KUNDENNR_CARRIER_MAP[kundennr]) {
-                        shipments[kundennr].freightForwarder = KUNDENNR_CARRIER_MAP[kundennr];
-                    }
-                    positionen.forEach(pos => {
-                        const [vse, sendnr] = pos.split(':');
-                        shipments[kundennr].scannedItems.push({ rawInput: vse, sendnr: sendnr, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null });
+                    dimensions = `${clean(dimParts[0])}x${clean(dimParts[1])}x${clean(dimParts[2])} MM`;
+                }
+            }
+
+            return { vse, sendnr: sendnr || '', grossWeight, dimensions };
+        };
+
+        if (!shipments[kundennr]) {
+            newOrders.add(kundennr);
+            shipments[kundennr] = {
+                hawb: kundennr,
+                lastModified: now,
+                totalPiecesExpected: positionen.length,
+                scannedItems: [],
+                mitarbeiter: MITARBEITER_NAME,
+                isHuListOrder: true,
+                parentOrderNumber: vorverladelisteNr,
+                truckId: 'VVL-' + vorverladelisteNr,
+            };
+
+            if (KUNDENNR_CARRIER_MAP[kundennr]) {
+                shipments[kundennr].freightForwarder = KUNDENNR_CARRIER_MAP[kundennr];
+            }
+
+            positionen.forEach(pos => {
+                const { vse, sendnr, grossWeight, dimensions } = parseVvlPosition(pos);
+                if (!vse) return;
+
+                shipments[kundennr].scannedItems.push({
+                    rawInput: vse,
+                    sendnr: sendnr,
+                    grossWeight: grossWeight,
+                    dimensions: dimensions,
+                    status: 'Anstehend',
+                    timestamp: now,
+                    isCombination: false,
+                    notes: [],
+                    isCancelled: false,
+                    cancelledTimestamp: null
+                });
+            });
+
+            addedPositionsCount += positionen.length;
+        } else {
+            updatedOrders.add(kundennr);
+            const existingShipment = shipments[kundennr];
+            let newPositionsAddedToThisCustomer = 0;
+
+            if (KUNDENNR_CARRIER_MAP[kundennr] && !existingShipment.freightForwarder) {
+                existingShipment.freightForwarder = KUNDENNR_CARRIER_MAP[kundennr];
+            }
+
+            existingShipment.parentOrderNumber = vorverladelisteNr;
+            existingShipment.truckId = 'VVL-' + vorverladelisteNr;
+
+            positionen.forEach(pos => {
+                const { vse, sendnr, grossWeight, dimensions } = parseVvlPosition(pos);
+                if (!vse) return;
+
+                const alreadyExists = existingShipment.scannedItems.some(item => item.rawInput === vse);
+                if (!alreadyExists) {
+                    existingShipment.scannedItems.push({
+                        rawInput: vse,
+                        sendnr: sendnr,
+                        grossWeight: grossWeight,
+                        dimensions: dimensions,
+                        status: 'Anstehend',
+                        timestamp: now,
+                        isCombination: false,
+                        notes: [],
+                        isCancelled: false,
+                        cancelledTimestamp: null
                     });
-                    addedPositionsCount += positionen.length;
-                } else {
-                    updatedOrders.add(kundennr);
-                    const existingShipment = shipments[kundennr];
-                    let newPositionsAddedToThisCustomer = 0;
-                    if (KUNDENNR_CARRIER_MAP[kundennr] && !existingShipment.freightForwarder) {
-                        existingShipment.freightForwarder = KUNDENNR_CARRIER_MAP[kundennr];
-                    }
-                    if (!existingShipment.parentOrderNumber) {
-                         existingShipment.parentOrderNumber = vorverladelisteNr;
-                    }
-                    positionen.forEach(pos => {
-                        const [vse, sendnr] = pos.split(':');
-                        const alreadyExists = existingShipment.scannedItems.some(item => item.rawInput === vse);
-                        if (!alreadyExists) {
-                            existingShipment.scannedItems.push({ rawInput: vse, sendnr: sendnr, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null });
-                            newPositionsAddedToThisCustomer++;
-                        }
-                    });
-                    if (newPositionsAddedToThisCustomer > 0) {
-                        existingShipment.totalPiecesExpected = (existingShipment.totalPiecesExpected || 0) + newPositionsAddedToThisCustomer;
-                        existingShipment.lastModified = now;
-                        addedPositionsCount += newPositionsAddedToThisCustomer;
-                    }
+                    newPositionsAddedToThisCustomer++;
                 }
             });
-            saveShipments(shipments);
-            alert(`Import der Vorverladeliste(n) [${[...processedVVLs].join(', ')}] abgeschlossen:\n\n- ${addedPositionsCount} neue Positionen importiert.\n- ${newOrders.size} neue AuftrÃ¤ge angelegt.\n- ${updatedOrders.size} AuftrÃ¤ge aktualisiert.`);
-            location.reload();
-            return;
+
+            if (newPositionsAddedToThisCustomer > 0) {
+                existingShipment.totalPiecesExpected = (existingShipment.totalPiecesExpected || 0) + newPositionsAddedToThisCustomer;
+                existingShipment.lastModified = now;
+                addedPositionsCount += newPositionsAddedToThisCustomer;
+            }
         }
+    });
+
+    saveShipments(shipments);
+    alert(`Import der Vorverladeliste(n) [${[...processedVVLs].join(', ')}] abgeschlossen:\n\n- ${addedPositionsCount} neue Positionen importiert.\n- ${newOrders.size} neue Aufträge angelegt.\n- ${updatedOrders.size} Aufträge aktualisiert.`);
+    location.reload();
+    return;
+}
+
+
+
 
         if (isBatchModeActive) {
             if (currentValue.length > 0) mainActionButtonEl.click();
@@ -4382,3 +4470,4 @@ function attemptLockOrientation() {
 }
 // window.addEventListener('load', attemptLockOrientation);
 */
+
