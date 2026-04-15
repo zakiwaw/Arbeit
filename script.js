@@ -113,7 +113,7 @@ const suspicionDeclineBtnEl = document.getElementById('suspicionDeclineBtn');
         const initialShipments = await loadDataFromServer();
 // LKW-Status vom Server laden und lokal cachen
     try {
-        const lkwRes = await fetch(WEBAPPURL, {
+        const lkwRes = await fetch(WEB_APP_URL, {
             method: 'POST', mode: 'cors', cache: 'no-cache',
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({ action: 'loadLkwStatus' })
