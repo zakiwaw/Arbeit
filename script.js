@@ -429,7 +429,7 @@ function loadLkwStatus() {
 async function saveLkwStatus(status) {
     localStorage.setItem(LKWSTATUSKEY, JSON.stringify(status));
     try {
-        await fetch(WEBAPPURL, {
+        await fetch(WEB_APP_URL, {
             method: 'POST', mode: 'cors', cache: 'no-cache',
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({ action: 'saveLkwStatus', payload: status })
