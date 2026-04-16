@@ -1333,8 +1333,8 @@ td.qr-code-cell {
 .lkw-label small { color: #bbb; font-size: 0.85em; }
 /* Animation für den Lauftext */
 @keyframes scrollText {
-     0%, 15% { transform: translateX(0); }
-    85%, 100% { transform: translateX(calc(-100% + 70px)); }
+  0%, 15% { transform: translateX(0); }
+  85%, 100% { transform: translateX(calc(-1 * var(--scroll-distance, 0px))); }
 }
 
 .scrolling-text-container {
