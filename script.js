@@ -139,10 +139,10 @@ const suspicionDeclineBtnEl = document.getElementById('suspicionDeclineBtn');
         batchFeedbackToggleEl.checked = false;
         updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
         updateClearButtonVisibility(noteInputEl, clearNoteButtonEl);
-        updateCurrentBatchNoteDisplay();
-    
-        setupEventListeners();
-        focusShipmentInput();
+updateCurrentBatchNoteDisplay();
+setupEventListeners();
+startBackgroundSync();
+focusShipmentInput();
         console.log(`Fracht Tracker ${document.title.split('(')[1].split(')')[0]} initialized.`);
         hideLoader(); // <<<< NEU: Lade-Spinner verstecken, wenn alles fertig ist
     }
@@ -919,6 +919,125 @@ async function loadDataFromServer() {
         const localData = localStorage.getItem(LOCAL_STORAGE_KEY);
         return localData ? JSON.parse(localData) : {};
     }
+}
+// ================================
+// Hintergrund-Synchronisierung
+// ================================
+
+const BACKGROUND_SYNC_INTERVAL_MS = 5000;
+
+let backgroundSyncTimer = null;
+let isBackgroundSyncRunning = false;
+
+function getDataFingerprint(shipments) {
+  return JSON.stringify(
+    Object.keys(shipments || {})
+      .sort()
+      .map(baseNumber => {
+        const shipment = shipments[baseNumber] || {};
+
+        return [
+          baseNumber,
+          shipment.lastModified || "",
+          Array.isArray(shipment.scannedItems)
+            ? shipment.scannedItems.length
+            : 0
+        ];
+      })
+  );
+}
+
+function getCurrentlyDisplayedShipment() {
+  const detailTitle = document.getElementById("shipmentDetailTitle");
+
+  if (detailTitle?.dataset?.hawb) {
+    return detailTitle.dataset.hawb;
+  }
+
+  const input = shipmentNumberInputEl.value.trim();
+
+  if (!input) return null;
+
+  const parsed = processShipmentNumber(input);
+  return parsed.isValidFormat ? parsed.baseNumber : null;
+}
+
+async function syncFromServerInBackground() {
+  // Kein paralleler Abruf.
+  if (isBackgroundSyncRunning || !navigator.onLine) return;
+
+  // Einen offenen, noch nicht gespeicherten Batch niemals überschreiben.
+  if (isBatchModeActive && currentBatch.length > 0) return;
+
+  // Während Bearbeitungsfenstern ebenfalls nicht still die Daten austauschen.
+  const isEditing = editModalEl.classList.contains("visible") ||
+    noteEditModalEl.classList.contains("visible") ||
+    importHuModalEl.classList.contains("visible") ||
+    newTotalSectionEl.classList.contains("visible");
+
+  if (isEditing) return;
+
+  isBackgroundSyncRunning = true;
+
+  try {
+    const localShipments = loadShipments();
+    const serverShipments = await loadDataFromServer();
+
+    if (!serverShipments || typeof serverShipments !== "object") return;
+
+    const localFingerprint = getDataFingerprint(localShipments);
+    const serverFingerprint = getDataFingerprint(serverShipments);
+
+    // Kein Unterschied: Oberfläche nicht unnötig neu zeichnen.
+    if (localFingerprint === serverFingerprint) return;
+
+    localStorage.setItem(
+      LOCALSTORAGEKEY,
+      JSON.stringify(serverShipments)
+    );
+
+    renderTable();
+    renderLkwMenu();
+
+    const shownBaseNumber = getCurrentlyDisplayedShipment();
+
+    if (shownBaseNumber && serverShipments[shownBaseNumber]) {
+      displayCurrentShipmentDetails(shownBaseNumber);
+    }
+
+    displayError("Neue Daten von anderem Gerät aktualisiert.", "green", 1800);
+
+  } catch (error) {
+    // Beim Hintergrundabruf absichtlich keine rote Meldung:
+    // Ein kurzfristiger Netzfehler soll den Scan-Ablauf nicht stören.
+    console.warn("Hintergrund-Synchronisierung fehlgeschlagen:", error);
+  } finally {
+    isBackgroundSyncRunning = false;
+  }
+}
+
+function startBackgroundSync() {
+  if (backgroundSyncTimer) {
+    clearInterval(backgroundSyncTimer);
+  }
+
+  backgroundSyncTimer = setInterval(() => {
+    if (!document.hidden) {
+      syncFromServerInBackground();
+    }
+  }, BACKGROUND_SYNC_INTERVAL_MS);
+
+  // Beim Zurückkehren zur App sofort aktualisieren.
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) {
+      syncFromServerInBackground();
+    }
+  });
+
+  // Sobald WLAN/Mobilfunk wieder da ist.
+  window.addEventListener("online", () => {
+    syncFromServerInBackground();
+  });
 }
 function isHuExpected(huNumber) {
     const upperHu = huNumber.trim().toUpperCase();
@@ -3849,37 +3968,31 @@ else if (currentValue.startsWith('FRT_VVL_V1')) {
 
 
 
-    parts.forEach(orderData => {
-        const [meta, huData] = orderData.split('|||');
-        if (!meta || !huData) return;
 
-        const [originalKundennr, vorverladelisteNr] = meta.split('|');
-        let kundennr = originalKundennr;
+parts.forEach(orderData => {
+        const [meta, huData] = orderData.split('|||');
+        if (!meta || !huData) return;
 
-        // --- START NEU: Verhindert das Überschreiben bestehender LKWs ---
-        // Wenn die Kundennummer schon im System ist, aber zu einer ANDEREN Vorverladeliste gehört,
-        // hängen wir eine Nummer an (z.B. "12345 (2)"), damit der alte LKW seinen Auftrag behält.
-        if (shipments[kundennr] && shipments[kundennr].parentOrderNumber && shipments[kundennr].parentOrderNumber !== vorverladelisteNr) {
-            let suffixNum = 2;
-            while (shipments[`${originalKundennr} (${suffixNum})`]) {
-                suffixNum++;
-            }
-            kundennr = `${originalKundennr} (${suffixNum})`;
-        }
-        // --- ENDE NEU ---
+        const [originalKundennr, vorverladelisteNr] = meta.split('|');
+        let kundennr = originalKundennr;
 
-        const positionen = huData.split('~~~').filter(Boolean);
-        processedVVLs.add(vorverladelisteNr);
+        // --- START NEU: Verhindert das Überschreiben bestehender LKWs ---
+        // Wenn die Kundennummer schon im System ist, aber zu einer ANDEREN Vorverladeliste gehört,
+        // hängen wir eine Nummer an (z.B. "12345 (2)"), damit der alte LKW seinen Auftrag behält.
+        if (shipments[kundennr] && shipments[kundennr].parentOrderNumber && shipments[kundennr].parentOrderNumber !== vorverladelisteNr) {
+            let suffixNum = 2;
+            while (shipments[`${originalKundennr} (${suffixNum})`]) {
+                suffixNum++;
+            }
+            kundennr = `${originalKundennr} (${suffixNum})`;
+        }
+        // --- ENDE NEU ---
 
-        const parseVvlPosition = (pos) => {
+        const positionen = huData.split('~~~').filter(Boolean);
+        processedVVLs.add(vorverladelisteNr);
 
+        const parseVvlPosition = (pos) => {
 
-
-
-
-            
-            
-            
             const [mainPart, grossWeightRaw = 'N/A', dimensionsRaw = 'N/A'] = pos.split('|').map(part => part.trim());
             const [vse, sendnr] = mainPart.split(':').map(part => part.trim());
 
