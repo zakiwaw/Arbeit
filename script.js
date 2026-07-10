@@ -260,7 +260,7 @@ const suspicionDeclineBtnEl = document.getElementById('suspicionDeclineBtn');
                     });
 
     // --- Konstanten & Konfiguration ---
-    const WEB_APP_URL_BACKEND = 'https://script.google.com/macros/s/AKfycbyBtlm37WxzXdFCDjQuSIWfnQiTny6gwrmXuoq_cacGY9_bkqZxuuW7aJEqLuHJhWYg/exec'; // Mail_13
+    const WEB_APP_URL_BACKEND = 'https://script.google.com/macros/s/AKfycbw8STlYekKZlxWFTW11rGmYiMztIkNdsWxNZwhE1fYHJDeTbJ-HLSB7JrvFrg8un4mFMg/exec'; // Mail_13
     const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbw_ug_levQ7LuOn27CijAdkabnz5utME2aEeN6s560RzSb8lKCsSo5VT4nyOebRJnd0gw/exec';
     const LOCAL_STORAGE_KEY = 'frachtSicherungMobile_V8_18_Refactored';
 const LKWSTATUSKEY = 'frachtLkwStatusV1';
@@ -3849,37 +3849,31 @@ else if (currentValue.startsWith('FRT_VVL_V1')) {
 
 
 
-    parts.forEach(orderData => {
-        const [meta, huData] = orderData.split('|||');
-        if (!meta || !huData) return;
 
-        const [originalKundennr, vorverladelisteNr] = meta.split('|');
-        let kundennr = originalKundennr;
+parts.forEach(orderData => {
+        const [meta, huData] = orderData.split('|||');
+        if (!meta || !huData) return;
 
-        // --- START NEU: Verhindert das Überschreiben bestehender LKWs ---
-        // Wenn die Kundennummer schon im System ist, aber zu einer ANDEREN Vorverladeliste gehört,
-        // hängen wir eine Nummer an (z.B. "12345 (2)"), damit der alte LKW seinen Auftrag behält.
-        if (shipments[kundennr] && shipments[kundennr].parentOrderNumber && shipments[kundennr].parentOrderNumber !== vorverladelisteNr) {
-            let suffixNum = 2;
-            while (shipments[`${originalKundennr} (${suffixNum})`]) {
-                suffixNum++;
-            }
-            kundennr = `${originalKundennr} (${suffixNum})`;
-        }
-        // --- ENDE NEU ---
+        const [originalKundennr, vorverladelisteNr] = meta.split('|');
+        let kundennr = originalKundennr;
 
-        const positionen = huData.split('~~~').filter(Boolean);
-        processedVVLs.add(vorverladelisteNr);
+        // --- START NEU: Verhindert das Überschreiben bestehender LKWs ---
+        // Wenn die Kundennummer schon im System ist, aber zu einer ANDEREN Vorverladeliste gehört,
+        // hängen wir eine Nummer an (z.B. "12345 (2)"), damit der alte LKW seinen Auftrag behält.
+        if (shipments[kundennr] && shipments[kundennr].parentOrderNumber && shipments[kundennr].parentOrderNumber !== vorverladelisteNr) {
+            let suffixNum = 2;
+            while (shipments[`${originalKundennr} (${suffixNum})`]) {
+                suffixNum++;
+            }
+            kundennr = `${originalKundennr} (${suffixNum})`;
+        }
+        // --- ENDE NEU ---
 
-        const parseVvlPosition = (pos) => {
+        const positionen = huData.split('~~~').filter(Boolean);
+        processedVVLs.add(vorverladelisteNr);
 
+        const parseVvlPosition = (pos) => {
 
-
-
-
-            
-            
-            
             const [mainPart, grossWeightRaw = 'N/A', dimensionsRaw = 'N/A'] = pos.split('|').map(part => part.trim());
             const [vse, sendnr] = mainPart.split(':').map(part => part.trim());
 
