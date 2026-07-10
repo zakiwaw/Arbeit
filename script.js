@@ -142,11 +142,9 @@ const suspicionDeclineBtnEl = document.getElementById('suspicionDeclineBtn');
         updateCurrentBatchNoteDisplay();
     
         setupEventListeners();
-	startLiveSync();
         focusShipmentInput();
-console.log(`${document.title.split(" - ")[0]} initialized.`);
-hideLoader(); // NEU: Lade-Spinner verstecken, wenn alles fertig ist
-
+        console.log(`Fracht Tracker ${document.title.split('(')[1].split(')')[0]} initialized.`);
+        hideLoader(); // <<<< NEU: Lade-Spinner verstecken, wenn alles fertig ist
     }
 
 
@@ -262,7 +260,7 @@ hideLoader(); // NEU: Lade-Spinner verstecken, wenn alles fertig ist
                     });
 
     // --- Konstanten & Konfiguration ---
-    const WEB_APP_URL_BACKEND = 'https://script.google.com/macros/s/AKfycbyjaxBurmTWWJENUF2nr2WB5S6Le5ja-bcZ9OtBLktATx1zGAAZCa5IlvFaL1_yl6jjgA/exec'; // Mail_13
+    const WEB_APP_URL_BACKEND = 'https://script.google.com/macros/s/AKfycbyBtlm37WxzXdFCDjQuSIWfnQiTny6gwrmXuoq_cacGY9_bkqZxuuW7aJEqLuHJhWYg/exec'; // Mail_13
     const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbw_ug_levQ7LuOn27CijAdkabnz5utME2aEeN6s560RzSb8lKCsSo5VT4nyOebRJnd0gw/exec';
     const LOCAL_STORAGE_KEY = 'frachtSicherungMobile_V8_18_Refactored';
 const LKWSTATUSKEY = 'frachtLkwStatusV1';
@@ -921,196 +919,6 @@ async function loadDataFromServer() {
         const localData = localStorage.getItem(LOCAL_STORAGE_KEY);
         return localData ? JSON.parse(localData) : {};
     }
-}
-// ============================================================
-// LIVE-SYNC: Serverstand automatisch im Hintergrund übernehmen
-// ============================================================
-
-const LIVE_SYNC_INTERVAL_MS = 5000; // 5 Sekunden
-let liveSyncTimerId = null;
-let liveSyncRunning = false;
-let pendingLiveSyncData = null;
-let lastLiveSyncAt = null;
-
-function hasOpenBlockingUi() {
-  const modalSelectors = [
-    "#editModal",
-    "#importHuModal",
-    "#batchNoteModal",
-    "#noteEditModal",
-    "#suspicionModal",
-    "#openHusModal",
-    "#huDetailsModal",
-    "#batchScanFeedbackModal"
-  ];
-
-  return modalSelectors.some(selector =>
-    document.querySelector(selector)?.classList.contains("visible")
-  );
-}
-
-function getCurrentlyShownBaseNumber() {
-  const detailTitle = document.getElementById("shipmentDetailTitle");
-
-  if (detailTitle?.dataset?.hawb) {
-    return detailTitle.dataset.hawb;
-  }
-
-  const inputValue = shipmentNumberInputEl.value.trim();
-
-  if (!inputValue) return null;
-
-  const parsed = processShipmentNumber(inputValue);
-  return parsed.isValidFormat ? parsed.baseNumber : null;
-}
-
-function getChangedShipmentNumbers(localShipments, serverShipments) {
-  const changed = new Set();
-  const allKeys = new Set([
-    ...Object.keys(localShipments || {}),
-    ...Object.keys(serverShipments || {})
-  ]);
-
-  for (const baseNumber of allKeys) {
-    const localShipment = localShipments?.[baseNumber];
-    const serverShipment = serverShipments?.[baseNumber];
-
-    if (!localShipment || !serverShipment) {
-      changed.add(baseNumber);
-      continue;
-    }
-
-    const localVersion = JSON.stringify(localShipment);
-    const serverVersion = JSON.stringify(serverShipment);
-
-    if (localVersion !== serverVersion) {
-      changed.add(baseNumber);
-    }
-  }
-
-  return [...changed];
-}
-
-function applyLiveServerData(serverShipments, changedBaseNumbers) {
-  localStorage.setItem(LOCALSTORAGEKEY, JSON.stringify(serverShipments));
-
-  // Tabelle neu aufbauen, ohne die Seite neu zu laden
-  renderTable();
-  renderLkwMenu();
-
-  // Falls gerade Details einer veränderten Sendung sichtbar sind:
-  // Detailansicht direkt aktualisieren.
-  const currentlyShown = getCurrentlyShownBaseNumber();
-
-  if (currentlyShown && changedBaseNumbers.includes(currentlyShown)) {
-    displayCurrentShipmentDetails(currentlyShown);
-  }
-
-  lastLiveSyncAt = new Date();
-
-  if (changedBaseNumbers.length === 1) {
-    displayError(
-      `Live aktualisiert: Sendung ${changedBaseNumbers[0]} wurde auf einem anderen Gerät geändert.`,
-      "green",
-      3500
-    );
-  } else {
-    displayError(
-      `Live aktualisiert: ${changedBaseNumbers.length} Sendungen wurden auf einem anderen Gerät geändert.`,
-      "green",
-      3500
-    );
-  }
-}
-
-async function syncFromServerInBackground() {
-  // Keine parallelen Anfragen erzeugen
-  if (liveSyncRunning || !navigator.onLine) return;
-
-  // Während eines lokalen Speichervorgangs nicht dazwischenfunken
-  if (hasOpenBlockingUi()) return;
-
-  liveSyncRunning = true;
-
-  try {
-    const response = await fetch(WEBAPPURL, {
-      method: "POST",
-      mode: "cors",
-      cache: "no-cache",
-      headers: {
-        "Content-Type": "text/plain;charset=utf-8"
-      },
-      body: JSON.stringify({ action: "loadAllData" })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Server-Fehler ${response.status}`);
-    }
-
-    const result = await response.json();
-
-    if (result.status !== "success" || !result.data) {
-      return;
-    }
-
-    const localShipments = loadShipments();
-    const serverShipments = result.data;
-
-    const changedBaseNumbers = getChangedShipmentNumbers(
-      localShipments,
-      serverShipments
-    );
-
-    if (changedBaseNumbers.length === 0) {
-      lastLiveSyncAt = new Date();
-      return;
-    }
-
-    // Offenen Batch niemals unbemerkt überschreiben
-    if (isBatchModeActive && Array.isArray(currentBatch) && currentBatch.length > 0) {
-      pendingLiveSyncData = {
-        serverShipments,
-        changedBaseNumbers
-      };
-
-      displayError(
-        "Serverstand geändert. Dein offener Batch bleibt erhalten; bitte vor dem Speichern prüfen.",
-        "orange",
-        6000
-      );
-
-      return;
-    }
-
-    applyLiveServerData(serverShipments, changedBaseNumbers);
-  } catch (error) {
-    console.warn("Live-Sync fehlgeschlagen:", error);
-  } finally {
-    liveSyncRunning = false;
-  }
-}
-
-function startLiveSync() {
-  if (liveSyncTimerId) {
-    clearInterval(liveSyncTimerId);
-  }
-
-  // Beim Start einmal nach kurzer Zeit prüfen
-  setTimeout(syncFromServerInBackground, 2000);
-
-  liveSyncTimerId = setInterval(
-    syncFromServerInBackground,
-    LIVE_SYNC_INTERVAL_MS
-  );
-
-  // Beim Zurückkehren zur App sofort aktuell werden
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) {
-      syncFromServerInBackground();
-    }
-  });
-
-  window.addEventListener("online", syncFromServerInBackground);
 }
 function isHuExpected(huNumber) {
     const upperHu = huNumber.trim().toUpperCase();
@@ -3016,7 +2824,6 @@ function saveBatch() {
     updateBatchUI();
     displayCurrentShipmentDetails('');
     focusShipmentInput();
-applyPendingLiveSyncIfSafe();
 }
 
 
@@ -4042,31 +3849,37 @@ else if (currentValue.startsWith('FRT_VVL_V1')) {
 
 
 
+    parts.forEach(orderData => {
+        const [meta, huData] = orderData.split('|||');
+        if (!meta || !huData) return;
 
-parts.forEach(orderData => {
-        const [meta, huData] = orderData.split('|||');
-        if (!meta || !huData) return;
+        const [originalKundennr, vorverladelisteNr] = meta.split('|');
+        let kundennr = originalKundennr;
 
-        const [originalKundennr, vorverladelisteNr] = meta.split('|');
-        let kundennr = originalKundennr;
+        // --- START NEU: Verhindert das Überschreiben bestehender LKWs ---
+        // Wenn die Kundennummer schon im System ist, aber zu einer ANDEREN Vorverladeliste gehört,
+        // hängen wir eine Nummer an (z.B. "12345 (2)"), damit der alte LKW seinen Auftrag behält.
+        if (shipments[kundennr] && shipments[kundennr].parentOrderNumber && shipments[kundennr].parentOrderNumber !== vorverladelisteNr) {
+            let suffixNum = 2;
+            while (shipments[`${originalKundennr} (${suffixNum})`]) {
+                suffixNum++;
+            }
+            kundennr = `${originalKundennr} (${suffixNum})`;
+        }
+        // --- ENDE NEU ---
 
-        // --- START NEU: Verhindert das Überschreiben bestehender LKWs ---
-        // Wenn die Kundennummer schon im System ist, aber zu einer ANDEREN Vorverladeliste gehört,
-        // hängen wir eine Nummer an (z.B. "12345 (2)"), damit der alte LKW seinen Auftrag behält.
-        if (shipments[kundennr] && shipments[kundennr].parentOrderNumber && shipments[kundennr].parentOrderNumber !== vorverladelisteNr) {
-            let suffixNum = 2;
-            while (shipments[`${originalKundennr} (${suffixNum})`]) {
-                suffixNum++;
-            }
-            kundennr = `${originalKundennr} (${suffixNum})`;
-        }
-        // --- ENDE NEU ---
+        const positionen = huData.split('~~~').filter(Boolean);
+        processedVVLs.add(vorverladelisteNr);
 
-        const positionen = huData.split('~~~').filter(Boolean);
-        processedVVLs.add(vorverladelisteNr);
+        const parseVvlPosition = (pos) => {
 
-        const parseVvlPosition = (pos) => {
 
+
+
+
+            
+            
+            
             const [mainPart, grossWeightRaw = 'N/A', dimensionsRaw = 'N/A'] = pos.split('|').map(part => part.trim());
             const [vse, sendnr] = mainPart.split(':').map(part => part.trim());
 
@@ -4324,24 +4137,18 @@ noteEditFormEl.addEventListener('submit', (e) => {
     // Batch Modus
     batchModeToggleEl.addEventListener('change', (e) => toggleBatchMode(e.target.checked));
     saveBatchButtonEl.addEventListener('click', saveBatch);
-clearBatchButtonEl.addEventListener("click", () => {
-  if (currentBatch.length > 0 && confirm("Aktuellen Batch wirklich leeren?")) {
-    currentBatch = [];
-    isBatchNotePromptRequired = true;
-applyPendingLiveSyncIfSafe(); // NEU
-    currentBatchGlobalNote = null;
-    batchNoteToggleEl.checked = false;
-    updateBatchUI();
-    clearError();
-    displayCurrentShipmentDetails();
-
-    applyPendingLiveSyncIfSafe(); // NEU: wartenden Serverstand übernehmen
-  } else if (currentBatch.length === 0) {
-    displayError("Batch ist bereits leer.");
-  }
-
-  focusShipmentInput();
-});
+    clearBatchButtonEl.addEventListener('click', () => {
+        if (currentBatch.length > 0 && confirm("Aktuellen Batch wirklich leeren?")) {
+            currentBatch = [];
+            isBatchNotePromptRequired = true;
+            currentBatchGlobalNote = null;
+            batchNoteToggleEl.checked = false;
+            updateBatchUI(); clearError(); displayCurrentShipmentDetails('');
+        } else if (currentBatch.length === 0) {
+            displayError("Batch ist bereits leer.");
+        }
+        focusShipmentInput();
+    });
 
     batchNoteToggleEl.addEventListener('change', () => {
         if (batchNoteToggleEl.checked && isBatchModeActive) {
@@ -4610,14 +4417,7 @@ showUeberzaehligHusBtnEl.addEventListener('click', () => {
                 }
                 return null;
             }
-function applyPendingLiveSyncIfSafe() {
-  if (!pendingLiveSyncData) return;
 
-  const { serverShipments, changedBaseNumbers } = pendingLiveSyncData;
-
-  pendingLiveSyncData = null;
-  applyLiveServerData(serverShipments, changedBaseNumbers);
-}
             // Funktion zum Ãffnen des Modals
             function openHuDetailsModal(event) {
                 const target = event.target.closest('.hu-value, .pending-vse');
