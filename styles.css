@@ -1,1357 +1,464 @@
+/* ============================================================
+   Fracht Tracker (V9) – Styles
+   Mobile-first, große Touch-Flächen, keine Hover-Abhängigkeit.
+   ============================================================ */
 
-    :root{--primary-color:#5cb85c;--primary-hover:#4cae4c;--secondary-color:#5bc0de;--secondary-hover:#31b0d5;--danger-color:#d9534f;--danger-hover:#c9302c;--warning-color:#f0ad4e;--warning-hover:#ec971f;--info-color:#5bc0de;--info-hover:#31b0d5;--light-bg:#f9f9f9;--border-color:#ddd;--text-color:#333;--cancelled-color:#999;}
-    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;margin:0;padding:0;background-color:#f4f4f4;color:var(--text-color);font-size:16px;-webkit-text-size-adjust:100%;-webkit-touch-callout:none;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;position:relative}
-    input[type="text"],input[type="number"]{-webkit-user-select:text;user-select:text}
-    .container{padding:10px;max-width:100%;box-sizing:border-box}
-    h1,h2{text-align:center;margin-top:15px;margin-bottom:15px} h1{font-size:1.6em} h2{font-size:1.3em}
-    .input-section{margin-bottom:10px;margin-top:10px;padding:15px;border:1px solid var(--border-color);border-radius:8px;background-color:var(--light-bg);display:flex;flex-direction:column;gap:15px}
-    .controls-row{display:flex;flex-wrap:wrap;gap:15px;align-items:center;padding-top:5px}
-    label{display:block;margin-bottom:5px;font-weight:bold}
-    input[type="text"],select,input[type="number"]{width:100%;padding:12px 10px;border:1px solid #ccc;border-radius:5px;box-sizing:border-box;font-size:1em;height:44px}
-    input:disabled{background-color:#eee;cursor:not-allowed}
-    .input-wrapper{position:relative}
-    .clear-input-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:#bbb;color:white;border:none;border-radius:50%;width:24px;height:24px;font-size:16px;line-height:22px;text-align:center;cursor:pointer;display:none;padding:0}
-    .clear-input-btn:hover{background:#999}
-    .input-wrapper input[type="text"]{padding-right:35px}
-    .combo-checkbox-group{display:none;align-items:center;padding:5px 0} .combo-checkbox-group input{width:20px;height:20px;margin-right:8px} .combo-checkbox-group label{margin-bottom:0;font-weight:normal;font-size:1em;cursor:pointer} #comboCheckboxContainer.visible{display:flex}
-    .note-toggle-btn{background-color:#f0f0f0;border:1px solid #ccc;border-radius:5px;padding:5px 8px;font-size:1.2em;line-height:1;cursor:pointer;transition:background-color .2s,border-color .2s,color .2s;margin-left:auto;flex-shrink:0;height:38px;width:45px;display:flex;align-items:center;justify-content:center}
-    .note-toggle-btn:hover{background-color:#e0e0e0}
-    .note-toggle-btn.note-active{background-color:var(--warning-color);border-color:var(--warning-hover);color:white}
-    .note-input-area{display:none;margin-top:10px;padding:10px;border:1px dashed var(--warning-color);border-radius:5px;background-color:#fffaf0}
-    .note-input-area label{font-weight:bold;margin-bottom:5px;display:block}
-    .note-input-area .input-wrapper{position:relative}
-    .note-input-area input[type="text"]{width:100%;padding-right:35px;height:44px;box-sizing:border-box}
-    .clear-note-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:#bbb;color:white;border:none;border-radius:50%;width:24px;height:24px;font-size:16px;line-height:22px;text-align:center;cursor:pointer;padding:0;display:block !important}
-    .clear-note-btn:hover{background:#999}
-    .main-action-button{background-color:var(--primary-color);color:white;padding:12px 15px;border:none;border-radius:5px;cursor:pointer;font-size:1.1em;height:48px;text-align:center;width:100%;transition:background-color .2s} .main-action-button:hover,.main-action-button:active{background-color:var(--primary-hover)}
-    .delete-btn{background-color:var(--danger-color) !important}
-    .delete-btn:hover,.delete-btn:active{background-color:var(--danger-hover) !important}
-    #newTotalSection{display:none;flex-direction:column;gap:10px;border-top:1px solid #ccc;margin-top:15px;padding-top:15px}
-    #newTotalSection.visible{display:flex}
-    #newTotalSection div{display:flex;gap:10px;margin-top:10px}
-    #newTotalSection button{flex-grow:1}
-    #confirmNewTotalBtn{background-color:var(--primary-color)}
-    #confirmNewTotalBtn:hover{background-color:var(--primary-hover)}
-    #skipNewTotalBtn{background-color:var(--secondary-color)}
-    #skipNewTotalBtn:hover{background-color:var(--secondary-hover)}
-    .batch-controls{display:flex;justify-content:flex-end;align-items:center;margin-bottom:5px;padding:8px 10px;background-color:#e9e9e9;border-radius:5px;gap:15px;position:relative;z-index:10}
-    #menu-toggle-btn{background-color:var(--secondary-color);color:white;border:none;border-radius:5px;padding:6px 10px;font-size:1.2em;line-height:1;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.1);order:-1;margin-right:auto}
-    #menu-toggle-btn:hover{background-color:var(--secondary-hover)}
-    .batch-controls label{margin:0}
-    .batch-toggle-switch{position:relative;display:inline-block;width:50px;height:28px;flex-shrink:0}
-    .batch-toggle-switch input{opacity:0;width:0;height:0}
-    .batch-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#ccc;transition:.4s;border-radius:28px}
-    .batch-slider:before{position:absolute;content:"";height:20px;width:20px;left:4px;bottom:4px;background-color:white;transition:.4s;border-radius:50%}
-    input:checked+.batch-slider{background-color:var(--primary-color)}
-    input:checked+.batch-slider:before{transform:translateX(22px)}
-    .batch-status-display{font-size:.9em;color:#555;text-align:right;margin-left:5px}
-    .batch-area{display:none;margin-top:15px;padding:10px;border:1px solid var(--info-color);border-radius:8px;background-color:#f0f8ff} .batch-area.visible{display:block} .batch-area h3{margin-top:0;text-align:center;color:var(--info-color);font-size:1.1em} #batchList{list-style-type:none;padding:0;margin:10px 0;max-height:150px;overflow-y:auto;border:1px solid #eee;background-color:#fff;border-radius:4px} #batchList li{display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border-bottom:1px solid #eee;font-family:monospace;font-size:.95em} #batchList li:last-child{border-bottom:none} .remove-batch-item{background-color:var(--danger-color);color:white;border:none;border-radius:3px;padding:2px 5px;font-size:.8em;cursor:pointer;margin-left:10px} .batch-action-buttons{display:flex;justify-content:space-around;margin-top:10px;gap:10px} .batch-action-buttons button{flex-grow:1;padding:10px;font-size:1em;border-radius:5px;border:none;cursor:pointer;transition:background-color .2s} #saveBatchButton{background-color:var(--primary-color);color:white} #saveBatchButton:hover{background-color:var(--primary-hover)} #clearBatchButton{background-color:var(--warning-color);color:white} #clearBatchButton:hover{background-color:var(--warning-hover)}
-    .error{color:var(--danger-color);font-weight:bold;margin-top:5px;min-height:1.2em;text-align:center;padding:5px}
-    #currentShipmentDetails{margin-top:15px;padding:10px;background-color:#eef;border:1px dashed #aac;border-radius:8px;font-size:.9em;line-height:1.5}
-    #currentShipmentDetails strong{color:#335;display:block;margin-bottom:8px}
-    #currentShipmentDetails ul{margin:5px 0;padding-left:5px;list-style-type:none}
-    #currentShipmentDetails li{margin-bottom:4px;padding-bottom:4px;font-family:monospace;white-space:pre-wrap;position:relative;padding-right:70px;border-bottom:1px dotted #ccc;line-height:1.3}
-    #currentShipmentDetails li .timestamp{color:#557;display:block;font-size:.9em}
-    #currentShipmentDetails li .status{font-weight:bold}
-    #currentShipmentDetails li .combo{font-style:italic;color:#66a;margin-left:5px}
-    #currentShipmentDetails li.cancelled-item{text-decoration:line-through;color:var(--cancelled-color)}
-    #currentShipmentDetails li.cancelled-item .timestamp,#currentShipmentDetails li.cancelled-item .status,#currentShipmentDetails li.cancelled-item .combo,#currentShipmentDetails li.cancelled-item .note-display,#currentShipmentDetails li.cancelled-item .editable-note,#currentShipmentDetails li.cancelled-item .add-note-link{color:var(--cancelled-color) !important;cursor:default;text-decoration:none}
-    #currentShipmentDetails li.cancelled-item .add-note-link{display:none}
-    #currentShipmentDetails li .cancelled-info{font-size:.85em;display:block;text-decoration:none !important;color:#777}
-    .cancel-button{position:absolute;right:5px;top:50%;transform:translateY(-50%);background-color:var(--warning-color);color:white;border:none;border-radius:4px;padding:3px 6px;font-size:.8em;cursor:pointer;transition:background-color .2s}
-    .cancel-button:hover,.cancel-button:active{background-color:var(--warning-hover)}
+/* ---------- Farbsystem (Dark-Mode-freundlich) ---------- */
+:root {
+    --primary-color: #2563eb;
+    --primary-hover: #1d4ed8;
+    --warning-color: #f59e0b;
+    --warning-hover: #d97706;
+    --danger-color: #dc2626;
+    --danger-hover: #b91c1c;
+    --info-color: #0891b2;
+    --info-hover: #0e7490;
+    --success-color: #16a34a;
 
-    #currentShipmentDetails li .editable-note{cursor:pointer;text-decoration-style:dotted;color:#007bff;margin-left:5px;font-size:.9em;font-style:italic}
-    #currentShipmentDetails li .add-note-link{cursor:pointer;color:#007bff;font-size:.9em;text-decoration:none;padding-left:10px;font-style:italic}
-    #currentShipmentDetails li .editable-note:hover,#currentShipmentDetails li .add-note-link:hover{color:#0056b3;text-decoration:underline;text-decoration-style:solid}
-    /* Die Regel ::before wird nicht mehr benÃ¶tigt und kann gelÃ¶scht werden */
+    --bg: #eef2f7;
+    --card: #ffffff;
+    --text: #0f172a;
+    --muted: #64748b;
+    --border: #d8e0ea;
+    --input-bg: #ffffff;
 
+    --batch-bg: #eff6ff;
+    --batch-border: #bfdbfe;
 
-    #currentShipmentDetails li .note-display{display:inline;padding-left:0;margin-top:0;font-style:italic;color:#448}
-    #currentShipmentDetails li .note-prefix{display:inline;font-size:.9em;color:#448;margin-top:3px;padding-left:10px;font-style:italic}
- 
+    --success-bg: #dcfce7;
+    --success-text: #166534;
+    --error-bg: #fee2e2;
+    --error-text: #b91c1c;
+}
 
-    #currentShipmentDetails .summary{margin-top:10px;border-top:1px solid #ccc;padding-top:8px;font-weight:bold} #currentShipmentDetails .summary span{display:block;margin-bottom:3px} /* --- DURCH DIESEN BLOCK ERSETZEN --- */
-.summary .ok, .summary-cell .ok {color:green} 
-.summary .mismatch, .summary-cell .mismatch {color:orange} 
-.summary .over, .summary-cell .over {color:red;font-weight:bold}
-    table{width:100%;border-collapse:collapse;margin-top:20px} thead{display:none} tr{display:block;margin-bottom:15px;border:1px solid var(--border-color);border-radius:8px;padding:12px;background-color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.1)} td{display:block;text-align:right;border:none;border-bottom:1px dotted #eee;padding:8px 0;position:relative;padding-left:40%;min-height:24px;font-size:.95em} td:last-child{border-bottom:none} td::before{content:attr(data-label);position:absolute;left:0;width:38%;padding-right:10px;white-space:nowrap;text-align:left;font-weight:bold;color:#555} td.summary-cell span,td.summary-cell strong{display:block} td.actions-cell{text-align:center;padding-left:0;padding-top:10px}
-    td.actions-cell button.edit-btn{background-color:#6c757d} td.actions-cell button.edit-btn:hover{background-color:#5a6268} body.batch-mode-active td.actions-cell button.edit-btn{display:none}
-    td.actions-cell button {
-        background-color: var(--secondary-color);
-        color: white;
-        border: none;
-        padding: 8px 10px;
-        border-radius: 5px;
-        cursor: pointer;
-        font-size: .9em;
-        /* margin: 3px; <-- Diese Zeile wird entfernt */
-        transition: background-color .2s;
-        min-width: 70px;
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #0b1220;
+        --card: #131c2e;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --border: #27344b;
+        --input-bg: #0e1727;
+        --batch-bg: #16233c;
+        --batch-border: #2c4266;
+        --success-bg: #14351f;
+        --success-text: #86efac;
+        --error-bg: #3b1414;
+        --error-text: #fca5a5;
     }
-     td.actions-cell button:hover,td.actions-cell button:active{background-color:var(--secondary-hover)}
-    
-   
-    .modal-content{background-color:#fefefe;margin:auto;padding:20px;border:1px solid #888;border-radius:8px;width:90%;max-width:450px;box-shadow:0 4px 8px rgba(0,0,0,.2);position:relative}
-    .modal-content h3{margin-top:0;text-align:center}
-    .modal-content .form-group{margin-bottom:15px}
-    .modal-content label{display:block;margin-bottom:5px;font-weight:bold}
-    .modal-content input[type="number"],.modal-content input[type="text"]{font-size:1em}
-    .modal-content input[readonly]{background-color:#eee;cursor:not-allowed}
-    .modal-actions{display:flex;justify-content:space-between;margin-top:20px;gap:10px}
-    .modal-actions button{padding:10px 15px;border-radius:5px;border:none;cursor:pointer;font-size:1em;flex-grow:1}
-    #saveEditButton{background-color:var(--primary-color);color:white}
-    #cancelEditButton{background-color:#aaa;color:white}
-    #confirmBatchNoteButton{background-color:var(--primary-color)}
-    #skipBatchNoteButton{background-color:var(--secondary-color)}
-    .side-menu{position:fixed;top:0;left:0;width:280px;max-width:80%;height:100vh;background-color:#fff;box-shadow:2px 0 5px rgba(0,0,0,.2);transform:translateX(-100%);transition:transform .3s ease-in-out;z-index:1010;padding:20px;box-sizing:border-box;display:flex;flex-direction:column;overflow-y:auto}
-    .side-menu.open{transform:translateX(0)}
-    .side-menu h3{margin-top:0;margin-bottom:25px;text-align:center;color:var(--text-color)}
-    .side-menu #sendToSheetButton{background-color:var(--info-color);width:100%;margin-top:15px}
-    .side-menu #sendToSheetButton:hover{background-color:var(--info-hover)}
-    .side-menu #sheetStatus{margin-top:10px;margin-bottom:15px;min-height:1.2em;font-weight:bold;text-align:center}
-    .side-menu #resetDataButton{margin-top:10px;width:100%}
-    .side-menu #sendSummaryEmailButton{margin-top:10px;width:100%;background-color:var(--warning-color)}
-    .side-menu #sendSummaryEmailButton:hover{background-color:var(--warning-hover)}
-    .menu-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background-color:rgba(0,0,0,.5);opacity:0;visibility:hidden;transition:opacity .3s ease-in-out,visibility .3s ease-in-out;z-index:1000}
-    .menu-overlay.visible{opacity:1;visibility:visible}
-    .status-and-button-container {
-    display: flex;
-    align-items: flex-end; /* Richtet Select und Button an ihrer Unterkante aus */
-    gap: 15px; /* Konsistenter Abstand, wie in .input-section */
 }
 
-.status-select-wrapper {
-    flex-grow: 1; /* Erlaubt dem Select-Wrapper (mit Label), den verfÃ¼gbaren Platz einzunehmen */
+/* ---------- Basis ---------- */
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; padding: 0; }
+body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 16px;
+    line-height: 1.45;
 }
+.hidden { display: none !important; }
+.visually-hidden {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap;
+}
+h2 { font-size: 1.15rem; margin: 0 0 12px; }
+h3 { font-size: 1rem; margin: 14px 0 8px; }
 
-/* Ãberschreibt die Breite fÃ¼r mainActionButton, wenn er im neuen Container ist */
-/* --- START DER ÃNDERUNG --- */
+main { max-width: 640px; margin: 0 auto; padding: 12px 12px 90px; }
 
-/* Ãberschreibt die Breite und HÃ¶he fÃ¼r mainActionButton, wenn er im neuen Container ist */
-.status-and-button-container > #mainActionButton {
-    width: auto; /* BehÃ¤lt die automatische Breitenanpassung bei */
-    flex-shrink: 0; /* Verhindert, dass der Button schrumpft */
-    height: 44px; /* Angleichen an die HÃ¶he des Select-Feldes (war 48px) */
-    padding-top: 10px; /* Vertikales Padding anpassen (war 12px) */
-    padding-bottom: 10px; /* Vertikales Padding anpassen (war 12px) */
-    /* padding-left und padding-right (15px) bleiben unverÃ¤ndert von .main-action-button */
-    line-height: normal; /* Stellt sicher, dass line-height die Zentrierung nicht stÃ¶rt, falls es woanders gesetzt wurde */
-    /* Die SchriftgrÃ¶Ãe (font-size: 1.1em) wird von .main-action-button geerbt */
-}
-    /* --- START: NEUE STILE FÃR MEHRERE NOTIZEN --- */
-    #currentShipmentDetails .notes-container {
-        margin-top: 5px;
-        padding-left: 15px; /* EinrÃ¼ckung fÃ¼r den gesamten Notiz-Block */
-        display: flex;
-        flex-direction: column;
-        gap: 3px;
-    }
-    #currentShipmentDetails .note-item {
-        display: flex;
-        align-items: center;
-        gap: 8px; /* Abstand zwischen Notiztext und LÃ¶schen-Button */
-    }
-#currentShipmentDetails .note-item .note-prefix {
-    font-weight: bold;
-    color: #555;
-    margin-right: 4px; /* Kleiner Abstand zum Notiztext */
-}
-    #currentShipmentDetails .note-item .editable-note {
-        flex-grow: 1; /* Notiztext nimmt verfÃ¼gbaren Platz ein */
-    }
-    #currentShipmentDetails .note-item .delete-note-btn {
-        background-color: #e7e7e7;
-        color: #888;
-        border: 1px solid #ccc;
-        border-radius: 50%;
-        width: 20px;
-        height: 20px;
-        font-size: 12px;
-        line-height: 18px;
-        text-align: center;
-        cursor: pointer;
-        padding: 0;
-        flex-shrink: 0;
-        transition: all 0.2s;
-    }
-    #currentShipmentDetails .note-item .delete-note-btn:hover {
-        background-color: var(--danger-color);
-        color: white;
-        border-color: var(--danger-hover);
-    }
-    /* --- ENDE: NEUE STILE FÃR MEHRERE NOTIZEN --- */
-/* --- ENDE DER ÃNDERUNG --- */
-#newTotalSection.warning-existing {
-    background-color: #f2dede; /* Heller Rotton */
-    border-color: #ebccd1;
-    border-style: solid;
-    border-width: 1px;
-}
-#newTotalSection.warning-existing label {
-    color: #a94442; /* Dunkelroter Text */
-    font-weight: bold;
-}
+.row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.row input[type="text"], .row input[type="search"] { flex: 1; min-width: 140px; }
 
-
-    #pendingHuList.partial {
-        border-color: orange; /* Orange fÃ¼r "teilweise bearbeitet" */
-    }
-    #pendingHuList h4 {
-        margin-top: 0;
-        margin-bottom: 8px;
-        font-size: 1em;
-        color: #333;
-    }
-    #pendingHuList ul {
-        list-style-type: none;
-        padding: 0;
-        margin: 0;
-        max-height: 120px; /* Limitiert die HÃ¶he und macht die Liste scrollbar */
-        overflow-y: auto;
-        font-family: monospace;
-        font-size: 0.95em;
-    }
-    #pendingHuList li {
-        padding: 2px 4px;
-        border-bottom: 1px dotted #ccc;
-    }
-    #pendingHuList li:last-child {
-        border-bottom: none;
-    }
-    /* --- ENDE: NEUE STILE FÃR OFFENE HU-LISTE --- */
-/* IN DER DATEI DSV_LFS.html, INNERHALB DES <style>-TAGS */
-
-/* --- START: NEUE STILE FÃR OFFENE HU-ZUSAMMENFASSUNG --- */
-#openHusListContainer .hu-order-group {
-    margin-bottom: 15px;
-    border-left: 3px solid var(--info-color);
-    padding-left: 10px;
-}
-#openHusListContainer .hu-order-title {
-    font-size: 1.1em;
-    font-weight: bold;
-    color: var(--text-color);
-    border-bottom: 1px solid #eee;
-    padding-bottom: 5px;
-    margin-bottom: 8px;
-}
-#openHusListContainer .hu-list {
-    list-style-type: none;
-    padding-left: 5px;
-    font-family: monospace;
-}
-#openHusListContainer .hu-list li {
-    padding: 3px 0;
-}
-#openHusListContainer .no-open-hus-message {
-    text-align: center;
-    padding: 20px 0;
-    font-style: italic;
-    color: #555;
-}
-/* --- ENDE: NEUE STILE --- */
-/* IN DER DATEI DSV_LFS.html, INNERHALB DES <style>-TAGS */
-
-/* --- START: NEUES DESIGN FÃR SEITENMENÃ --- */
-.side-menu .side-menu-list {
-    list-style: none;
-    padding: 0;
-    margin: 0 0 15px 0; /* Abstand nach unten zur Statusmeldung */
-    display: flex;
-    flex-direction: column;
-    gap: 8px; /* Abstand zwischen den MenÃ¼punkten */
-}
-
-.side-menu .menu-action-item {
-    display: flex;
-    align-items: center;
-    padding: 12px 15px;
-    border-radius: 8px;
-    text-decoration: none;
-    font-weight: 500; /* Etwas dickere Schrift */
-    color: #333;
-    background-color: transparent;
-    border: 1px solid transparent; /* Platzhalter fÃ¼r den Hover-Effekt */
-    transition: all 0.2s ease-in-out;
-    cursor: pointer;
-}
-
-.side-menu .menu-action-item:hover {
-    background-color: #f4f4f4;
-    border-color: #e0e0e0;
-}
-
-/* Stil fÃ¼r die Icons */
-.side-menu .menu-action-item svg {
-    width: 22px;
-    height: 22px;
-    margin-right: 15px;
-    flex-shrink: 0; /* Verhindert, dass das Icon schrumpft */
-    fill: currentColor; /* Icon nimmt die Textfarbe an */
-}
-
-/* Spezielle Hover-Effekte fÃ¼r bestimmte Aktionen */
-
-/* PrimÃ¤re Aktion: Senden */
-.side-menu .menu-action-item.action-primary:hover {
-    background-color: #eef8ff;
-    color: var(--secondary-hover);
-    border-color: var(--secondary-color);
-}
-
-/* Wichtige Aktion: Zusammenfassung, Import */
-.side-menu .menu-action-item.action-warning:hover {
-    background-color: #fffaf0;
-    color: var(--warning-hover);
-    border-color: var(--warning-color);
-}
-
-/* Destruktive Aktion: ZurÃ¼cksetzen */
-.side-menu .menu-action-item.action-reset {
-    /* Kein spezieller Grundzustand, nur der Hover ist anders */
-}
-.side-menu .menu-action-item.action-reset:hover {
-    background-color: #fdeeee; /* Heller Rotton (Tippfehler korrigiert) */
-    color: var(--danger-color);
-    border-color: var(--danger-hover);
-}
-
-/* Die alten Button-Stile im MenÃ¼ werden nicht mehr gebraucht */
-.side-menu .main-action-button {
-    display: none; /* Versteckt die alten Buttons, falls sie noch da sind */
-}
-
-/* Besserer Stil fÃ¼r die Statusmeldung */
-.side-menu #sheetStatus {
-    margin-top: 10px;
-    padding: 10px;
-    border-radius: 5px;
-    background-color: #f8f9fa;
-    min-height: 1.2em;
-    font-weight: bold;
-    text-align: center;
-    border: 1px solid #eee;
-}
-/* --- ENDE: NEUES DESIGN FÃR SEITENMENÃ --- */
-/* --- START: NEUE STILE FÃR MODAL-TABS --- */
-.modal-tabs {
-    display: flex;
-    margin-bottom: 15px;
-    border-bottom: 2px solid #eee;
-    
-    /* NEU: Horizontales Scrollen aktivieren, wenn der Inhalt Ã¼berlÃ¤uft */
-    overflow-x: auto;
-    /* NEU: Verhindert, dass die Buttons in die nÃ¤chste Zeile umbrechen */
-    flex-wrap: nowrap;
-
-    /* Optional: Verbessert das Scroll-GefÃ¼hl auf iOS */
-    -webkit-overflow-scrolling: touch;
-
-    /* Optional: Gestaltet die Scrollleiste unauffÃ¤lliger */
-    scrollbar-width: thin;
-    scrollbar-color: #ccc transparent;
-}
-.modal-tab-btn {
-    /* ÃNDERUNG: 'flex: 1;' wird entfernt, damit die Buttons nicht mehr gezwungen werden, den Platz auszufÃ¼llen */
-    
-    padding: 10px 15px; /* Etwas mehr seitliches Padding fÃ¼r besseres Aussehen */
-    font-size: 0.95em;
-    font-weight: 500;
-    text-align: center;
-    border: none;
-    background-color: transparent;
-    color: #555;
-    cursor: pointer;
-    border-bottom: 3px solid transparent;
-    transition: all 0.2s ease-in-out;
-
-    /* NEU: Verhindert, dass die Buttons schrumpfen */
-    flex-shrink: 0;
-    /* NEU: Stellt sicher, dass der Text im Button nicht umbricht */
-    white-space: nowrap;
-}
-.modal-tabs::-webkit-scrollbar {
-    height: 4px; /* HÃ¶he der Scrollleiste */
-}
-.modal-tabs::-webkit-scrollbar-thumb {
-    background-color: #ccc; /* Farbe des Scroll-Balkens */
-    border-radius: 4px;
-}
-modal-tabs::-webkit-scrollbar-track
-.modal-tab-btn:hover {
-    background-color: #f9f9f9;
-    color: var(--primary-color);
-}
-.modal-tab-btn.active {
-    color: var(--primary-color);
-    font-weight: bold;
-    border-bottom-color: var(--primary-color);
-}
-/* --- ENDE: NEUE STILE FÃR MODAL-TABS --- */
-/* --- START: NEUE STILE FÃR VOLLBILD-MODAL --- */
-
-/* Diese Klasse wird per JavaScript zum <body> hinzugefÃ¼gt, wenn ein Modal offen ist */
-body.modal-open {
-    overflow: hidden; /* Verhindert das Scrollen des Hintergrunds */
-}
-
-/* Passt das Aussehen des Modal-Inhalts an, um den Bildschirm auszufÃ¼llen */
-.modal-content {
+input[type="text"], input[type="search"], textarea, select {
     width: 100%;
-    height: 100%;
-    max-width: 100%; /* Ãberschreibt die alte Breitenbegrenzung */
-    margin: 0;
-    border: none;
-    border-radius: 0; /* Entfernt abgerundete Ecken fÃ¼r den Vollbild-Look */
-    box-shadow: none;
-    
-    /* Flexbox-Layout, um Header, Inhalt und Footer besser zu steuern */
-    display: flex;
-    flex-direction: column;
-    padding: 15px; /* Etwas Padding fÃ¼r den Inhalt */
-    box-sizing: border-box;
-}
-
-/* Sorgt dafÃ¼r, dass der scrollbare Bereich im Modal den verfÃ¼gbaren Platz einnimmt */
-#openHusListContainer, 
-#missingReceiptHusListContainer,
-#editModal .form-group,
-#importHuModal .form-group:nth-of-type(2) /* Zielt auf den Container der Textarea */ {
-    flex-grow: 1; /* Dieser Bereich dehnt sich aus */
-    overflow-y: auto; /* Nur dieser Bereich wird scrollbar, nicht das ganze Modal */
-    min-height: 0; /* Wichtiger Fix fÃ¼r Flexbox-Scrolling */
-}
-
-/* Stellt sicher, dass die Textarea im Import-Modal den ganzen Platz ausfÃ¼llt */
-#huListTextarea {
-    flex-grow: 1;
-    height: 100%;
-}
-
-/* Die Aktions-Buttons am Ende sollen nicht mitwachsen */
-.modal-actions {
-    flex-shrink: 0;
-    margin-top: 15px;
-}
-/* --- ENDE: NEUE STILE FÃR VOLLBILD-MODAL --- */
-/* --- NEU: Styling fÃ¼r perfekt ausgerichtete Listen im Modal --- */
-#openHusListContainer .hu-list li,
-#missingReceiptHusListContainer .hu-list li,
-#dunkelalarmHusListContainer .hu-list li {
-    display: flex;
-    align-items: flex-start; /* Stellt sicher, dass die Zeilen oben beginnen */
-    padding: 3px 0; /* Etwas mehr vertikaler Abstand */
-}
-
-/* --- Styling fÃ¼r perfekt ausgerichtete Listen --- */
-/* Gilt fÃ¼r Modal UND Detailansicht */
-#openHusListContainer .hu-list li,
-#missingReceiptHusListContainer .hu-list li,
-#dunkelalarmHusListContainer .hu-list li,
-#pendingHuList .hu-list li {
-    display: flex;
-    align-items: flex-start;
-    padding: 3px 0;
-}
-
-/* Basis-Styling fÃ¼r die Positionsnummer */
-#openHusListContainer .hu-list .position-number,
-#missingReceiptHusListContainer .hu-list .position-number,
-#dunkelalarmHusListContainer .hu-list .position-number,
-#pendingHuList .hu-list .position-number {
-    min-width: 2.5em;
-    text-align: right;
-    padding-right: 0.75em; /* Standard-Abstand */
-    flex-shrink: 0;
-    color: #888;
-}
-
-/* --- HIER IST DIE SPEZIFISCHE ÃBERSCHREIBUNG --- */
-/* Diese Regel erhÃ¶ht den Abstand NUR fÃ¼r die pendingHuList in der Detailansicht */
-#pendingHuList .hu-list .position-number {
-    padding-right: 1.5em; /* GrÃ¶Ãerer Abstand */
-}
-.batch-sound-toggle-container {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    gap: 10px;
-    margin-top: 15px; /* Etwas Abstand nach oben */
-    font-size: 0.9em;
-}
-.batch-sound-toggle-container label {
-    margin-bottom: 0;
-    font-weight: normal;
-    cursor: pointer;
-}
-/* --- NEU: Layout fÃ¼r zweizeilige Scan-EintrÃ¤ge --- */
-#currentShipmentDetails li {
-    display: flex;
-    flex-wrap: wrap; /* Erlaubt den Zeilenumbruch */
-    align-items: center;
-    position: relative;
-    padding-right: 70px; /* Platz fÃ¼r den Storno-Button */
-}
-
-#currentShipmentDetails .scan-main-info {
-    flex-grow: 1; /* Nimmt den verfÃ¼gbaren Platz in der ersten Zeile ein */
-    white-space: nowrap; /* Verhindert Zeilenumbruch innerhalb dieser Zeile */
-    overflow: hidden;
-    text-overflow: ellipsis; /* ... falls es doch zu lang wird */
-}
-
-#currentShipmentDetails .scan-actions-and-notes {
-    flex-basis: 100%; /* Erzwingt, dass dieser Block immer eine neue Zeile beginnt */
-    padding-left: 1.5em; /* Kleine EinrÃ¼ckung fÃ¼r die Notizen */
-    padding-top: 4px; /* Etwas Abstand nach oben */
-}
-/* INNERHALB des <style> Tags */
-
-.hu-value.has-dunkelalarm {
-    color: red;
-    font-weight: bold;
-}
-.sendnr-display {
-    color: #666;
-    font-size: 0.9em;
-    font-style: italic;
-    margin-left: 8px;
-}
-
-/* --- NEU: Styling fÃ¼r die tabellarische Pending-Liste --- */
-.pending-list-header {
-    display: flex;
-    justify-content: space-between;
-    font-weight: bold;
-    color: #333;
-    font-size: 0.9em;
-    padding: 4px 8px;
-    border-bottom: 2px solid #ccc;
-    margin-bottom: 4px;
-}
-.pending-list-header span:first-child {
-    flex-basis: 55%;
-    text-align: left;
-}
-.pending-list-header span:last-child {
-    flex-basis: 45%;
-    text-align: left;
-}
-
-#pendingHuList .hu-list li {
-    display: flex;
-    align-items: center; /* Vertikal zentrieren */
-}
-
-.pending-item-details {
-    display: flex;
-    justify-content: space-between;
-    width: 100%;
-}
-
-.pending-item-details .pending-vse {
-    flex-basis: 55%;
-    text-align: left;
-    font-weight: bold;
-}
-
-.pending-item-details .pending-sendnr {
-    flex-basis: 45%;
-    text-align: left;
-    color: #555;
-    font-style: italic;
-    font-size: 0.95em;
-}
-/* --- NEU: Styling fÃ¼r VVL-Anzeige im "Offene HUs"-Modal --- */
-
-/* Titel-Formatierung fÃ¼r VVL */
-.hu-order-group .hu-order-title small {
-    font-weight: normal;
-    font-size: 0.9em;
-    color: #555;
-}
-
-/* Kopfzeile fÃ¼r die VVL-Tabelle */
-.hu-list-header {
-    display: flex;
-    font-weight: bold;
-    font-size: 0.9em;
-    padding: 5px 0 5px 5px;
-    border-bottom: 2px solid #ddd;
-    margin-bottom: 5px;
-    color: #333;
-}
-.hu-list-header span:first-child {
-    flex: 2; /* VSE-Spalte bekommt mehr Platz */
-}
-.hu-list-header span:last-child {
-    flex: 1; /* Sendnr-Spalte bekommt weniger Platz */
-}
-
-/* Styling fÃ¼r die Zeilen in der VVL-Tabelle */
-.hu-list.vvl-list li {
-    padding: 4px 0 4px 5px;
-    border-bottom: 1px dotted #eee;
-}
-.hu-list.vvl-list li:last-child {
-    border-bottom: none;
-}
-
-.vvl-item-row {
-    display: flex;
-    width: 100%;
-}
-.vvl-item-row .vvl-vse {
-    flex: 2; /* VSE-Spalte */
-    font-family: monospace;
-    font-weight: bold;
-}
-.vvl-item-row .vvl-sendnr {
-    flex: 1; /* Sendnr-Spalte */
-    font-family: monospace;
-    color: #666;
-    font-size: 0.95em;
-}
-/* --- NEU & OPTIMIERT: Einheitliches Tabellen-Layout fÃ¼r offene Positionen --- */
-
-/* Gemeinsamer Stil fÃ¼r die Kopfzeile in der Detailansicht und im Modal */
-.pending-list-header,
-.hu-list-header {
-    display: flex;
-    font-weight: bold;
-    color: #333;
-    font-size: 0.9em;
-    padding: 4px 8px;
-    border-bottom: 2px solid #ccc;
-    margin-bottom: 4px;
-}
-.pending-list-header span:first-child,
-.hu-list-header span:first-child {
-    flex-basis: 55%;
-    text-align: left;
-}
-.pending-list-header span:last-child,
-.hu-list-header span:last-child {
-    flex-basis: 45%;
-    text-align: left;
-}
-
-/* Gemeinsamer Stil fÃ¼r ListeneintrÃ¤ge */
-#pendingHuList .hu-list li,
-.hu-order-group .hu-list.vvl-list li {
-    padding: 4px 8px;
-    border-bottom: 1px dotted #eee;
-}
-.hu-order-group .hu-list.vvl-list li:last-child {
-    border-bottom: none;
-}
-
-
-/* Gemeinsamer Stil fÃ¼r die zweispaltige Zeile */
-.pending-item-details,
-.vvl-item-row {
-    display: flex;
-    justify-content: space-between;
-    width: 100%;
-}
-
-/* Gemeinsamer Stil fÃ¼r die VSE-Spalte */
-.pending-item-details .pending-vse,
-.vvl-item-row .vvl-vse {
-    flex-basis: 55%;
-    text-align: left;
-    font-family: monospace;
-    font-weight: bold;
-}
-
-/* Gemeinsamer Stil fÃ¼r die Sendnr-Spalte */
-.pending-item-details .pending-sendnr,
-.vvl-item-row .vvl-sendnr {
-    flex-basis: 45%;
-    text-align: left;
-    font-family: monospace;
-    color: #555;
-    font-style: italic;
-    font-size: 0.95em;
-}
-/* --- START DER ÃNDERUNG: Batch Scan Feedback Modal --- */
-
-/* --- START DER ÃNDERUNG: Batch Scan Feedback Modal Stile --- */
-/* --- START DER ÃNDERUNG: Batch Scan Feedback Modal Stile --- */
-#batchScanFeedbackModal .modal-content {
-    background-color: black;
-    padding: 20px;
-    box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
-}
-
-#batchScanFeedbackModal .modal-content.unexpected {
-    box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
-}
-
-#batchScanFeedbackModal h3 {
-    color: black;
-    margin-bottom: 20px;
-}
-/* --- START DER ÃNDERUNG: Close-Button Icon Stil --- */
-.close-modal-icon-btn {
-    position: absolute; /* Absolut positioniert innerhalb des .modal-content */
-    top: 15px; /* Abstand vom oberen Rand */
-    right: 15px; /* Abstand vom rechten Rand */
-    background: none; /* Kein Hintergrund */
-    border: none; /* Kein Rahmen */
-    color: #bbb; /* Standardfarbe des Icons */
-    cursor: pointer;
-    font-size: 1.8em; /* GrÃ¶Ãe des Icons */
-    padding: 0;
-    width: 30px; /* Breite fÃ¼r Click-Bereich */
-    height: 30px; /* HÃ¶he fÃ¼r Click-Bereich */
-    display: flex; /* Flexbox fÃ¼r Zentrierung des SVG */
-    justify-content: center;
-    align-items: center;
-    transition: color 0.2s, transform 0.2s; /* Ãbergang fÃ¼r Hover-Effekt */
-    z-index: 10; /* Sicherstellen, dass es Ã¼ber anderen Inhalten liegt */
-}
-
-.close-modal-icon-btn:hover {
-    color: white; /* WeiÃer auf Schwarz bei Hover */
-    transform: scale(1.1); /* Leicht vergrÃ¶Ãern bei Hover */
-}
-
-.close-modal-icon-btn svg {
-    fill: currentColor; /* SVG-Farbe folgt der Textfarbe des Buttons */
-    width: 24px; /* GrÃ¶Ãe des SVG-Icons */
-    height: 24px;
-}
-/* --- ENDE DER ÃNDERUNG: Close-Button Icon Stil --- */
-
-/* Optional: Titel des Modals leicht anpassen, damit er nicht mit dem X-Icon kollidiert */
-#batchScanFeedbackModal h3 {
-    padding-right: 40px; /* Platz fÃ¼r das X-Icon schaffen */
-    text-align: center;
-}
-/* --- START DER ÃNDERUNG: Batch Scan Feedback Modal Stile (Font Sizing Vorbereitung) --- */
-#batchScanFeedbackModal .modal-content {
-    background-color: black;
-    padding: 20px;
-    box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
-}
-
-#batchScanFeedbackModal .modal-content.unexpected {
-    box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
-}
-
-
-
-/* --- START DER ÃNDERUNG: feedbackScanNumber responsive SchriftgrÃ¶Ãe --- */
-#feedbackScanNumber {
-    /* Vorherige Eigenschaften beibehalten: */
-    font-weight: bold;
-    text-align: center;
-    word-break: break-all; /* Wichtig, damit lange Nummern umbrechen, falls nÃ¶tig */
-    color: lime;
-    background-color: black;
-    padding: 10px 0px;
+    min-height: 46px;
+    padding: 8px 12px;
+    font-size: 16px;
+    color: var(--text);
+    background: var(--input-bg);
+    border: 2px solid var(--border);
     border-radius: 10px;
-    margin-bottom: 10px;
-    min-width: 80%;
-
-    /* NEU: Responsive SchriftgrÃ¶Ãe */
-    /* clamp(minimale GrÃ¶Ãe, responsive GrÃ¶Ãe (vw), maximale GrÃ¶Ãe) */
-    /* Hier: min. 1.8em, skaliert mit 8vw (8% der Viewport-Breite), max. 3.5em */
-    font-size: clamp(2.5em, 8vw, 3.5em);
-    
-    /* NEU: Flexbox verwenden, um den Text zu zentrieren und bei Bedarf zu schrumpfen */
-    display: flex; /* Macht das Element zu einem Flex-Container */
-    justify-content: center; /* Zentriert horizontal */
-    align-items: center; /* Zentriert vertikal */
-    line-height: 1.2; /* Etwas kleinerer Zeilenabstand */
+}
+textarea { resize: vertical; }
+label { font-size: 0.92rem; }
+input:focus, textarea:focus, select:focus, button:focus-visible {
+    outline: 3px solid var(--primary-color);
+    outline-offset: 1px;
 }
 
-/* Anpassung fÃ¼r unerwartete Scans, falls noch nicht erfolgt */
-#feedbackScanNumber.unexpected {
-    color: red;
+/* ---------- Buttons ---------- */
+.btn {
+    min-height: 48px;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+    cursor: pointer;
 }
-/* --- ENDE DER ÃNDERUNG: feedbackScanNumber responsive SchriftgrÃ¶Ãe --- */
+.btn.primary { background: var(--primary-color); }
+.btn.primary:active { background: var(--primary-hover); }
+.btn.warning { background: var(--warning-color); }
+.btn.warning:active { background: var(--warning-hover); }
+.btn.danger { background: var(--danger-color); }
+.btn.danger:active { background: var(--danger-hover); }
+.btn.info { background: var(--info-color); }
+.btn.info:active { background: var(--info-hover); }
+.btn.secondary { background: var(--border); color: var(--text); }
+.btn.small { min-height: 40px; font-size: 14px; padding: 4px 12px; }
+.btn.square { min-width: 48px; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
-/* --- START DER ÃNDERUNG: feedbackCarrier linksbÃ¼ndig --- */
-#feedbackCarrier {
-    font-size: 1.0em;
-    color: #ccc;
-    text-align: left; /* GEÃNDERT */
-    word-break: break-all;
-    font-style: italic;
-    margin-top: 5px;
-    width: 100%; /* Sicherstellen, dass es die volle Breite einnimmt, um linksbÃ¼ndig zu wirken */
-    padding-left: 20px; /* Optional: Leichte EinrÃ¼ckung von links, passend zum Padding des Modals */
-    padding-right: 20px; /* Optional: Auch rechts ein Padding fÃ¼r Symmetrie, wenn breiter */
-    box-sizing: border-box; /* Sicherstellen, dass Padding in der Breite enthalten ist */
+.icon-btn {
+    min-width: 48px;
+    min-height: 48px;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    background: var(--input-bg);
+    color: var(--text);
+    font-size: 20px;
+    cursor: pointer;
 }
-/* --- ENDE DER ÃNDERUNG: feedbackCarrier linksbÃ¼ndig --- */
-/* --- ENDE DER ÃNDERUNG: Batch Scan Feedback Modal --- */
-/* --- NEU: Styling fÃ¼r Positionen mit Dunkelalarm in der "Offene HUs"-Ansicht --- */
-.hu-value.has-dunkelalarm,
-.pending-vse.has-dunkelalarm {
-    color: var(--danger-color);
-    font-weight: bold;
-}
-/* --- NEU: Styling fÃ¼r die VVL-Anzeige in der Haupttabelle --- */
-.vvl-table-entry {
-    font-size: 0.9em;
-    line-height: 1.4;
-}
-.vvl-table-entry .vvl-prefix,
-.vvl-table-entry .kundennr-prefix {
-    font-weight: normal;
-    color: #666;
-}
-/* --- NEU: Styling fÃ¼r die Trennlinie in der "Ãbersicht"-Spalte --- */
-.summary-cell {
-    padding-top: 12px; /* Etwas mehr Platz oben */
-    padding-bottom: 12px; /* Etwas mehr Platz unten */
-}
-.summary-divider {
-    width: 100%; /* Volle Breite der Zelle */
-    height: 1px; /* Dicke der Linie */
-    background-color: #e0e0e0; /* Farbe der Linie */
-    margin: 8px 0; /* Vertikaler Abstand oben und unten */
-}
+.icon-btn:active { background: var(--border); }
+.icon-btn.tiny { min-width: 34px; min-height: 34px; font-size: 14px; border-width: 1px; }
+.icon-btn.small { min-width: 40px; min-height: 40px; font-size: 16px; }
 
-/* --- NEU: Styling fÃ¼r Tab-Notification-Badges (Vorschlag 1) --- */
-.modal-tab-btn {
-    position: relative; /* Wichtig fÃ¼r die Positionierung des Badges */
-    padding-right: 25px; /* Etwas mehr Platz fÃ¼r den Badge */
-}
-
-.tab-badge {
-    position: absolute;
-    top: 50%;
-    right: 8px;
-    transform: translateY(-50%);
-    background-color: var(--danger-color);
-    color: white;
-    font-size: 0.75em; /* Kleinere Schrift */
-    font-weight: bold;
-    padding: 2px 6px;
-    border-radius: 10px; /* Macht es zu einer Pille */
-    min-width: 10px; /* Sorgt dafÃ¼r, dass auch eine '1' gut aussieht */
-    text-align: center;
-    line-height: 1.2;
-    transition: transform 0.2s ease-in-out;
-}
-
-/* Versteckt den Badge, wenn er leer ist */
-.tab-badge.hidden {
-    transform: translateY(-50%) scale(0); /* SchÃ¶ner Ausblend-Effekt */
-    opacity: 0;
-}
-/* ===== NEUE STILE FÃR DEN LADE-SPINNER ===== */
-
-/* Das Overlay, das den gesamten Bildschirm abdeckt */
+/* ---------- Lade-Overlay ---------- */
 .loading-overlay {
-    position: fixed; /* Bleibt an Ort und Stelle, auch beim Scrollen */
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(255, 255, 255, 0.7); /* Leicht durchsichtiger weiÃer Hintergrund */
-    display: flex; /* Zentriert den Spinner */
-    justify-content: center;
-    align-items: center;
-    z-index: 9999; /* Stellt sicher, dass es Ã¼ber allem anderen liegt */
-    
-    /* StandardmÃ¤Ãig unsichtbar */
-    visibility: hidden;
-    opacity: 0;
-    transition: opacity 0.3s, visibility 0.3s;
+    position: fixed; inset: 0; z-index: 1000;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(15, 23, 42, 0.55);
 }
-
-/* Sichtbarer Zustand fÃ¼r das Overlay */
-.loading-overlay.visible {
-    visibility: visible;
-    opacity: 1;
-}
-
-/* Der eigentliche Spinner (das sich drehende Rad) */
 .spinner {
-    width: 60px;
-    height: 60px;
-    border: 8px solid #f3f3f3; /* Der hellgraue Kreis */
-    border-top: 8px solid #3498db; /* Die blaue Farbe, die sich dreht */
+    width: 46px; height: 46px;
+    border: 5px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #fff;
     border-radius: 50%;
-    animation: spin 1s linear infinite; /* Die Dreh-Animation */
+    animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---------- Top-Bar ---------- */
+.top-bar {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 14px;
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+.top-bar-title { font-weight: 800; font-size: 1.05rem; flex: 1; }
+.top-bar-batch { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; font-weight: 600; }
+
+/* ---------- Toggle-Switch ---------- */
+.toggle-switch { position: relative; display: inline-block; width: 52px; height: 30px; flex: none; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-switch .slider {
+    position: absolute; inset: 0;
+    background: #94a3b8; border-radius: 30px; transition: 0.2s;
+}
+.toggle-switch .slider::before {
+    content: ""; position: absolute; left: 3px; top: 3px;
+    width: 24px; height: 24px; background: #fff; border-radius: 50%;
+    transition: 0.2s;
+}
+.toggle-switch input:checked + .slider { background: var(--primary-color); }
+.toggle-switch input:checked + .slider::before { transform: translateX(22px); }
+.toggle-switch input:disabled + .slider { opacity: 0.5; }
+.toggle-switch.small { width: 44px; height: 26px; }
+.toggle-switch.small .slider::before { width: 20px; height: 20px; }
+.toggle-switch.small input:checked + .slider::before { transform: translateX(18px); }
+
+/* ---------- Karten ---------- */
+.card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
-/* Die Keyframe-Animation fÃ¼r die Drehung */
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+/* ---------- Scan-Bereich ---------- */
+.scan-row { display: flex; gap: 8px; align-items: stretch; }
+.input-wrap { position: relative; flex: 1; }
+#shipmentNumberInput {
+    font-family: ui-monospace, "Courier New", monospace;
+    font-size: 18px;
+    text-transform: uppercase;
+    padding-right: 44px;
+    min-height: 50px;
 }
-/* ===== ENDE DER NEUEN SPINNER-STILE ===== */
-/* ===== ENDE DER NEUEN SPINNER-STILE ===== */
-
-/* --- START: NEUE STILE FÃR HU-DETAIL-MODAL --- */
-/* NEU: Diese Regel Ã¼berschreibt die Zentrierung NUR fÃ¼r das HU-Detail-Modal */
-#huDetailsModal {
-    align-items: flex-start; /* Richtet das Modal oben aus statt in der Mitte */
-    padding-top: 20px;       /* FÃ¼gt einen kleinen Abstand zum oberen Bildschirmrand hinzu */
+.clear-btn {
+    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    width: 36px; height: 36px;
+    border: none; border-radius: 50%;
+    background: var(--border); color: var(--text);
+    font-size: 20px; font-weight: 700; line-height: 1;
+    cursor: pointer;
 }
+.note-btn.active { background: var(--warning-color); border-color: var(--warning-hover); color: #fff; }
 
-#huDetailsModal .modal-content {
-    max-width: 400px; /* Eine passende Breite fÃ¼r das kleine Info-Modal */
-    width: 90%;
-    height: auto; /* HÃ¶he passt sich dem Inhalt an */
-    max-height: 80vh;
-    border-radius: 8px; /* Ecken wieder abrunden */
-}
-
-#huDetailsContent dl {
-    margin: 10px 0;
-    padding: 0;
-}
-
-#huDetailsContent dt {
-    font-weight: bold;
-    color: #555;
+.new-shipment, .note-section {
     margin-top: 12px;
-    font-size: 0.9em;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--batch-bg);
+    border: 1px dashed var(--batch-border);
 }
 
-#huDetailsContent dd {
-    margin-left: 0;
+.status-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.status-row select { flex: 1; min-width: 160px; font-weight: 700; }
+
+.combo-line { display: none; }
+.combo-line.visible { display: block; }
+.combo-label { display: flex; align-items: center; gap: 8px; font-weight: 600; min-height: 48px; }
+.combo-label input { width: 22px; height: 22px; }
+
+/* ---------- Feedback-Meldungen ---------- */
+.feedback-message { display: none; margin-top: 10px; border-radius: 8px; padding: 10px 12px; font-weight: 600; }
+.feedback-message.visible { display: block; }
+.feedback-message.success { background: var(--success-bg); color: var(--success-text); }
+.feedback-message.error { background: var(--error-bg); color: var(--error-text); }
+
+/* ---------- Batch-Bereich ---------- */
+.batch-area {
+    background: var(--batch-bg);
+    border: 1px solid var(--batch-border);
+    border-radius: 14px;
+    padding: 12px;
+    margin-bottom: 12px;
+}
+.batch-title { margin-bottom: 4px; }
+.batch-count { font-size: 0.85rem; color: var(--muted); margin-bottom: 8px; font-weight: 600; }
+.batch-list {
+    font-family: ui-monospace, "Courier New", monospace;
+    font-size: 13px;
+    max-height: 150px;
+    overflow-y: auto;
+    background: var(--card);
+    border: 1px solid var(--batch-border);
+    border-radius: 8px;
+    padding: 4px;
+}
+.batch-entry {
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    padding: 5px 6px;
+    border-bottom: 1px dashed var(--batch-border);
+}
+.batch-entry:last-child { border-bottom: none; }
+.batch-entry .entry-meta { color: var(--muted); font-size: 11px; }
+
+.extra-toggles {
+    display: flex; gap: 10px; flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+.toggle-label {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 8px 12px; font-size: 0.88rem; font-weight: 600;
+    flex: 1; min-width: 180px;
+}
+
+/* ---------- Suche ---------- */
+.search-input { margin-bottom: 12px; }
+
+/* ---------- Sendungsliste ---------- */
+.shipment-list { display: flex; flex-direction: column; gap: 10px; }
+.empty-hint { color: var(--muted); text-align: center; padding: 18px 8px; }
+
+.shipment-card { padding: 0; overflow: hidden; }
+.shipment-card.selected { border-color: var(--primary-color); box-shadow: 0 0 0 2px var(--primary-color); }
+.shipment-card-header {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    width: 100%; padding: 12px 14px;
+    background: none; border: none; color: inherit;
+    text-align: left; font-size: 1rem; cursor: pointer;
+}
+.shipment-number { font-family: ui-monospace, "Courier New", monospace; font-weight: 700; font-size: 1rem; word-break: break-all; }
+.counter { margin-left: auto; font-weight: 800; font-size: 0.95rem; white-space: nowrap; }
+.progress-track {
+    flex: 1 1 100%; height: 8px;
+    background: var(--border); border-radius: 6px; overflow: hidden;
+}
+.progress-fill { display: block; height: 100%; width: 0; background: var(--primary-color); transition: width 0.25s; }
+.progress-fill.done { background: var(--success-color); }
+.parent-badge, .chip-hu {
+    font-size: 0.72rem; font-weight: 700;
+    padding: 2px 8px; border-radius: 999px;
+    background: var(--batch-bg); color: var(--info-color);
+    border: 1px solid var(--batch-border);
+}
+.shipment-card-actions {
+    display: flex; gap: 8px;
+    padding: 0 14px 12px;
+}
+
+/* ---------- Detailansicht ---------- */
+.details-placeholder { color: var(--muted); text-align: center; padding: 10px 0; }
+.details-header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.details-header .shipment-number { font-size: 1.1rem; }
+.details-list { font-family: ui-monospace, "Courier New", monospace; font-size: 14px; }
+.detail-item { border-bottom: 1px solid var(--border); padding: 8px 0; }
+.detail-item:last-child { border-bottom: none; }
+.detail-item.dunkelalarm .item-number { color: var(--danger-color); font-weight: 800; }
+.detail-item-main { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.item-number { font-weight: 700; word-break: break-all; }
+.item-timestamp { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.kombi { font-style: italic; color: #7c3aed; font-weight: 700; }
+.item-note {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+    font-style: italic; color: #3b6fa0;
+    padding-left: 18px; margin-top: 4px; font-size: 13px;
+}
+.note-text { cursor: pointer; text-decoration: underline dotted; }
+.note-inline-editor {
+    min-height: 34px; font-size: 13px; font-style: italic;
+    flex: 1; min-width: 120px;
+}
+
+/* ---------- Status-Chips ---------- */
+.status-chip {
+    display: inline-block; padding: 2px 10px;
+    border-radius: 999px; font-size: 12px; font-weight: 800;
+    white-space: nowrap;
+}
+.chip-XRY { background: #dbeafe; color: #1e40af; }
+.chip-ETD { background: #cffafe; color: #155e75; }
+.chip-EDD { background: #fae8ff; color: #86198f; }
+.chip-Wareneingang { background: #e0e7ff; color: #3730a3; }
+.chip-Dunkelalarm { background: #fee2e2; color: #b91c1c; }
+.chip-Anstehend { background: #fef9c3; color: #854d0e; }
+.chip-NichtSichern { background: #e2e8f0; color: #334155; }
+.chip-Abgelehnt { background: #ffedd5; color: #9a3412; }
+
+/* ---------- Seitenmenü ---------- */
+.menu-overlay {
+    position: fixed; inset: 0; z-index: 250;
+    background: rgba(15, 23, 42, 0.45);
+}
+.side-menu {
+    position: fixed; top: 0; left: 0; bottom: 0; z-index: 300;
+    width: min(82vw, 320px);
+    background: var(--card);
+    padding: 16px 14px;
+    overflow-y: auto;
+    transform: translateX(-105%);
+    transition: transform 0.25s ease;
+    box-shadow: 4px 0 16px rgba(0, 0, 0, 0.25);
+}
+.side-menu.open { transform: translateX(0); }
+.side-menu h2 { border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+.menu-btn {
+    display: flex; align-items: center; gap: 10px;
+    width: 100%; min-height: 48px;
+    margin-bottom: 8px; padding: 8px 12px;
+    border: none; border-radius: 10px;
+    font-size: 15px; font-weight: 700; color: #fff;
+    cursor: pointer; text-align: left;
+}
+.menu-btn.warning { background: var(--warning-color); }
+.menu-btn.warning:active { background: var(--warning-hover); }
+.menu-btn.info { background: var(--info-color); }
+.menu-btn.info:active { background: var(--info-hover); }
+.menu-btn.primary { background: var(--primary-color); }
+.menu-btn.primary:active { background: var(--primary-hover); }
+.menu-btn.danger { background: var(--danger-color); }
+.menu-btn.danger:active { background: var(--danger-hover); }
+.menu-btn.small-menu-btn { min-height: 40px; font-size: 13px; }
+.sheet-status { font-weight: 700; text-align: center; min-height: 20px; margin: 2px 0 10px; font-size: 0.9rem; }
+.sheet-status.success { color: var(--success-text); }
+.sheet-status.error { color: var(--error-text); }
+.sheet-status.info { color: var(--info-color); }
+
+/* ---------- LKW-Bereich ---------- */
+.lkw-section { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 4px; }
+.lkw-entry {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 10px 8px;
+    border-bottom: 1px dashed var(--border);
+    user-select: none;
+}
+.lkw-name { font-family: ui-monospace, "Courier New", monospace; font-weight: 700; word-break: break-all; }
+.lkw-current { font-size: 0.7rem; color: var(--success-color); font-style: italic; }
+.lkw-entry.active .lkw-name { color: var(--success-color); }
+.lkw-hint { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+
+/* ---------- Modals ---------- */
+.modal-overlay {
+    position: fixed; inset: 0; z-index: 400;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(15, 23, 42, 0.55);
+    padding: 16px;
+}
+.modal-content {
+    position: relative;
+    width: 100%; max-width: 430px;
+    max-height: 86vh; overflow-y: auto;
+    background: var(--card);
+    border-radius: 14px;
+    padding: 16px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+.modal-content label { display: block; margin: 10px 0 4px; font-weight: 600; }
+.modal-close {
+    position: absolute; top: 8px; right: 8px;
+    width: 38px; height: 38px;
+    border: none; border-radius: 50%;
+    background: var(--border); color: var(--text);
+    font-size: 20px; font-weight: 800; line-height: 1;
+    cursor: pointer;
+}
+.hu-import-status { min-height: 20px; margin: 8px 0 4px; font-weight: 700; font-size: 0.9rem; }
+.hu-import-status.error { color: var(--error-text); }
+.hu-import-status.success { color: var(--success-text); }
+
+/* ---------- Offene-HUs-Modal ---------- */
+.hus-tabs { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+.hus-tab {
+    flex: 1; min-height: 42px;
+    border: 2px solid var(--border); border-radius: 10px;
+    background: var(--card); color: var(--text);
+    font-size: 13px; font-weight: 700; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
     padding: 4px 8px;
-    background-color: #f4f4f4;
-    border-radius: 4px;
-    border: 1px solid #eee;
-    font-family: monospace;
-    font-size: 1.05em;
+}
+.hus-tab.active { border-color: var(--primary-color); background: var(--primary-color); color: #fff; }
+.hus-tab-content { font-size: 14px; }
+.hus-order-header {
+    font-family: ui-monospace, "Courier New", monospace;
+    font-weight: 800; margin: 10px 0 4px;
     word-break: break-all;
 }
-/* --- ENDE: NEUE STILE FÃR HU-DETAIL-MODAL --- */
-/* ===== START DER ÃNDERUNG: Stile fÃ¼r die neue Detailansicht ===== */
-
-/* Versteckt die Hauptansicht, wenn die Detailansicht aktiv ist */
-#mainView.hidden {
-    display: none;
-}
-
-/* Container fÃ¼r die Detailansicht */
-.detail-view-container {
-    display: none; /* StandardmÃ¤Ãig versteckt */
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: #f4f4f4; /* Gleicher Hintergrund wie body */
-    z-index: 100; /* Liegt Ã¼ber dem normalen Inhalt, aber unter Modals */
-    flex-direction: column;
-}
-
-.detail-view-container.visible {
-    display: flex; /* Sichtbar machen */
-}
-
-
-
-.detail-view-header h2 {
-    margin: 0;
-    font-size: 1.2em;
-    text-align: center;
-    flex-grow: 1; /* Nimmt den restlichen Platz ein */
-}
-
-/* ZurÃ¼ck-Button */
-.detail-view-header .back-button {
-    background: none;
-    border: none;
+.hus-entry {
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    padding: 6px 8px;
+    border-bottom: 1px dashed var(--border);
+    font-family: ui-monospace, "Courier New", monospace;
+    font-size: 13px;
     cursor: pointer;
-    padding: 5px;
-    margin-right: 10px;
+}
+.hus-entry.dunkelalarm { color: var(--danger-color); font-weight: 700; }
+.badge {
+    display: inline-block; min-width: 22px; padding: 1px 7px;
+    border-radius: 999px;
+    background: var(--danger-color); color: #fff;
+    font-size: 12px; font-weight: 800; text-align: center;
 }
 
-.detail-view-header .back-button svg {
-    width: 28px;
-    height: 28px;
-    fill: var(--text-color);
-}
+/* ---------- HU-Details ---------- */
+.hu-details-list { margin: 0; }
+.hu-details-list div { display: flex; gap: 10px; padding: 7px 0; border-bottom: 1px dashed var(--border); }
+.hu-details-list dt { font-weight: 700; min-width: 110px; }
+.hu-details-list dd { margin: 0; font-family: ui-monospace, "Courier New", monospace; word-break: break-all; }
 
-/* Scrollbarer Inhaltsbereich */
-.detail-view-content {
-    flex-grow: 1; /* FÃ¼llt den restlichen Platz aus */
-    overflow-y: auto; /* Macht den Inhalt scrollbar */
-    padding: 10px;
+/* ---------- Batch-Feedback ---------- */
+.feedback-card { text-align: center; max-width: 300px; }
+.batch-feedback-text {
+    font-family: ui-monospace, "Courier New", monospace;
+    font-size: 16px; font-weight: 700;
+    margin-bottom: 14px; word-break: break-all;
 }
-
-/* Wir "stehlen" das Styling von #currentShipmentDetails fÃ¼r unsere neue Ansicht */
-.detail-view-content #currentShipmentDetails {
-    margin-top: 0; /* Kein extra Abstand oben */
-}
-/* ===== ENDE DER ÃNDERUNG ===== */
-/* FÃ¼gen Sie dies am Ende Ihrer styles.css Datei hinzu */
-
-/* =============================================================== */
-/* NEU: Stile fÃ¼r die Master-Detail-Ansicht                        */
-/* =============================================================== */
-
-/* =============================================================== */
-/* KORREKTE STILE FÃR ANSICHTEN & MODALS                           */
-/* =============================================================== */
-
-/* Versteckt ein Element zuverlÃ¤ssig */
-.hidden {
-    display: none !important;
-}
-
-/* Container fÃ¼r die Detailansicht */
-#detailView {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: #f4f4f4;
-    z-index: 100; /* Liegt UNTER den Modals */
-    overflow-y: auto;
-    padding: 10px;
-    box-sizing: border-box;
-}
-
-/* Das Overlay fÃ¼r ALLE Modals */
-.modal-overlay {
-    display: none;
-    position: fixed;
-    z-index: 9000; /* Extrem hoher Wert, um Ã¼ber allem zu liegen */
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    overflow: auto;
-    background-color: rgba(0,0,0,.5);
-    justify-content: center;
-    align-items: center;
-}
-.modal-overlay.visible {
-    display: flex;
-}
-
-.detail-view-header {
-    display: flex;
-    align-items: center;
-    margin-bottom: 0px;
-    position: sticky; /* HÃ¤lt den Header beim Scrollen oben */
-    top: 0;
-    background-color: #f4f4f4;
-    padding-top: 10px;
-    padding-bottom: 5px;
-    z-index: 101;
-}
-
-#backToMainViewBtn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 5px;
-    margin-right: 10px;
-}
-
-#backToMainViewBtn svg {
-    width: 32px;
-    height: 32px;
-    fill: #333;
-    transition: transform 0.2s;
-}
-#backToMainViewBtn:hover svg {
-    transform: scale(1.1);
-}
-
-.detail-view-header h2 {
-    margin: 0;
-    font-size: 1.4em;
-}
-
-/* Passt die Detailanzeige in der Detailansicht an */
-#detailViewContent #currentShipmentDetails {
-    margin-top: 0;
-    border-style: solid; /* Macht den Rahmen durchgezogen statt gestrichelt */
-}
-/* ===== NEU: Styling fÃ¼r klickbaren Titel zum Kopieren ===== */
-#currentShipmentDetails #shipmentDetailTitle:hover {
-    color: var(--primary-color); /* Hebt den Text farblich hervor */
-    text-decoration: underline;  /* Unterstreicht den Text beim Ãberfahren mit der Maus */
-    text-decoration-style: dotted;
-}
-/* ===== NEU: Styling fÃ¼r "Kopiert!"-Meldung bei HU-Nummern ===== */
-
-/* Positioniert das Pseudo-Element relativ zur HU-Nummer */
-#currentShipmentDetails .hu-value {
-    position: relative; 
-    transition: color 0.2s;
-}
-#currentShipmentDetails .hu-value:hover {
-    color: var(--primary-color);
-}
-
-/* Das Pseudo-Element, das als "Kopiert!"-Meldung dient */
-#currentShipmentDetails .hu-value.copied::after {
-    content: 'Kopiert!';
-    position: absolute;
-    top: 50%;
-    left: 105%; /* Positioniert es rechts neben der Nummer */
-    transform: translateY(-50%);
-    background-color: var(--primary-color);
-    color: white;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 0.8em;
-    font-weight: bold;
-    white-space: nowrap;
-    opacity: 0;
-    
-    /* Hier wird die Animation zugewiesen */
-    animation: fade-in-out 1.5s ease-in-out;
-}
-
-/* Die Keyframe-Animation fÃ¼r das Ein- und Ausblenden */
-@keyframes fade-in-out {
-    0% {
-        opacity: 0;
-        transform: translateY(-50%) scale(0.8);
-    }
-    20% {
-        opacity: 1;
-        transform: translateY(-50%) scale(1);
-    }
-    80% {
-        opacity: 1;
-        transform: translateY(-50%) scale(1);
-    }
-    100% {
-        opacity: 0;
-        transform: translateY(-50%) scale(0.8);
-    }
-}
-
-.suspicion-details {
-    text-align: center;
-    font-size: 1.1em;
-    line-height: 1.6;
-}
-.suspicion-details p {
-    margin: 5px 0;
-}
-.suspicion-details code {
-    font-family: monospace;
-    font-size: 1.2em;
-    padding: 3px 6px;
-    background-color: #eee;
-    border-radius: 4px;
-    border: 1px solid #ddd;
-}
-.suspicion-details hr {
-    border: none;
-    border-top: 1px dashed #ccc;
-    margin: 15px 0;
-}
-.suspicion-question {
-    font-weight: bold;
-    color: var(--secondary-hover);
-}
-
-/* =============================================================== */
-/* HIER DEN NEUEN CODE EINFÃGEN                                     */
-/* =============================================================== */
-/* ===== NEU: Stile fÃ¼r QR-Code in der Tabelle ===== */
-
-/* Die neue Spalte standardmÃ¤Ãig (auf MobilgerÃ¤ten) komplett ausblenden */
-th.qr-code-header,
-td.qr-code-cell {
-    display: none;
-}
-
-/* Der Container fÃ¼r den QR-Code, um ihn zu zentrieren */
-.qr-code-cell div {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 5px 0;
-}
-
-/* Media Query fÃ¼r "Desktop"-Ansichten (Bildschirme breiter als 992px) */
-@media (min-width: 992px) {
-    /* Ãndert das Layout der Tabelle zurÃ¼ck zu einer klassischen Tabellenansicht */
-    thead {
-        display: table-header-group;
-    }
-    tbody tr {
-        display: table-row;
-        margin-bottom: 0;
-        border: none;
-        box-shadow: none;
-        border-bottom: 1px solid #ddd;
-    }
-    tbody tr:last-child {
-        border-bottom: none;
-    }
-    td {
-        display: table-cell;
-        text-align: left;
-        border-bottom: none;
-        padding: 8px;
-        position: static;
-        padding-left: 8px; /* Padding zurÃ¼cksetzen */
-        vertical-align: middle;
-    }
-    /* Das "data-label" aus der mobilen Ansicht auf dem Desktop ausblenden */
-    td::before {
-        display: none;
-    }
-
-    /* Die QR-Code Spalte auf dem Desktop sichtbar machen und formatieren */
-    th.qr-code-header,
-    td.qr-code-cell {
-        display: table-cell;
-        width: 80px; /* Eine feste Breite fÃ¼r die Spalte */
-        vertical-align: middle;
-        text-align: center;
-        padding: 5px;
-    }
-    
-    .actions-cell {
-        width: 220px;
-        /* text-align: right; <-- Alte Eigenschaft wird ersetzt durch: */
-        display: flex; /* Macht die Zelle zu einem Flexbox-Container */
-        justify-content: flex-end; /* Richtet die Buttons rechts aus */
-        align-items: center; /* Zentriert die Buttons vertikal in der Zelle */
-        gap: 6px; /* FÃ¼gt einen sauberen Abstand von 6px zwischen den Buttons hinzu */
-    }
-
-/* Macht die HU-Nummer im Detail-Modal klickbar und fÃ¼gt visuelles Feedback hinzu */
-#huDetailsContent #huDetailsNumber {
-    cursor: pointer;
-    position: relative; /* Wichtig fÃ¼r die "Kopiert!"-Meldung */
-    transition: background-color 0.2s;
-}
-
-#huDetailsContent #huDetailsNumber:hover {
-    background-color: #e9e9e9; /* Leichter Hover-Effekt */
-}
-
-/* Stil fÃ¼r die "Kopiert!"-Meldung (verwendet die existierende Animation) */
-#huDetailsContent #huDetailsNumber.copied::after {
-    content: 'Kopiert!';
-    position: absolute;
-    top: 50%;
-    right: 10px;
-    transform: translateY(-50%);
-    background-color: var(--primary-color);
-    color: white;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 0.8em;
-    font-weight: bold;
-    white-space: nowrap;
-    opacity: 0;
-    animation: fade-in-out 1.5s ease-in-out;
-}
-
-/* --- ENDE DER ÃNDERUNG --- */
-/* ===== NEU: STIL FÃR BLINKENDE ZEICHEN BEI HU-VERDACHTSFÃLLEN ===== */
-
-/* Die Keyframe-Animation, die das Blinken erzeugt */
-@keyframes blink {
-    0%, 100% {
-        opacity: 1;
-    }
-    50% {
-        opacity: 0.2; /* Ein sanfteres Blinken statt komplett unsichtbar */
-    }
-}
-
-/* Die Klasse, die auf das abweichende Zeichen angewendet wird */
-.blinking-char {
-    font-weight: bold;
-    color: var(--danger-color); /* Rot, um den Fehler hervorzuheben */
-    background-color: #fff0f0;  /* Ein sehr leichter roter Hintergrund */
-    border-radius: 3px;
-    padding: 0 2px;
-    
-    /* Zuweisung der Animation */
-    animation-name: blink;
-    animation-duration: 1.5s; /* Dauer eines Blink-Zyklus */
-    animation-iteration-count: infinite; /* Endloses Blinken */
-}
-/* ===== LKW-MenÃ¼ ===== */
-#lkw-section {
-    margin-top: 15px;
-    border-top: 1px solid #e0e0e0;
-    padding-top: 10px;
-    padding-bottom: 10px;
-}
-.lkw-section-title {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: nowrap;
-}
-.lkw-total-count {
-    font-size: 0.8em;
-    color: #555;
-    font-weight: 600;
-    white-space: nowrap;
-}
-.lkw-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-#lkw-menu-container {
-    list-style: none;
-    padding: 0;         /* Zieht alles ganz nach links */
-    margin: 0;
-}
-
-.lkw-menu-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 15px; /* Etwas mehr Luft nach oben/unten und links/rechts */
-    font-size: 0.88em;
-    border-bottom: 1px solid #f5f5f5;
-    flex-wrap: nowrap;
-    gap: 15px;          /* Vergrößert den Abstand zwischen Text und Switch */
-}
-
-.lkw-label {
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    min-width: 0;       /* WICHTIG für iOS, damit der Text nicht den Switch wegschiebt */
-}
-
-.lkw-label small { color: #bbb; font-size: 0.85em; }
-/* Animation für den Lauftext */
-@keyframes scrollText {
-  0%, 15% { transform: translateX(0); }
-  85%, 100% { transform: translateX(calc(-1 * var(--scroll-distance, 0px))); }
-}
-
-.scrolling-text-container {
-    overflow: hidden;
-    white-space: nowrap;
-    min-width: 0;
-    flex-grow: 1;
-    position: relative;
-    padding-right: 15px;
-}
-
-.scrolling-text {
-    display: inline-block;
-    /* Animation läuft nur, wenn wir per JavaScript eine Klasse setzen */
-}
-
-.scrolling-text.needs-scroll {
-    animation: scrollText 4s linear infinite alternate;
-}
-
