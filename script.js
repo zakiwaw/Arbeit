@@ -146,6 +146,9 @@ const suspicionDeclineBtnEl = document.getElementById('suspicionDeclineBtn');
         updateCurrentBatchNoteDisplay();
     
         setupEventListeners();
+        startSyncPolling();
+        if (serverIsLegacy) displayError(SYNC_LEGACY_MESSAGE, 'orange'); // (toggleBatchMode oben hat Meldungen gelöscht)
+        flushPendingChanges(); // offline erfasste Änderungen vom letzten Mal nachschicken
         focusShipmentInput();
         console.log(`Fracht Tracker ${document.title.split('(')[1].split(')')[0]} initialized.`);
         hideLoader(); // <<<< NEU: Lade-Spinner verstecken, wenn alles fertig ist
@@ -385,6 +388,8 @@ const LKWSTATUSKEY = 'frachtLkwStatusV1';
                     });
                 }
             });
+// Migration: stabile Kennung je Scan-Eintrag (Mehrgeräte-Sync)
+    Object.values(shipments).forEach(ensureItemIds);
 // Migration: truckId für ältere Einträge
     Object.values(shipments).forEach(shipment => {
         if (!shipment.truckId) {
@@ -404,6 +409,7 @@ function loadLkwStatus() {
 }
 async function saveLkwStatus(status) {
     localStorage.setItem(LKWSTATUSKEY, JSON.stringify(status));
+    lkwStatusSaveInFlight++;
     try {
         await fetch(WEB_APP_URL, {
             method: 'POST', mode: 'cors', cache: 'no-cache',
@@ -412,6 +418,8 @@ async function saveLkwStatus(status) {
         });
     } catch(e) {
         console.warn('LKW-Status Server-Sync fehlgeschlagen:', e);
+    } finally {
+        lkwStatusSaveInFlight--;
     }
 }
 
@@ -848,56 +856,309 @@ function showOpenHusSummary() {
  * @param {object} shipments Das Objekt mit allen Sendungen.
  */
 const SYNC_FAILED_MESSAGE = "Lokal gespeichert – Server nicht erreichbar. Wird beim nächsten Speichern erneut versucht.";
+const SYNC_LEGACY_MESSAGE = "Server-Skript ist veraltet (backend/Code.gs neu bereitstellen). Mehrgeräte-Sync inaktiv – Daten werden wie bisher gespeichert.";
+
+// ===================================================================
+// MEHRGERÄTE-SYNC (siehe backend/Code.gs)
+// - Jedes Gerät schickt nur die Sendungen, die es selbst geändert hat, zusammen mit dem
+//   Server-Stand, von dem es ausging. Der Server führt zusammen (3-Wege-Merge) und liefert
+//   den gemeinsamen Stand zurück – nichts wird mehr blind überschrieben.
+// - Zusätzlich holt das Gerät regelmäßig nur die Änderungen der anderen Geräte ab.
+// - Offline: Änderungen werden vorgemerkt und beim nächsten Kontakt nachgeschickt.
+// ===================================================================
+const SYNC_VERSION_KEY = LOCAL_STORAGE_KEY + '_syncVersion';    // zuletzt gesehene Server-Version
+const SYNC_SNAPSHOT_KEY = LOCAL_STORAGE_KEY + '_syncSnapshot';  // Server-Stand je Sendung, von dem die lokalen Daten ausgehen
+const SYNC_PENDING_KEY = LOCAL_STORAGE_KEY + '_syncPending';    // noch nicht bestätigte Änderungen/Löschungen
+const SYNC_POLL_INTERVAL_MS = 15000;
+const SYNC_DEVICE_ID = (function () {
+    const k = 'frachtTracker_deviceId';
+    let id = localStorage.getItem(k);
+    if (!id) { id = 'dev-' + Math.random().toString(36).slice(2, 10); localStorage.setItem(k, id); }
+    return id;
+})();
+let syncInFlight = false;   // gerade ein Senden/Abruf unterwegs?
+let syncQueued = false;     // währenddessen erneut gespeichert → danach nochmal senden
+let syncPollTimer = null;
+let serverIsLegacy = false; // Backend noch V1 (kennt loadChanges/saveShipments nicht) → altes Verhalten
+let lkwStatusSaveInFlight = 0;
+
+function getSyncVersion() { return Number(localStorage.getItem(SYNC_VERSION_KEY)) || 0; }
+function setSyncVersion(v) { if (typeof v === 'number' && !isNaN(v)) localStorage.setItem(SYNC_VERSION_KEY, String(v)); }
+function readSnapshot() { try { return JSON.parse(localStorage.getItem(SYNC_SNAPSHOT_KEY) || '{}'); } catch (e) { return {}; } }
+function writeSnapshot(snap) { localStorage.setItem(SYNC_SNAPSHOT_KEY, JSON.stringify(snap)); }
+function writeSnapshotFrom(shipments) {
+    const snap = {};
+    Object.keys(shipments || {}).forEach(b => { snap[b] = JSON.stringify(shipments[b]); });
+    writeSnapshot(snap);
+}
+function readPending() { try { const p = JSON.parse(localStorage.getItem(SYNC_PENDING_KEY) || '{}'); return { changed: p.changed || {}, deleted: p.deleted || {} }; } catch (e) { return { changed: {}, deleted: {} }; } }
+function writePending(p) { localStorage.setItem(SYNC_PENDING_KEY, JSON.stringify(p)); }
+function hasPending(p) { p = p || readPending(); return Object.keys(p.changed).length > 0 || Object.keys(p.deleted).length > 0; }
+function clearSyncState() { [SYNC_VERSION_KEY, SYNC_SNAPSHOT_KEY, SYNC_PENDING_KEY].forEach(k => localStorage.removeItem(k)); }
+
+// Stabile Kennung je Scan-Eintrag (gleiche Formel wie im Backend), damit Geräte denselben Eintrag erkennen –
+// auch wenn sich Zeitstempel/Status ändern (z. B. "Anstehend"-Platzhalter, der gescannt wird).
+function ensureItemIds(shipment) {
+    if (!shipment || !Array.isArray(shipment.scannedItems)) return shipment;
+    const seen = {};
+    shipment.scannedItems.forEach(it => { if (it && it.id) seen[it.id] = true; });
+    shipment.scannedItems.forEach(it => {
+        if (!it || it.id) return;
+        const baseKey = String(it.timestamp || '') + '|' + String(it.rawInput || '');
+        let key = baseKey, n = 1;
+        while (seen[key]) { n++; key = baseKey + '#' + n; }
+        seen[key] = true;
+        it.id = key;
+    });
+    return shipment;
+}
+
+function isUnknownActionError(err) { return /Unbekannte Aktion/i.test((err && err.message) || ''); }
+
+async function postToServer(action, payload) {
+    const response = await fetch(WEB_APP_URL, {
+        method: 'POST', mode: 'cors', cache: 'no-cache',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action, payload })
+    });
+    if (!response.ok) throw new Error(`Server-Fehler: ${response.status}`);
+    const result = await response.json();
+    if (result.status !== 'success') throw new Error(result.message || 'Unbekannter Serverfehler');
+    return result;
+}
+
+function showSyncOk() {
+    setSyncIndicator('ok', 'Synchronisiert');
+    if (errorDisplayEl.textContent === SYNC_FAILED_MESSAGE) clearError();
+}
+
+// Wird von allen Stellen aufgerufen, die etwas geändert haben (Signatur unverändert):
+// 1) lokal speichern  2) geänderte/gelöschte Sendungen vormerken  3) an den Server schicken
 async function saveShipments(shipments) {
+    Object.values(shipments).forEach(ensureItemIds);
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(shipments));
+
+    const snap = readSnapshot();
+    const pending = readPending();
+    Object.keys(shipments).forEach(b => {
+        if (snap[b] !== JSON.stringify(shipments[b])) pending.changed[b] = true;
+    });
+    Object.keys(pending.changed).forEach(b => { if (!(b in shipments)) delete pending.changed[b]; });
+    Object.keys(snap).forEach(b => { if (!(b in shipments)) pending.deleted[b] = true; });
+    writePending(pending);
+
+    await flushPendingChanges();
+}
+
+// Schickt alles Vorgemerkte an den Server; läuft nie doppelt parallel.
+async function flushPendingChanges() {
+    if (syncInFlight) { syncQueued = true; return; }
+    if (!hasPending()) return;
+
+    syncInFlight = true;
     setSyncIndicator('busy', 'Wird synchronisiert …');
     try {
-        const response = await fetch(WEB_APP_URL, {
-            method: 'POST',
-            mode: 'cors',
-            cache: 'no-cache',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action: "saveAllData", payload: shipments })
-        });
-        if (!response.ok) throw new Error(`Server-Fehler: ${response.status}`);
-        const result = await response.json();
-        if (result.status === 'success') {
-            console.log("Daten erfolgreich zum Server synchronisiert.");
-            setSyncIndicator('ok', 'Synchronisiert');
-            if (errorDisplayEl.textContent === SYNC_FAILED_MESSAGE) clearError(); // alte Offline-Warnung aufräumen
+        if (serverIsLegacy) {
+            // Altes Backend: kompletter Datensatz wie früher
+            await postToServer('saveAllData', loadShipments());
+            writeSnapshotFrom(loadShipments());
+            writePending({ changed: {}, deleted: {} });
         } else {
-            throw new Error(result.message);
+            const pending = readPending();
+
+            // Löschungen zuerst (Tombstones), damit kein anderes Gerät die Sendung wiederbelebt
+            for (const b of Object.keys(pending.deleted)) {
+                await postToServer('deleteShipment', { baseNumber: b });
+                const p = readPending(); delete p.deleted[b]; writePending(p);
+                const s = readSnapshot(); delete s[b]; writeSnapshot(s);
+            }
+
+            const changedBases = Object.keys(readPending().changed);
+            if (changedBases.length > 0) {
+                const local = loadShipments();
+                const snap = readSnapshot();
+                const toSend = {}, bases = {}, sentJson = {};
+                changedBases.forEach(b => {
+                    if (!local[b]) return;
+                    toSend[b] = local[b];
+                    sentJson[b] = JSON.stringify(local[b]);
+                    bases[b] = snap[b] ? JSON.parse(snap[b]) : null; // Ausgangsstand für den 3-Wege-Merge
+                });
+                const r = await postToServer('saveShipments', { shipments: toSend, bases, deviceId: SYNC_DEVICE_ID });
+
+                // Zusammengeführten Stand übernehmen (enthält ggf. Scans anderer Geräte)
+                const merged = r.merged || {};
+                const after = loadShipments(); const snapNow = readSnapshot(); const p = readPending();
+                let touched = false;
+                Object.keys(merged).forEach(b => {
+                    const mj = JSON.stringify(merged[b]);
+                    if (JSON.stringify(after[b]) === sentJson[b]) {
+                        // lokal seit dem Senden unverändert → Server-Stand ist jetzt unser Stand
+                        snapNow[b] = mj;
+                        if (mj !== sentJson[b]) { after[b] = merged[b]; touched = true; }
+                        delete p.changed[b];
+                    }
+                    // sonst: währenddessen weiter geändert → bleibt vorgemerkt, wird mit altem Ausgangsstand erneut gesendet
+                });
+                changedBases.forEach(b => { if (!toSend[b]) delete p.changed[b]; });
+                writeSnapshot(snapNow); writePending(p);
+                if (touched) { localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(after)); refreshViewsAfterRemoteChange(); }
+                // Hinweis: die Server-Version wird bewusst NUR beim Abruf (pullRemoteChanges) weitergeschaltet,
+                // sonst würden zwischenzeitliche Änderungen anderer Geräte übersprungen.
+            }
         }
+        if (!hasPending()) showSyncOk();
     } catch (error) {
-        console.error("Fehler bei der Server-Synchronisierung:", error);
-        setSyncIndicator('error', 'Server nicht erreichbar – Daten sind lokal gespeichert');
-        displayError(SYNC_FAILED_MESSAGE, 'red'); // bleibt stehen, bis der nächste Sync klappt
+        console.warn("Server-Synchronisierung fehlgeschlagen:", error.message);
+        if (isUnknownActionError(error) && !serverIsLegacy) {
+            serverIsLegacy = true; displayError(SYNC_LEGACY_MESSAGE, 'orange'); syncQueued = true;
+        } else {
+            setSyncIndicator('error', 'Server nicht erreichbar – Daten sind lokal gespeichert');
+            displayError(SYNC_FAILED_MESSAGE, 'red');
+        }
+    } finally {
+        syncInFlight = false;
+        if (syncQueued) { syncQueued = false; flushPendingChanges(); }
     }
 }
+
+// Übernimmt Sendungen vom Server in den lokalen Bestand.
+// Sendungen mit lokal wartenden Änderungen werden NICHT angefasst (sie gehen beim Senden durch den Server-Merge).
+function applyServerShipments(changed, deleted, fullSet) {
+    const local = loadShipments();
+    const pending = readPending();
+    const snap = readSnapshot();
+    let touched = false, skipped = false;
+    Object.keys(changed || {}).forEach(b => {
+        if (pending.changed[b] || pending.deleted[b]) { skipped = true; return; }
+        ensureItemIds(changed[b]);
+        const serverJson = JSON.stringify(changed[b]);
+        snap[b] = serverJson;
+        if (JSON.stringify(local[b]) !== serverJson) { local[b] = changed[b]; touched = true; }
+    });
+    (deleted || []).forEach(b => {
+        if (pending.changed[b]) { skipped = true; return; }
+        delete snap[b];
+        if (b in local) { delete local[b]; touched = true; }
+    });
+    if (fullSet) { // kompletter Bestand: alles Unbekannte entfernen (außer lokal Vorgemerktes)
+        Object.keys(local).forEach(b => {
+            if (!(b in changed) && !pending.changed[b]) { delete local[b]; delete snap[b]; touched = true; }
+        });
+    }
+    writeSnapshot(snap);
+    if (touched) {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(local));
+        refreshViewsAfterRemoteChange();
+    }
+    return { touched, skipped };
+}
+
+function applyServerLkwStatus(status) {
+    if (!status || typeof status !== 'object' || lkwStatusSaveInFlight > 0) return;
+    const json = JSON.stringify(status);
+    if (json === JSON.stringify(loadLkwStatus())) return;
+    localStorage.setItem(LKWSTATUSKEY, json);
+    refreshViewsAfterRemoteChange();
+}
+
+// Oberfläche nach Fremdänderung aktualisieren – ohne den Nutzer zu stören
+function refreshViewsAfterRemoteChange() {
+    const msg = errorDisplayEl.textContent, msgColor = errorDisplayEl.style.color;
+    if (typeof renderTable === 'function') renderTable();
+    if (typeof renderLkwMenu === 'function') renderLkwMenu();
+    const detailOpen = detailViewEl && !detailViewEl.classList.contains('hidden');
+    const editing = currentDetailsDivEl && currentDetailsDivEl.querySelector('.inline-note-editor');
+    if (detailOpen && !editing) {
+        const title = document.getElementById('shipmentDetailTitle');
+        const base = title ? title.dataset.hawb : '';
+        if (base && loadShipments()[base]) {
+            displayCurrentShipmentDetails(base);
+            if (msg) { errorDisplayEl.textContent = msg; errorDisplayEl.style.color = msgColor; } // Meldung nicht wegwischen
+        }
+    }
+}
+
+// Änderungen anderer Geräte abholen
+async function pullRemoteChanges() {
+    if (syncInFlight || document.hidden) return;
+    // Während der Stückzahl-Abfrage für eine NEUE Sendung nicht abrufen: die Sendung wird gleich lokal neu angelegt
+    // und soll dann per Vereinigung (nicht per Ausgangsstand) mit einer evtl. gleichzeitig angelegten Fremd-Sendung zusammenlaufen.
+    if (document.querySelector('#newTotalSection.visible')) return;
+    syncInFlight = true;
+    try {
+        if (serverIsLegacy) {
+            const r = await postToServer('loadAllData');
+            applyServerShipments(r.data || {}, [], true);
+        } else {
+            const r = await postToServer('loadChanges', { sinceVersion: getSyncVersion() });
+            const skipped = applyServerShipments(r.changed || {}, r.deleted || [], !!r.full).skipped;
+            applyServerLkwStatus(r.lkwStatus);
+            // Wurde eine Fremdänderung wegen lokal wartender Änderungen übersprungen, Version NICHT weiterschalten –
+            // sie wird beim nächsten Abruf erneut geliefert (und ist dann nach dem Server-Merge längst enthalten).
+            if (!skipped) setSyncVersion(r.version);
+        }
+        if (!hasPending()) showSyncOk();
+    } catch (error) {
+        console.warn("Abruf der Änderungen fehlgeschlagen:", error.message);
+        if (isUnknownActionError(error) && !serverIsLegacy) { serverIsLegacy = true; displayError(SYNC_LEGACY_MESSAGE, 'orange'); }
+        else setSyncIndicator('error', 'Server nicht erreichbar');
+    } finally {
+        syncInFlight = false;
+        if (syncQueued || hasPending()) { syncQueued = false; flushPendingChanges(); }
+    }
+}
+
+function startSyncPolling() {
+    if (syncPollTimer) clearInterval(syncPollTimer);
+    syncPollTimer = setInterval(pullRemoteChanges, SYNC_POLL_INTERVAL_MS);
+    // Sofort abrufen, wenn die App wieder in den Vordergrund kommt oder das Netz zurück ist
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) pullRemoteChanges(); });
+    window.addEventListener('online', () => pullRemoteChanges());
+}
+
+function waitForSyncIdle(maxMs = 20000) {
+    return new Promise(resolve => {
+        const t0 = Date.now();
+        (function check() { if (!syncInFlight || Date.now() - t0 > maxMs) resolve(); else setTimeout(check, 100); })();
+    });
+}
+
+// Start: kompletten Stand laden; lokal vorgemerkte (offline erfasste) Änderungen bleiben erhalten
 async function loadDataFromServer() {
     console.log("Versuche Daten vom Server zu laden...");
+    const localRaw = (() => { try { return JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '{}'); } catch (e) { return {}; } })();
     try {
-        const response = await fetch(WEB_APP_URL, {
-            method: 'POST',
-            mode: 'cors',
-            cache: 'no-cache',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action: "loadAllData" })
-        });
-        if (!response.ok) throw new Error(`Server-Fehler: ${response.status}`);
-        
-        const result = await response.json();
-        if (result.status === 'success') {
-            console.log("Daten erfolgreich vom Server geladen.");
-            return result.data || {};
-        } else {
-            throw new Error(result.message);
+        let serverData, version = null;
+        try {
+            const r = await postToServer('loadChanges', { sinceVersion: 0 });
+            serverData = r.changed || {}; version = r.version;
+            Object.values(serverData).forEach(ensureItemIds);
+            applyServerLkwStatus(r.lkwStatus);
+        } catch (e) {
+            if (!isUnknownActionError(e)) throw e;
+            serverIsLegacy = true;
+            const r = await postToServer('loadAllData');
+            serverData = r.data || {};
+            Object.values(serverData).forEach(ensureItemIds);
+            displayError(SYNC_LEGACY_MESSAGE, 'orange');
         }
+        const pending = readPending();
+        const data = Object.assign({}, serverData);
+        Object.keys(pending.changed).forEach(b => { if (localRaw[b]) data[b] = localRaw[b]; });
+        Object.keys(pending.deleted).forEach(b => { delete data[b]; });
+        // Ausgangsstand = Serverstand (für Sendungen mit wartenden Änderungen bleibt der alte Ausgangsstand erhalten)
+        const oldSnap = readSnapshot(); const snap = {};
+        Object.keys(serverData).forEach(b => { snap[b] = pending.changed[b] && oldSnap[b] ? oldSnap[b] : JSON.stringify(serverData[b]); });
+        writeSnapshot(snap);
+        if (version !== null) setSyncVersion(version);
+        console.log("Daten erfolgreich vom Server geladen.");
+        return data;
     } catch (error) {
         console.error("Fehler beim Laden vom Server:", error);
         displayError("Keine Serververbindung. Lade lokale Daten.", 'orange', 4000);
-        const localData = localStorage.getItem(LOCAL_STORAGE_KEY);
-        return localData ? JSON.parse(localData) : {};
+        setSyncIndicator('error', 'Server nicht erreichbar');
+        return localRaw;
     }
 }
 function isHuExpected(huNumber) {
@@ -3451,19 +3712,17 @@ async function sendPdfEmailViaBackend(event) {
                 if (Object.keys(shipmentsData).length === 0) {
                     sheetStatusEl.textContent = 'Keine Daten zum Senden.'; sheetStatusEl.style.color = 'blue'; return;
                 }
-                const response = await fetch(WEB_APP_URL, {
-                    method: 'POST', mode: 'cors', cache: 'no-cache',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // text/plain für Gas POST
-                    body: JSON.stringify({action: "saveAllData", payload: shipmentsData}) // Struktur für Gas
-                });
-                if (!response.ok) throw new Error(`Server Verbindung: ${response.status} ${response.statusText}`);
-                const result = await response.json();
-                if (result.status === 'success') {
-                    sheetStatusEl.textContent = `Erfolg: ${result.message || 'Daten gesendet.'}`; sheetStatusEl.style.color = 'green';
-                    setTimeout(closeSideMenu, 1500);
-                } else {
-                    throw new Error(`Apps Script Fehler: ${result.message || 'Unbekannt'}`);
-                }
+                // Alle Sendungen vormerken und über den Server-Merge senden (überschreibt nichts von anderen Geräten)
+                const pending = readPending();
+                Object.keys(shipmentsData).forEach(b => { pending.changed[b] = true; });
+                writePending(pending);
+                await waitForSyncIdle();
+                await flushPendingChanges();
+                await waitForSyncIdle();
+                if (hasPending()) throw new Error('Server nicht erreichbar – Daten bleiben lokal vorgemerkt.');
+                await pullRemoteChanges();
+                sheetStatusEl.textContent = 'Erfolg: Daten mit dem Server abgeglichen.'; sheetStatusEl.style.color = 'green';
+                setTimeout(closeSideMenu, 1500);
             } catch (error) {
                 console.error("Fehler beim Senden an Google Sheet:", error);
                 sheetStatusEl.textContent = `Fehler: ${error.message}`; sheetStatusEl.style.color = 'red';
@@ -4171,6 +4430,7 @@ noteEditFormEl.addEventListener('submit', (e) => {
                 const result = await response.json();
                 if (result.status !== 'success') throw new Error(result.message);
                 localStorage.removeItem(LOCAL_STORAGE_KEY);
+                clearSyncState();
                 location.reload(); 
             } catch (error) {
                 console.error("Fehler beim Zurücksetzen der Daten:", error);
