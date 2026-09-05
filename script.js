@@ -871,7 +871,8 @@ const SYNC_LEGACY_MESSAGE = "Server-Skript ist veraltet (backend/Code.gs neu ber
 const SYNC_VERSION_KEY = LOCAL_STORAGE_KEY + '_syncVersion';    // zuletzt gesehene Server-Version
 const SYNC_SNAPSHOT_KEY = LOCAL_STORAGE_KEY + '_syncSnapshot';  // Server-Stand je Sendung, von dem die lokalen Daten ausgehen
 const SYNC_PENDING_KEY = LOCAL_STORAGE_KEY + '_syncPending';    // noch nicht bestätigte Änderungen/Löschungen
-const SYNC_POLL_INTERVAL_MS = 15000; // ausgelegt für bis zu 3 Geräte gleichzeitig; ab ~5 Geräten auf 25000 erhöhen
+const SYNC_POLL_INTERVAL_MS = 3000;      // Grundtakt des Abrufs (Server beantwortet "nichts Neues" aus dem Cache, ohne die Tabelle zu öffnen)
+const SYNC_POLL_MAX_INTERVAL_MS = 30000; // bei Verbindungsfehlern schrittweise bis hierhin verlangsamen, danach wieder Grundtakt
 const SYNC_DEVICE_ID = (function () {
     const k = 'frachtTracker_deviceId';
     let id = localStorage.getItem(k);
@@ -881,6 +882,8 @@ const SYNC_DEVICE_ID = (function () {
 let syncInFlight = false;   // gerade ein Senden/Abruf unterwegs?
 let syncQueued = false;     // währenddessen erneut gespeichert → danach nochmal senden
 let syncPollTimer = null;
+let syncPollDelay = SYNC_POLL_INTERVAL_MS;
+let syncPollFailures = 0;
 let serverIsLegacy = false; // Backend noch V1 (kennt loadChanges/saveShipments nicht) → altes Verhalten
 let lkwStatusSaveInFlight = 0;
 
@@ -1100,23 +1103,36 @@ async function pullRemoteChanges() {
             // sie wird beim nächsten Abruf erneut geliefert (und ist dann nach dem Server-Merge längst enthalten).
             if (!skipped) setSyncVersion(r.version);
         }
+        syncPollFailures = 0; syncPollDelay = SYNC_POLL_INTERVAL_MS;
         if (!hasPending()) showSyncOk();
     } catch (error) {
         console.warn("Abruf der Änderungen fehlgeschlagen:", error.message);
+        syncPollFailures++;
+        syncPollDelay = Math.min(syncPollDelay * 2, SYNC_POLL_MAX_INTERVAL_MS); // Server nicht mit Anfragen fluten
         if (isUnknownActionError(error) && !serverIsLegacy) { serverIsLegacy = true; displayError(SYNC_LEGACY_MESSAGE, 'orange'); }
-        else setSyncIndicator('error', 'Server nicht erreichbar');
+        else if (syncPollFailures >= 2) setSyncIndicator('error', 'Server nicht erreichbar'); // ein einzelner Aussetzer flackert nicht rot
     } finally {
         syncInFlight = false;
         if (syncQueued || hasPending()) { syncQueued = false; flushPendingChanges(); }
     }
 }
 
+function scheduleNextPoll() {
+    if (syncPollTimer) clearTimeout(syncPollTimer);
+    syncPollTimer = setTimeout(async () => {
+        try { await pullRemoteChanges(); } finally { scheduleNextPoll(); }
+    }, syncPollDelay);
+}
+// Sofort abrufen (Vordergrund, Netz zurück) – und den Takt wieder auf den Grundwert setzen
+function pollNow() {
+    syncPollDelay = SYNC_POLL_INTERVAL_MS;
+    if (syncPollTimer) clearTimeout(syncPollTimer);
+    pullRemoteChanges().finally(scheduleNextPoll);
+}
 function startSyncPolling() {
-    if (syncPollTimer) clearInterval(syncPollTimer);
-    syncPollTimer = setInterval(pullRemoteChanges, SYNC_POLL_INTERVAL_MS);
-    // Sofort abrufen, wenn die App wieder in den Vordergrund kommt oder das Netz zurück ist
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) pullRemoteChanges(); });
-    window.addEventListener('online', () => pullRemoteChanges());
+    scheduleNextPoll();
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) pollNow(); });
+    window.addEventListener('online', pollNow);
 }
 
 function waitForSyncIdle(maxMs = 20000) {

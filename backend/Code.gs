@@ -11,6 +11,7 @@
 //    Sehr große Sendungen werden über mehrere Zellen verteilt, weil eine Zelle max. 50.000 Zeichen fasst.)
 // Sheet "lkw_status": A1 = JSON (unverändert)
 // Sheet "_meta":      A1 = globaler Versionszähler (wird automatisch angelegt, ausgeblendet)
+// Script-Cache:       Versionszähler + LKW-Status für den Schnellpfad von loadChanges (siehe CACHE_TTL_S)
 // ===================================================
 
 // EINSTELLUNGEN
@@ -23,6 +24,15 @@ const COL_BASE = 1, COL_JSON = 2, COL_VERSION = 3, COL_UPDATED = 4, COL_DELETED 
 const COL_JSON_EXTRA = 6;        // ab Spalte F: Fortsetzung des JSON, falls eine Zelle nicht reicht
 const CELL_LIMIT = 45000;        // Google Sheets erlaubt max. 50.000 Zeichen je Zelle
 const LOCK_TIMEOUT_MS = 20000;
+
+// Schnellpfad für den häufigen Abruf "gibt es etwas Neues?" (alle 3 s je Gerät):
+// Versionszähler und LKW-Status liegen zusätzlich im Script-Cache. Ist die Version des Geräts aktuell,
+// wird geantwortet, OHNE die Tabelle zu öffnen (~10× schneller, schont das Kontingent).
+// Der Cache wird nur unter Sperre und erst NACH dem Schreiben gefüllt; die kurze Lebensdauer begrenzt
+// den Schaden, falls ein Eintrag je veralten sollte (dann höchstens CACHE_TTL_S Sekunden Verzögerung).
+const CACHE_TTL_S = 30;
+const CACHE_KEY_VERSION = 'fracht_version';
+const CACHE_KEY_LKW = 'fracht_lkw';
 
 // ===================================================
 // HAUPTFUNKTION
@@ -78,7 +88,13 @@ function getMetaSheet_() {
   let sheet = ss.getSheetByName(META_SHEET_NAME);
   if (!sheet) {
     sheet = ss.insertSheet(META_SHEET_NAME);
-    sheet.getRange('A1').setValue(0);
+    // Startwert = höchste bereits vergebene Zeilen-Version (falls das Blatt je gelöscht wurde), sonst 0
+    let start = 0;
+    const sh = ss.getSheetByName(SHEET_NAME);
+    if (sh && sh.getLastRow() > 1 && sh.getMaxColumns() >= COL_VERSION) {
+      sh.getRange(2, COL_VERSION, sh.getLastRow() - 1, 1).getValues().forEach(function (r) { const n = Number(r[0]) || 0; if (n > start) start = n; });
+    }
+    sheet.getRange('A1').setValue(start);
     sheet.hideSheet();
   }
   return sheet;
@@ -88,7 +104,42 @@ function getGlobalVersion_() {
   const v = Number(getMetaSheet_().getRange('A1').getValue());
   return isNaN(v) ? 0 : v;
 }
-function setGlobalVersion_(v) { getMetaSheet_().getRange('A1').setValue(v); }
+// Nur unter Sperre aufrufen (alle Schreibpfade tun das).
+function setGlobalVersion_(v) {
+  getMetaSheet_().getRange('A1').setValue(v);
+  SpreadsheetApp.flush();                 // erst für alle sichtbar machen …
+  cacheVersion_(v);                       // … dann den Schnellpfad informieren
+  cacheLkw_(loadLkwStatusFromSheet());
+}
+
+// ---- Script-Cache (Schnellpfad) ----
+function cache_() { return CacheService.getScriptCache(); }
+function getCachedState_() {
+  const vals = cache_().getAll([CACHE_KEY_VERSION, CACHE_KEY_LKW]) || {};
+  const v = vals[CACHE_KEY_VERSION], l = vals[CACHE_KEY_LKW];
+  return {
+    version: (v === undefined || v === null || v === '') ? null : Number(v),
+    lkw: (l === undefined || l === null) ? null : parseJsonSafe_(l)
+  };
+}
+function cacheVersion_(v) {
+  try { cache_().put(CACHE_KEY_VERSION, String(v), CACHE_TTL_S); }
+  catch (e) { Logger.log('Cache (Version): ' + e.message); try { cache_().remove(CACHE_KEY_VERSION); } catch (e2) {} }
+}
+function cacheLkw_(obj) {
+  try { cache_().put(CACHE_KEY_LKW, JSON.stringify(obj || {}), CACHE_TTL_S); }
+  catch (e) { Logger.log('Cache (LKW): ' + e.message); try { cache_().remove(CACHE_KEY_LKW); } catch (e2) {} }
+}
+// Cache aus der Tabelle nachziehen – unter Sperre, damit nie ein älterer Stand einen neueren überschreibt.
+// Ist gerade ein Schreiber aktiv, wird übersprungen: der füllt den Cache selbst.
+function refreshCache_() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(3000)) return;
+  try {
+    cacheVersion_(getGlobalVersion_());
+    cacheLkw_(loadLkwStatusFromSheet());
+  } finally { lock.releaseLock(); }
+}
 
 // Führt fn unter einer Script-Sperre aus, damit zwei Geräte nie gleichzeitig schreiben.
 // Wichtig: flush() VOR dem Freigeben, sonst sieht der nächste Aufruf evtl. noch nicht geschriebene Zeilen.
@@ -375,22 +426,26 @@ function deleteShipmentRow(payload) {
 // ===================================================
 function loadChangesSince(payload) {
   const since = Number(payload && payload.sinceVersion) || 0;
+
+  // Schnellpfad: Gerät ist auf dem Stand des Caches → antworten, ohne die Tabelle zu öffnen
+  const cached = getCachedState_();
+  if (since > 0 && cached.version !== null && cached.lkw !== null && since === cached.version) {
+    return { status: 'success', version: cached.version, changed: {}, deleted: [], full: false, lkwStatus: cached.lkw, cached: true };
+  }
+
   const version = getGlobalVersion_();          // ZUERST lesen (siehe saveShipmentsMerged)
   const lkwStatus = loadLkwStatusFromSheet();
-  if (since > 0 && since >= version) {          // nichts Neues → Sendungs-Sheet gar nicht erst lesen
-    return { status: 'success', version: version, changed: {}, deleted: [], full: false, lkwStatus: lkwStatus };
-  }
-  const sheet = getShipmentSheet_();
   const changed = {};
   const deleted = [];
   if (since === 0) {
-    const rows = readAllRows_(sheet);
+    const rows = readAllRows_(getShipmentSheet_());
     Object.keys(rows).forEach(function (base) {
       if (rows[base].deleted) return;
       const obj = parseJsonSafe_(rows[base].json);
       if (obj) changed[base] = obj;
     });
-  } else {
+  } else if (since < version) {
+    const sheet = getShipmentSheet_();
     const index = readIndex_(sheet);
     Object.keys(index).forEach(function (base) {
       const r = index[base];
@@ -400,6 +455,9 @@ function loadChangesSince(payload) {
       if (obj) changed[base] = obj;
     });
   }
+  // Cache fehlt oder hinkt hinterher → nachziehen (damit die nächsten Abrufe wieder über den Schnellpfad gehen)
+  if (cached.version === null || cached.lkw === null || cached.version < version) refreshCache_();
+
   return { status: 'success', version: version, changed: changed, deleted: deleted, full: since === 0, lkwStatus: lkwStatus };
 }
 
@@ -468,8 +526,11 @@ function getOrCreateLkwSheet() {
 }
 
 function saveLkwStatusToSheet(statusObj) {
-  const sheet = getOrCreateLkwSheet();
-  sheet.getRange('A1').setValue(JSON.stringify(statusObj));
+  withLock_(function () {
+    getOrCreateLkwSheet().getRange('A1').setValue(JSON.stringify(statusObj));
+    SpreadsheetApp.flush();
+    cacheLkw_(statusObj);
+  });
 }
 
 function loadLkwStatusFromSheet() {
