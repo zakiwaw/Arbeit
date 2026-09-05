@@ -818,17 +818,17 @@ function showOpenHusSummary() {
 
     console.log("Verdächtige Paare gefunden:", suspiciousPairs);
     if (suspiciousPairs.length > 0) {
-        ueberzaehligHtml += `<h3 style="margin-top: 20px; color: var(--danger-color); border-top: 2px solid #eee; padding-top: 15px;">Mögliche Tippfehler (Verdachte):</h3>`;
+        ueberzaehligHtml += `<h3 class="suspicion-heading">Mögliche Tippfehler (Verdachte):</h3>`;
         suspiciousPairs.forEach((pair, index) => {
             const diffHtml = highlightDifference(pair.surplus.rawInput, pair.expected);
 
             ueberzaehligHtml += `
-                <div class="hu-order-group" style="border-left-color: var(--warning-color); padding-left: 10px; margin-bottom: 10px;">
-                    <ul class="hu-list" style="font-family: monospace; padding-left: 5px; list-style-type: none;">
-<li><strong style="color: #333;">Gescant: </strong>&nbsp;<span class="hu-value has-dunkelalarm" style="cursor:pointer;" title="Klicken zum Kopieren. Details f\u00FCr ${escapeHtml(pair.surplus.rawInput)} anzeigen">${diffHtml.html1}</span></li>
-                        <li><strong style="color: #333;">Erwartet:</strong>&nbsp;<span class="hu-value" style="cursor:pointer;" title="Klicken zum Kopieren">${diffHtml.html2}</span></li>
+                <div class="hu-order-group hu-order-group-warning">
+                    <ul class="hu-list">
+<li><strong>Gescant: </strong>&nbsp;<span class="hu-value has-dunkelalarm" style="cursor:pointer;" title="Klicken zum Kopieren. Details f\u00FCr ${escapeHtml(pair.surplus.rawInput)} anzeigen">${diffHtml.html1}</span></li>
+                        <li><strong>Erwartet:</strong>&nbsp;<span class="hu-value" style="cursor:pointer;" title="Klicken zum Kopieren">${diffHtml.html2}</span></li>
                     </ul>
-                    ${index < suspiciousPairs.length - 1 ? '<hr style="margin: 5px 0; border: none; border-top: 1px dashed #ccc;">' : ''}
+                    ${index < suspiciousPairs.length - 1 ? '<hr class="detail-divider">' : ''}
                 </div>
             `;
         });
@@ -1413,7 +1413,7 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
     let detailsHtml = '';
 
     if (shipment.parentOrderNumber) {
-        detailsHtml += `<div style="font-size: 0.9em; color: #555; font-weight: bold; margin-bottom: 5px;">VVL: ${escapeHtml(shipment.parentOrderNumber)}</div>`;
+        detailsHtml += `<div class="detail-meta detail-meta-strong">VVL: ${escapeHtml(shipment.parentOrderNumber)}</div>`;
     }
 
     const isManOrder = shipment.freightForwarder && shipment.destinationCountry;
@@ -1422,13 +1422,13 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
         const titlePrefix = isManOrder ? 'Rechnung: ' : 'Kundennr: ';
         detailsHtml += `<strong>${titlePrefix}${escapeHtml(baseNumberToDisplay)}</strong>`;
         if (shipment.plsoNumber && shipment.plsoNumber !== 'N/A') {
-            detailsHtml += `<div style="font-size: 0.9em; color: #555;">PLSO: ${escapeHtml(shipment.plsoNumber)}</div>`;
+            detailsHtml += `<div class="detail-meta">PLSO: ${escapeHtml(shipment.plsoNumber)}</div>`;
         }
         if (isManOrder) {
             const shortForwarderName = shortenForwarderName(shipment.freightForwarder);
-            detailsHtml += `<div style="font-size: 0.9em; color: #555;">Sped.: ${escapeHtml(shortForwarderName)} / Land: ${escapeHtml(shipment.destinationCountry)}</div>`;
+            detailsHtml += `<div class="detail-meta">Sped.: ${escapeHtml(shortForwarderName)} / Land: ${escapeHtml(shipment.destinationCountry)}</div>`;
         }
-        detailsHtml += `<hr style="border: none; border-top: 1px dotted #ccc; margin: 8px 0;">`;
+        detailsHtml += `<hr class="detail-divider">`;
     } else {
         // --- START DER ÄNDERUNG ---
         // ID, data-Attribut und Titel für die Kopierfunktion hinzugefügt.
@@ -1680,7 +1680,7 @@ Object.values(shipments).forEach(s => {
     if (Object.keys(trucks).length === 0) {
 // ... der restliche Code von renderLkwMenu() bleibt unverändert
 
-        container.innerHTML = '<li style="font-size:0.82em;color:#999;padding:4px 12px;list-style:none;">Keine LKWs importiert</li>';
+        container.innerHTML = '<li class="lkw-empty">Keine LKWs importiert</li>';
         return;
     }
 
@@ -1738,7 +1738,7 @@ Object.values(shipments).forEach(s => {
             : '';
 
         // Wir fügen hier die Klasse 'lkw-longpress-target' und data-truckid hinzu
-        html += `<li class="lkw-menu-item lkw-longpress-target" data-truckid="${truckId}" style="list-style: none; display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 8px 0; border-bottom: 1px solid #f5f5f5; flex-wrap: nowrap; overflow: hidden; user-select: none; -webkit-user-select: none;">
+        html += `<li class="lkw-menu-item lkw-longpress-target" data-truckid="${truckId}">
             
             <div style="display: flex; align-items: center; flex-grow: 1; min-width: 0; padding-right: 15px; overflow: hidden; pointer-events: none;">
                 <span style="flex-shrink: 0; white-space: pre;">${prefix}</span>
