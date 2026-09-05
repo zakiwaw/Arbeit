@@ -698,10 +698,17 @@ body.batch-mode-active .status-and-button-container > #mainActionButton { flex: 
 
 .shipment-table { width: 100%; border-collapse: collapse; margin-top: var(--sp-3); }
 .shipment-table thead { display: none; }
+/* Karte: 2 Spalten – links HAWB / Pills / Zeit, rechts die Aktions-Icons */
 .shipment-table tr {
-    display: block;
-    margin-bottom: var(--sp-3);
-    padding: var(--sp-3) var(--sp-4);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+        "hawb    hawb"
+        "summary actions"
+        "time    actions";
+    column-gap: var(--sp-2);
+    margin-bottom: var(--sp-2);
+    padding: var(--sp-3) var(--sp-3) var(--sp-2) var(--sp-4);
     background-color: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--r-lg);
@@ -712,53 +719,42 @@ body.batch-mode-active .status-and-button-container > #mainActionButton { flex: 
 .shipment-table td {
     display: block;
     position: relative;
-    padding: var(--sp-2) 0 var(--sp-2) 38%;
-    min-height: 24px;
+    padding: 0;
+    min-height: 0;
     font-size: var(--fs-sm);
-    text-align: right;
-    border: none;
-    border-bottom: 1px solid var(--border);
-}
-.shipment-table td:last-child { border-bottom: none; }
-.shipment-table td::before {
-    content: attr(data-label);
-    position: absolute;
-    left: 0;
-    width: 36%;
-    padding-right: var(--sp-2);
-    font-size: var(--fs-xs);
-    font-weight: 600;
-    letter-spacing: .04em;
-    text-transform: uppercase;
     text-align: left;
-    color: var(--text-muted);
-    white-space: nowrap;
+    border: none;
 }
+.shipment-table td::before { display: none; } /* keine Labels mehr – Inhalte erklären sich selbst */
 
-/* Erste Zelle: HAWB – groß, Monospace, klickbar */
+/* HAWB – groß, Monospace, ganze Zeile tippbar (öffnet Details) */
 .shipment-table td:first-child {
-    padding: var(--sp-1) 0 var(--sp-3);
+    grid-area: hawb;
+    display: flex;
+    align-items: center;
+    min-height: var(--touch-min);
+    margin: calc(-1 * var(--sp-2)) 0 0;
+    padding: 0 28px 0 0;
     font-family: var(--font-mono);
     font-size: var(--fs-lg);
     font-weight: 700;
     letter-spacing: .01em;
-    text-align: left;
     color: var(--text);
     cursor: pointer;
 }
-.shipment-table td:first-child::before { display: none; }
 .shipment-table td:first-child::after {
     content: "";
     position: absolute;
-    right: 0;
-    top: 14px;
-    width: 10px;
-    height: 10px;
+    right: 6px;
+    top: 50%;
+    width: 9px;
+    height: 9px;
+    margin-top: -6px;
     border-right: 2px solid var(--text-faint);
     border-bottom: 2px solid var(--text-faint);
     transform: rotate(-45deg);
 }
-.vvl-table-entry { font-size: var(--fs-md); line-height: 1.4; }
+.vvl-table-entry { font-size: var(--fs-md); line-height: 1.35; }
 .vvl-table-entry .vvl-prefix, .vvl-table-entry .kundennr-prefix {
     font-family: var(--font-sans);
     font-size: var(--fs-xs);
@@ -768,15 +764,15 @@ body.batch-mode-active .status-and-button-container > #mainActionButton { flex: 
     color: var(--text-muted);
 }
 
-/* Übersicht: Status-Pills */
-.summary-cell { display: flex !important; flex-wrap: wrap; justify-content: flex-end; gap: var(--sp-2); padding-top: var(--sp-2); padding-bottom: var(--sp-2); }
+/* Übersicht: Status-Pills, linksbündig unter der Nummer */
+.summary-cell { grid-area: summary; display: flex !important; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: var(--sp-1) var(--sp-2); padding: 0; }
 .summary-cell strong {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 5px 12px;
+    gap: 5px;
+    padding: 3px 8px;
     font-family: var(--font-mono);
-    font-size: var(--fs-sm);
+    font-size: var(--fs-xs);
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     line-height: 1.2;
@@ -802,36 +798,71 @@ body.batch-mode-active .status-and-button-container > #mainActionButton { flex: 
 .summary-cell strong.over::before { background-color: var(--danger); }
 .summary-divider { display: none; }
 
-/* Aktionen */
-.shipment-table td.actions-cell {
+/* Letzte Änderung: klein, grau, mit Uhr-Icon */
+.shipment-table td:nth-child(3) {
+    grid-area: time;
     display: flex;
-    justify-content: flex-end;
-    gap: var(--sp-2);
-    padding: var(--sp-3) 0 var(--sp-1);
+    align-items: center;
+    gap: 5px;
+    margin-top: var(--sp-1);
+    font-size: var(--fs-xs);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-faint);
+}
+.shipment-table td:nth-child(3)::before {
+    content: "";
+    display: block;
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+    background-color: currentColor;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm.5-13H11v6l5.2 3.1.8-1.3-4.5-2.7V7z'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm.5-13H11v6l5.2 3.1.8-1.3-4.5-2.7V7z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+/* Aktionen: Icon-Leiste rechts (Text bleibt für Screenreader im DOM, wird visuell durch Icon ersetzt) */
+.shipment-table td.actions-cell {
+    grid-area: actions;
+    display: flex;
+    align-items: center;
+    align-self: center;
+    gap: 2px;
+    padding: 0;
     text-align: right;
 }
-.shipment-table td.actions-cell::before { display: none; }
 td.actions-cell button {
-    min-width: 72px;
-    height: 38px;
-    padding: 0 var(--sp-3);
-    font-size: var(--fs-sm);
-    font-weight: 600;
-    color: var(--text);
-    background-color: var(--surface);
-    border: 1.5px solid var(--border-strong);
+    position: relative;
+    width: var(--touch-min);
+    height: var(--touch-min);
+    min-width: 0;
+    padding: 0;
+    font-size: 0;                 /* Text ausblenden … */
+    color: var(--text-muted);
+    background: none;
+    border: none;
     border-radius: var(--r-md);
-    transition: background-color var(--dur) var(--ease), border-color var(--dur) var(--ease), color var(--dur) var(--ease);
+    transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
 }
-td.actions-cell button:hover, td.actions-cell button:active { background-color: var(--surface-3); }
-td.actions-cell button.edit-btn { color: var(--text); }
-td.actions-cell button.pdf-btn { color: var(--accent-text); border-color: var(--accent); }
+td.actions-cell button::before {  /* … und Icon zeigen */
+    content: "";
+    display: block;
+    width: 24px;
+    height: 24px;
+    margin: 0 auto;
+    background-color: currentColor;
+    -webkit-mask: var(--icon) center / contain no-repeat;
+    mask: var(--icon) center / contain no-repeat;
+}
+td.actions-cell button:hover, td.actions-cell button:active { background-color: var(--surface-3); color: var(--text); }
+td.actions-cell button.edit-btn { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z'/%3E%3C/svg%3E"); }
+td.actions-cell button.pdf-btn  { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 12h8v2H8v-2zm0 4h8v2H8v-2z'/%3E%3C/svg%3E"); color: var(--accent-text); }
 td.actions-cell button.pdf-btn:hover { background-color: var(--accent-soft); }
 td.actions-cell button.main-delete-btn,
 td.actions-cell button.delete-btn {
+    --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12zM8 9h8v10H8V9zm7.5-5-1-1h-5l-1 1H5v2h14V4h-3.5z'/%3E%3C/svg%3E");
     color: var(--danger-text) !important;
-    background-color: var(--surface) !important;
-    border-color: var(--danger) !important;
+    background-color: transparent !important;
+    border-color: transparent !important;
 }
 td.actions-cell button.delete-btn:hover { background-color: var(--danger-soft) !important; }
 body.batch-mode-active td.actions-cell button.edit-btn { display: none; }
@@ -1782,11 +1813,14 @@ body.modal-open { overflow: hidden; }
         border: none;
     }
     .shipment-table td::before, .shipment-table td:first-child::after { display: none; }
-    .shipment-table td:first-child { padding: var(--sp-3) var(--sp-4); font-size: var(--fs-md); }
+    .shipment-table td:first-child { display: table-cell; min-height: 0; margin: 0; padding: var(--sp-3) var(--sp-4); font-size: var(--fs-md); }
     .shipment-table th:nth-child(3), .shipment-table td:nth-child(3) { white-space: nowrap; color: var(--text-muted); }
+    .shipment-table td:nth-child(3) { display: table-cell; margin: 0; font-size: var(--fs-sm); }
+    .shipment-table td:nth-child(3)::before { display: none; }
     .summary-cell { display: table-cell !important; }
     .summary-cell strong { margin: 2px 6px 2px 0; }
-    .shipment-table td.actions-cell { display: table-cell; width: 260px; text-align: right; white-space: nowrap; }
+    .shipment-table td.actions-cell { display: table-cell; width: 170px; text-align: right; white-space: nowrap; }
+    td.actions-cell button { display: inline-block; vertical-align: middle; width: 40px; height: 40px; }
     td.actions-cell button + button { margin-left: var(--sp-1); }
     th.qr-code-header, td.qr-code-cell { display: table-cell; width: 90px; text-align: center; }
 
