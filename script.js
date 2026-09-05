@@ -3782,9 +3782,15 @@ async function sendPdfEmailViaBackend(event) {
                 });
                 if (!response.ok) throw new Error(`Server Fehler (Mail): ${response.status} ${response.statusText}`);
                 const result = await response.json();
-                if (result.status === 'success') {
-                    console.log(`Abschluss-Benachrichtigung für ${baseNumber} erfolgreich gesendet.`);
-                    displayError(`Sendung ${escapeHtml(baseNumber)} abgeschlossen! Benachrichtigung gesendet.`, 'blue', 4000);
+                // Kennt das Server-Skript die Aktion nicht (Skript ohne Abschluss-Handler), ist das KEIN Fehler:
+                // die Scans sind längst über saveShipments gespeichert – nur die Zusatz-Benachrichtigung entfällt.
+                const serverHasNoHandler = result.status !== 'success' && isUnknownActionError(result);
+                if (result.status === 'success' || serverHasNoHandler) {
+                    if (serverHasNoHandler) console.info(`Server kennt 'shipmentComplete' nicht – Abschluss von ${baseNumber} nur lokal gemeldet.`);
+                    else console.log(`Abschluss-Benachrichtigung für ${baseNumber} erfolgreich gesendet.`);
+                    const count = calculateCurrentCountedPieces(shipmentObject.scannedItems || []);
+                    const serverNote = (!serverHasNoHandler && result.message) ? ` ${result.message}` : '';
+                    displayError(`Sendung ${escapeHtml(baseNumber)} vollständig erfasst (${count}/${shipmentObject.totalPiecesExpected}).${serverNote}`, 'blue', 4000);
                 } else {
                     throw new Error(`Apps Script Fehler (Mail): ${result.message || 'Unbekannt'}`);
                 }
@@ -3964,10 +3970,12 @@ else if (target.closest('.hu-value')) {
             const result = processAndSaveSingleScan(rawInput, status, isCombination);
             if (!result.waitingForTotal) {
                 if (result.success) {
-                    renderTable();
-                    displayCurrentShipmentDetails(processShipmentNumber(rawInput).baseNumber);
+                    // Eingabefeld ZUERST leeren: renderTable() filtert die Liste nach dem Feldinhalt.
+                    // Wurde erst danach geleert, blieben alle anderen Sendungen ausgeblendet („verschwunden“).
                     shipmentNumberInputEl.value = '';
                     updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
+                    renderTable();
+                    displayCurrentShipmentDetails(processShipmentNumber(rawInput).baseNumber);
                     displayError(result.message, 'green', 2000);
                 } else {
                     displayError(result.message);

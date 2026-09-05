@@ -18,6 +18,11 @@ V2 ändert das:
 | `deleteShipment` | Löschung als Markierung (Tombstone, Spalte E = TRUE), damit andere Geräte die Sendung nicht wiederbeleben. |
 | `loadAllData`, `saveAllData`, `clearAllData`, `sendPdfEmail`, `saveLkwStatus`, `loadLkwStatus` | Wie bisher – `saveAllData` läuft jetzt ebenfalls durch den Merge, ein altes Gerät kann also nichts mehr überschreiben. |
 
+Nicht im Skript enthalten: `shipmentComplete` (Abschluss-Benachrichtigung) und `sendSummaryEmail`. Die App wertet die
+Antwort „Unbekannte Aktion“ auf `shipmentComplete` **nicht** als Fehler – die Scans sind zu dem Zeitpunkt längst über
+`saveShipments` gespeichert, es entfällt nur die Zusatz-Benachrichtigung. Soll beim Abschluss einer Sendung wirklich eine
+E-Mail verschickt werden, muss dafür ein `case "shipmentComplete"` mit `MailApp.sendEmail(...)` ergänzt werden.
+
 Merge-Regeln (je Scan-Eintrag, identifiziert über eine stabile `id`):
 - Einträge beider Seiten bleiben erhalten; nur was ein Gerät **selbst** geändert hat, setzt sich durch.
 - **Storno geht nie verloren** (ein Gerät, das das Storno noch nicht kannte, kann es nicht aufheben).
