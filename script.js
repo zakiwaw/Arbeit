@@ -249,9 +249,13 @@ const LKWSTATUSKEY = 'frachtLkwStatusV1';
     const MITARBEITER_NAME = "Zakaria Bisbiss";
     const RAC_NUMMER = "DE/RA/00889-07";
     const NON_COUNTING_STATUSES = ['Dunkelalarm', 'Anstehend', 'NichtSichern', 'Abgelehnt', 'Wareneingang'];
-    const NOTE_ALLOWED_STATUSES = ['XRY', 'Abgelehnt', 'Dunkelalarm', 'ETD', 'EDD'];
-    const EXCLUSIVE_SECURITY_STATUSES = ['XRY', 'ETD', 'EDD'];
-    // ... (Zeile 118) const EXCLUSIVE_SECURITY_STATUSES = ['XRY', 'ETD', 'EDD'];
+    // Sicherheits-Kontrollmethoden (zählen als Sicherung, schließen sich je Packstück gegenseitig aus,
+    // lösen automatisch den Wareneingang aus). Neue Methoden NUR hier und im <select id="securityStatusSelect"> ergänzen.
+    // Kürzel wie in der Sicherheitserklärung: XRY = Röntgen, ETD = Sprengstoffspurendetektion, EDD = Sprengstoffspürhund,
+    // PHS = Handdurchsuchung, VCK = Sichtkontrolle. PHS/VCK verhalten sich in der App exakt wie ETD/EDD.
+    const EXCLUSIVE_SECURITY_STATUSES = ['XRY', 'ETD', 'EDD', 'PHS', 'VCK'];
+    const NOTE_ALLOWED_STATUSES = [...EXCLUSIVE_SECURITY_STATUSES, 'Abgelehnt', 'Dunkelalarm'];
+    const STATUSES_THAT_TRIGGER_WE = [...EXCLUSIVE_SECURITY_STATUSES, 'Dunkelalarm']; // Scan erzeugt automatisch den Wareneingang
     
     // AKTUALISIERTE LISTE BASIEREND AUF Kundennummerliste VW.xlsx (Stand: 16.10.2025)
     const KUNDENNR_CARRIER_MAP = {
@@ -572,7 +576,7 @@ function closeSuspicionModal() {
 function showOpenHusSummary() {
     removeActiveInlineNoteEditor();
     const shipments = loadShipments();
-    const securityClearanceStatuses = ['XRY', 'ETD', 'EDD'];
+    const securityClearanceStatuses = EXCLUSIVE_SECURITY_STATUSES;
     let openSecurityHusByOrder = [],
         missingReceiptHusByOrder = [],
         dunkelalarmItemsByOrder = {},
@@ -1711,7 +1715,7 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
     }
 
     if (shipment.isHuListOrder) {
-        const securityClearanceStatuses = ['XRY', 'ETD', 'EDD'];
+        const securityClearanceStatuses = EXCLUSIVE_SECURITY_STATUSES;
         const manifestSlots = shipment.scannedItems.filter(item => 
             item.status === 'Anstehend' || securityClearanceStatuses.includes(item.status)
         );
@@ -2209,7 +2213,7 @@ function hideDetailView() {
 // --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESER NEUEN VERSION ---
 
 function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFromCheckbox) {
-    const statusesThatTriggerWE = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
+    const statusesThatTriggerWE = STATUSES_THAT_TRIGGER_WE;
 
     const { baseNumber, suffix, isValidFormat, raw: processedRawInput, isSuffixFormat } = processShipmentNumber(rawInputToSave);
     if (!isValidFormat) { return { success: false, waitingForTotal: false, message: `Ungültiges Format: ${escapeHtml(rawInputToSave)}` }; }
@@ -2951,7 +2955,7 @@ function skipNoteAndAddFirstBatchItem() {
 function saveBatch() {
     if (currentBatch.length === 0) { displayError("Batch ist leer."); focusShipmentInput(); return; }
     
-    const statusesThatTriggerWE = ['XRY', 'ETD', 'EDD', 'Dunkelalarm'];
+    const statusesThatTriggerWE = STATUSES_THAT_TRIGGER_WE;
 
     let successCount = 0;
     let errorCount = 0;
@@ -3691,7 +3695,7 @@ async function sendPdfEmailViaBackend(event) {
                 return [];
             }
 
-            const securityClearanceStatuses = ['XRY', 'ETD', 'EDD'];
+            const securityClearanceStatuses = EXCLUSIVE_SECURITY_STATUSES;
             
             // Alle HUs, die entweder "Anstehend" sind oder bereits einen Sicherheitsstatus haben (aus der Originalliste)
             const manifestSlots = shipment.scannedItems.filter(item => 
