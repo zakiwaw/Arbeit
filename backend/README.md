@@ -38,6 +38,10 @@ Das Sheet `_meta` (ausgeblendet) hält den globalen Versionszähler in A1 und wi
    (Nicht „Neue Bereitstellung“ – das würde eine neue URL erzeugen.)
 5. Fertig. Die URL in `script.js` bleibt unverändert.
 
+Falls doch eine **neue Bereitstellung** entstanden ist (neue ID), die neue Web-App-URL in `script.js` bei
+`const WEB_APP_URL = …` eintragen. Die zweite Konstante `WEB_APP_URL_BACKEND` (PDF-Mail-Versand) ist eine
+andere Bereitstellung und bleibt unberührt.
+
 Prüfen: App auf zwei Geräten öffnen, auf Gerät A scannen → nach spätestens 15 s erscheint der Scan auf
 Gerät B ohne Neuladen. Der Sync-Punkt in der Kopfzeile ist grün.
 

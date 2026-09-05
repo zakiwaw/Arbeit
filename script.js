@@ -240,7 +240,9 @@ const suspicionDeclineBtnEl = document.getElementById('suspicionDeclineBtn');
 
     // --- Konstanten & Konfiguration ---
     const WEB_APP_URL_BACKEND = 'https://script.google.com/macros/s/AKfycbyBtlm37WxzXdFCDjQuSIWfnQiTny6gwrmXuoq_cacGY9_bkqZxuuW7aJEqLuHJhWYg/exec'; // Mail_13
-    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbw_ug_levQ7LuOn27CijAdkabnz5utME2aEeN6s560RzSb8lKCsSo5VT4nyOebRJnd0gw/exec';
+    // Daten-Backend (backend/Code.gs). Bereitstellung "Version 10" vom 05.09.2026 – bei einer NEUEN Bereitstellung hier die URL anpassen.
+    // Vorherige Bereitstellung (altes Skript V1): AKfycbw_ug_levQ7LuOn27CijAdkabnz5utME2aEeN6s560RzSb8lKCsSo5VT4nyOebRJnd0gw
+    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyjaxBurmTWWJENUF2nr2WB5S6Le5ja-bcZ9OtBLktATx1zGAAZCa5IlvFaL1_yl6jjgA/exec';
     const LOCAL_STORAGE_KEY = 'frachtSicherungMobile_V8_18_Refactored';
 const LKWSTATUSKEY = 'frachtLkwStatusV1';
     const SUFFIX_LENGTH = 4;
