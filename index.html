@@ -6,8 +6,11 @@
     <title>Fracht Tracker (V8.18 - Refactored)</title>
     <link rel="stylesheet" href="styles.css">
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+    <!-- Bibliotheken werden lokal ausgeliefert (kein CDN mehr nötig):
+         jsPDF 2.5.1, jsPDF-AutoTable 3.5.23, qrcodejs 1.0.0 -->
+    <script src="assets/vendor/jspdf.umd.min.js"></script>
+    <script src="assets/vendor/jspdf.plugin.autotable.min.js"></script>
+    <script src="assets/vendor/qrcode.min.js"></script>
 </head>
 <body>
 
@@ -126,7 +129,9 @@
                 <button id="clearBatchButton">Batch Leeren</button>
             </div>
         </div>
-        <div id="currentShipmentDetails">Geben Sie eine Sendungsnummer ein...</div>
+        <!-- Statischer Hinweis in der Hauptansicht. Die eigentlichen Sendungsdetails
+             werden in der Detailansicht (#detailView → #currentShipmentDetails) angezeigt. -->
+        <div id="mainShipmentDetails">Geben Sie eine Sendungsnummer ein...</div>
 
        <table>
             <thead>
@@ -252,8 +257,6 @@
         </div>
     </div>
 </div>
-<!-- =============================================================== -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <!-- =============================================================== -->
 
 <script src="script.js"></script>
