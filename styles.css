@@ -698,17 +698,20 @@ body.batch-mode-active .status-and-button-container > #mainActionButton { flex: 
 
 .shipment-table { width: 100%; border-collapse: collapse; margin-top: var(--sp-3); }
 .shipment-table thead { display: none; }
-/* Karte: 2 Spalten – links HAWB / Pills / Zeit, rechts die Aktions-Icons */
+/* Karte: HAWB und Status-Pills über die volle Breite, darunter Zeit (links) und Aktions-Icons (rechts).
+   Die Pill-Zeile hängt bewusst NICHT von der Breite der Icon-Leiste ab: Safari (iOS) berechnet die Zeilenhöhe
+   nicht neu, wenn sich nur die Nachbarspalte ändert (z. B. Stift-Icon im Batch-Modus ausgeblendet) – die
+   umgebrochene Pille lag dann über der Uhrzeit. */
 .shipment-table tr {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
         "hawb    hawb"
-        "summary actions"
+        "summary summary"
         "time    actions";
     column-gap: var(--sp-2);
     margin-bottom: var(--sp-2);
-    padding: var(--sp-3) var(--sp-3) var(--sp-2) var(--sp-4);
+    padding: var(--sp-3) var(--sp-3) var(--sp-1) var(--sp-4);
     background-color: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--r-lg);
@@ -798,13 +801,15 @@ body.batch-mode-active .status-and-button-container > #mainActionButton { flex: 
 .summary-cell strong.over::before { background-color: var(--danger); }
 .summary-divider { display: none; }
 
-/* Letzte Änderung: klein, grau, mit Uhr-Icon */
+/* Letzte Änderung: klein, grau, mit Uhr-Icon – einzeilig, damit sich die Zeilenhöhe nie ändert */
 .shipment-table td:nth-child(3) {
     grid-area: time;
     display: flex;
     align-items: center;
     gap: 5px;
-    margin-top: var(--sp-1);
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
     font-size: var(--fs-xs);
     font-variant-numeric: tabular-nums;
     color: var(--text-faint);

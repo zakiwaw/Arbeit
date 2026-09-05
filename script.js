@@ -2606,12 +2606,22 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
             }
         }
 
+        // Reines Darstellungs-Hilfsmittel: Safari (iOS) übernimmt Größenänderungen von Nachbarspalten im Karten-Raster
+        // nicht immer in die Zeilenhöhe. Kurzes display:none → Reflow → zurück erzwingt ein sauberes Layout (kein Flackern,
+        // passiert innerhalb eines Frames), Daten und Handler bleiben unberührt.
+        function forceListRelayout() {
+            if (!tableBodyEl) return;
+            tableBodyEl.style.display = 'none';
+            void tableBodyEl.offsetHeight;
+            tableBodyEl.style.display = '';
+        }
         function toggleBatchMode(activate) {
             isBatchModeActive = activate;
             clearError();
             resetSingleScanNoteInputState();
             updateNoteAndComboVisibility(); // Combo und Einzelnotiz-Button aktualisieren
             document.body.classList.toggle('batch-mode-active', isBatchModeActive);
+            forceListRelayout(); // Safari: Karten nach Ein-/Ausblenden des Stift-Icons frisch layouten (sonst veraltete Zeilenhöhe)
 
 
             if (isBatchModeActive) {
