@@ -233,11 +233,36 @@ button {
     text-overflow: ellipsis;
 }
 
+/* Sync-Punkt: grau = unbekannt, grün = synchron, gelb pulsierend = sendet, rot = offline */
+.sync-indicator {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    margin-left: calc(-1 * var(--sp-1));
+    flex-shrink: 0;
+}
+.sync-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background-color: var(--text-faint);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--text-faint) 20%, transparent);
+    transition: background-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.sync-indicator.is-ok    .sync-dot { background-color: var(--success); box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 25%, transparent); }
+.sync-indicator.is-busy  .sync-dot { background-color: var(--warning); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warning) 25%, transparent); animation: blink 1s ease-in-out infinite; }
+.sync-indicator.is-error .sync-dot { background-color: var(--danger);  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 30%, transparent); }
+
 .app-bar-batch {
     display: flex;
     align-items: center;
     gap: var(--sp-2);
     flex-shrink: 0;
+}
+@media (max-width: 420px) {
+    .app-bar-batch > label:first-child { display: none; }
 }
 .app-bar-batch > label:first-child {
     margin: 0;
@@ -867,10 +892,10 @@ th.qr-code-header, td.qr-code-cell { display: none; }
     border-radius: var(--r-lg);
     box-shadow: var(--shadow-md);
 }
-/* Titel = HAWB. Klick kopiert → als große, tippbare Fläche */
+/* Titel = HAWB. Tippen kopiert. -------------------------------------- */
 #currentShipmentDetails > strong {
     display: block;
-    margin: 0 0 var(--sp-3);
+    margin: 0 0 var(--sp-2);
     font-family: var(--font-mono);
     font-size: var(--fs-xl);
     font-weight: 700;
@@ -880,18 +905,16 @@ th.qr-code-header, td.qr-code-cell { display: none; }
 }
 #currentShipmentDetails #shipmentDetailTitle {
     position: relative;
+    display: flex;
+    align-items: center;
     min-height: var(--touch-min);
-    padding: var(--sp-2) 92px var(--sp-2) var(--sp-3);
-    font-size: var(--fs-lg);
-    background-color: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: var(--r-md);
+    padding: 0 88px 0 0;
     cursor: pointer;
 }
 #shipmentDetailTitle::after {
     content: "Kopieren";
     position: absolute;
-    right: var(--sp-2);
+    right: 0;
     top: 50%;
     transform: translateY(-50%);
     padding: 6px 10px;
@@ -903,90 +926,140 @@ th.qr-code-header, td.qr-code-cell { display: none; }
     background-color: var(--accent-soft);
     border-radius: var(--r-full);
 }
-#currentShipmentDetails #shipmentDetailTitle:hover { color: var(--accent); }
+#currentShipmentDetails #shipmentDetailTitle:active { color: var(--accent); }
+#currentShipmentDetails #shipmentDetailTitle.copied::after { content: "Kopiert!"; color: #fff; background-color: var(--success); }
 
-/* Scan-Liste = Zeitleiste ---------------------------------------- */
-#currentShipmentDetails ul { list-style: none; margin: var(--sp-2) 0; padding: 0; }
+/* Zusammenfassung – direkt unter dem Titel, zwei große Zahlen ---------- */
+#currentShipmentDetails .summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-3);
+}
+#currentShipmentDetails .summary > span {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: var(--sp-2) var(--sp-3);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    background-color: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+}
+.summary .ok, .summary .mismatch, .summary .over {
+    font-family: var(--font-mono);
+    font-size: var(--fs-2xl);
+    font-weight: 800;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0;
+    text-transform: none;
+}
+.summary .ok small, .summary .mismatch small, .summary .over small { font-size: var(--fs-md); font-weight: 600; opacity: .7; }
+.summary .ok       { color: var(--success-text); }
+.summary .mismatch { color: var(--warning-text); }
+.summary .over     { color: var(--danger-text); }
+/* Kachel färbt sich mit: fertig grün, überzählig rot */
+#currentShipmentDetails .summary > span:has(.ok)   { background-color: var(--success-soft); border-color: color-mix(in srgb, var(--success) 35%, transparent); }
+#currentShipmentDetails .summary > span:has(.over) { background-color: var(--danger-soft);  border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
+
+/* Scan-Liste = Zeitleiste, kompakt ------------------------------------- */
+#currentShipmentDetails ul { list-style: none; margin: 0; padding: 0; }
+#currentShipmentDetails > ul { position: relative; padding-left: 14px; }
+#currentShipmentDetails > ul::before { /* durchgehende Linie */
+    content: "";
+    position: absolute;
+    left: 4px;
+    top: 10px;
+    bottom: 10px;
+    width: 2px;
+    background-color: var(--border);
+}
 #currentShipmentDetails > ul > li {
     display: flex;
     flex-wrap: wrap;
-    align-items: flex-start;
+    align-items: center;
     position: relative;
-    margin: 0 0 var(--sp-2);
-    padding: var(--sp-3) var(--sp-3) var(--sp-3) 22px;
+    margin: 0 0 var(--sp-1);
+    padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3);
     font-family: var(--font-sans);
     font-size: var(--fs-md);
-    line-height: 1.4;
+    line-height: 1.35;
     white-space: normal;
     background-color: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--r-md);
 }
 #currentShipmentDetails > ul > li:last-child { margin-bottom: 0; }
-/* Punkt + Linie der Zeitleiste */
-#currentShipmentDetails > ul > li::before {
+#currentShipmentDetails > ul > li::before { /* Punkt auf der Linie */
     content: "";
     position: absolute;
-    left: 8px;
-    top: 21px;
-    width: 8px;
-    height: 8px;
+    left: -14px;
+    top: 18px;
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
     background-color: var(--accent);
-    box-shadow: 0 0 0 3px var(--accent-soft);
+    border: 2px solid var(--surface);
+    box-sizing: border-box;
 }
-#currentShipmentDetails > ul > li.cancelled-item::before { background-color: var(--text-faint); box-shadow: 0 0 0 3px var(--surface-3); }
+#currentShipmentDetails > ul > li.cancelled-item::before { background-color: var(--text-faint); }
 
 #currentShipmentDetails .scan-main-info {
     flex: 1 1 auto;
     min-width: 0;
-    padding-right: 84px; /* Platz für Storno */
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px var(--sp-2);
+    padding-right: 72px; /* Platz für Storno */
     white-space: normal;
     overflow: visible;
     overflow-wrap: anywhere;
 }
 #currentShipmentDetails li .timestamp {
-    display: block;
-    margin-bottom: 2px;
+    flex: 0 0 100%;
+    margin: 0;
     font-family: var(--font-mono);
     font-size: var(--fs-xs);
     font-variant-numeric: tabular-nums;
     color: var(--text-muted);
 }
-/* HU-Nummer: eigene große Tippfläche (kopieren) */
+/* HU-Nummer: eigene Tippfläche (kopieren) */
 #currentShipmentDetails .scan-main-info .hu-value {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
     min-height: 36px;
-    margin: 2px 0;
-    padding: 4px 8px;
+    padding: 0 var(--sp-2);
     font-family: var(--font-mono);
     font-size: var(--fs-md);
     font-weight: 700;
-    line-height: 28px;
     color: var(--text);
     background-color: var(--surface-2);
     border: 1px solid var(--border);
     border-radius: var(--r-sm);
-    vertical-align: middle;
 }
 #currentShipmentDetails .scan-main-info .hu-value:active { background-color: var(--accent-soft); border-color: var(--accent); }
-#currentShipmentDetails .scan-main-info .position-number { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-faint); vertical-align: middle; }
+#currentShipmentDetails .scan-main-info .position-number { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-faint); }
 #currentShipmentDetails li .status {
     display: inline-block;
     padding: 3px 8px;
     font-size: var(--fs-xs);
-    letter-spacing: .01em;
     font-weight: 700;
+    letter-spacing: .01em;
     color: var(--accent-text);
     background-color: var(--accent-soft);
     border-radius: var(--r-full);
-    vertical-align: middle;
 }
-#currentShipmentDetails li .combo { margin-left: var(--sp-1); font-size: var(--fs-xs); font-style: italic; color: var(--info-text); vertical-align: middle; }
-#currentShipmentDetails li .cancelled-info { display: block; margin-top: 2px; font-size: var(--fs-xs); color: var(--text-faint); text-decoration: none !important; }
+#currentShipmentDetails li .combo { font-size: var(--fs-xs); font-style: italic; color: var(--info-text); }
+#currentShipmentDetails li .cancelled-info { flex: 0 0 100%; font-size: var(--fs-xs); color: var(--text-faint); text-decoration: none !important; }
 #currentShipmentDetails li.cancelled-item { color: var(--cancelled-color); background-color: var(--surface-2); text-decoration: none; }
 #currentShipmentDetails li.cancelled-item .hu-value,
-#currentShipmentDetails li.cancelled-item .status { text-decoration: line-through; opacity: .7; }
+#currentShipmentDetails li.cancelled-item .status { text-decoration: line-through; opacity: .65; }
 #currentShipmentDetails li.cancelled-item .status { color: var(--text-muted); background-color: var(--surface-3); }
 #currentShipmentDetails li.cancelled-item .timestamp,
 #currentShipmentDetails li.cancelled-item .combo,
@@ -995,38 +1068,48 @@ th.qr-code-header, td.qr-code-cell { display: none; }
 #currentShipmentDetails li.cancelled-item .add-note-link { color: var(--cancelled-color) !important; cursor: default; text-decoration: none; }
 #currentShipmentDetails li.cancelled-item .add-note-link { display: none; }
 
-/* Storno: rechts oben, volle Touch-Höhe */
+/* Storno: dezenter Text-Button rechts, 44 px Tippfläche */
 .cancel-button {
     position: absolute;
-    right: var(--sp-2);
+    right: var(--sp-1);
     top: var(--sp-2);
     min-height: var(--touch-min);
+    min-width: var(--touch-min);
     padding: 0 var(--sp-2);
     font-family: var(--font-sans);
     font-size: var(--fs-xs);
-    letter-spacing: .02em;
-    text-transform: uppercase;
     font-weight: 700;
+    letter-spacing: .03em;
+    text-transform: uppercase;
     color: var(--warning-text);
-    background-color: var(--warning-soft);
-    border: 1px solid transparent;
+    background: none;
+    border: none;
     border-radius: var(--r-md);
     transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
 }
-.cancel-button:hover, .cancel-button:active { color: #fff; background-color: var(--warning); }
+.cancel-button:hover, .cancel-button:active { color: var(--warning-text); background-color: var(--warning-soft); }
 
 .hu-value.has-dunkelalarm, .pending-vse.has-dunkelalarm { color: var(--danger); font-weight: 700; }
 #currentShipmentDetails .scan-main-info .hu-value.has-dunkelalarm { color: var(--danger-text); background-color: var(--danger-soft); border-color: var(--danger); }
-.sendnr-display { margin-left: var(--sp-1); font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-muted); vertical-align: middle; }
+.sendnr-display { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-muted); }
 
 /* Notizen & Aktionen unter dem Scan -------------------------------- */
-#currentShipmentDetails .scan-actions-and-notes { flex-basis: 100%; padding: var(--sp-1) 0 0 0; }
-#currentShipmentDetails .notes-container { display: flex; flex-direction: column; gap: var(--sp-1); margin-top: var(--sp-1); }
+#currentShipmentDetails .scan-actions-and-notes {
+    flex-basis: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--sp-1);
+    padding: 0;
+}
+#currentShipmentDetails .scan-actions-and-notes:has(.notes-container) { padding-top: var(--sp-1); }
+#currentShipmentDetails .notes-container { flex: 1 1 100%; display: flex; flex-direction: column; gap: var(--sp-1); }
 #currentShipmentDetails .note-item {
     display: flex;
     align-items: center;
     gap: var(--sp-2);
-    min-height: var(--touch-min);
+    min-height: 40px;
     padding: 0 0 0 var(--sp-3);
     font-family: var(--font-sans);
     background-color: var(--warning-soft);
@@ -1039,8 +1122,8 @@ th.qr-code-header, td.qr-code-cell { display: none; }
     align-self: stretch;
     display: flex;
     align-items: center;
-    min-height: var(--touch-min);
-    padding: var(--sp-2) 0;
+    min-height: 40px;
+    padding: var(--sp-1) 0;
     font-family: var(--font-sans);
     font-size: var(--fs-sm);
     font-style: normal;
@@ -1054,7 +1137,7 @@ th.qr-code-header, td.qr-code-cell { display: none; }
     flex-shrink: 0;
     align-self: stretch;
     width: var(--touch-min);
-    min-height: var(--touch-min);
+    min-height: 40px;
     padding: 0;
     font-size: 0;           /* Emoji-Glyphe ausblenden – nicht jede Geräteschrift hat sie */
     line-height: 1;
@@ -1068,65 +1151,30 @@ th.qr-code-header, td.qr-code-cell { display: none; }
 #currentShipmentDetails .note-item .delete-note-btn:hover,
 #currentShipmentDetails .note-item .delete-note-btn:active { color: #fff; background-color: var(--danger); }
 
-/* "Notiz hinzufügen": Outline-Button in Touch-Größe */
+/* "Notiz hinzufügen": klein sichtbar, aber 44 px hohe Tippfläche */
 #currentShipmentDetails li .add-note-link {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    min-height: 40px;
-    margin-top: var(--sp-2);
-    padding: 0 var(--sp-3);
+    gap: 4px;
+    min-height: var(--touch-min);
+    margin: calc(-1 * var(--sp-2)) 0; /* Tippfläche ragt in die Karten-Polsterung, ohne Höhe zu kosten */
+    padding: 0 var(--sp-2);
     font-family: var(--font-sans);
-    font-size: var(--fs-sm);
-    font-weight: 600;
-    color: var(--accent);
-    background-color: transparent;
-    border: 1px dashed var(--border-strong);
-    border-radius: var(--r-md);
-    text-decoration: none;
-    cursor: pointer;
-    transition: background-color var(--dur) var(--ease), border-color var(--dur) var(--ease);
-}
-#currentShipmentDetails li .add-note-link::before { content: "+"; font-size: var(--fs-lg); font-weight: 700; line-height: 1; }
-#currentShipmentDetails li .add-note-link:hover,
-#currentShipmentDetails li .add-note-link:active { background-color: var(--accent-soft); border-color: var(--accent); text-decoration: none; }
-#currentShipmentDetails li .editable-note:hover { color: var(--accent-hover); }
-
-/* Zusammenfassung unten in den Details – zwei Kacheln */
-#currentShipmentDetails .summary {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--sp-2);
-    margin-top: var(--sp-4);
-    padding-top: var(--sp-3);
-    font-weight: 600;
-    border-top: 1px solid var(--border);
-}
-#currentShipmentDetails .summary > span {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: var(--sp-2) var(--sp-3);
     font-size: var(--fs-xs);
-    font-weight: 700;
-    letter-spacing: .04em;
-    text-transform: uppercase;
+    font-weight: 600;
     color: var(--text-muted);
-    background-color: var(--surface-2);
-    border: 1px solid var(--border);
+    text-decoration: none;
     border-radius: var(--r-md);
+    cursor: pointer;
+    transition: color var(--dur) var(--ease), background-color var(--dur) var(--ease);
 }
-.summary .ok, .summary .mismatch, .summary .over {
-    font-family: var(--font-mono);
-    font-size: var(--fs-lg);
-    font-variant-numeric: tabular-nums;
-    letter-spacing: 0;
-    text-transform: none;
-}
-.summary .ok       { color: var(--success-text); }
-.summary .mismatch { color: var(--warning-text); }
-.summary .over     { color: var(--danger-text); font-weight: 800; }
-@media (max-width: 359px) { #currentShipmentDetails .summary { grid-template-columns: 1fr; } }
+#currentShipmentDetails li .add-note-link::before { content: "+"; font-size: var(--fs-sm); font-weight: 700; line-height: 1; }
+#currentShipmentDetails li .add-note-link { font-weight: 500; }
+#currentShipmentDetails li .add-note-link:hover,
+#currentShipmentDetails li .add-note-link:active { color: var(--accent); background-color: var(--accent-soft); text-decoration: none; }
+#currentShipmentDetails li .editable-note:hover { color: var(--accent-hover); }
+/* Wenn Notizen da sind, sitzt der Link unter der letzten Notiz und darf nicht nach oben ragen */
+#currentShipmentDetails .scan-actions-and-notes:has(.notes-container) .add-note-link { margin-top: 0; }
 
 /* Offene Positionen (HU-Liste in den Details) */
 #pendingHuList {
@@ -1181,7 +1229,6 @@ th.qr-code-header, td.qr-code-cell { display: none; }
 }
 #huDetailsContent #huDetailsNumber.copied::after { left: auto; right: 10px; }
 #currentShipmentDetails .scan-main-info .hu-value.copied::after { left: 0; top: auto; bottom: 100%; transform: none; margin-bottom: 4px; }
-#currentShipmentDetails #shipmentDetailTitle.copied::after { content: "Kopiert!"; color: #fff; background-color: var(--success); }
 
 
 /* ===================================================================
@@ -1619,12 +1666,17 @@ body.modal-open { overflow: hidden; }
 }
 /* Sobald Text drin ist, wird die Zeile zu einer Meldungs-Box.
    Die Textfarbe setzt das JS (red/green/orange/blue) – der Hintergrund folgt ihr über currentColor. */
+.error[style*="color: red"]    { color: var(--danger-text) !important; }
+.error[style*="color: orange"] { color: var(--warning-text) !important; }
+.error[style*="color: blue"]   { color: var(--info-text) !important; }
+.error[style*="color: green"]  { color: var(--success-text) !important; }
 .error:not(:empty) {
     padding: var(--sp-3) var(--sp-4);
+    text-align: left;
     border-radius: var(--r-md);
     background-color: color-mix(in srgb, currentColor 10%, transparent);
-    border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
-    animation: pop-in .2s var(--ease);
+    border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+    border-left: 4px solid currentColor;
 }
 
 .loading-overlay {

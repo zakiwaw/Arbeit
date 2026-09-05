@@ -847,8 +847,10 @@ function showOpenHusSummary() {
  * Speichert Sendungen zuerst lokal und synchronisiert dann mit dem Server.
  * @param {object} shipments Das Objekt mit allen Sendungen.
  */
+const SYNC_FAILED_MESSAGE = "Lokal gespeichert – Server nicht erreichbar. Wird beim nächsten Speichern erneut versucht.";
 async function saveShipments(shipments) {
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(shipments));
+    setSyncIndicator('busy', 'Wird synchronisiert …');
     try {
         const response = await fetch(WEB_APP_URL, {
             method: 'POST',
@@ -861,13 +863,15 @@ async function saveShipments(shipments) {
         const result = await response.json();
         if (result.status === 'success') {
             console.log("Daten erfolgreich zum Server synchronisiert.");
-            displayError("Gespeichert & Synchronisiert", 'green', 1500);
+            setSyncIndicator('ok', 'Synchronisiert');
+            if (errorDisplayEl.textContent === SYNC_FAILED_MESSAGE) clearError(); // alte Offline-Warnung aufräumen
         } else {
             throw new Error(result.message);
         }
     } catch (error) {
         console.error("Fehler bei der Server-Synchronisierung:", error);
-        displayError("Lokal gespeichert, aber Server-Sync fehlgeschlagen!", 'red', 5000);
+        setSyncIndicator('error', 'Server nicht erreichbar – Daten sind lokal gespeichert');
+        displayError(SYNC_FAILED_MESSAGE, 'red'); // bleibt stehen, bis der nächste Sync klappt
     }
 }
 async function loadDataFromServer() {
@@ -1077,7 +1081,22 @@ function findCarrierForHu(huNumber) {
 // --- ENDE DER ÄNDERUNG: Neue Hilfsfunktion für Spediteur-Info ---
         // --- Hilfsfunktionen: UI & Fehler ---
         function clearError() { errorDisplayEl.textContent = ''; }
+        // Sync-Punkt in der App-Bar: 'ok' | 'busy' | 'error'. Ersetzt die grünen Erfolgsmeldungen,
+        // damit im Scan-Betrieb nichts mehr blinkt und springt. Fehler laufen weiterhin über die Meldungsbox.
+        function setSyncIndicator(state, title) {
+            const el = document.getElementById('syncIndicator');
+            if (!el) return;
+            el.classList.remove('is-ok', 'is-busy', 'is-error');
+            el.classList.add('is-' + state);
+            if (title) el.title = title;
+        }
         function displayError(message, color = 'red', autoClearTimeout = null) {
+            if (color === 'green') {
+                // Erfolg wird nicht mehr als Box gezeigt – kurz grün am Sync-Punkt anzeigen.
+                setSyncIndicator('ok', message);
+                if (errorDisplayEl.style.color === 'green') clearError();
+                return;
+            }
             errorDisplayEl.textContent = message;
             errorDisplayEl.style.color = color;
             if (autoClearTimeout) {
@@ -1408,7 +1427,7 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
         detailsHtml += `<strong id="shipmentDetailTitle" 
                                 style="cursor:pointer;" 
                                 title="Klicken, um '${escapeHtml(baseNumberToDisplay)}' zu kopieren" 
-                                data-hawb="${escapeHtml(baseNumberToDisplay)}">Details f\u00FCr ${escapeHtml(baseNumberToDisplay)}:</strong>`;
+                                data-hawb="${escapeHtml(baseNumberToDisplay)}">${escapeHtml(baseNumberToDisplay)}</strong>`;
         // --- ENDE DER ÄNDERUNG ---
     }
 
@@ -1451,15 +1470,32 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
         }
     }
     
+    // Zusammenfassung steht oben – das Wichtigste zuerst.
+    const expected = shipment.totalPiecesExpected;
+    const securityScansCount = calculateCurrentCountedPieces(shipment.scannedItems || []);
+    const receiptScansCount = calculateGoodsReceiptCount(shipment.scannedItems || []);
+    {
+        const expectedText = (expected !== null && expected !== undefined) ? `${expected}` : 'N/A';
+        const receiptClass = getStatusClass(receiptScansCount, expected);
+        const securityClass = getStatusClass(securityScansCount, expected);
+        detailsHtml += `<div class="summary">`;
+        detailsHtml += `<span>Wareneingang<span class="${receiptClass}">${receiptScansCount}<small>/${expectedText}</small></span></span>`;
+        detailsHtml += `<span>Sicherung<span class="${securityClass}">${securityScansCount}<small>/${expectedText}</small></span></span>`;
+        detailsHtml += `</div>`;
+    }
+
+    const todayStr = new Date().toLocaleDateString('de-DE');
     detailsHtml += `<ul>`;
-    (shipment.scannedItems || []).filter(item => item.status !== 'Anstehend').sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)).forEach(item => {
+    // Neueste Scans zuerst – am Scanner will man sehen, was man gerade gemacht hat.
+    (shipment.scannedItems || []).filter(item => item.status !== 'Anstehend').sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).forEach(item => {
         const dt = new Date(item.timestamp);
         const timeStr = dt.toLocaleTimeString('de-DE');
         const dateStr = dt.toLocaleDateString('de-DE');
         const isCancelled = item.isCancelled;
         detailsHtml += `<li class="${isCancelled ? 'cancelled-item' : ''}">`;
         detailsHtml += `<div class="scan-main-info">`;
-        detailsHtml += `<span class="timestamp">[${dateStr} ${timeStr}]</span> `;
+        // Datum nur anzeigen, wenn es nicht heute ist
+        detailsHtml += `<span class="timestamp">${dateStr === todayStr ? timeStr : dateStr + ' ' + timeStr}</span> `;
 //... innerhalb der Funktion displayCurrentShipmentDetails ...
 let numberPart = isManOrder && item.position ? `<span class="position-number">${item.position}.</span> ` : '';
 let sendnrHtml = item.sendnr ? `<span class="sendnr-display"> (${escapeHtml(item.sendnr)})</span>` : '';
@@ -1498,17 +1534,6 @@ detailsHtml += `${numberPart}<span class="hu-value" style="cursor:pointer;" titl
     });
     detailsHtml += `</ul>`;
 
-    const expected = shipment.totalPiecesExpected;
-    const securityScansCount = calculateCurrentCountedPieces(shipment.scannedItems || []);
-    const receiptScansCount = calculateGoodsReceiptCount(shipment.scannedItems || []);
-    detailsHtml += `<div class="summary">`;
-    let expectedText = (expected !== null && expected !== undefined) ? `${expected} Stk.` : 'N/A';
-    const receiptClass = getStatusClass(receiptScansCount, expected);
-    detailsHtml += `<span>Wareneingang: <span class="${receiptClass}">${receiptScansCount} von ${expectedText}</span></span>`;
-    const securityClass = getStatusClass(securityScansCount, expected);
-    detailsHtml += `<span>Sicherung erfasst: <span class="${securityClass}">${securityScansCount} von ${expectedText}</span></span>`;
-    detailsHtml += `</div>`;
-    
     displayTarget.innerHTML = detailsHtml;
 
     if (expected !== null && expected !== undefined) {
