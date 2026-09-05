@@ -44,6 +44,13 @@ Gerät B ohne Neuladen. Der Sync-Punkt in der Kopfzeile ist grün.
 Solange das alte Skript noch läuft, zeigt die neue App den Hinweis „Server-Skript ist veraltet …“ und
 arbeitet wie bisher (kompletter Datensatz, kein Mehrgeräte-Schutz).
 
+## Auslegung
+
+Abgestimmt auf **bis zu 3 Geräte gleichzeitig**: Abruf alle 15 s je sichtbarem Gerät → maximal ~12 Anfragen/Minute
+insgesamt. Ein Abruf ohne Änderungen liest nur den Versionszähler (kein Sendungs-Sheet), Schreibzugriffe laufen
+nacheinander unter Sperre. Apps Script erlaubt 30 gleichzeitige Ausführungen; davon sind wir weit entfernt.
+Bei deutlich mehr Geräten `SYNC_POLL_INTERVAL_MS` in `script.js` erhöhen (z. B. 25000).
+
 ## Optional: Aufräumen
 
 `purgeDeletedRows()` im Skript-Editor manuell ausführen, um Lösch-Markierungen physisch aus dem Sheet zu entfernen.
