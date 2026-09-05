@@ -867,141 +867,266 @@ th.qr-code-header, td.qr-code-cell { display: none; }
     border-radius: var(--r-lg);
     box-shadow: var(--shadow-md);
 }
+/* Titel = HAWB. Klick kopiert → als große, tippbare Fläche */
 #currentShipmentDetails > strong {
     display: block;
-    margin-bottom: var(--sp-3);
+    margin: 0 0 var(--sp-3);
     font-family: var(--font-mono);
-    font-size: var(--fs-lg);
+    font-size: var(--fs-xl);
     font-weight: 700;
+    letter-spacing: .01em;
     color: var(--text);
+    overflow-wrap: anywhere;
 }
-#currentShipmentDetails #shipmentDetailTitle:hover { color: var(--accent); text-decoration: underline dotted; }
+#currentShipmentDetails #shipmentDetailTitle {
+    position: relative;
+    min-height: var(--touch-min);
+    padding: var(--sp-2) 92px var(--sp-2) var(--sp-3);
+    font-size: var(--fs-lg);
+    background-color: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    cursor: pointer;
+}
+#shipmentDetailTitle::after {
+    content: "Kopieren";
+    position: absolute;
+    right: var(--sp-2);
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 6px 10px;
+    font-family: var(--font-sans);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: .02em;
+    color: var(--accent);
+    background-color: var(--accent-soft);
+    border-radius: var(--r-full);
+}
+#currentShipmentDetails #shipmentDetailTitle:hover { color: var(--accent); }
 
+/* Scan-Liste = Zeitleiste ---------------------------------------- */
 #currentShipmentDetails ul { list-style: none; margin: var(--sp-2) 0; padding: 0; }
-#currentShipmentDetails li {
+#currentShipmentDetails > ul > li {
     display: flex;
     flex-wrap: wrap;
     align-items: flex-start;
     position: relative;
-    margin-bottom: var(--sp-1);
-    padding: var(--sp-2) 88px var(--sp-2) 0;
-    font-family: var(--font-mono);
+    margin: 0 0 var(--sp-2);
+    padding: var(--sp-3) var(--sp-3) var(--sp-3) 22px;
+    font-family: var(--font-sans);
     font-size: var(--fs-md);
     line-height: 1.4;
     white-space: normal;
-    border-bottom: 1px solid var(--border);
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
 }
-#currentShipmentDetails li:last-child { border-bottom: none; }
-#currentShipmentDetails .scan-main-info { flex: 1 1 100%; min-width: 0; white-space: normal; overflow: visible; overflow-wrap: anywhere; }
-#currentShipmentDetails .scan-main-info .hu-value { font-weight: 700; }
-#currentShipmentDetails .scan-actions-and-notes { flex-basis: 100%; padding: var(--sp-1) 0 0 0; }
-#currentShipmentDetails li .timestamp { display: block; margin-bottom: 2px; font-size: var(--fs-xs); color: var(--text-muted); }
-#currentShipmentDetails li .status { font-weight: 700; color: var(--accent-text); }
-#currentShipmentDetails li .combo { margin-left: var(--sp-1); font-style: italic; color: var(--info-text); }
-#currentShipmentDetails li .cancelled-info { display: block; font-size: var(--fs-xs); color: var(--text-faint); text-decoration: none !important; }
-#currentShipmentDetails li.cancelled-item { color: var(--cancelled-color); text-decoration: line-through; }
+#currentShipmentDetails > ul > li:last-child { margin-bottom: 0; }
+/* Punkt + Linie der Zeitleiste */
+#currentShipmentDetails > ul > li::before {
+    content: "";
+    position: absolute;
+    left: 8px;
+    top: 21px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
+#currentShipmentDetails > ul > li.cancelled-item::before { background-color: var(--text-faint); box-shadow: 0 0 0 3px var(--surface-3); }
+
+#currentShipmentDetails .scan-main-info {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding-right: 84px; /* Platz für Storno */
+    white-space: normal;
+    overflow: visible;
+    overflow-wrap: anywhere;
+}
+#currentShipmentDetails li .timestamp {
+    display: block;
+    margin-bottom: 2px;
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+}
+/* HU-Nummer: eigene große Tippfläche (kopieren) */
+#currentShipmentDetails .scan-main-info .hu-value {
+    display: inline-block;
+    min-height: 36px;
+    margin: 2px 0;
+    padding: 4px 8px;
+    font-family: var(--font-mono);
+    font-size: var(--fs-md);
+    font-weight: 700;
+    line-height: 28px;
+    color: var(--text);
+    background-color: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    vertical-align: middle;
+}
+#currentShipmentDetails .scan-main-info .hu-value:active { background-color: var(--accent-soft); border-color: var(--accent); }
+#currentShipmentDetails .scan-main-info .position-number { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-faint); vertical-align: middle; }
+#currentShipmentDetails li .status {
+    display: inline-block;
+    padding: 3px 8px;
+    font-size: var(--fs-xs);
+    letter-spacing: .01em;
+    font-weight: 700;
+    color: var(--accent-text);
+    background-color: var(--accent-soft);
+    border-radius: var(--r-full);
+    vertical-align: middle;
+}
+#currentShipmentDetails li .combo { margin-left: var(--sp-1); font-size: var(--fs-xs); font-style: italic; color: var(--info-text); vertical-align: middle; }
+#currentShipmentDetails li .cancelled-info { display: block; margin-top: 2px; font-size: var(--fs-xs); color: var(--text-faint); text-decoration: none !important; }
+#currentShipmentDetails li.cancelled-item { color: var(--cancelled-color); background-color: var(--surface-2); text-decoration: none; }
+#currentShipmentDetails li.cancelled-item .hu-value,
+#currentShipmentDetails li.cancelled-item .status { text-decoration: line-through; opacity: .7; }
+#currentShipmentDetails li.cancelled-item .status { color: var(--text-muted); background-color: var(--surface-3); }
 #currentShipmentDetails li.cancelled-item .timestamp,
-#currentShipmentDetails li.cancelled-item .status,
 #currentShipmentDetails li.cancelled-item .combo,
 #currentShipmentDetails li.cancelled-item .note-display,
 #currentShipmentDetails li.cancelled-item .editable-note,
 #currentShipmentDetails li.cancelled-item .add-note-link { color: var(--cancelled-color) !important; cursor: default; text-decoration: none; }
 #currentShipmentDetails li.cancelled-item .add-note-link { display: none; }
 
+/* Storno: rechts oben, volle Touch-Höhe */
 .cancel-button {
     position: absolute;
-    right: 0;
+    right: var(--sp-2);
     top: var(--sp-2);
-    height: 34px;
-    padding: 0 var(--sp-3);
+    min-height: var(--touch-min);
+    padding: 0 var(--sp-2);
     font-family: var(--font-sans);
     font-size: var(--fs-xs);
+    letter-spacing: .02em;
+    text-transform: uppercase;
     font-weight: 700;
     color: var(--warning-text);
     background-color: var(--warning-soft);
-    border: none;
-    border-radius: var(--r-sm);
+    border: 1px solid transparent;
+    border-radius: var(--r-md);
     transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
 }
 .cancel-button:hover, .cancel-button:active { color: #fff; background-color: var(--warning); }
 
-#currentShipmentDetails .hu-value { position: relative; cursor: pointer; transition: color var(--dur) var(--ease); }
-#currentShipmentDetails .hu-value:hover { color: var(--accent); }
 .hu-value.has-dunkelalarm, .pending-vse.has-dunkelalarm { color: var(--danger); font-weight: 700; }
-.sendnr-display { margin-left: var(--sp-2); font-size: var(--fs-xs); font-style: italic; color: var(--text-muted); }
+#currentShipmentDetails .scan-main-info .hu-value.has-dunkelalarm { color: var(--danger-text); background-color: var(--danger-soft); border-color: var(--danger); }
+.sendnr-display { margin-left: var(--sp-1); font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-muted); vertical-align: middle; }
 
-/* Notizen */
-#currentShipmentDetails .notes-container { display: flex; flex-direction: column; gap: 3px; margin-top: var(--sp-1); }
-#currentShipmentDetails .note-item { display: flex; align-items: center; gap: var(--sp-2); font-family: var(--font-sans); }
-#currentShipmentDetails .note-item .note-prefix { font-size: var(--fs-xs); font-weight: 700; color: var(--text-muted); }
+/* Notizen & Aktionen unter dem Scan -------------------------------- */
+#currentShipmentDetails .scan-actions-and-notes { flex-basis: 100%; padding: var(--sp-1) 0 0 0; }
+#currentShipmentDetails .notes-container { display: flex; flex-direction: column; gap: var(--sp-1); margin-top: var(--sp-1); }
+#currentShipmentDetails .note-item {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-height: var(--touch-min);
+    padding: 0 0 0 var(--sp-3);
+    font-family: var(--font-sans);
+    background-color: var(--warning-soft);
+    border-left: 3px solid var(--warning);
+    border-radius: var(--r-sm);
+}
+#currentShipmentDetails .note-item .note-prefix { display: none; } /* Farbstreifen ersetzt das Wort "Notiz:" */
 #currentShipmentDetails li .editable-note {
     flex: 1;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    min-height: var(--touch-min);
+    padding: var(--sp-2) 0;
     font-family: var(--font-sans);
     font-size: var(--fs-sm);
-    font-style: italic;
-    color: var(--accent-text);
+    font-style: normal;
+    color: var(--text);
     cursor: pointer;
-    text-decoration: underline dotted;
-}
-#currentShipmentDetails li .add-note-link {
-    display: inline-block;
-    margin-top: var(--sp-1);
-    font-family: var(--font-sans);
-    font-size: var(--fs-xs);
-    font-weight: 600;
-    color: var(--accent);
     text-decoration: none;
-    cursor: pointer;
+    overflow-wrap: anywhere;
 }
-#currentShipmentDetails li .editable-note:hover, #currentShipmentDetails li .add-note-link:hover { color: var(--accent-hover); text-decoration: underline; }
-#currentShipmentDetails .note-item .delete-note-btn {
-    flex-shrink: 0;
-    width: 28px;
-    height: 28px;
-    padding: 0;
-    font-size: var(--fs-xs);
-    line-height: 1;
-    color: var(--text-muted);
-    background-color: var(--surface-3);
-    border: none;
-    border-radius: 50%;
-    transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
-}
-#currentShipmentDetails .note-item .delete-note-btn:hover { color: #fff; background-color: var(--danger); }
 #currentShipmentDetails .note-item .delete-note-btn {
     position: relative;
+    flex-shrink: 0;
+    align-self: stretch;
+    width: var(--touch-min);
+    min-height: var(--touch-min);
+    padding: 0;
     font-size: 0;           /* Emoji-Glyphe ausblenden – nicht jede Geräteschrift hat sie */
-}
-#currentShipmentDetails .note-item .delete-note-btn::before {
-    content: "×";
-    font-size: 18px;
     line-height: 1;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    border-radius: 0 var(--r-sm) var(--r-sm) 0;
+    transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
 }
+#currentShipmentDetails .note-item .delete-note-btn::before { content: "×"; font-size: 22px; line-height: 1; }
+#currentShipmentDetails .note-item .delete-note-btn:hover,
+#currentShipmentDetails .note-item .delete-note-btn:active { color: #fff; background-color: var(--danger); }
 
-/* Zusammenfassung unten in den Details */
+/* "Notiz hinzufügen": Outline-Button in Touch-Größe */
+#currentShipmentDetails li .add-note-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 40px;
+    margin-top: var(--sp-2);
+    padding: 0 var(--sp-3);
+    font-family: var(--font-sans);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--accent);
+    background-color: transparent;
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--r-md);
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+#currentShipmentDetails li .add-note-link::before { content: "+"; font-size: var(--fs-lg); font-weight: 700; line-height: 1; }
+#currentShipmentDetails li .add-note-link:hover,
+#currentShipmentDetails li .add-note-link:active { background-color: var(--accent-soft); border-color: var(--accent); text-decoration: none; }
+#currentShipmentDetails li .editable-note:hover { color: var(--accent-hover); }
+
+/* Zusammenfassung unten in den Details – zwei Kacheln */
 #currentShipmentDetails .summary {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: var(--sp-2);
-    margin-top: var(--sp-3);
+    margin-top: var(--sp-4);
     padding-top: var(--sp-3);
     font-weight: 600;
     border-top: 1px solid var(--border);
 }
 #currentShipmentDetails .summary > span {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    font-size: var(--fs-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--sp-2) var(--sp-3);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
     color: var(--text-muted);
-    background-color: var(--surface-3);
-    border-radius: var(--r-full);
+    background-color: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
 }
-.summary .ok, .summary .mismatch, .summary .over { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.summary .ok, .summary .mismatch, .summary .over {
+    font-family: var(--font-mono);
+    font-size: var(--fs-lg);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0;
+    text-transform: none;
+}
 .summary .ok       { color: var(--success-text); }
 .summary .mismatch { color: var(--warning-text); }
 .summary .over     { color: var(--danger-text); font-weight: 800; }
+@media (max-width: 359px) { #currentShipmentDetails .summary { grid-template-columns: 1fr; } }
 
 /* Offene Positionen (HU-Liste in den Details) */
 #pendingHuList {
@@ -1013,10 +1138,10 @@ th.qr-code-header, td.qr-code-cell { display: none; }
 }
 #pendingHuList.partial { border-color: var(--warning); background-color: var(--warning-soft); }
 #pendingHuList h4 { margin: 0 0 var(--sp-2); font-size: var(--fs-sm); font-weight: 700; color: var(--text); }
-#pendingHuList ul { margin: 0; padding: 0; max-height: 180px; overflow-y: auto; font-family: var(--font-mono); font-size: var(--fs-sm); }
-#pendingHuList li { padding: var(--sp-1) var(--sp-2); border-bottom: 1px solid var(--border); }
+#pendingHuList ul { margin: 0; padding: 0; max-height: 240px; overflow-y: auto; font-family: var(--font-mono); font-size: var(--fs-sm); }
+#pendingHuList li { min-height: 40px; padding: var(--sp-1) var(--sp-2); border-bottom: 1px solid var(--border); }
 #pendingHuList li:last-child { border-bottom: none; }
-#pendingHuList .hu-list li { display: flex; align-items: center; padding: var(--sp-1) var(--sp-2); }
+#pendingHuList .hu-list li { display: flex; align-items: center; min-height: 40px; padding: var(--sp-1) var(--sp-2); }
 .position-number { min-width: 2.5em; padding-right: 1em; flex-shrink: 0; text-align: right; color: var(--text-faint); }
 
 .pending-list-header, .hu-list-header {
@@ -1055,6 +1180,8 @@ th.qr-code-header, td.qr-code-cell { display: none; }
     animation: fade-in-out 1.5s ease-in-out;
 }
 #huDetailsContent #huDetailsNumber.copied::after { left: auto; right: 10px; }
+#currentShipmentDetails .scan-main-info .hu-value.copied::after { left: 0; top: auto; bottom: 100%; transform: none; margin-bottom: 4px; }
+#currentShipmentDetails #shipmentDetailTitle.copied::after { content: "Kopiert!"; color: #fff; background-color: var(--success); }
 
 
 /* ===================================================================
