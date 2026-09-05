@@ -234,34 +234,6 @@ const suspicionDeclineBtnEl = document.getElementById('suspicionDeclineBtn');
                         return { success: true, message: message, messageType: messageType, baseNumber: mainOrderNumber };
                     }
         
-                    // Listener für den "Importieren & Speichern"-Button (schließt das Modal)
-                    saveHuListButtonEl.addEventListener('click', () => {
-                        const result = saveAndProcessHuListData();
-                        if (result.success) {
-                            displayCurrentShipmentDetails(result.baseNumber);
-                            importHuModalEl.classList.remove('visible');
-                            document.body.classList.remove('modal-open'); // <-- DIESE ZEILE IST NEU
-                            if (result.message) {
-                                displayError(result.message, result.messageType, 5000);
-                            }
-                            focusShipmentInput();
-                        }
-                    });
-        
-                    // Listener für den neuen "+"-Button (speichert und leert die Felder)
-                    addAndContinueHuButtonEl.addEventListener('click', () => {
-                        const result = saveAndProcessHuListData();
-                        if (result.success) {
-                            displayCurrentShipmentDetails(result.baseNumber);
-                            if (result.message) {
-                               displayError(result.message, result.messageType, 5000);
-                            }
-                            // Felder für die nächste Eingabe leeren
-                            mainOrderNumberInputEl.value = '';
-                            huListTextareaEl.value = '';
-                            mainOrderNumberInputEl.focus();
-                        }
-                    });
 
     // --- Konstanten & Konfiguration ---
     const WEB_APP_URL_BACKEND = 'https://script.google.com/macros/s/AKfycbyBtlm37WxzXdFCDjQuSIWfnQiTny6gwrmXuoq_cacGY9_bkqZxuuW7aJEqLuHJhWYg/exec'; // Mail_13
@@ -3548,53 +3520,10 @@ async function sendPdfEmailViaBackend(event) {
             }
         }
 
-            // --- START: Doppelklick-Logik für manuelle Eingabe im HU-Modal ---
-            function enableManualInputOnDoubleClick(event) {
-                const element = event.target;
-                element.removeAttribute('readonly');
-                element.setAttribute('inputmode', 'text');
-                setTimeout(() => {
-                    element.focus();
-                    element.select();
-                }, 50);
-            }
-
-            mainOrderNumberInputEl.addEventListener('dblclick', enableManualInputOnDoubleClick);
-            huListTextareaEl.addEventListener('dblclick', enableManualInputOnDoubleClick);
-            // --- ENDE: Doppelklick-Logik ---
         // --- Seitenmenü ---
         function openSideMenu() { removeActiveInlineNoteEditor(); sideMenuEl.classList.add('open'); menuOverlayEl.classList.add('visible'); }
         function closeSideMenu() { sideMenuEl.classList.remove('open'); menuOverlayEl.classList.remove('visible'); sheetStatusEl.textContent = ''; focusShipmentInput(); }
-            // --- START: Doppelklick-Logik für manuelle Eingabe im HU-Modal ---
-            function enableManualInput(event) {
-                const element = event.target;
-                element.removeAttribute('readonly');
-                element.setAttribute('inputmode', 'text'); // Tastatur anfordern
-                // Kleiner Timeout, damit der Browser die Änderung verarbeiten kann, bevor der Fokus gesetzt wird
-                setTimeout(() => {
-                    element.focus();
-                    element.select(); // Text markieren für einfaches Überschreiben
-                }, 50);
-            }
 
-            mainOrderNumberInputEl.addEventListener('dblclick', enableManualInput);
-            huListTextareaEl.addEventListener('dblclick', enableManualInput);
-
-            importHuListButtonEl.addEventListener('click', () => {
-                sideMenuEl.classList.remove('open');
-                menuOverlayEl.classList.remove('visible');
-
-                // Inputmode für Scanner zurücksetzen
-                mainOrderNumberInputEl.inputMode = 'none';
-                huListTextareaEl.inputMode = 'none';
-
-                mainOrderNumberInputEl.value = '';
-                huListTextareaEl.value = '';
-                importHuModalEl.classList.add('visible');
-                document.body.classList.add('modal-open');
-                // NEU: Diese Zeile auskommentieren, um das automatische Öffnen der Tastatur zu verhindern.
-                // mainOrderNumberInputEl.focus(); 
-            });
 
 
 
@@ -4136,9 +4065,6 @@ noteEditFormEl.addEventListener('submit', (e) => {
     cancelEditButtonEl.addEventListener('click', closeEditModal);
     editModalEl.addEventListener('click', (e) => { if (e.target === editModalEl) closeEditModal(); });
 
-    confirmNewTotalBtnEl.addEventListener('click', () => completeNewShipmentSave(newTotalInputEl.value));
-    skipNewTotalBtnEl.addEventListener('click', () => completeNewShipmentSave(null));
-    newTotalInputEl.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); confirmNewTotalBtnEl.click(); }});
 
     // Batch Modus
     batchModeToggleEl.addEventListener('change', (e) => toggleBatchMode(e.target.checked));
@@ -4366,16 +4292,6 @@ showUeberzaehligHusBtnEl.addEventListener('click', () => {
         }
     });
 
-    openHusListContainerEl.addEventListener('click', openHuDetailsModal);
-    missingReceiptHusListContainerEl.addEventListener('click', openHuDetailsModal);
-    dunkelalarmHusListContainerEl.addEventListener('click', openHuDetailsModal);
-
-    huDetailsModalEl.addEventListener('click', (e) => {
-        if (e.target === huDetailsModalEl || e.target.closest('[data-close-modal="huDetailsModal"]')) {
-            huDetailsModalEl.classList.remove('visible');
-            document.body.classList.remove('modal-open');
-        }
-    });
 
     saveHuListButtonEl.addEventListener('click', () => {
         const result = saveAndProcessHuListData();
