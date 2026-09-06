@@ -1557,9 +1557,8 @@ function fitTextToContainer(element, container, initialFontSize, minFontSize, pa
                 document.querySelector('#currentShipmentDetails .inline-note-editor')) {
                 return; // Kein Fokus, wenn ein Modal, Menü oder Editor aktiv ist
             }
-            // Eingabe auf einer Unterseite (z. B. Info-Suche) nicht unterbrechen
-            const ae = document.activeElement;
-            if (ae && pageContentEl && pageContentEl.contains(ae) && /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName)) return;
+            // Auf einer Unterseite (Vollbild) ist das Scan-Feld nicht sichtbar – dort nichts fokussieren
+            if (typeof currentPage !== 'undefined' && currentPage && pageViewEl && !pageViewEl.classList.contains('hidden')) return;
             if (shipmentNumberInputEl && !shipmentNumberInputEl.disabled) {
                 shipmentNumberInputEl.inputMode = 'none'; // Für Scanner
                 setTimeout(() => shipmentNumberInputEl.focus(), 0);
@@ -2443,22 +2442,20 @@ Object.values(shipments).forEach(s => {
 
 
 // ===================================================================
-// STARTSEITE (Suche + Kacheln) UND UNTERSEITEN
+// STARTSEITE (Kacheln) UND UNTERSEITEN
 // Kacheln: Anlieferung (LKW → seine Sendungen), Dunkelalarm, Offene Sendungen, Info (Suche mit Filtern).
-// Die Unterseiten sind keine Modals und keine eigenen HTML-Dateien: sie werden unterhalb der Scan-Box in
-// #pageView gezeichnet und liegen im Browser-Verlauf (history.pushState) – Zurück-Geste/-Taste schließt sie
-// wieder, ebenso die Detailansicht. Die Scan-Box bleibt auf jeder Seite stehen: Scannen, Batch-Modus und Sync
-// laufen unverändert; nach jedem Zeichnen der Liste (drawShipmentList) werden Kacheln und Seite mit aktualisiert.
-// Tippt man im Scan-Feld, erscheinen die Treffer an Stelle der Kacheln bzw. des Seiteninhalts.
+// Die Unterseiten sind eigene Vollbild-Ansichten (#pageView) wie die Sendungsdetails – die Hauptansicht ist dabei
+// ausgeblendet. Sie liegen im Browser-Verlauf mit eigener Adresse (?seite=anlieferung usw.): Zurück-Geste/-Taste
+// schließt sie, Neuladen öffnet sie wieder. Keine getrennten HTML-Dateien: Daten, Sync und Scan-Logik bleiben
+// an einer Stelle. Nach jedem Zeichnen der Liste (drawShipmentList) – also nach Scan, Sync, Löschen, Import –
+// werden Kacheln und eine offene Seite mit aktualisiert. Tippt man im Scan-Feld, weichen die Kacheln den Treffern.
 // ===================================================================
 const homeHubEl = document.getElementById('homeHub');
-const homeSearchBtnEl = document.getElementById('homeSearchBtn');
 const pageViewEl = document.getElementById('pageView');
 const pageTitleEl = document.getElementById('pageTitle');
 const pageBadgeEl = document.getElementById('pageBadge');
 const pageContentEl = document.getElementById('pageContent');
 const pageBackBtnEl = document.getElementById('pageBackBtn');
-const listBlockEl = document.getElementById('listBlock');
 const listCaptionEl = document.getElementById('listCaption');
 
 const PAGE_LIST_STEP = LIST_PAGE_SIZE;
@@ -2563,14 +2560,14 @@ function updateHomeTiles() {
     setTileText('tileInfoMeta', `${pluralize(st.total, 'Sendung', 'Sendungen')}${st.archived ? ` · ${st.archived} im Archiv` : ''}`);
 }
 
-// ---- Sichtbarkeit von Kacheln / Seite / Liste ------------------------------
+// ---- Sichtbarkeit: Kacheln ↔ Treffer, Seite (Vollbild) ↔ Hauptansicht ------------------------------
 function updateHomeLayout() {
     const filter = isBatchModeActive ? '' : listFilterText;
     const pageOpen = !!currentPage;
-    if (homeHubEl) homeHubEl.classList.toggle('hidden', pageOpen || !!filter);
+    const detailOpen = detailViewEl && !detailViewEl.classList.contains('hidden');
+    if (homeHubEl) homeHubEl.classList.toggle('hidden', !!filter);
     if (pageViewEl) pageViewEl.classList.toggle('hidden', !pageOpen);
-    if (pageContentEl) pageContentEl.classList.toggle('hidden', pageOpen && !!filter); // Suchtreffer verdrängen den Seiteninhalt
-    if (listBlockEl) listBlockEl.classList.toggle('hidden', pageOpen && !filter);
+    if (mainViewEl) mainViewEl.classList.toggle('hidden', pageOpen || detailOpen);
     if (listCaptionEl) listCaptionEl.textContent = filter ? `Treffer zu „${filter}“` : (isBatchModeActive ? 'Sendungen' : 'Zuletzt bearbeitet');
 }
 // Wird am Ende von drawShipmentList aufgerufen – also nach jedem Scan, Sync, Löschen, Import …
@@ -2580,23 +2577,32 @@ function refreshHomeViews() {
     updateHomeLayout();
 }
 
-// ---- Navigation (Browser-Verlauf) --------------------------------------------
+// ---- Navigation (Browser-Verlauf, Adresse ?seite=…) --------------------------------------------
 function pageKey(p) { return p ? p.id + (p.truckId ? ':' + p.truckId : '') : ''; }
-function pushHistory(state) { try { history.pushState(state, '', location.href); } catch (e) { /* z. B. file:// */ } }
+function pageUrl(page, detail) {
+    const u = new URL(location.href);
+    u.searchParams.delete('seite'); u.searchParams.delete('lkw'); u.searchParams.delete('sendung');
+    if (page) { u.searchParams.set('seite', page.id === 'lkw' ? 'anlieferung' : page.id); if (page.truckId) u.searchParams.set('lkw', page.truckId); }
+    if (detail) u.searchParams.set('sendung', detail);
+    return u.pathname + u.search + u.hash;
+}
+function pushHistory(state) { try { history.pushState(state, '', pageUrl(state.frtPage, state.frtDetail)); } catch (e) { /* z. B. file:// */ } }
+function replaceHistory(state) { try { history.replaceState(state, '', pageUrl(state.frtPage, state.frtDetail)); } catch (e) { /* ignorieren */ } }
 function openPage(page) {
     if (!pageViewEl || !page || !PAGE_RENDERERS[page.id]) return;
     const next = { id: page.id, truckId: page.truckId || null };
     const same = pageKey(currentPage) === pageKey(next);
     currentPage = next;
     if (!same) pushHistory({ frtPage: currentPage });
+    lastScrollPosition = window.scrollY;
     renderCurrentPage(true);
-    window.scrollTo(0, 0);
-    if (next.id !== 'info') focusShipmentInput(); // Scan-Feld bleibt das Ziel für den Scanner (Info-Seite: eigenes Suchfeld)
+    pageViewEl.scrollTop = 0;
 }
 function showHome() {
     currentPage = null;
     if (pageContentEl) pageContentEl.innerHTML = '';
     updateHomeLayout();
+    window.scrollTo(0, lastScrollPosition);
     focusShipmentInput(); // Scanner wieder scharf (wie nach dem Schließen der Detailansicht)
 }
 // Zurück-Knopf der Seite: über den Verlauf schließen, damit Verlauf und Anzeige zusammenpassen
@@ -2797,9 +2803,7 @@ const PAGE_RENDERERS = {
             const sum = computeOpenHusSummary();
             const orders = Object.keys(sum.dunkelalarmItemsByOrder).map(b => Object.assign({}, sum.dunkelalarmItemsByOrder[b], { orderNumber: b })).sort(sortByCountryAndOrder);
             setPageHeader('Dunkelalarm', sum.totalDunkelalarms ? String(sum.totalDunkelalarms) : '');
-            let html = orders.length
-                ? '<p class="page-note">Sendungszeile antippen öffnet die Details, HU antippen zeigt ihre Daten. Deaktivierte LKW sind ausgeblendet.</p>'
-                : '<p class="page-empty">Keine Einträge mit Status „Dunkelalarm“.</p>';
+            let html = orders.length ? '' : '<p class="page-empty">Keine Einträge mit Status „Dunkelalarm“.</p>';
             html += orders.map(d => `<div class="page-order" data-basenumber="${escapeHtml(d.orderNumber)}">${generateHtmlForOrderGroup(d, generateHuListHtml(d.items, d.scannedItems, sum.shipments), true)}</div>`).join('');
             html += '<div class="page-actions"><button type="button" class="page-link-btn" data-open-hus-modal="1">Alle offenen HUs anzeigen (Sicherung · Eingänge · Überzählig)</button></div>';
             pageContentEl.innerHTML = html;
@@ -2827,9 +2831,7 @@ const PAGE_RENDERERS = {
             const openCount = groups.reduce((n, g) => n + g.rows.length, 0);
             setPageHeader('Offene Sendungen', openCount ? `${openCount} offen` : '');
             const detailsWasOpen = !!pageContentEl.querySelector('.page-details[open]'); // beim Neuzeichnen (Sync) offen lassen
-            pageContentEl.innerHTML = openCount
-                ? '<p class="page-note">Offen = Sicherung noch nicht vollständig (HU-Listen: noch „Anstehend“; Einzelsendungen: erfasste Stück + Dunkelalarm unter der Stückzahl). Deaktivierte LKW sind ausgeblendet.</p>'
-                : '<p class="page-empty">Keine offenen Sendungen – alles erfasst.</p>';
+            pageContentEl.innerHTML = openCount ? '' : '<p class="page-empty">Keine offenen Sendungen – alles erfasst.</p>';
             appendShipmentGroups(pageContentEl, groups);
             if (unknown.length) {
                 unknown.sort(byTime);
@@ -2933,13 +2935,7 @@ const PAGE_RENDERERS = {
 // ---- Klicks auf Kacheln und Seiteninhalt ------------------------------------------
 if (homeHubEl) homeHubEl.addEventListener('click', (e) => {
     const tile = e.target.closest('.home-tile[data-page]');
-    if (tile) { openPage({ id: tile.dataset.page }); return; }
-    if (e.target.closest('#homeSearchBtn')) {
-        // Scan-Feld ist zugleich das Suchfeld – hier mit normaler Tastatur (Scanner-Modus blendet sie aus)
-        window.scrollTo(0, 0);
-        shipmentNumberInputEl.inputMode = 'text';
-        setTimeout(() => shipmentNumberInputEl.focus(), 50);
-    }
+    if (tile) openPage({ id: tile.dataset.page });
 });
 if (pageBackBtnEl) pageBackBtnEl.addEventListener('click', closePage);
 if (pageContentEl) pageContentEl.addEventListener('click', (event) => {
@@ -2991,11 +2987,18 @@ function handlePageShipmentRowClick(event, row) {
 // Menü-Links (href="#") sollen keinen Verlaufseintrag „#“ erzeugen – sonst schließt die Zurück-Geste erst den Hash
 if (sideMenuEl) sideMenuEl.addEventListener('click', (e) => { const a = e.target.closest('a[href="#"]'); if (a) e.preventDefault(); });
 
-// Verlauf beim Start normalisieren; eine vor einem Neuladen offene Seite (z. B. nach Import) wieder öffnen
+// Verlauf beim Start normalisieren; eine offene Seite (Adresse ?seite=… – z. B. nach Neuladen/Import) wieder öffnen
 (function initHistory() {
-    const saved = (history.state && history.state.frtPage) ? history.state.frtPage : null;
-    try { history.replaceState({ frtHome: true }, '', location.href); } catch (e) { /* ignorieren */ }
+    let saved = (history.state && history.state.frtPage) ? history.state.frtPage : null;
+    if (!saved) {
+        const q = new URLSearchParams(location.search);
+        const id = q.get('seite'), lkw = q.get('lkw');
+        if (id && PAGE_RENDERERS[id]) saved = (id === 'anlieferung' && lkw) ? { id: 'lkw', truckId: lkw } : { id };
+    }
+    const sendung = new URLSearchParams(location.search).get('sendung');
+    replaceHistory({ frtHome: true });
     if (saved && saved.id && PAGE_RENDERERS[saved.id]) openPage(saved);
+    if (sendung && loadShipments()[sendung]) showDetailView(sendung); // Adresse ?sendung=… (z. B. geteilter Link)
 })();
 
 
@@ -3006,26 +3009,26 @@ function showDetailView(baseNumber) {
     // 2. Die Detail-Daten in den Container der Detail-Ansicht laden
     displayCurrentShipmentDetails(baseNumber);
 
-    // 3. Ansichten umschalten
+    // 3. Ansichten umschalten (auch eine offene Unterseite tritt zurück)
     mainViewEl.classList.add('hidden');
+    if (pageViewEl) pageViewEl.classList.add('hidden');
     detailViewEl.classList.remove('hidden');
     
     // 4. In der neuen Ansicht nach ganz oben scrollen
     detailViewEl.scrollTop = 0;
 
-    // 5. Verlaufseintrag: Zurück-Geste/-Taste schließt die Detailansicht (siehe popstate-Listener der Startseite)
+    // 5. Verlaufseintrag (?sendung=…): Zurück-Geste/-Taste schließt die Detailansicht (popstate-Listener der Startseite)
     const st = history.state || {};
-    try {
-        if (st.frtDetail) history.replaceState({ frtPage: currentPage, frtDetail: baseNumber }, '', location.href);
-        else history.pushState({ frtPage: currentPage, frtDetail: baseNumber }, '', location.href);
-    } catch (e) { /* z. B. file:// */ }
+    if (st.frtDetail) replaceHistory({ frtPage: currentPage, frtDetail: baseNumber });
+    else pushHistory({ frtPage: currentPage, frtDetail: baseNumber });
 }
 
 
 function hideDetailView() {
-    // 1. Ansichten zurückschalten
+    // 1. Ansichten zurückschalten – zurück zur Unterseite, von der aus geöffnet wurde, sonst zur Hauptansicht
     detailViewEl.classList.add('hidden');
-    mainViewEl.classList.remove('hidden');
+    if (currentPage && pageViewEl) pageViewEl.classList.remove('hidden');
+    else mainViewEl.classList.remove('hidden');
 
     // 2. Zur gespeicherten Scroll-Position zurückkehren
     window.scrollTo(0, lastScrollPosition);

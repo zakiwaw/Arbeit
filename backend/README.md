@@ -78,12 +78,12 @@ Archivsuche erscheint der Hinweis, das Skript neu bereitzustellen.
 
 ## Startseite (Kacheln) – nur App, keine Server-Änderung
 
-Unter der Scan-Box zeigt die App eine Startseite: Suchfeld und vier Kacheln **Anlieferung** (LKW → seine
-Sendungen), **Dunkelalarm**, **Offene Sendungen**, **Info** (Suche mit Filtern Status / LKW / Zeitraum, optional
-inkl. Archiv über `searchArchive`). Die Liste darunter zeigt ohne Suchtext nur die **5 zuletzt bearbeiteten** Sendungen
-(„Weitere anzeigen“ für den Rest); tippt man ins Scan-Feld, erscheinen die Treffer. Die Unterseiten sind keine
-Modals: sie liegen im Browser-Verlauf, die **Zurück-Geste/-Taste** schließt sie (ebenso die Detailansicht).
-Scan-Box, Batch-Modus und Sync laufen auf jeder Seite unverändert weiter.
+Unter der Scan-Box zeigt die App vier Kacheln: **Anlieferung** (LKW → seine Sendungen), **Dunkelalarm**,
+**Offene Sendungen**, **Info** (Suche mit Filtern Status / LKW / Zeitraum, optional inkl. Archiv über
+`searchArchive`). Die Liste darunter zeigt ohne Suchtext nur die **5 zuletzt bearbeiteten** Sendungen („Weitere
+anzeigen“ für den Rest); tippt man ins Scan-Feld, erscheinen die Treffer. Die Unterseiten öffnen als eigene
+**Vollbild-Seiten** (wie die Sendungsdetails) mit eigener Adresse (`?seite=anlieferung&lkw=…`, `?sendung=…`);
+die **Zurück-Geste/-Taste** schließt sie, Neuladen öffnet sie wieder. Sync läuft im Hintergrund weiter.
 
 ## Neue Version bereitstellen (gleiche URL bleibt gültig)
 
