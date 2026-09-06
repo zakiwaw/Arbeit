@@ -969,8 +969,25 @@ body.batch-mode-active .home-hub { display: none; } /* im Batch-Modus zählt nur
     color: var(--text);
 }
 .info-filters .info-archive input { width: 20px; height: 20px; margin: 0; }
-/* Gewichtsbereich „von – bis“ (kg): zwei kleine Felder in einer Zelle des Filterrasters */
-.info-filters .info-weight { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+/* Gewichtsbereich „von – bis“ (kg) und Datum „von – bis“: je zwei kleine Felder in einer Zelle des Filterrasters */
+.info-filters .info-weight, .info-filters .info-dates { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.info-weight-inputs input[type="date"] {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 40px;
+    padding: 0 var(--sp-2);
+    font: inherit;
+    font-size: var(--fs-sm);
+    color: var(--text);
+    background-color: var(--surface);
+    border: 1.5px solid var(--border-strong);
+    border-radius: var(--r-md);
+    -webkit-appearance: none;
+    appearance: none;
+}
+.info-weight-inputs input[type="date"]:focus { border-color: var(--accent); box-shadow: var(--focus-ring); outline: none; }
+/* iOS zeigt Datumsfelder sonst zentriert/ohne Höhe */
+.info-weight-inputs input[type="date"]::-webkit-date-and-time-value { text-align: left; min-height: 1.2em; }
 .info-weight-label { font-size: var(--fs-xs); font-weight: 600; color: var(--text-muted); }
 .info-weight-inputs { display: flex; align-items: center; gap: var(--sp-1); min-width: 0; }
 .info-weight-inputs input[type="text"] {
@@ -2298,8 +2315,9 @@ body.modal-open { overflow: hidden; }
     .home-tile { min-height: 132px; }
     #pageView { padding: 0 var(--sp-6) var(--sp-8); }
     .page-content { max-width: 900px; margin: 0 auto; }
-    .info-filters { grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.2fr) auto; align-items: end; }
-    .info-filters .info-archive { grid-column: auto; }
+    .info-filters { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); align-items: end; }
+    .info-filters .info-dates { grid-column: span 2; }
+    .info-filters .info-archive { grid-column: auto; white-space: nowrap; }
     .weight-hits { flex-basis: auto; margin-top: 0; }
 }
 

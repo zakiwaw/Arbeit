@@ -2462,7 +2462,7 @@ const PAGE_LIST_STEP = LIST_PAGE_SIZE;
 let currentPage = null;          // { id: 'anlieferung'|'lkw'|'dunkelalarm'|'offen'|'info', truckId }
 let pageLimit = PAGE_LIST_STEP;  // wie viele Sendungskarten die offene Seite gerade zeigt
 let infoArchiveCache = {};       // base → Sendung (Archiv-Treffer der Info-Suche)
-const infoState = { text: '', status: 'all', truck: 'all', period: 'all', weightMin: '', weightMax: '', archive: false,
+const infoState = { text: '', status: 'all', truck: 'all', period: 'all', dateFrom: '', dateTo: '', weightMin: '', weightMax: '', archive: false,
                     archiveQuery: '', archiveOrder: [], archiveTotal: 0, archiveTruncated: false, archiveBusy: false, archiveNote: '' };
 let infoTimer = null, infoArchiveTimer = null, infoArchiveSeq = 0;
 
@@ -2710,6 +2710,25 @@ function infoPeriodStart(period) {
     if (period === '30d') return Date.now() - 30 * 86400000;
     return 0;
 }
+// Zeitraum als [start, end] in ms (Ortszeit) oder null (kein Zeitfilter). Bei „Datum wählen“ zählen ganze Tage:
+// „von“ ab 00:00, „bis“ einschließlich bis 23:59:59; nur ein Feld = offene Grenze; vertauschte Daten werden sortiert.
+function infoDateBounds() {
+    if (infoState.period === 'custom') {
+        const day = (v) => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || ''); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; };
+        let from = day(infoState.dateFrom), to = day(infoState.dateTo);
+        if (!from && !to) return null;
+        if (from && to && from > to) { const t = from; from = to; to = t; }
+        return { start: from ? from.getTime() : 0, end: to ? to.getTime() + 86400000 - 1 : Infinity, from, to };
+    }
+    const start = infoPeriodStart(infoState.period);
+    return start ? { start, end: Infinity } : null;
+}
+function dateRangeText(b) {
+    if (!b || !b.from && !b.to) return '';
+    const f = (d) => d.toLocaleDateString('de-DE');
+    if (b.from && b.to) return b.from.getTime() === b.to.getTime() ? `am ${f(b.from)}` : `${f(b.from)} – ${f(b.to)}`;
+    return b.from ? `ab ${f(b.from)}` : `bis ${f(b.to)}`;
+}
 // ---- Gewicht (Info-Suche) ---------------------------------------------------------------------
 // Gewicht einer HU steht als Text am Eintrag (grossWeight: „19.5 KG“, „19,500 KG“, „1.250,5 KG“, „N/A“ …).
 // Liefert Kilogramm als Zahl oder null (kein/unlesbares Gewicht). Dient auch zum Lesen der Eingabefelder „von/bis“.
@@ -2772,8 +2791,8 @@ function infoMatches(base, s, text, range) {
     if (infoState.truck !== 'all') {
         if (infoState.truck === 'none' ? !!s.truckId : s.truckId !== infoState.truck) return false;
     }
-    const start = infoPeriodStart(infoState.period);
-    if (start && (Date.parse(s.lastModified) || 0) < start) return false;
+    const bounds = infoDateBounds();
+    if (bounds) { const t = Date.parse(s.lastModified) || 0; if (t < bounds.start || t > bounds.end) return false; }
     if (infoState.status !== 'all') {
         const p = shipmentProgress(s);
         if (infoState.status === 'open' && !p.open) return false;
@@ -2940,7 +2959,15 @@ const PAGE_RENDERERS = {
                     <div class="info-filters">
                         <label>Status<select id="infoStatusSelect">${infoOptionsHtml([['all', 'Alle'], ['open', 'Offen'], ['done', 'Abgeschlossen'], ['dunkel', 'Mit Dunkelalarm'], ['unknown', 'Ohne Stückzahl']], infoState.status)}</select></label>
                         <label>LKW<select id="infoTruckSelect">${infoOptionsHtml(truckOptions, truckOptions.some(o => o[0] === infoState.truck) ? infoState.truck : 'all')}</select></label>
-                        <label>Zeitraum<select id="infoPeriodSelect">${infoOptionsHtml([['all', 'Gesamt'], ['today', 'Heute'], ['7d', '7 Tage'], ['30d', '30 Tage']], infoState.period)}</select></label>
+                        <label>Zeitraum<select id="infoPeriodSelect">${infoOptionsHtml([['all', 'Gesamt'], ['today', 'Heute'], ['7d', '7 Tage'], ['30d', '30 Tage'], ['custom', 'Datum …']], infoState.period)}</select></label>
+                        <div class="info-dates${infoState.period === 'custom' ? '' : ' hidden'}" id="infoDates" role="group" aria-label="Datum von bis">
+                            <span class="info-weight-label">Datum</span>
+                            <div class="info-weight-inputs">
+                                <input type="date" id="infoDateFrom" aria-label="Datum von" value="${escapeHtml(infoState.dateFrom)}">
+                                <span class="info-weight-sep" aria-hidden="true">–</span>
+                                <input type="date" id="infoDateTo" aria-label="Datum bis" value="${escapeHtml(infoState.dateTo)}">
+                            </div>
+                        </div>
                         <div class="info-weight" role="group" aria-label="Gewicht in Kilogramm">
                             <span class="info-weight-label">Gewicht (kg)</span>
                             <div class="info-weight-inputs">
@@ -2965,7 +2992,23 @@ const PAGE_RENDERERS = {
             // Nach der Auswahl den Fokus freigeben – sonst landen Scanner-Eingaben in der Auswahlliste
             document.getElementById('infoStatusSelect').addEventListener('change', (e) => { infoState.status = e.target.value; e.target.blur(); setAndUpdate(); });
             document.getElementById('infoTruckSelect').addEventListener('change', (e) => { infoState.truck = e.target.value; e.target.blur(); setAndUpdate(); });
-            document.getElementById('infoPeriodSelect').addEventListener('change', (e) => { infoState.period = e.target.value; e.target.blur(); setAndUpdate(); });
+            document.getElementById('infoPeriodSelect').addEventListener('change', (e) => {
+                infoState.period = e.target.value; e.target.blur();
+                const custom = infoState.period === 'custom';
+                document.getElementById('infoDates').classList.toggle('hidden', !custom);
+                if (custom && !infoState.dateFrom && !infoState.dateTo) { // Vorbelegung: heute – Anwender passt an
+                    const d = new Date(), iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                    infoState.dateFrom = iso; infoState.dateTo = iso;
+                    document.getElementById('infoDateFrom').value = iso; document.getElementById('infoDateTo').value = iso;
+                }
+                setAndUpdate();
+            });
+            // Datumsfelder: „input“ (Tastatur) und „change“ (Auswahl im Kalender) abdecken
+            ['infoDateFrom', 'infoDateTo'].forEach((id, i) => {
+                const el = document.getElementById(id);
+                const apply = () => { infoState[i === 0 ? 'dateFrom' : 'dateTo'] = el.value || ''; debounced(); };
+                el.addEventListener('input', apply); el.addEventListener('change', apply);
+            });
             document.getElementById('infoArchiveToggle').addEventListener('change', (e) => { infoState.archive = e.target.checked; setAndUpdate(); });
             scheduleInfoArchiveSearch();
             this.update();
@@ -3012,8 +3055,11 @@ const PAGE_RENDERERS = {
             const total = local.length + (groups.length > 1 ? archived.length : 0);
             setPageHeader('Info & Suche', total ? `${total} Treffer` : '');
             const parts = [];
-            if (!total) parts.push('Kein Treffer' + (text ? ` zu „${text}“` : '') + (range ? ` (Gewicht ${weightRangeText(range)})` : '') + '.');
-            else if (range) parts.push(`Gewicht ${weightRangeText(range)} – passende HUs stehen an der Sendung.`);
+            const dateInfo = infoState.period === 'custom' ? dateRangeText(infoDateBounds()) : '';
+            const criteria = [dateInfo ? `Datum ${dateInfo}` : '', range ? `Gewicht ${weightRangeText(range)}` : ''].filter(Boolean).join(', ');
+            if (!total) parts.push('Kein Treffer' + (text ? ` zu „${text}“` : '') + (criteria ? ` (${criteria})` : '') + '.');
+            else if (criteria) parts.push(`${criteria}${range ? ' – passende HUs stehen an der Sendung' : ''}.`);
+            if (infoState.period === 'custom' && !dateInfo) parts.push('Datum von/bis wählen – ohne Datum gilt der gesamte Zeitraum.');
             if (archiveInfo) parts.push(archiveInfo);
             if (infoState.archiveTruncated && groups.length > 1) parts.push('Archiv zeigt nur die neuesten Treffer – Suche weiter eingrenzen.');
             note.textContent = parts.join(' ');
