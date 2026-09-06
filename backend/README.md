@@ -76,6 +76,15 @@ Einstellungen oben in `Code.gs`: `ARCHIVE_AFTER_DAYS`, `ARCHIVE_LKW_AFTER_DAYS`,
 Solange das alte Skript läuft, arbeitet die App ohne Archiv (alles bleibt in der Liste); beim Versuch einer
 Archivsuche erscheint der Hinweis, das Skript neu bereitzustellen.
 
+## Startseite (Kacheln) – nur App, keine Server-Änderung
+
+Unter der Scan-Box zeigt die App eine Startseite: Suchfeld und vier Kacheln **Anlieferung** (LKW → seine
+Sendungen), **Dunkelalarm**, **Offene Sendungen**, **Info** (Suche mit Filtern Status / LKW / Zeitraum, optional
+inkl. Archiv über `searchArchive`). Die Liste darunter zeigt ohne Suchtext nur die **5 zuletzt bearbeiteten** Sendungen
+(„Weitere anzeigen“ für den Rest); tippt man ins Scan-Feld, erscheinen die Treffer. Die Unterseiten sind keine
+Modals: sie liegen im Browser-Verlauf, die **Zurück-Geste/-Taste** schließt sie (ebenso die Detailansicht).
+Scan-Box, Batch-Modus und Sync laufen auf jeder Seite unverändert weiter.
+
 ## Neue Version bereitstellen (gleiche URL bleibt gültig)
 
 1. <https://script.google.com> öffnen → das Projekt des Fracht Trackers öffnen.

@@ -578,8 +578,72 @@ function closeSuspicionModal() {
 // ERSETZEN SIE IHRE GESAMTE showOpenHusSummary FUNKTION MIT DIESER
 // =========================================================================
 
-function showOpenHusSummary() {
-    removeActiveInlineNoteEditor();
+// HTML-Bausteine für HU-Listen (Modal „Offene HUs“ und Unterseite „Dunkelalarm“ – Vorlagen unverändert)
+const sortByCountryAndOrder = (a, b) => (a.destinationCountry || 'zz').localeCompare(b.destinationCountry || 'zz') || (a.orderNumber || a.hawb).localeCompare(b.orderNumber || a.hawb);
+function generateHuListHtml(items, allScannedItemsForContext, shipments) {
+    shipments = shipments || loadShipments();
+    if (!items || items.length === 0) return '';
+    const dunkelalarmedNumbers = new Set(
+        allScannedItemsForContext
+        .filter(scan => scan.status === 'Dunkelalarm' && !scan.isCancelled)
+        .map(scan => scan.rawInput)
+    );
+    const sortedItems = items.sort((a, b) => (a.position || 9999) - (b.position || 9999));
+    const isVvlList = sortedItems[0] && sortedItems[0].sendnr;
+    if (isVvlList) {
+        let html = '<div class="hu-list-header"><span>VSE-Nummer</span><span>Sendungs-Nr.</span></div>';
+        const listItems = sortedItems.map(item => {
+            const hasDunkelalarm = dunkelalarmedNumbers.has(item.rawInput);
+            const alarmClass = hasDunkelalarm ? 'has-dunkelalarm' : '';
+            return `
+            <li>
+                <div class="pending-item-details">
+                    <span class="pending-vse hu-value ${alarmClass}" style="cursor:pointer;" title="Klicken zum Kopieren. Details f\u00FCr ${escapeHtml(item.rawInput)} anzeigen">${escapeHtml(item.rawInput)}</span>
+                    <span class="pending-sendnr">${escapeHtml(item.sendnr)}</span>
+                </div>
+            </li>`;
+        }).join('');
+        return html + `<ul class="hu-list vvl-list">${listItems}</ul>`;
+    } else {
+        const listItems = sortedItems.map(item => {
+            const parentOrder = shipments[item.orderNumber] || shipments[Object.keys(shipments).find(key => shipments[key].scannedItems && shipments[key].scannedItems.some(i => i.rawInput === item.rawInput))];
+            const isManOrderContext = parentOrder && parentOrder.freightForwarder;
+            const positionHtml = isManOrderContext && item.position ? `<span class="position-number">${item.position}.</span>` : ``;
+            const hasDunkelalarm = dunkelalarmedNumbers.has(item.rawInput);
+            const alarmClass = hasDunkelalarm ? 'has-dunkelalarm' : '';
+           return `<li>${positionHtml}<span class="hu-value ${alarmClass}" style="cursor:pointer;" title="Details f\u00FCr ${escapeHtml(item.rawInput)} anzeigen">${escapeHtml(item.rawInput)}</span></li>`;
+        }).join('');
+        return `<ul class="hu-list">${listItems}</ul>`;
+    }
+}
+function generateHtmlForOrderGroup(order, listItemsHtml, forSpecialList = false) {
+    const orderNumber = order.orderNumber || order.hawb;
+    let countText = '';
+    if (!forSpecialList) {
+        countText = order.receiptCount !== undefined ? `(${order.receiptCount} von ${order.totalHus} erfasst)` : `(${(order.totalHus - order.pendingHus.length)} von ${order.totalHus} erfasst)`;
+    }
+    let titleHtml = '';
+    if (order.parentOrderNumber) {
+        titleHtml = `VVL: ${escapeHtml(order.parentOrderNumber)}<br><small>Kundennr: ${escapeHtml(orderNumber)} ${countText}</small>`;
+    } else {
+        const isManOrder = order.freightForwarder && order.destinationCountry;
+        const titlePrefix = isManOrder ? 'Rechnung: ' : 'Sendung: ';
+        let metaLineHtml = '';
+        if (order.plsoNumber && order.plsoNumber !== 'N/A') {
+            metaLineHtml += `<br><small>PLSO: ${escapeHtml(order.plsoNumber)}</small>`;
+        }
+        if (isManOrder) {
+            const shortForwarderName = shortenForwarderName(order.freightForwarder);
+            metaLineHtml += `<br><small>Sped.: ${escapeHtml(shortForwarderName)} / Land: ${escapeHtml(order.destinationCountry)}</small>`;
+        }
+        titleHtml = `${titlePrefix}${escapeHtml(orderNumber)} ${countText}${metaLineHtml}`;
+    }
+    return `<div class="hu-order-group"><div class="hu-order-title">${titleHtml}</div>${listItemsHtml}</div>`;
+}
+
+// Berechnung der offenen HUs (ohne Anzeige). Genutzt vom Modal „Offene HUs“ (showOpenHusSummary) und von der
+// Unterseite „Dunkelalarm“ der Startseite – die Regeln stehen damit nur einmal hier.
+function computeOpenHusSummary() {
     const shipments = loadShipments();
     const securityClearanceStatuses = EXCLUSIVE_SECURITY_STATUSES;
     let openSecurityHusByOrder = [],
@@ -706,10 +770,19 @@ function showOpenHusSummary() {
         }
     });
 
-    // 3. Badges aktualisieren
     const totalMissingReceipts = missingReceiptHusByOrder.reduce((sum, order) => sum + order.pendingHus.length, 0);
     const totalDunkelalarms = Object.values(dunkelalarmItemsByOrder).reduce((sum, data) => sum + data.items.length, 0);
     const totalUeberzaehlig = Object.values(ueberzaehligItemsByOrder).reduce((sum, data) => sum + data.items.length, 0) + suspiciousPairs.length;
+    return { shipments, openSecurityHusByOrder, missingReceiptHusByOrder, dunkelalarmItemsByOrder, ueberzaehligItemsByOrder,
+             suspiciousPairs, totalMissingReceipts, totalDunkelalarms, totalUeberzaehlig };
+}
+
+function showOpenHusSummary() {
+    removeActiveInlineNoteEditor();
+    const { shipments, openSecurityHusByOrder, missingReceiptHusByOrder, dunkelalarmItemsByOrder, ueberzaehligItemsByOrder,
+            suspiciousPairs, totalMissingReceipts, totalDunkelalarms, totalUeberzaehlig } = computeOpenHusSummary();
+
+    // 3. Badges aktualisieren
     const missingBadge = document.getElementById('missingReceiptsBadge');
     const dunkelalarmBadge = document.getElementById('dunkelalarmBadge');
     const ueberzaehligBadge = document.getElementById('ueberzaehligBadge');
@@ -727,67 +800,7 @@ function showOpenHusSummary() {
         ueberzaehligBadge.classList.toggle('hidden', totalUeberzaehlig === 0);
     }
 
-    // 4. HTML für die Listen generieren
-    const sortByCountryAndOrder = (a, b) => (a.destinationCountry || 'zz').localeCompare(b.destinationCountry || 'zz') || (a.orderNumber || a.hawb).localeCompare(b.orderNumber || a.hawb);
-    const generateHuListHtml = (items, allScannedItemsForContext) => {
-        if (!items || items.length === 0) return '';
-        const dunkelalarmedNumbers = new Set(
-            allScannedItemsForContext
-            .filter(scan => scan.status === 'Dunkelalarm' && !scan.isCancelled)
-            .map(scan => scan.rawInput)
-        );
-        const sortedItems = items.sort((a, b) => (a.position || 9999) - (b.position || 9999));
-        const isVvlList = sortedItems[0] && sortedItems[0].sendnr;
-        if (isVvlList) {
-            let html = '<div class="hu-list-header"><span>VSE-Nummer</span><span>Sendungs-Nr.</span></div>';
-            const listItems = sortedItems.map(item => {
-                const hasDunkelalarm = dunkelalarmedNumbers.has(item.rawInput);
-                const alarmClass = hasDunkelalarm ? 'has-dunkelalarm' : '';
-                return `
-                <li>
-                    <div class="pending-item-details">
-                        <span class="pending-vse hu-value ${alarmClass}" style="cursor:pointer;" title="Klicken zum Kopieren. Details f\u00FCr ${escapeHtml(item.rawInput)} anzeigen">${escapeHtml(item.rawInput)}</span>
-                        <span class="pending-sendnr">${escapeHtml(item.sendnr)}</span>
-                    </div>
-                </li>`;
-            }).join('');
-            return html + `<ul class="hu-list vvl-list">${listItems}</ul>`;
-        } else {
-            const listItems = sortedItems.map(item => {
-                const parentOrder = shipments[item.orderNumber] || shipments[Object.keys(shipments).find(key => shipments[key].scannedItems && shipments[key].scannedItems.some(i => i.rawInput === item.rawInput))];
-                const isManOrderContext = parentOrder && parentOrder.freightForwarder;
-                const positionHtml = isManOrderContext && item.position ? `<span class="position-number">${item.position}.</span>` : ``;
-                const hasDunkelalarm = dunkelalarmedNumbers.has(item.rawInput);
-                const alarmClass = hasDunkelalarm ? 'has-dunkelalarm' : '';
-               return `<li>${positionHtml}<span class="hu-value ${alarmClass}" style="cursor:pointer;" title="Details f\u00FCr ${escapeHtml(item.rawInput)} anzeigen">${escapeHtml(item.rawInput)}</span></li>`;
-            }).join('');
-            return `<ul class="hu-list">${listItems}</ul>`;
-        }
-    };
-    const generateHtmlForOrderGroup = (order, listItemsHtml, forSpecialList = false) => {
-        const orderNumber = order.orderNumber || order.hawb;
-        let countText = '';
-        if (!forSpecialList) {
-            countText = order.receiptCount !== undefined ? `(${order.receiptCount} von ${order.totalHus} erfasst)` : `(${(order.totalHus - order.pendingHus.length)} von ${order.totalHus} erfasst)`;
-        }
-        let titleHtml = '';
-        if (order.parentOrderNumber) {
-            titleHtml = `VVL: ${escapeHtml(order.parentOrderNumber)}<br><small>Kundennr: ${escapeHtml(orderNumber)} ${countText}</small>`;
-        } else {
-            const isManOrder = order.freightForwarder && order.destinationCountry;
-            const titlePrefix = isManOrder ? 'Rechnung: ' : 'Sendung: ';
-            let metaLineHtml = '';
-            if (order.plsoNumber && order.plsoNumber !== 'N/A') {
-                metaLineHtml += `<br><small>PLSO: ${escapeHtml(order.plsoNumber)}</small>`;
-            }
-            if (isManOrder) {
-                const shortForwarderName = shortenForwarderName(order.freightForwarder);
-                metaLineHtml += `<br><small>Sped.: ${escapeHtml(shortForwarderName)} / Land: ${escapeHtml(order.destinationCountry)}</small>`;
-            }
-            titleHtml = `${titlePrefix}${escapeHtml(orderNumber)} ${countText}${metaLineHtml}`;
-        }
-        return `<div class="hu-order-group"><div class="hu-order-title">${titleHtml}</div>${listItemsHtml}</div>`;
-    };
+    // 4. HTML für die Listen: generateHuListHtml / generateHtmlForOrderGroup (siehe oberhalb von showOpenHusSummary)
 
     // 5. Daten sortieren und in die Container rendern
     openSecurityHusByOrder.sort(sortByCountryAndOrder);
@@ -795,16 +808,16 @@ function showOpenHusSummary() {
     const dunkelalarmArray = Object.values(dunkelalarmItemsByOrder).sort(sortByCountryAndOrder);
     const ueberzaehligArray = Object.values(ueberzaehligItemsByOrder).sort(sortByCountryAndOrder);
 
-    openHusListContainerEl.innerHTML = openSecurityHusByOrder.map(order => generateHtmlForOrderGroup(order, generateHuListHtml(order.pendingHus, order.scannedItems))).join('') || '<p class="no-open-hus-message">Glückwunsch! Alle HUs sind sicherheitstechnisch bearbeitet.</p>';
-    missingReceiptHusListContainerEl.innerHTML = missingReceiptHusByOrder.map(order => generateHtmlForOrderGroup(order, generateHuListHtml(order.pendingHus, order.scannedItems))).join('') || '<p class="no-open-hus-message">Perfekt! Alle HUs wurden im Wareneingang erfasst.</p>';
-    dunkelalarmHusListContainerEl.innerHTML = dunkelalarmArray.map(data => generateHtmlForOrderGroup(data, generateHuListHtml(data.items, data.scannedItems), true)).join('') || '<p class="no-open-hus-message">Keine Eintr\u00E4ge mit Status "Dunkelalarm" gefunden.</p>';
+    openHusListContainerEl.innerHTML = openSecurityHusByOrder.map(order => generateHtmlForOrderGroup(order, generateHuListHtml(order.pendingHus, order.scannedItems, shipments))).join('') || '<p class="no-open-hus-message">Glückwunsch! Alle HUs sind sicherheitstechnisch bearbeitet.</p>';
+    missingReceiptHusListContainerEl.innerHTML = missingReceiptHusByOrder.map(order => generateHtmlForOrderGroup(order, generateHuListHtml(order.pendingHus, order.scannedItems, shipments))).join('') || '<p class="no-open-hus-message">Perfekt! Alle HUs wurden im Wareneingang erfasst.</p>';
+    dunkelalarmHusListContainerEl.innerHTML = dunkelalarmArray.map(data => generateHtmlForOrderGroup(data, generateHuListHtml(data.items, data.scannedItems, shipments), true)).join('') || '<p class="no-open-hus-message">Keine Eintr\u00E4ge mit Status "Dunkelalarm" gefunden.</p>';
     
     // ERWEITERTE HTML-GENERIERUNG FÜR DEN "ÜBERZÄHLIG"-TAB
     
     // ===== ÄNDERUNG HIER =====
     // Wir rufen nicht mehr `generateHtmlForOrderGroup` auf, sondern generieren direkt die Listen.
     // Das entfernt die Titel (`hu-order-title`).
-    let ueberzaehligHtml = ueberzaehligArray.map(data => generateHuListHtml(data.items, data.scannedItems)).join('');
+    let ueberzaehligHtml = ueberzaehligArray.map(data => generateHuListHtml(data.items, data.scannedItems, shipments)).join('');
     // ===== ENDE DER ÄNDERUNG =====
 
     console.log("Verdächtige Paare gefunden:", suspiciousPairs);
@@ -1544,6 +1557,9 @@ function fitTextToContainer(element, container, initialFontSize, minFontSize, pa
                 document.querySelector('#currentShipmentDetails .inline-note-editor')) {
                 return; // Kein Fokus, wenn ein Modal, Menü oder Editor aktiv ist
             }
+            // Eingabe auf einer Unterseite (z. B. Info-Suche) nicht unterbrechen
+            const ae = document.activeElement;
+            if (ae && pageContentEl && pageContentEl.contains(ae) && /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName)) return;
             if (shipmentNumberInputEl && !shipmentNumberInputEl.disabled) {
                 shipmentNumberInputEl.inputMode = 'none'; // Für Scanner
                 setTimeout(() => shipmentNumberInputEl.focus(), 0);
@@ -1741,7 +1757,7 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
 
     // Die Sendungsdetails werden ausschließlich im Container der Detailansicht
     // (#detailView → #currentShipmentDetails) gerendert. Die Hauptansicht zeigt
-    // in #mainShipmentDetails nur einen statischen Hinweis.
+    // Startseite (Kacheln) bzw. Unterseite und die Liste.
     const displayTarget = currentDetailsDivEl;
 
     if (!displayTarget) {
@@ -1933,11 +1949,13 @@ detailsHtml += `${numberPart}<span class="hu-value" style="cursor:pointer;" titl
 // QR-Codes) mehrere Sekunden – und zwar nach JEDEM Scan.
 // ===================================================================
 const LIST_PAGE_SIZE = 30;
+const HOME_RECENT_LIMIT = 5;        // Startseite ohne Suchtext: nur die zuletzt bearbeiteten Karten (Rest über Kacheln/Suche)
 let listFilterText = '';            // aktueller Suchtext (getrimmt, Großschrift)
-let listLimit = LIST_PAGE_SIZE;     // wie viele Treffer gerade gezeigt werden
+let listExtra = 0;                  // über „Weitere anzeigen“ zusätzlich aufgeklappte Karten
+function currentListLimit(filter) { return ((filter || isBatchModeActive) ? LIST_PAGE_SIZE : HOME_RECENT_LIMIT) + listExtra; }
 const listMoreBtnEl = document.getElementById('listMoreBtn');
 const listEmptyHintEl = document.getElementById('listEmptyHint');
-if (listMoreBtnEl) listMoreBtnEl.addEventListener('click', () => { listLimit += LIST_PAGE_SIZE; drawShipmentList(); });
+if (listMoreBtnEl) listMoreBtnEl.addEventListener('click', () => { listExtra += LIST_PAGE_SIZE; drawShipmentList(); });
 
 function shipmentMatchesListFilter(baseNumber, shipment, filter) {
     const parts = filter.split('+');
@@ -1953,7 +1971,7 @@ function shipmentMatchesListFilter(baseNumber, shipment, filter) {
 }
 function setListFilter(text) {
     const next = (text || '').trim().toUpperCase();
-    if (next !== listFilterText) { listFilterText = next; listLimit = LIST_PAGE_SIZE; clearArchiveResults(); }
+    if (next !== listFilterText) { listFilterText = next; listExtra = 0; clearArchiveResults(); }
 }
 // Liste aus den Daten neu zeichnen; Filter = Inhalt des Eingabefelds (Signatur unverändert)
 function renderTable() { setListFilter(shipmentNumberInputEl.value); drawShipmentList(); }
@@ -2067,13 +2085,14 @@ function drawArchiveResults(order, total, truncated) {
 }
 function removeArchiveResultRow(base) {
     delete archiveResultsCache[base];
+    delete infoArchiveCache[base]; // Info-Suche: Treffer ebenfalls vergessen (Seite zeichnet sich über renderTable neu)
     if (!archiveTableBodyEl) return;
     [...archiveTableBodyEl.rows].forEach(tr => { if (tr.dataset.basenumber === base) tr.remove(); });
     if (archiveResultsFilter && archiveTableBodyEl.rows.length === 0) { clearArchiveResults(); updateArchiveHint(lastListTotal); }
 }
 // „Wiederherstellen“ aus der Trefferliste oder der Detailansicht
 function restoreArchivedShipment(base, fromDetail) {
-    const obj = (fromDetail && detailArchived && detailArchived.base === base) ? detailArchived.shipment : archiveResultsCache[base];
+    const obj = (fromDetail && detailArchived && detailArchived.base === base) ? detailArchived.shipment : (archiveResultsCache[base] || infoArchiveCache[base]);
     if (!base || !obj) return;
     const lkwReactivated = restoreArchivedShipmentLocally(base, JSON.parse(JSON.stringify(obj)));
     removeArchiveResultRow(base);
@@ -2093,7 +2112,7 @@ function scheduleArchiveAutoSearch(value) {
 }
 // PDF für eine Archiv-Sendung: Daten aus den Treffern; bei einer VVL alle zugehörigen Aufträge aus dem Archiv dazuholen
 async function sendArchivedPdf(event, base) {
-    const s = archiveResultsCache[base];
+    const s = archiveResultsCache[base] || infoArchiveCache[base];
     if (!s) return;
     const pool = Object.assign({}, loadShipments()); pool[base] = s;
     if (s.parentOrderNumber) {
@@ -2133,7 +2152,7 @@ function drawShipmentList() {
         .map(b => [b, Date.parse(shipments[b].lastModified) || 0])
         .sort((x, y) => y[1] - x[1])   // neueste zuerst
         .map(x => x[0]);
-    const shown = matching.slice(0, listLimit);
+    const shown = matching.slice(0, currentListLimit(filter));
 
     if (qrObserver) {
         qrObserver.disconnect();
@@ -2144,6 +2163,7 @@ function drawShipmentList() {
     shown.forEach(baseNumber => appendShipmentRow(tableBodyEl, baseNumber, shipments[baseNumber], false));
     updateEditButtonVisibilityInTable();
     updateListFooter(matching.length, shown.length);
+    refreshHomeViews(); // Kacheln, offene Unterseite und Sichtbarkeit (Kacheln ↔ Treffer) nachziehen
 }
 // Eine Karte/Zeile zeichnen (Vorlage unverändert). archived = Archiv-Treffer: Kennzeichen „Archiv“,
 // „Wiederherstellen“ + PDF statt Bearbeiten/PDF/Löschen.
@@ -2422,6 +2442,563 @@ Object.values(shipments).forEach(s => {
 
 
 
+// ===================================================================
+// STARTSEITE (Suche + Kacheln) UND UNTERSEITEN
+// Kacheln: Anlieferung (LKW → seine Sendungen), Dunkelalarm, Offene Sendungen, Info (Suche mit Filtern).
+// Die Unterseiten sind keine Modals und keine eigenen HTML-Dateien: sie werden unterhalb der Scan-Box in
+// #pageView gezeichnet und liegen im Browser-Verlauf (history.pushState) – Zurück-Geste/-Taste schließt sie
+// wieder, ebenso die Detailansicht. Die Scan-Box bleibt auf jeder Seite stehen: Scannen, Batch-Modus und Sync
+// laufen unverändert; nach jedem Zeichnen der Liste (drawShipmentList) werden Kacheln und Seite mit aktualisiert.
+// Tippt man im Scan-Feld, erscheinen die Treffer an Stelle der Kacheln bzw. des Seiteninhalts.
+// ===================================================================
+const homeHubEl = document.getElementById('homeHub');
+const homeSearchBtnEl = document.getElementById('homeSearchBtn');
+const pageViewEl = document.getElementById('pageView');
+const pageTitleEl = document.getElementById('pageTitle');
+const pageBadgeEl = document.getElementById('pageBadge');
+const pageContentEl = document.getElementById('pageContent');
+const pageBackBtnEl = document.getElementById('pageBackBtn');
+const listBlockEl = document.getElementById('listBlock');
+const listCaptionEl = document.getElementById('listCaption');
+
+const PAGE_LIST_STEP = LIST_PAGE_SIZE;
+let currentPage = null;          // { id: 'anlieferung'|'lkw'|'dunkelalarm'|'offen'|'info', truckId }
+let pageLimit = PAGE_LIST_STEP;  // wie viele Sendungskarten die offene Seite gerade zeigt
+let infoArchiveCache = {};       // base → Sendung (Archiv-Treffer der Info-Suche)
+const infoState = { text: '', status: 'all', truck: 'all', period: 'all', archive: false,
+                    archiveQuery: '', archiveOrder: [], archiveTotal: 0, archiveTruncated: false, archiveBusy: false, archiveNote: '' };
+let infoTimer = null, infoArchiveTimer = null, infoArchiveSeq = 0;
+
+// ---- Datenhilfen -------------------------------------------------------
+function expectedPiecesOf(s) {
+    const raw = s ? s.totalPiecesExpected : null;
+    if (raw === null || raw === undefined || raw === '') return null;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
+}
+// Fortschritt einer Sendung – gleiche Regeln wie Karten und Server-Archiv: HU-Listen-Auftrag offen, solange eine
+// Position „Anstehend“ ist; Einzelsendung offen, solange erfasste Stück + Dunkelalarm unter der Stückzahl liegen.
+// Ohne Stückzahl (null/0) ist der Abschluss nicht bestimmbar (unknown).
+function shipmentProgress(s) {
+    const items = Array.isArray(s && s.scannedItems) ? s.scannedItems : [];
+    const counted = calculateCurrentCountedPieces(items);
+    const dunkel = calculateDunkelalarmCount(items);
+    const we = calculateGoodsReceiptCount(items);
+    const expected = expectedPiecesOf(s);
+    if (s && s.isHuListOrder) {
+        const pending = items.filter(i => i && i.status === 'Anstehend' && !i.isCancelled).length;
+        return { counted, dunkel, we, expected, pending, unknown: false, open: pending > 0 };
+    }
+    if (expected === null || expected <= 0) return { counted, dunkel, we, expected: null, pending: null, unknown: true, open: false };
+    const pending = Math.max(0, expected - counted - dunkel);
+    return { counted, dunkel, we, expected, pending, unknown: false, open: pending > 0 };
+}
+// LKW mit Kennzahlen; Bezeichnung und Reihenfolge wie im Seitenmenü (renderLkwMenu)
+function collectTrucks(shipments, lkwStatus) {
+    const trucks = {};
+    let manCount = 1;
+    Object.keys(shipments).forEach(base => {
+        const s = shipments[base];
+        if (!s || !s.truckId) return;
+        let t = trucks[s.truckId];
+        if (!t) {
+            const id = s.truckId;
+            let icon = '🚚', name = id;
+            if (id.startsWith('VVL-')) { name = 'VW ' + id.replace('VVL-', ''); }
+            else if (id === 'MAN-legacy') { icon = '🚛'; name = 'MAN importiert'; }
+            else if (id.startsWith('MAN-')) { icon = '🚛'; name = 'MAN ' + (manCount++); }
+            else if (id.startsWith('MAN ')) { icon = '🚛'; }
+            t = trucks[id] = { truckId: id, icon, name, active: lkwStatus[id] !== false, bases: [], hus: 0,
+                               counted: 0, dunkel: 0, we: 0, expected: 0, openOrders: 0, unknown: 0, lastModified: 0 };
+        }
+        const p = shipmentProgress(s);
+        t.bases.push(base);
+        t.hus += s.isHuListOrder ? (expectedPiecesOf(s) || 0) : 1; // gleiche Zählung wie der Zähler im Menü
+        t.counted += p.counted; t.dunkel += p.dunkel; t.we += p.we;
+        if (p.expected) t.expected += p.expected;
+        if (p.open) t.openOrders++;
+        if (p.unknown) t.unknown++;
+        const ts = Date.parse(s.lastModified) || 0;
+        if (ts > t.lastModified) t.lastModified = ts;
+    });
+    return Object.values(trucks);
+}
+function truckLabel(t) { return `${t.icon} ${t.name}`; }
+function truckLabelHtml(t) { return `<span class="emoji">${t.icon}</span> ${escapeHtml(t.name)}`; }
+function chipClass(count, expected) { return expected > 0 ? getStatusClass(count, expected) : ''; }
+function ratioText(count, expected) { return expected > 0 ? `${count}/${expected}` : String(count); }
+function pluralize(n, one, many) { return `${n} ${n === 1 ? one : many}`; }
+
+// ---- Kacheln -------------------------------------------------------------
+function computeHomeStats() {
+    const shipments = loadShipments();
+    const lkwStatus = loadLkwStatus();
+    const st = { total: 0, open: 0, unknown: 0, dunkel: 0, trucksActive: 0, trucksInactive: 0, archived: archiveKnownBases.size };
+    const seen = new Set();
+    Object.keys(shipments).forEach(base => {
+        const s = shipments[base];
+        if (!s) return;
+        if (s.truckId && !seen.has(s.truckId)) { seen.add(s.truckId); if (lkwStatus[s.truckId] !== false) st.trucksActive++; else st.trucksInactive++; }
+        if (s.truckId && lkwStatus[s.truckId] === false) return; // deaktivierter LKW → wie in der Liste ausgeblendet
+        st.total++;
+        const p = shipmentProgress(s);
+        if (p.open) st.open++;
+        if (p.unknown) st.unknown++;
+        st.dunkel += p.dunkel;
+    });
+    return st;
+}
+function setTileText(id, text) { const el = document.getElementById(id); if (el) el.textContent = text; }
+function setTileCount(id, n) { const el = document.getElementById(id); if (!el) return; el.textContent = n > 99 ? '99+' : String(n); el.classList.toggle('hidden', !(n > 0)); }
+function updateHomeTiles() {
+    if (!homeHubEl) return;
+    const st = computeHomeStats();
+    setTileText('tileAnlieferungMeta', st.trucksActive === 0
+        ? (st.trucksInactive ? `${st.trucksInactive} deaktiviert` : 'Keine LKW importiert')
+        : `${st.trucksActive} aktiv${st.trucksInactive ? ` · ${st.trucksInactive} deaktiviert` : ''}`);
+    setTileCount('tileDunkelalarmCount', st.dunkel);
+    setTileText('tileDunkelalarmMeta', st.dunkel === 0 ? 'Keine Alarme' : pluralize(st.dunkel, 'HU betroffen', 'HUs betroffen'));
+    setTileCount('tileOffenCount', st.open);
+    setTileText('tileOffenMeta', st.open === 0 ? (st.total ? 'Alles erfasst' : 'Keine Sendungen') : `von ${st.total} Sendungen`);
+    setTileText('tileInfoMeta', `${pluralize(st.total, 'Sendung', 'Sendungen')}${st.archived ? ` · ${st.archived} im Archiv` : ''}`);
+}
+
+// ---- Sichtbarkeit von Kacheln / Seite / Liste ------------------------------
+function updateHomeLayout() {
+    const filter = isBatchModeActive ? '' : listFilterText;
+    const pageOpen = !!currentPage;
+    if (homeHubEl) homeHubEl.classList.toggle('hidden', pageOpen || !!filter);
+    if (pageViewEl) pageViewEl.classList.toggle('hidden', !pageOpen);
+    if (pageContentEl) pageContentEl.classList.toggle('hidden', pageOpen && !!filter); // Suchtreffer verdrängen den Seiteninhalt
+    if (listBlockEl) listBlockEl.classList.toggle('hidden', pageOpen && !filter);
+    if (listCaptionEl) listCaptionEl.textContent = filter ? `Treffer zu „${filter}“` : (isBatchModeActive ? 'Sendungen' : 'Zuletzt bearbeitet');
+}
+// Wird am Ende von drawShipmentList aufgerufen – also nach jedem Scan, Sync, Löschen, Import …
+function refreshHomeViews() {
+    updateHomeTiles();
+    if (currentPage) renderCurrentPage(false);
+    updateHomeLayout();
+}
+
+// ---- Navigation (Browser-Verlauf) --------------------------------------------
+function pageKey(p) { return p ? p.id + (p.truckId ? ':' + p.truckId : '') : ''; }
+function pushHistory(state) { try { history.pushState(state, '', location.href); } catch (e) { /* z. B. file:// */ } }
+function openPage(page) {
+    if (!pageViewEl || !page || !PAGE_RENDERERS[page.id]) return;
+    const next = { id: page.id, truckId: page.truckId || null };
+    const same = pageKey(currentPage) === pageKey(next);
+    currentPage = next;
+    if (!same) pushHistory({ frtPage: currentPage });
+    renderCurrentPage(true);
+    window.scrollTo(0, 0);
+    if (next.id !== 'info') focusShipmentInput(); // Scan-Feld bleibt das Ziel für den Scanner (Info-Seite: eigenes Suchfeld)
+}
+function showHome() {
+    currentPage = null;
+    if (pageContentEl) pageContentEl.innerHTML = '';
+    updateHomeLayout();
+    focusShipmentInput(); // Scanner wieder scharf (wie nach dem Schließen der Detailansicht)
+}
+// Zurück-Knopf der Seite: über den Verlauf schließen, damit Verlauf und Anzeige zusammenpassen
+function closePage() {
+    if (history.state && history.state.frtPage) history.back();
+    else showHome();
+}
+function goBackFromDetail() {
+    if (history.state && history.state.frtDetail) history.back();
+    else hideDetailView();
+}
+window.addEventListener('popstate', (e) => {
+    const st = (e.state && typeof e.state === 'object') ? e.state : {};
+    if (!st.frtDetail && detailViewEl && !detailViewEl.classList.contains('hidden')) hideDetailView();
+    if (st.frtPage && st.frtPage.id && PAGE_RENDERERS[st.frtPage.id]) {
+        const next = { id: st.frtPage.id, truckId: st.frtPage.truckId || null };
+        const same = pageKey(currentPage) === pageKey(next);
+        currentPage = next;
+        renderCurrentPage(!same);
+    } else if (currentPage) {
+        showHome();
+    }
+    // Vorwärts-Navigation zu einer Detailansicht (showDetailView ersetzt dann nur den Eintrag)
+    if (st.frtDetail && detailViewEl && detailViewEl.classList.contains('hidden') && loadShipments()[st.frtDetail]) showDetailView(st.frtDetail);
+});
+
+// ---- Seiten zeichnen ----------------------------------------------------------
+function setPageHeader(title, badge, titleHtml) {
+    if (pageTitleEl) { if (titleHtml) pageTitleEl.innerHTML = titleHtml; else pageTitleEl.textContent = title; }
+    if (pageBadgeEl) { pageBadgeEl.textContent = badge || ''; pageBadgeEl.classList.toggle('hidden', !badge); }
+}
+function renderCurrentPage(fresh) {
+    if (!currentPage || !pageContentEl) return;
+    const r = PAGE_RENDERERS[currentPage.id];
+    if (!r) { showHome(); return; }
+    if (fresh) pageLimit = PAGE_LIST_STEP;
+    if (fresh || !r.update) r.render(); else r.update();
+    updateHomeLayout();
+}
+const SHIPMENT_TABLE_HEAD = '<thead><tr><th>HAWB.</th><th>Übersicht</th><th>Letzte Änd.</th><th>Aktionen</th><th class="qr-code-header">QR-Code</th></tr></thead>';
+// Eine Sendungskarte (gleiche Vorlage wie in der Liste) in eine Seitentabelle; chip = Zusatzkennzeichen (z. B. LKW)
+function appendPageShipmentRow(tbody, base, s, archived, chip) {
+    appendShipmentRow(tbody, base, s, !!archived);
+    const row = tbody.rows[tbody.rows.length - 1];
+    if (!row) return;
+    const qr = row.querySelector('.qr-code-cell div');
+    if (qr) qr.id = 'qrcode-page-' + base.replace(/[^a-zA-Z0-9]/g, ''); // eigener Namensraum (Liste kann dieselbe Sendung zeigen)
+    if (chip) row.cells[0].insertAdjacentHTML('beforeend', `<span class="row-chip">${escapeHtml(chip)}</span>`);
+}
+// Gruppen von Sendungskarten mit gemeinsamer Seitenblätterung („Weitere anzeigen“)
+function appendShipmentGroups(container, groups) {
+    let budget = pageLimit, total = 0, shown = 0;
+    groups.forEach(g => {
+        total += g.rows.length;
+        if (!g.rows.length || budget <= 0) return;
+        if (g.title) { const h = document.createElement('h4'); h.className = 'page-section-title'; h.textContent = g.title; container.appendChild(h); }
+        const slice = g.rows.slice(0, budget);
+        budget -= slice.length; shown += slice.length;
+        const table = document.createElement('table');
+        table.className = 'shipment-table page-shipments';
+        table.innerHTML = SHIPMENT_TABLE_HEAD + '<tbody></tbody>';
+        const tbody = table.tBodies[0];
+        slice.forEach(r => appendPageShipmentRow(tbody, r.b, r.s, r.archived, r.chip));
+        container.appendChild(table);
+    });
+    if (shown < total) {
+        const btn = document.createElement('button');
+        btn.type = 'button'; btn.className = 'list-more-btn page-more-btn';
+        btn.textContent = `Weitere ${Math.min(PAGE_LIST_STEP, total - shown)} anzeigen (${shown} von ${total})`;
+        container.appendChild(btn);
+    }
+    return { total, shown };
+}
+function truckRowHtml(t) {
+    const progress = t.expected > 0 ? Math.min(100, Math.round((t.counted + t.dunkel) / t.expected * 100)) : 0;
+    const state = t.openOrders > 0 ? `<span class="page-chip warn">${t.openOrders} offen</span>`
+        : (t.unknown ? `<span class="page-chip">${t.unknown} ohne Stückzahl</span>` : `<span class="page-chip ok">fertig</span>`);
+    return `<li><button type="button" class="page-row" data-truckid="${escapeHtml(t.truckId)}" title="Sendungen von ${escapeHtml(t.name)} anzeigen">
+        <span class="page-row-icon emoji" aria-hidden="true">${t.icon}</span>
+        <span class="page-row-body">
+            <span class="page-row-title">${escapeHtml(t.name)}</span>
+            <span class="page-row-sub">${pluralize(t.bases.length, 'Auftrag', 'Aufträge')} · ${t.hus} HUs · WE ${ratioText(t.we, t.expected)} · Sich. ${ratioText(t.counted, t.expected)}${t.dunkel ? ` · <span class="text-danger">${t.dunkel} Dunkelalarm</span>` : ''}</span>
+            <span class="page-progress"><span style="width:${progress}%"></span></span>
+        </span>
+        <span class="page-row-end">${state}<span class="page-chevron" aria-hidden="true"></span></span>
+    </button></li>`;
+}
+async function setLkwActiveFromPage(truckId, active) {
+    const status = loadLkwStatus();
+    status[truckId] = active;
+    const saving = saveLkwStatus(status); // schreibt sofort lokal, dann Server (wie der Schalter im Menü)
+    renderTable(); renderLkwMenu();
+    await saving;
+}
+function infoPeriodStart(period) {
+    const now = new Date();
+    if (period === 'today') { now.setHours(0, 0, 0, 0); return now.getTime(); }
+    if (period === '7d') return Date.now() - 7 * 86400000;
+    if (period === '30d') return Date.now() - 30 * 86400000;
+    return 0;
+}
+function infoMatches(base, s, text) {
+    if (text && !shipmentMatchesListFilter(base, s, text)) return false;
+    if (infoState.truck !== 'all') {
+        if (infoState.truck === 'none' ? !!s.truckId : s.truckId !== infoState.truck) return false;
+    }
+    const start = infoPeriodStart(infoState.period);
+    if (start && (Date.parse(s.lastModified) || 0) < start) return false;
+    if (infoState.status !== 'all') {
+        const p = shipmentProgress(s);
+        if (infoState.status === 'open' && !p.open) return false;
+        if (infoState.status === 'done' && !(!p.unknown && !p.open)) return false;
+        if (infoState.status === 'dunkel' && p.dunkel === 0) return false;
+        if (infoState.status === 'unknown' && !p.unknown) return false;
+    }
+    return true;
+}
+function scheduleInfoArchiveSearch() {
+    if (infoArchiveTimer) { clearTimeout(infoArchiveTimer); infoArchiveTimer = null; }
+    const q = infoState.text;
+    if (!infoState.archive || !archiveAvailable() || q.length < 3) {
+        infoState.archiveQuery = ''; infoState.archiveOrder = []; infoState.archiveNote = ''; infoArchiveCache = {};
+        infoState.archiveBusy = false; infoArchiveSeq++;
+        return;
+    }
+    if (infoState.archiveQuery === q) return;
+    infoState.archiveBusy = true;
+    const seq = ++infoArchiveSeq;
+    infoArchiveTimer = setTimeout(async () => {
+        try {
+            const r = await postToServer('searchArchive', { query: q, mode: 'prefix' });
+            if (seq !== infoArchiveSeq) return;
+            infoArchiveCache = r.results || {};
+            infoState.archiveOrder = (Array.isArray(r.order) ? r.order : Object.keys(infoArchiveCache)).filter(b => infoArchiveCache[b]);
+            infoState.archiveTotal = r.total || infoState.archiveOrder.length;
+            infoState.archiveTruncated = !!r.truncated;
+            infoState.archiveQuery = q; infoState.archiveNote = '';
+            let k = false; infoState.archiveOrder.forEach(b => { if (!archiveKnownBases.has(b)) { archiveKnownBases.add(b); k = true; } }); if (k) saveArchiveKnownBases();
+        } catch (e) {
+            if (seq !== infoArchiveSeq) return;
+            infoState.archiveOrder = []; infoArchiveCache = {}; infoState.archiveQuery = q;
+            if (isUnknownActionError(e)) { archiveUnsupported = true; infoState.archiveNote = 'Archivsuche benötigt das neue Server-Skript (backend/Code.gs neu bereitstellen).'; }
+            else infoState.archiveNote = `Archiv nicht erreichbar: ${e.message}`;
+        } finally {
+            if (seq === infoArchiveSeq) { infoState.archiveBusy = false; if (currentPage && currentPage.id === 'info') PAGE_RENDERERS.info.update(); }
+        }
+    }, 400);
+}
+function infoOptionsHtml(options, selected) {
+    return options.map(o => `<option value="${escapeHtml(o[0])}"${o[0] === selected ? ' selected' : ''}>${escapeHtml(o[1])}</option>`).join('');
+}
+
+const PAGE_RENDERERS = {
+    anlieferung: {
+        render() {
+            const trucks = collectTrucks(loadShipments(), loadLkwStatus());
+            const active = trucks.filter(t => t.active), inactive = trucks.filter(t => !t.active);
+            setPageHeader('Anlieferung', trucks.length ? `${trucks.length} LKW` : '');
+            let html = '';
+            if (!trucks.length) html = '<p class="page-empty">Noch kein LKW vorhanden. Vorverladeliste (VVL) oder MAN-Liste per QR-Code scannen – die Aufträge erscheinen dann hier je LKW.</p>';
+            if (active.length) html += `<ul class="page-list">${active.map(truckRowHtml).join('')}</ul>`;
+            if (inactive.length) html += `<h4 class="page-section-title">Deaktiviert – in der Liste ausgeblendet (${inactive.length})</h4><ul class="page-list page-list-muted">${inactive.map(truckRowHtml).join('')}</ul>`;
+            pageContentEl.innerHTML = html;
+        }
+    },
+    lkw: {
+        render() {
+            const shipments = loadShipments();
+            const t = collectTrucks(shipments, loadLkwStatus()).find(x => x.truckId === currentPage.truckId);
+            if (!t) {
+                setPageHeader(currentPage.truckId || 'LKW', '');
+                pageContentEl.innerHTML = '<p class="page-empty">Zu diesem LKW gibt es keine Sendungen mehr.</p>';
+                return;
+            }
+            setPageHeader(truckLabel(t), pluralize(t.bases.length, 'Auftrag', 'Aufträge'), truckLabelHtml(t));
+            const rows = t.bases.map(b => ({ b, s: shipments[b], p: shipmentProgress(shipments[b]) }));
+            rows.sort((x, y) => (Number(y.p.open) - Number(x.p.open)) || String(x.b).localeCompare(String(y.b), 'de', { numeric: true }));
+            const open = rows.filter(r => r.p.open), rest = rows.filter(r => !r.p.open);
+            let html = '';
+            if (!t.active) html += `<div class="page-banner"><span>LKW ist deaktiviert – seine Sendungen sind in der Liste und unter „Offene Sendungen“ ausgeblendet.</span><button type="button" class="page-banner-btn" data-lkw-activate="${escapeHtml(t.truckId)}">Aktivieren</button></div>`;
+            html += `<div class="page-summary">
+                <span>${t.hus} HUs</span>
+                <span class="${chipClass(t.we, t.expected)}">WE ${ratioText(t.we, t.expected)}</span>
+                <span class="${chipClass(t.counted + t.dunkel, t.expected)}">Sich. ${ratioText(t.counted, t.expected)}</span>
+                ${t.dunkel ? `<span class="over">${t.dunkel} Dunkelalarm</span>` : ''}
+                ${t.openOrders ? `<span class="mismatch">${t.openOrders} offen</span>` : '<span class="ok">alles erfasst</span>'}
+                ${t.active ? `<button type="button" class="page-summary-btn" data-lkw-deactivate="${escapeHtml(t.truckId)}">LKW deaktivieren</button>` : ''}
+            </div>`;
+            pageContentEl.innerHTML = html;
+            appendShipmentGroups(pageContentEl, [
+                { title: `Offen (${open.length})`, rows: open },
+                { title: `Abgeschlossen (${rest.length})`, rows: rest }
+            ]);
+        }
+    },
+    dunkelalarm: {
+        render() {
+            const sum = computeOpenHusSummary();
+            const orders = Object.keys(sum.dunkelalarmItemsByOrder).map(b => Object.assign({}, sum.dunkelalarmItemsByOrder[b], { orderNumber: b })).sort(sortByCountryAndOrder);
+            setPageHeader('Dunkelalarm', sum.totalDunkelalarms ? String(sum.totalDunkelalarms) : '');
+            let html = orders.length
+                ? '<p class="page-note">Sendungszeile antippen öffnet die Details, HU antippen zeigt ihre Daten. Deaktivierte LKW sind ausgeblendet.</p>'
+                : '<p class="page-empty">Keine Einträge mit Status „Dunkelalarm“.</p>';
+            html += orders.map(d => `<div class="page-order" data-basenumber="${escapeHtml(d.orderNumber)}">${generateHtmlForOrderGroup(d, generateHuListHtml(d.items, d.scannedItems, sum.shipments), true)}</div>`).join('');
+            html += '<div class="page-actions"><button type="button" class="page-link-btn" data-open-hus-modal="1">Alle offenen HUs anzeigen (Sicherung · Eingänge · Überzählig)</button></div>';
+            pageContentEl.innerHTML = html;
+        }
+    },
+    offen: {
+        render() {
+            const shipments = loadShipments();
+            const lkwStatus = loadLkwStatus();
+            const trucks = collectTrucks(shipments, lkwStatus);
+            const byTruck = {}, singles = [], unknown = [];
+            Object.keys(shipments).forEach(b => {
+                const s = shipments[b];
+                if (!s || (s.truckId && lkwStatus[s.truckId] === false)) return;
+                const p = shipmentProgress(s);
+                if (p.unknown) { unknown.push({ b, s, p }); return; }
+                if (!p.open) return;
+                if (s.truckId) (byTruck[s.truckId] = byTruck[s.truckId] || []).push({ b, s, p });
+                else singles.push({ b, s, p });
+            });
+            const byTime = (x, y) => (Date.parse(y.s.lastModified) || 0) - (Date.parse(x.s.lastModified) || 0);
+            const groups = [];
+            trucks.forEach(t => { const rows = byTruck[t.truckId]; if (rows) groups.push({ title: `${truckLabel(t)} (${rows.length} offen)`, rows: rows.sort(byTime) }); });
+            if (singles.length) groups.push({ title: `Einzelsendungen (${singles.length} offen)`, rows: singles.sort(byTime) });
+            const openCount = groups.reduce((n, g) => n + g.rows.length, 0);
+            setPageHeader('Offene Sendungen', openCount ? `${openCount} offen` : '');
+            const detailsWasOpen = !!pageContentEl.querySelector('.page-details[open]'); // beim Neuzeichnen (Sync) offen lassen
+            pageContentEl.innerHTML = openCount
+                ? '<p class="page-note">Offen = Sicherung noch nicht vollständig (HU-Listen: noch „Anstehend“; Einzelsendungen: erfasste Stück + Dunkelalarm unter der Stückzahl). Deaktivierte LKW sind ausgeblendet.</p>'
+                : '<p class="page-empty">Keine offenen Sendungen – alles erfasst.</p>';
+            appendShipmentGroups(pageContentEl, groups);
+            if (unknown.length) {
+                unknown.sort(byTime);
+                const det = document.createElement('details');
+                det.className = 'page-details';
+                det.open = detailsWasOpen;
+                det.innerHTML = `<summary>Ohne Stückzahl (${unknown.length}) – Abschluss nicht bestimmbar</summary>`;
+                const table = document.createElement('table');
+                table.className = 'shipment-table page-shipments';
+                table.innerHTML = SHIPMENT_TABLE_HEAD + '<tbody></tbody>';
+                unknown.slice(0, PAGE_LIST_STEP).forEach(r => appendPageShipmentRow(table.tBodies[0], r.b, r.s, false));
+                det.appendChild(table);
+                if (unknown.length > PAGE_LIST_STEP) det.insertAdjacentHTML('beforeend', `<p class="page-note">Nur die neuesten ${PAGE_LIST_STEP} – die übrigen über „Info“ suchen (Status: ohne Stückzahl).</p>`);
+                pageContentEl.appendChild(det);
+            }
+        }
+    },
+    info: {
+        render() {
+            setPageHeader('Info & Suche', '');
+            const trucks = collectTrucks(loadShipments(), loadLkwStatus());
+            const truckOptions = [['all', 'Alle LKW']].concat(trucks.map(t => [t.truckId, `${truckLabel(t)}${t.active ? '' : ' (deaktiviert)'}`]), [['none', 'Ohne LKW']]);
+            pageContentEl.innerHTML = `
+                <form id="infoForm" class="info-form" autocomplete="off">
+                    <div class="input-wrapper info-search-wrapper">
+                        <input type="search" id="infoSearchInput" placeholder="Sendungsnummer, VVL, HU/VSE, Notiz …" autocapitalize="characters" autocomplete="off" enterkeyhint="search" value="${escapeHtml(infoState.text)}">
+                    </div>
+                    <div class="info-filters">
+                        <label>Status<select id="infoStatusSelect">${infoOptionsHtml([['all', 'Alle'], ['open', 'Offen'], ['done', 'Abgeschlossen'], ['dunkel', 'Mit Dunkelalarm'], ['unknown', 'Ohne Stückzahl']], infoState.status)}</select></label>
+                        <label>LKW<select id="infoTruckSelect">${infoOptionsHtml(truckOptions, truckOptions.some(o => o[0] === infoState.truck) ? infoState.truck : 'all')}</select></label>
+                        <label>Zeitraum<select id="infoPeriodSelect">${infoOptionsHtml([['all', 'Gesamt'], ['today', 'Heute'], ['7d', '7 Tage'], ['30d', '30 Tage']], infoState.period)}</select></label>
+                        <label class="info-archive"><input type="checkbox" id="infoArchiveToggle"${infoState.archive ? ' checked' : ''}${archiveAvailable() ? '' : ' disabled'}> Archiv einbeziehen${archiveAvailable() ? '' : ' (Server ohne Archiv)'}</label>
+                    </div>
+                </form>
+                <p id="infoResultNote" class="page-note"></p>
+                <div id="infoResults"></div>`;
+            const form = document.getElementById('infoForm');
+            const input = document.getElementById('infoSearchInput');
+            const setAndUpdate = () => { pageLimit = PAGE_LIST_STEP; scheduleInfoArchiveSearch(); PAGE_RENDERERS.info.update(); };
+            form.addEventListener('submit', (e) => { e.preventDefault(); input.blur(); });
+            input.addEventListener('input', () => {
+                infoState.text = input.value.trim().toUpperCase();
+                if (infoTimer) clearTimeout(infoTimer);
+                infoTimer = setTimeout(setAndUpdate, 150);
+            });
+            // Nach der Auswahl den Fokus freigeben – sonst landen Scanner-Eingaben in der Auswahlliste
+            document.getElementById('infoStatusSelect').addEventListener('change', (e) => { infoState.status = e.target.value; e.target.blur(); setAndUpdate(); });
+            document.getElementById('infoTruckSelect').addEventListener('change', (e) => { infoState.truck = e.target.value; e.target.blur(); setAndUpdate(); });
+            document.getElementById('infoPeriodSelect').addEventListener('change', (e) => { infoState.period = e.target.value; e.target.blur(); setAndUpdate(); });
+            document.getElementById('infoArchiveToggle').addEventListener('change', (e) => { infoState.archive = e.target.checked; setAndUpdate(); });
+            scheduleInfoArchiveSearch();
+            this.update();
+            // Am Desktop gleich ins Suchfeld; auf Touch-Geräten nicht (Tastatur würde aufklappen, Scanner-Eingaben landeten hier)
+            if (!infoState.text && !('ontouchstart' in window)) setTimeout(() => { input.focus(); }, 50);
+        },
+        update() {
+            const results = document.getElementById('infoResults');
+            const note = document.getElementById('infoResultNote');
+            if (!results || !note) { this.render(); return; }
+            const text = infoState.text;
+            const anyFilter = infoState.status !== 'all' || infoState.truck !== 'all' || infoState.period !== 'all';
+            results.innerHTML = '';
+            if (!text && !anyFilter) {
+                note.textContent = 'Suchbegriff eingeben oder Filter wählen. Gefunden werden Sendungs-, VVL-, HU/VSE-Nummern und (ab 4 Zeichen) Notiztexte – auf diesem Gerät und auf Wunsch im Archiv.';
+                setPageHeader('Info & Suche', '');
+                return;
+            }
+            const shipments = loadShipments();
+            const lkwStatus = loadLkwStatus();
+            const trucks = collectTrucks(shipments, lkwStatus);
+            const nameOf = {}; trucks.forEach(t => { nameOf[t.truckId] = truckLabel(t) + (t.active ? '' : ' · deaktiviert'); });
+            const local = Object.keys(shipments)
+                .filter(b => shipments[b] && infoMatches(b, shipments[b], text))
+                .map(b => ({ b, s: shipments[b], t: Date.parse(shipments[b].lastModified) || 0 }))
+                .sort((x, y) => y.t - x.t)
+                .map(r => ({ b: r.b, s: r.s, chip: r.s.truckId ? (nameOf[r.s.truckId] || r.s.truckId) : '' }));
+            const archived = infoState.archiveOrder
+                .filter(b => infoArchiveCache[b] && !shipments[b] && infoMatches(b, infoArchiveCache[b], text))
+                .map(b => ({ b, s: infoArchiveCache[b], archived: true, chip: infoArchiveCache[b].truckId ? (nameOf[infoArchiveCache[b].truckId] || infoArchiveCache[b].truckId) : '' }));
+            const groups = [{ title: `Auf diesem Gerät (${local.length})`, rows: local }];
+            let archiveInfo = '';
+            if (infoState.archive) {
+                if (!archiveAvailable()) archiveInfo = 'Archiv: nicht verfügbar.';
+                else if (text.length < 3) archiveInfo = 'Archiv: mindestens 3 Zeichen eingeben.';
+                else if (infoState.archiveBusy) archiveInfo = 'Archiv wird durchsucht …';
+                else if (infoState.archiveNote) archiveInfo = infoState.archiveNote;
+                else groups.push({ title: `Archiv (${archived.length}${infoState.archiveTruncated ? ` von ${infoState.archiveTotal}` : ''})`, rows: archived });
+            }
+            const total = local.length + (groups.length > 1 ? archived.length : 0);
+            setPageHeader('Info & Suche', total ? `${total} Treffer` : '');
+            const parts = [];
+            if (!total) parts.push('Kein Treffer' + (text ? ` zu „${text}“` : '') + '.');
+            if (archiveInfo) parts.push(archiveInfo);
+            if (infoState.archiveTruncated && groups.length > 1) parts.push('Archiv zeigt nur die neuesten Treffer – Suche weiter eingrenzen.');
+            note.textContent = parts.join(' ');
+            appendShipmentGroups(results, groups);
+        }
+    }
+};
+
+// ---- Klicks auf Kacheln und Seiteninhalt ------------------------------------------
+if (homeHubEl) homeHubEl.addEventListener('click', (e) => {
+    const tile = e.target.closest('.home-tile[data-page]');
+    if (tile) { openPage({ id: tile.dataset.page }); return; }
+    if (e.target.closest('#homeSearchBtn')) {
+        // Scan-Feld ist zugleich das Suchfeld – hier mit normaler Tastatur (Scanner-Modus blendet sie aus)
+        window.scrollTo(0, 0);
+        shipmentNumberInputEl.inputMode = 'text';
+        setTimeout(() => shipmentNumberInputEl.focus(), 50);
+    }
+});
+if (pageBackBtnEl) pageBackBtnEl.addEventListener('click', closePage);
+if (pageContentEl) pageContentEl.addEventListener('click', (event) => {
+    const target = event.target;
+    const truckBtn = target.closest('.page-row[data-truckid]');
+    if (truckBtn) { openPage({ id: 'lkw', truckId: truckBtn.dataset.truckid }); return; }
+    const act = target.closest('[data-lkw-activate]');
+    if (act) { setLkwActiveFromPage(act.dataset.lkwActivate, true); return; }
+    const deact = target.closest('[data-lkw-deactivate]');
+    if (deact) {
+        if (confirm('LKW deaktivieren?\n\nSeine Sendungen werden in der Liste ausgeblendet; nach 7 Tagen wandern sie ins Archiv (bleiben suchbar).')) setLkwActiveFromPage(deact.dataset.lkwDeactivate, false);
+        return;
+    }
+    if (target.closest('.page-more-btn')) { pageLimit += PAGE_LIST_STEP; renderCurrentPage(false); return; }
+    if (target.closest('[data-open-hus-modal]')) { showOpenHusSummary(); return; }
+    const row = target.closest('tr[data-basenumber]');
+    if (row) { handlePageShipmentRowClick(event, row); return; }
+    if (target.closest('.hu-value, .pending-vse')) { openHuDetailsModal(event); return; }
+    const orderTitle = target.closest('.page-order .hu-order-title');
+    if (orderTitle) {
+        const base = orderTitle.closest('.page-order').dataset.basenumber;
+        if (base && loadShipments()[base]) showDetailView(base);
+    }
+});
+// Sendungskarte auf einer Seite: gleiche Aktionen wie in der Liste (Details, Edit, PDF, Löschen; Archiv: lesen/zurückholen)
+function handlePageShipmentRowClick(event, row) {
+    const base = row.dataset.basenumber;
+    const target = event.target;
+    if (!base) return;
+    if (row.dataset.archived) {
+        if (target.closest('button')) {
+            if (target.classList.contains('restore-btn')) restoreArchivedShipment(base, false);
+            else if (target.classList.contains('pdf-btn')) sendArchivedPdf(event, base);
+            return;
+        }
+        const cell = target.closest('td');
+        if (cell && cell === row.cells[0] && infoArchiveCache[base]) { detailArchived = { base, shipment: infoArchiveCache[base] }; showDetailView(base); }
+        return;
+    }
+    if (target.closest('button')) {
+        if (target.classList.contains('edit-btn') && !isBatchModeActive) openEditModal(base);
+        else if (target.classList.contains('pdf-btn')) sendPdfEmailViaBackend(event);
+        else if (target.classList.contains('main-delete-btn')) { if (confirm(`Sendung ${escapeHtml(base)} wirklich löschen?`)) deleteShipment(base); }
+        return;
+    }
+    const cell = target.closest('td');
+    if (cell && cell === row.cells[0]) showDetailView(base);
+}
+// Menü-Links (href="#") sollen keinen Verlaufseintrag „#“ erzeugen – sonst schließt die Zurück-Geste erst den Hash
+if (sideMenuEl) sideMenuEl.addEventListener('click', (e) => { const a = e.target.closest('a[href="#"]'); if (a) e.preventDefault(); });
+
+// Verlauf beim Start normalisieren; eine vor einem Neuladen offene Seite (z. B. nach Import) wieder öffnen
+(function initHistory() {
+    const saved = (history.state && history.state.frtPage) ? history.state.frtPage : null;
+    try { history.replaceState({ frtHome: true }, '', location.href); } catch (e) { /* ignorieren */ }
+    if (saved && saved.id && PAGE_RENDERERS[saved.id]) openPage(saved);
+})();
+
+
 function showDetailView(baseNumber) {
     // 1. Aktuelle Scroll-Position der Hauptseite speichern
     lastScrollPosition = window.scrollY;
@@ -2435,6 +3012,13 @@ function showDetailView(baseNumber) {
     
     // 4. In der neuen Ansicht nach ganz oben scrollen
     detailViewEl.scrollTop = 0;
+
+    // 5. Verlaufseintrag: Zurück-Geste/-Taste schließt die Detailansicht (siehe popstate-Listener der Startseite)
+    const st = history.state || {};
+    try {
+        if (st.frtDetail) history.replaceState({ frtPage: currentPage, frtDetail: baseNumber }, '', location.href);
+        else history.pushState({ frtPage: currentPage, frtDetail: baseNumber }, '', location.href);
+    } catch (e) { /* z. B. file:// */ }
 }
 
 
@@ -4152,7 +4736,7 @@ function setupEventListeners() {
     // ===============================================================
 
     // Listener für den "Zurück"-Button in der Detailansicht
-    backToMainViewBtnEl.addEventListener('click', hideDetailView);
+    backToMainViewBtnEl.addEventListener('click', goBackFromDetail); // über den Verlauf (Zurück-Geste macht dasselbe)
 
     // ÄNDERUNG: Klick-Verhalten der Tabelle wurde überarbeitet
 // ÄNDERUNG: Klick-Verhalten der Tabelle wurde überarbeitet
