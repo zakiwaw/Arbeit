@@ -1273,6 +1273,12 @@ async function loadDataFromServer() {
         return localRaw;
     }
 }
+// Gibt es mindestens einen HU-Listen-Auftrag (MAN/VVL) mit aktivem LKW? Nur dann ist „HU steht auf keiner Liste“
+// eine sinnvolle Aussage – ohne Listen würde sonst jeder Scan als unerwartet gelten (und piepen).
+function hasActiveHuListOrders() {
+    const shipments = loadShipments();
+    return Object.values(shipments).some(s => s && s.isHuListOrder && isLkwActive(s.truckId));
+}
 function isHuExpected(huNumber) {
     const upperHu = huNumber.trim().toUpperCase();
     if (!upperHu) return true;
@@ -3213,15 +3219,17 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
         // DIESE ZEILE HAT BEI IHNEN GEFEHLT: Wir müssen den Auftrag erst im System suchen!
         const parentHawbByHu = findShipmentByHuNumber(processedRawInput);
         
-        console.log("Der Auftrag heißt:", parentHawbByHu);
-        
         // Jetzt weiß das System, was parentHawbByHu ist und kann danach suchen:
         const isNachlieferungHu = parentHawbByHu && parentHawbByHu.toUpperCase().indexOf('NACHLIEFERUNG') !== -1;
 
         if (isNachlieferungHu) {
             playNachlieferungSound();
-            
-                   }
+        } else if (!isCurrentHuExpected && !isSuffixFormat && !loadShipments()[baseNumber] && hasActiveHuListOrders()) {
+            // Überzählig-Ton: Nummer steht auf keiner aktiven HU-Liste (bisher war der Ton definiert, wurde aber nie ausgelöst).
+            // Nicht bei normalen Sendungsnummern (Suffix-Format …+0001 / …0001), nicht bei bekannten Einzelsendungen und
+            // nur, wenn überhaupt HU-Listen im System sind – sonst würde jeder Scan einer neuen Einzelsendung piepen.
+            playShortErrorSound();
+        }
     }
     // --- ENDE DER AKTUALISIERTEN SOUND-LOGIK ---
 
@@ -3781,15 +3789,16 @@ function addToBatch() {
         // 1. Wir holen den Namen (die Variable heißt "parentHawb")
         const parentHawb = findShipmentByHuNumber(processedRawInput);
         
-        console.log("Der Auftrag heißt:", parentHawb);
-        
         // 2. Wir prüfen genau diese Variable "parentHawb"
         const isNachlieferungHu = parentHawb && parentHawb.toUpperCase().indexOf('NACHLIEFERUNG') !== -1;
 
         if (isNachlieferungHu) {
             playNachlieferungSound();
-            
-                  }
+        } else if (!isCurrentHuExpected && hasActiveHuListOrders()) {
+            // Überzählig-Ton: HU steht auf keiner aktiven Liste (im Batch landet sie als roter/„überzähliger“ Eintrag).
+            // Bisher war der Ton zwar definiert, wurde aber nie ausgelöst. Ohne HU-Listen im System kein Ton.
+            playShortErrorSound();
+        }
     }
 
     
