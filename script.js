@@ -1317,66 +1317,44 @@ function isHuExpected(huNumber) {
  * Spielt den Fehlerton für eine definierte Dauer (500ms) mit maximaler Lautstärke ab.
  */
 // ---- Töne (Überzählig / Nachlieferung) ----------------------------------------------------------
-// Jeder Ton spielt VOLLSTÄNDIG zu Ende. Wird während des Abspielens erneut ein Ton angefordert (schnelles Scannen),
-// kommt er in eine Warteschlange und läuft direkt danach – kein laufender Ton wird mehr unterbrochen oder auf
-// Anfang gesetzt. (Vorher: Neustart bei jedem Scan + ein 500-ms-Stopp-Timer, der auch den NÄCHSTEN Ton nach
-// wenigen Millisekunden abwürgte – daher die „abgehackten“ Töne beim schnellen Scannen.)
-const SOUND_QUEUE_MAX = 3;          // mehr als 3 wartende Töne bringen nichts – dann piept es ohnehin lange genug
-const soundQueue = [];
-let soundPlaying = false;
-let soundWatchdog = null;
+// Jeder Scan startet seinen Ton SOFORT – auch wenn der vorherige noch läuft – und jeder Ton spielt VOLLSTÄNDIG
+// zu Ende (die Töne überlagern sich dann kurz). Dafür bekommt jeder Ton eine eigene Kopie des <audio>-Elements
+// (ein einzelnes Element kann nur einmal gleichzeitig spielen und würde beim Neustart abgeschnitten).
+// (Vorher: Neustart bei jedem Scan + 500-ms-Stopp-Timer → abgehackte Töne beim schnellen Scannen.)
+const SOUND_MAX_PARALLEL = 4;           // mehr gleichzeitige Kopien bringen hörbar nichts (nur Lärm)
+const activeSounds = { error: [], nachlieferung: [] };
 
 function soundElementFor(kind) { return kind === 'nachlieferung' ? nachlieferungSoundEl : errorSoundEl; }
 
-function playQueuedSound(kind) {
-    const el = soundElementFor(kind);
-    if (!el) return;
-    if (soundPlaying) {
-        // Läuft gerade ein Ton: nicht unterbrechen, sondern anstellen (gleichartige Töne nicht endlos stapeln)
-        if (soundQueue.length < SOUND_QUEUE_MAX) soundQueue.push(kind);
-        return;
-    }
-    startSound(kind);
-}
-
-function startSound(kind) {
-    const el = soundElementFor(kind);
-    if (!el) { soundPlaying = false; playNextQueuedSound(); return; }
-    soundPlaying = true;
-    const finish = () => {
-        el.removeEventListener('ended', finish);
-        el.removeEventListener('error', finish);
-        if (soundWatchdog) { clearTimeout(soundWatchdog); soundWatchdog = null; }
-        soundPlaying = false;
-        playNextQueuedSound();
-    };
-    el.addEventListener('ended', finish);
-    el.addEventListener('error', finish);
-    // Sicherheitsnetz: falls 'ended' ausbleibt (z. B. Tab im Hintergrund), nach Tondauer + Reserve weitermachen
-    const durMs = (Number.isFinite(el.duration) && el.duration > 0 ? el.duration : 3) * 1000 + 500;
-    soundWatchdog = setTimeout(finish, durMs);
+function playSoundNow(kind) {
+    const base = soundElementFor(kind);
+    if (!base) return;
+    const list = activeSounds[kind];
+    // Abgelaufene Kopien aufräumen
+    for (let i = list.length - 1; i >= 0; i--) { if (list[i].ended || list[i].paused) list.splice(i, 1); }
+    if (list.length >= SOUND_MAX_PARALLEL) return; // es spielen schon genug – der Hinweis ist längst hörbar
+    let el;
     try {
+        el = base.cloneNode(false);             // eigene Kopie: gleiche Quelle (bereits geladen/gepuffert), eigener Abspielkopf
+        el.removeAttribute('id');
         el.volume = 1.0;
         el.currentTime = 0;
+    } catch (e) { el = base; }
+    const done = () => { const i = list.indexOf(el); if (i !== -1) list.splice(i, 1); el.removeEventListener('ended', done); el.removeEventListener('error', done); };
+    el.addEventListener('ended', done);
+    el.addEventListener('error', done);
+    list.push(el);
+    try {
         const p = el.play();
-        if (p && p.catch) p.catch(error => { console.warn(`Audio (${kind}) konnte nicht abgespielt werden:`, error); finish(); });
-    } catch (e) {
-        console.warn(`Audio (${kind}) Fehler:`, e);
-        finish();
-    }
+        if (p && p.catch) p.catch(error => { console.warn(`Audio (${kind}) konnte nicht abgespielt werden:`, error); done(); });
+    } catch (e) { console.warn(`Audio (${kind}) Fehler:`, e); done(); }
 }
 
-function playNextQueuedSound() {
-    if (soundPlaying || soundQueue.length === 0) return;
-    // Kurze Pause zwischen zwei Tönen, damit man sie als getrennte Töne hört
-    setTimeout(() => { if (!soundPlaying && soundQueue.length) startSound(soundQueue.shift()); }, 120);
-}
+/** Fehlerton (Überzählig): startet sofort, spielt vollständig – auch parallel zu einem noch laufenden Ton. */
+function playShortErrorSound() { playSoundNow('error'); }
 
-/** Fehlerton (Überzählig): spielt vollständig; bei schnellem Scannen nacheinander. */
-function playShortErrorSound() { playQueuedSound('error'); }
-
-/** Nachlieferungs-Ton: spielt vollständig; bei schnellem Scannen nacheinander. */
-function playNachlieferungSound() { playQueuedSound('nachlieferung'); }
+/** Nachlieferungs-Ton: startet sofort, spielt vollständig – auch parallel zu einem noch laufenden Ton. */
+function playNachlieferungSound() { playSoundNow('nachlieferung'); }
 
 
 
