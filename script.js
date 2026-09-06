@@ -1316,35 +1316,67 @@ function isHuExpected(huNumber) {
 /**
  * Spielt den Fehlerton für eine definierte Dauer (500ms) mit maximaler Lautstärke ab.
  */
-function playShortErrorSound() {
-    if (errorSoundEl) {
-        errorSoundEl.volume = 1.0;
-        errorSoundEl.currentTime = 0;
-        const playPromise = errorSoundEl.play();
-        if (playPromise !== undefined) {
-            playPromise.then(() => {
-                setTimeout(() => { errorSoundEl.pause(); }, 500);
-            }).catch(error => { console.warn("Audio playback failed:", error); });
-        }
+// ---- Töne (Überzählig / Nachlieferung) ----------------------------------------------------------
+// Jeder Ton spielt VOLLSTÄNDIG zu Ende. Wird während des Abspielens erneut ein Ton angefordert (schnelles Scannen),
+// kommt er in eine Warteschlange und läuft direkt danach – kein laufender Ton wird mehr unterbrochen oder auf
+// Anfang gesetzt. (Vorher: Neustart bei jedem Scan + ein 500-ms-Stopp-Timer, der auch den NÄCHSTEN Ton nach
+// wenigen Millisekunden abwürgte – daher die „abgehackten“ Töne beim schnellen Scannen.)
+const SOUND_QUEUE_MAX = 3;          // mehr als 3 wartende Töne bringen nichts – dann piept es ohnehin lange genug
+const soundQueue = [];
+let soundPlaying = false;
+let soundWatchdog = null;
+
+function soundElementFor(kind) { return kind === 'nachlieferung' ? nachlieferungSoundEl : errorSoundEl; }
+
+function playQueuedSound(kind) {
+    const el = soundElementFor(kind);
+    if (!el) return;
+    if (soundPlaying) {
+        // Läuft gerade ein Ton: nicht unterbrechen, sondern anstellen (gleichartige Töne nicht endlos stapeln)
+        if (soundQueue.length < SOUND_QUEUE_MAX) soundQueue.push(kind);
+        return;
+    }
+    startSound(kind);
+}
+
+function startSound(kind) {
+    const el = soundElementFor(kind);
+    if (!el) { soundPlaying = false; playNextQueuedSound(); return; }
+    soundPlaying = true;
+    const finish = () => {
+        el.removeEventListener('ended', finish);
+        el.removeEventListener('error', finish);
+        if (soundWatchdog) { clearTimeout(soundWatchdog); soundWatchdog = null; }
+        soundPlaying = false;
+        playNextQueuedSound();
+    };
+    el.addEventListener('ended', finish);
+    el.addEventListener('error', finish);
+    // Sicherheitsnetz: falls 'ended' ausbleibt (z. B. Tab im Hintergrund), nach Tondauer + Reserve weitermachen
+    const durMs = (Number.isFinite(el.duration) && el.duration > 0 ? el.duration : 3) * 1000 + 500;
+    soundWatchdog = setTimeout(finish, durMs);
+    try {
+        el.volume = 1.0;
+        el.currentTime = 0;
+        const p = el.play();
+        if (p && p.catch) p.catch(error => { console.warn(`Audio (${kind}) konnte nicht abgespielt werden:`, error); finish(); });
+    } catch (e) {
+        console.warn(`Audio (${kind}) Fehler:`, e);
+        finish();
     }
 }
 
-// NEUE FUNKTION HINZUFÜGEN
-function playNachlieferungSound() {
-    if (nachlieferungSoundEl) {
-        nachlieferungSoundEl.volume = 1.0;
-        nachlieferungSoundEl.currentTime = 0;
-        const playPromise = nachlieferungSoundEl.play();
-        
-        // Die playPromise-Behandlung bleibt, aber ohne den setTimeout-Stopp
-        if (playPromise !== undefined) {
-            playPromise.catch(error => {
-                // Verhindert Konsolenfehler, wenn der Browser das Abspielen blockiert
-                console.warn("Audio playback for 'nachlieferung' failed:", error);
-            });
-        }
-    }
+function playNextQueuedSound() {
+    if (soundPlaying || soundQueue.length === 0) return;
+    // Kurze Pause zwischen zwei Tönen, damit man sie als getrennte Töne hört
+    setTimeout(() => { if (!soundPlaying && soundQueue.length) startSound(soundQueue.shift()); }, 120);
 }
+
+/** Fehlerton (Überzählig): spielt vollständig; bei schnellem Scannen nacheinander. */
+function playShortErrorSound() { playQueuedSound('error'); }
+
+/** Nachlieferungs-Ton: spielt vollständig; bei schnellem Scannen nacheinander. */
+function playNachlieferungSound() { playQueuedSound('nachlieferung'); }
 
 
 
