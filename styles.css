@@ -698,6 +698,29 @@ body.batch-mode-active .status-and-button-container > #mainActionButton { flex: 
 
 .shipment-table { width: 100%; border-collapse: collapse; margin-top: var(--sp-3); }
 .shipment-table thead { display: none; }
+
+/* Unter der Liste: „Weitere anzeigen“ (nur die neuesten Karten werden gezeichnet) und Leer-Hinweis bei Suche */
+.list-footer { margin: var(--sp-2) 0 var(--sp-4); }
+.list-more-btn {
+    width: 100%;
+    min-height: var(--control-h);
+    padding: 0 var(--sp-4);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--text-muted);
+    background-color: var(--surface);
+    border: 1.5px dashed var(--border-strong);
+    border-radius: var(--r-lg);
+    transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.list-more-btn:hover, .list-more-btn:active { color: var(--text); background-color: var(--surface-3); }
+.list-empty-hint {
+    margin: var(--sp-3) 0 0;
+    padding: var(--sp-3);
+    text-align: center;
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+}
 /* Karte: HAWB und Status-Pills über die volle Breite, darunter Zeit (links) und Aktions-Icons (rechts).
    Die Pill-Zeile hängt bewusst NICHT von der Breite der Icon-Leiste ab: Safari (iOS) berechnet die Zeilenhöhe
    nicht neu, wenn sich nur die Nachbarspalte ändert (z. B. Stift-Icon im Batch-Modus ausgeblendet) – die

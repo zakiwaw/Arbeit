@@ -1835,14 +1835,83 @@ detailsHtml += `${numberPart}<span class="hu-value" style="cursor:pointer;" titl
 
 // ERSETZEN SIE IHRE KOMPLETTE, ALTE renderTable-FUNKTION MIT DIESER NEUEN VERSION
 
-function renderTable() {
+// ===================================================================
+// SENDUNGSLISTE
+// Es werden nur die neuesten LIST_PAGE_SIZE Karten gezeichnet („Weitere anzeigen“ für den Rest).
+// Die Suche läuft über die DATEN, nicht über gezeichnete Zeilen – sie findet also auch Sendungen,
+// die gerade nicht in der Liste stehen: Sendungsnummer, VVL-Nummer, HU/VSE-Nummer, ab 4 Zeichen auch Notiztext.
+// Grund: Ab ~1.000 Sendungen kosteten Aufbau und Neuzeichnen der kompletten Liste (inkl. unsichtbarer
+// QR-Codes) mehrere Sekunden – und zwar nach JEDEM Scan.
+// ===================================================================
+const LIST_PAGE_SIZE = 30;
+let listFilterText = '';            // aktueller Suchtext (getrimmt, Großschrift)
+let listLimit = LIST_PAGE_SIZE;     // wie viele Treffer gerade gezeigt werden
+const listMoreBtnEl = document.getElementById('listMoreBtn');
+const listEmptyHintEl = document.getElementById('listEmptyHint');
+if (listMoreBtnEl) listMoreBtnEl.addEventListener('click', () => { listLimit += LIST_PAGE_SIZE; drawShipmentList(); });
+
+function shipmentMatchesListFilter(baseNumber, shipment, filter) {
+    const parts = filter.split('+');
+    const base = parts[0];
+    const hasSuffix = parts.length > 1 && parts[1].length === SUFFIX_LENGTH && /^\d+$/.test(parts[1]);
+    const b = String(baseNumber).toUpperCase();
+    if (hasSuffix ? b === base : b.startsWith(base)) return true;                       // Sendungsnummer / Kundennr
+    if (shipment.parentOrderNumber && String(shipment.parentOrderNumber).toUpperCase().startsWith(base)) return true; // VVL-Nummer
+    const items = shipment.scannedItems || [];
+    if (items.some(it => it && it.rawInput && String(it.rawInput).toUpperCase().startsWith(filter))) return true;   // HU / VSE
+    if (filter.length > 3 && items.some(it => it && Array.isArray(it.notes) && it.notes.some(n => String(n).toUpperCase().includes(filter)))) return true;
+    return false;
+}
+function setListFilter(text) {
+    const next = (text || '').trim().toUpperCase();
+    if (next !== listFilterText) { listFilterText = next; listLimit = LIST_PAGE_SIZE; }
+}
+// Liste aus den Daten neu zeichnen; Filter = Inhalt des Eingabefelds (Signatur unverändert)
+function renderTable() { setListFilter(shipmentNumberInputEl.value); drawShipmentList(); }
+// Liste nach einem bestimmten Text filtern (Signatur unverändert)
+function filterTable(filterText) { setListFilter(filterText); drawShipmentList(); }
+
+// QR-Codes erst zeichnen, wenn die Zelle wirklich sichtbar wird (mobil ist sie per CSS ausgeblendet – bisher
+// wurde trotzdem für jede Karte ein QR-Code berechnet). Am Desktop erscheinen sie beim Scrollen.
+const qrObserver = (typeof IntersectionObserver !== 'undefined') ? new IntersectionObserver(entries => {
+    entries.forEach(entry => { if (entry.isIntersecting) { qrObserver.unobserve(entry.target); drawQrCode(entry.target); } });
+}) : null;
+function drawQrCode(container) {
+    if (!container || container.childElementCount > 0 || typeof QRCode === 'undefined') return;
+    new QRCode(container, {
+        text: container.dataset.qrText, width: 60, height: 60,
+        colorDark: "#000000", colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.L // Niedrige Fehlerkorrektur, gut für einfache Texte
+    });
+}
+function updateListFooter(total, shownCount) {
+    const more = total - shownCount;
+    if (listMoreBtnEl) {
+        listMoreBtnEl.textContent = more > 0 ? `Weitere ${Math.min(more, LIST_PAGE_SIZE)} anzeigen (${shownCount} von ${total})` : '';
+        listMoreBtnEl.classList.toggle('hidden', more <= 0);
+    }
+    if (listEmptyHintEl) {
+        const filter = isBatchModeActive ? '' : listFilterText;
+        listEmptyHintEl.textContent = filter ? `Keine Sendung zu „${filter}“ gefunden.` : '';
+        listEmptyHintEl.classList.toggle('hidden', !(filter && total === 0));
+    }
+}
+
+function drawShipmentList() {
     const shipments = loadShipments();
+    const filter = isBatchModeActive ? '' : listFilterText; // im Batch-Modus alle zeigen (wie bisher)
+    const matching = Object.keys(shipments)
+        .filter(b => shipments[b] && isLkwActive(shipments[b].truckId) /* LKW deaktiviert → ausblenden */
+                     && (!filter || shipmentMatchesListFilter(b, shipments[b], filter)))
+        .map(b => [b, Date.parse(shipments[b].lastModified) || 0])
+        .sort((x, y) => y[1] - x[1])   // neueste zuerst
+        .map(x => x[0]);
+    const shown = matching.slice(0, listLimit);
+
+    if (qrObserver) qrObserver.disconnect();
     tableBodyEl.innerHTML = '';
-    Object.keys(shipments).sort((a, b) => new Date(shipments[b].lastModified || 0) - new Date(shipments[a].lastModified || 0))
-        .forEach(baseNumber => {
+    shown.forEach(baseNumber => {
             const shipment = shipments[baseNumber];
-            if (!shipment) return;
- if (!isLkwActive(shipment.truckId)) return; // LKW deaktiviert → Zeile ausblenden
 
             const row = tableBodyEl.insertRow();
             
@@ -1905,31 +1974,18 @@ function renderTable() {
             qrCell.classList.add('qr-code-cell');
             qrCell.setAttribute('data-label', 'QR-Code'); // Für mobile Ansicht, obwohl versteckt
             
-            // Erstelle einen eindeutigen Container für den QR-Code
+            // Eindeutiger Container; gezeichnet wird erst, wenn er sichtbar wird (siehe qrObserver)
             const qrContainerId = 'qrcode-' + baseNumber.replace(/[^a-zA-Z0-9]/g, ''); // Bereinige ID
-            qrCell.innerHTML = `<div id="${qrContainerId}"></div>`;
-
-            // Generiere den QR-Code, nachdem das Element im DOM ist
-            setTimeout(() => {
-                // Prüfe, ob das Element noch existiert, bevor der QR-Code gezeichnet wird
-                const qrContainer = document.getElementById(qrContainerId);
-                if (qrContainer && typeof QRCode !== 'undefined') {
-                    new QRCode(qrContainer, {
-                        text: baseNumber,
-                        width: 60,
-                        height: 60,
-                        colorDark: "#000000",
-                        colorLight: "#ffffff",
-                        correctLevel: QRCode.CorrectLevel.L // Niedrige Fehlerkorrektur, gut für einfache Texte
-                    });
-                }
-            }, 0); // setTimeout mit 0 verzögert die Ausführung minimal, aber genug
+            qrCell.innerHTML = `<div id="${qrContainerId}" data-qr-text="${escapeHtml(baseNumber)}"></div>`;
+            const qrContainer = qrCell.firstElementChild;
+            if (qrObserver) qrObserver.observe(qrContainer);
+            else setTimeout(() => drawQrCode(qrContainer), 0);
             // ===============================================================
             // ENDE DER QR-CODE-LOGIK
             // ===============================================================
         });
     updateEditButtonVisibilityInTable();
-    filterTable(shipmentNumberInputEl.value);
+    updateListFooter(matching.length, shown.length);
 }
 function renderLkwMenu() {
     const container = document.getElementById('lkw-menu-container');
@@ -2164,38 +2220,7 @@ function hideDetailView() {
              document.body.classList.toggle('batch-mode-active', isBatchModeActive);
         }
 
-        function filterTable(filterText) {
-            const rows = tableBodyEl.getElementsByTagName('tr');
-            const trimmedFilter = filterText ? filterText.trim().toUpperCase() : "";
-
-            if (isBatchModeActive) { // Im Batch Mode alle Zeilen zeigen
-                for (let row of rows) row.style.display = '';
-                return;
-            }
-            if (trimmedFilter === "") { // Kein Filter, alle Zeilen zeigen
-                for (let row of rows) row.style.display = '';
-                return;
-            }
-
-            const inputParts = trimmedFilter.split('+');
-            const inputBaseNumber = inputParts[0];
-            const inputHasSuffix = inputParts.length > 1 && inputParts[1].length === SUFFIX_LENGTH && /^\d+$/.test(inputParts[1]);
-
-            for (let row of rows) {
-                const cell = row.cells[0];
-                if (cell) {
-                    const fullCellText = (cell.textContent || cell.innerText).toUpperCase();
-                    const cellBaseNumber = fullCellText.split('+')[0].trim();
-                    let showRow = false;
-                    if (inputHasSuffix) { // Bei Suffix genaue Übereinstimmung des Basenumbers
-                        if (cellBaseNumber === inputBaseNumber) showRow = true;
-                    } else { // Ohne Suffix, Präfix-Suche
-                        if (cellBaseNumber.startsWith(inputBaseNumber)) showRow = true;
-                    }
-                    row.style.display = showRow ? '' : 'none';
-                }
-            }
-        }
+        // filterTable(): siehe Sendungsliste (oberhalb von drawShipmentList) – filtert jetzt über die Daten statt über Zeilen
 
         
         
