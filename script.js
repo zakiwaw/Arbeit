@@ -2462,7 +2462,7 @@ const PAGE_LIST_STEP = LIST_PAGE_SIZE;
 let currentPage = null;          // { id: 'anlieferung'|'lkw'|'dunkelalarm'|'offen'|'info', truckId }
 let pageLimit = PAGE_LIST_STEP;  // wie viele Sendungskarten die offene Seite gerade zeigt
 let infoArchiveCache = {};       // base → Sendung (Archiv-Treffer der Info-Suche)
-const infoState = { text: '', status: 'all', truck: 'all', period: 'all', archive: false,
+const infoState = { text: '', status: 'all', truck: 'all', period: 'all', weightMin: '', weightMax: '', archive: false,
                     archiveQuery: '', archiveOrder: [], archiveTotal: 0, archiveTruncated: false, archiveBusy: false, archiveNote: '' };
 let infoTimer = null, infoArchiveTimer = null, infoArchiveSeq = 0;
 
@@ -2644,13 +2644,19 @@ function renderCurrentPage(fresh) {
 }
 const SHIPMENT_TABLE_HEAD = '<thead><tr><th>HAWB.</th><th>Übersicht</th><th>Letzte Änd.</th><th>Aktionen</th><th class="qr-code-header">QR-Code</th></tr></thead>';
 // Eine Sendungskarte (gleiche Vorlage wie in der Liste) in eine Seitentabelle; chip = Zusatzkennzeichen (z. B. LKW)
-function appendPageShipmentRow(tbody, base, s, archived, chip) {
+function appendPageShipmentRow(tbody, base, s, archived, chip, hits) {
     appendShipmentRow(tbody, base, s, !!archived);
     const row = tbody.rows[tbody.rows.length - 1];
     if (!row) return;
     const qr = row.querySelector('.qr-code-cell div');
     if (qr) qr.id = 'qrcode-page-' + base.replace(/[^a-zA-Z0-9]/g, ''); // eigener Namensraum (Liste kann dieselbe Sendung zeigen)
     if (chip) row.cells[0].insertAdjacentHTML('beforeend', `<span class="row-chip">${escapeHtml(chip)}</span>`);
+    if (hits && hits.length) { // Gewichtsfilter: die passenden HUs mit Gewicht in der Übersichtszelle (Tippen → HU-Details)
+        const shown = hits.slice(0, 6);
+        let html = shown.map(h => `<button type="button" class="weight-hit" data-hu="${escapeHtml(h.hu)}" title="HU ${escapeHtml(h.hu)}: ${escapeHtml(h.raw)}"><span class="weight-hit-hu">${escapeHtml(h.hu)}</span>${escapeHtml(formatKg(h.kg))}</button>`).join('');
+        if (hits.length > shown.length) html += `<span class="weight-hit weight-hit-more">+${hits.length - shown.length} weitere</span>`;
+        row.cells[1].insertAdjacentHTML('beforeend', `<span class="weight-hits">${html}</span>`);
+    }
 }
 // Gruppen von Sendungskarten mit gemeinsamer Seitenblätterung („Weitere anzeigen“)
 function appendShipmentGroups(container, groups) {
@@ -2665,7 +2671,7 @@ function appendShipmentGroups(container, groups) {
         table.className = 'shipment-table page-shipments';
         table.innerHTML = SHIPMENT_TABLE_HEAD + '<tbody></tbody>';
         const tbody = table.tBodies[0];
-        slice.forEach(r => appendPageShipmentRow(tbody, r.b, r.s, r.archived, r.chip));
+        slice.forEach(r => appendPageShipmentRow(tbody, r.b, r.s, r.archived, r.chip, r.hits));
         container.appendChild(table);
     });
     if (shown < total) {
@@ -2704,8 +2710,65 @@ function infoPeriodStart(period) {
     if (period === '30d') return Date.now() - 30 * 86400000;
     return 0;
 }
-function infoMatches(base, s, text) {
+// ---- Gewicht (Info-Suche) ---------------------------------------------------------------------
+// Gewicht einer HU steht als Text am Eintrag (grossWeight: „19.5 KG“, „19,500 KG“, „1.250,5 KG“, „N/A“ …).
+// Liefert Kilogramm als Zahl oder null (kein/unlesbares Gewicht). Dient auch zum Lesen der Eingabefelder „von/bis“.
+function parseWeightKg(raw) {
+    if (raw === null || raw === undefined) return null;
+    if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null;
+    const str = String(raw).trim().toUpperCase();
+    if (!str || str === 'N/A') return null;
+    const m = str.match(/\d[\d.,]*/);
+    if (!m) return null;
+    let num = m[0];
+    const lastDot = num.lastIndexOf('.'), lastComma = num.lastIndexOf(',');
+    if (lastDot !== -1 && lastComma !== -1) {
+        // beide Zeichen vorhanden: das hintere ist das Dezimalzeichen, das andere ein Tausenderpunkt/-komma
+        num = lastDot > lastComma ? num.replace(/,/g, '') : num.replace(/\./g, '').replace(',', '.');
+    } else if (lastComma !== -1) {
+        num = num.slice(0, lastComma).replace(/,/g, '') + '.' + num.slice(lastComma + 1);
+    } else if (num.indexOf('.') !== lastDot) {
+        num = num.slice(0, lastDot).replace(/\./g, '') + '.' + num.slice(lastDot + 1);
+    }
+    const n = parseFloat(num);
+    if (!Number.isFinite(n)) return null;
+    const unit = str.slice(m.index + m[0].length).trim();
+    if (/^G(\b|R)/.test(unit)) return n / 1000;    // Gramm
+    if (/^T(\b|O)/.test(unit)) return n * 1000;    // Tonnen
+    return n;                                      // Kilogramm (Standard, auch ohne Einheit)
+}
+function formatKg(n) { return `${Number(n).toLocaleString('de-DE', { maximumFractionDigits: 3 })} kg`; }
+// Eingaben „von/bis“ als Bereich in kg; null = kein Gewichtsfilter. Vertauschte Grenzen werden sortiert.
+function infoWeightRange() {
+    const a = parseWeightKg(infoState.weightMin), b = parseWeightKg(infoState.weightMax);
+    if (a === null && b === null) return null;
+    if (a !== null && b !== null) return { min: Math.min(a, b), max: Math.max(a, b) };
+    return { min: a, max: b };
+}
+function weightRangeText(range) {
+    if (!range) return '';
+    if (range.min !== null && range.max !== null) return range.min === range.max ? formatKg(range.min) : `${formatKg(range.min).replace(' kg', '')}–${formatKg(range.max)}`;
+    return range.min !== null ? `ab ${formatKg(range.min)}` : `bis ${formatKg(range.max)}`;
+}
+// HUs einer Sendung, deren Gewicht im Bereich liegt – je HU-Nummer ein Eintrag (weitere Scans derselben HU tragen kein Gewicht)
+function shipmentWeightHits(s, range) {
+    const items = Array.isArray(s && s.scannedItems) ? s.scannedItems : [];
+    const hits = [], seen = new Set();
+    items.forEach(it => {
+        if (!it || !it.rawInput) return;
+        const kg = parseWeightKg(it.grossWeight);
+        if (kg === null) return;
+        const key = String(it.rawInput).toUpperCase();
+        if (seen.has(key)) return;
+        seen.add(key);
+        if ((range.min !== null && kg < range.min - 1e-9) || (range.max !== null && kg > range.max + 1e-9)) return;
+        hits.push({ hu: String(it.rawInput), kg, raw: String(it.grossWeight) });
+    });
+    return hits;
+}
+function infoMatches(base, s, text, range) {
     if (text && !shipmentMatchesListFilter(base, s, text)) return false;
+    if (range && shipmentWeightHits(s, range).length === 0) return false;
     if (infoState.truck !== 'all') {
         if (infoState.truck === 'none' ? !!s.truckId : s.truckId !== infoState.truck) return false;
     }
@@ -2850,10 +2913,25 @@ const PAGE_RENDERERS = {
         }
     },
     info: {
+        truckOptions(trucks) {
+            return [['all', 'Alle LKW']].concat(trucks.map(t => [t.truckId, `${truckLabel(t)}${t.active ? '' : ' (deaktiviert)'}`]), [['none', 'Ohne LKW']]);
+        },
+        // LKW-Auswahl nachziehen, wenn sich die LKW geändert haben (z. B. Seite per Adresse geöffnet, bevor die Daten da waren; Import; Sync)
+        syncTruckSelect(trucks) {
+            const sel = document.getElementById('infoTruckSelect');
+            if (!sel) return;
+            const options = this.truckOptions(trucks);
+            const current = [...sel.options].map(o => o.value + '\u0000' + o.textContent).join('\n');
+            const next = options.map(o => o[0] + '\u0000' + o[1]).join('\n');
+            if (current === next) return;
+            const keep = options.some(o => o[0] === infoState.truck) ? infoState.truck : 'all';
+            sel.innerHTML = infoOptionsHtml(options, keep);
+            if (keep !== infoState.truck) infoState.truck = keep;
+        },
         render() {
             setPageHeader('Info & Suche', '');
             const trucks = collectTrucks(loadShipments(), loadLkwStatus());
-            const truckOptions = [['all', 'Alle LKW']].concat(trucks.map(t => [t.truckId, `${truckLabel(t)}${t.active ? '' : ' (deaktiviert)'}`]), [['none', 'Ohne LKW']]);
+            const truckOptions = this.truckOptions(trucks);
             pageContentEl.innerHTML = `
                 <form id="infoForm" class="info-form" autocomplete="off">
                     <div class="input-wrapper info-search-wrapper">
@@ -2863,6 +2941,14 @@ const PAGE_RENDERERS = {
                         <label>Status<select id="infoStatusSelect">${infoOptionsHtml([['all', 'Alle'], ['open', 'Offen'], ['done', 'Abgeschlossen'], ['dunkel', 'Mit Dunkelalarm'], ['unknown', 'Ohne Stückzahl']], infoState.status)}</select></label>
                         <label>LKW<select id="infoTruckSelect">${infoOptionsHtml(truckOptions, truckOptions.some(o => o[0] === infoState.truck) ? infoState.truck : 'all')}</select></label>
                         <label>Zeitraum<select id="infoPeriodSelect">${infoOptionsHtml([['all', 'Gesamt'], ['today', 'Heute'], ['7d', '7 Tage'], ['30d', '30 Tage']], infoState.period)}</select></label>
+                        <div class="info-weight" role="group" aria-label="Gewicht in Kilogramm">
+                            <span class="info-weight-label">Gewicht (kg)</span>
+                            <div class="info-weight-inputs">
+                                <input type="text" id="infoWeightMin" inputmode="decimal" placeholder="von" aria-label="Gewicht von (kg)" autocomplete="off" enterkeyhint="done" value="${escapeHtml(infoState.weightMin)}">
+                                <span class="info-weight-sep" aria-hidden="true">–</span>
+                                <input type="text" id="infoWeightMax" inputmode="decimal" placeholder="bis" aria-label="Gewicht bis (kg)" autocomplete="off" enterkeyhint="done" value="${escapeHtml(infoState.weightMax)}">
+                            </div>
+                        </div>
                         <label class="info-archive"><input type="checkbox" id="infoArchiveToggle"${infoState.archive ? ' checked' : ''}${archiveAvailable() ? '' : ' disabled'}> Archiv einbeziehen${archiveAvailable() ? '' : ' (Server ohne Archiv)'}</label>
                     </div>
                 </form>
@@ -2871,12 +2957,11 @@ const PAGE_RENDERERS = {
             const form = document.getElementById('infoForm');
             const input = document.getElementById('infoSearchInput');
             const setAndUpdate = () => { pageLimit = PAGE_LIST_STEP; scheduleInfoArchiveSearch(); PAGE_RENDERERS.info.update(); };
-            form.addEventListener('submit', (e) => { e.preventDefault(); input.blur(); });
-            input.addEventListener('input', () => {
-                infoState.text = input.value.trim().toUpperCase();
-                if (infoTimer) clearTimeout(infoTimer);
-                infoTimer = setTimeout(setAndUpdate, 150);
-            });
+            form.addEventListener('submit', (e) => { e.preventDefault(); input.blur(); if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); });
+            const debounced = () => { if (infoTimer) clearTimeout(infoTimer); infoTimer = setTimeout(setAndUpdate, 150); };
+            input.addEventListener('input', () => { infoState.text = input.value.trim().toUpperCase(); debounced(); });
+            document.getElementById('infoWeightMin').addEventListener('input', (e) => { infoState.weightMin = e.target.value.trim(); debounced(); });
+            document.getElementById('infoWeightMax').addEventListener('input', (e) => { infoState.weightMax = e.target.value.trim(); debounced(); });
             // Nach der Auswahl den Fokus freigeben – sonst landen Scanner-Eingaben in der Auswahlliste
             document.getElementById('infoStatusSelect').addEventListener('change', (e) => { infoState.status = e.target.value; e.target.blur(); setAndUpdate(); });
             document.getElementById('infoTruckSelect').addEventListener('change', (e) => { infoState.truck = e.target.value; e.target.blur(); setAndUpdate(); });
@@ -2892,25 +2977,29 @@ const PAGE_RENDERERS = {
             const note = document.getElementById('infoResultNote');
             if (!results || !note) { this.render(); return; }
             const text = infoState.text;
-            const anyFilter = infoState.status !== 'all' || infoState.truck !== 'all' || infoState.period !== 'all';
+            const range = infoWeightRange();
+            const anyFilter = infoState.status !== 'all' || infoState.truck !== 'all' || infoState.period !== 'all' || !!range;
             results.innerHTML = '';
             if (!text && !anyFilter) {
                 note.textContent = 'Suchbegriff eingeben oder Filter wählen. Gefunden werden Sendungs-, VVL-, HU/VSE-Nummern und (ab 4 Zeichen) Notiztexte – auf diesem Gerät und auf Wunsch im Archiv.';
                 setPageHeader('Info & Suche', '');
+                this.syncTruckSelect(collectTrucks(loadShipments(), loadLkwStatus()));
                 return;
             }
             const shipments = loadShipments();
             const lkwStatus = loadLkwStatus();
             const trucks = collectTrucks(shipments, lkwStatus);
+            this.syncTruckSelect(trucks);
             const nameOf = {}; trucks.forEach(t => { nameOf[t.truckId] = truckLabel(t) + (t.active ? '' : ' · deaktiviert'); });
+            const hitsOf = (s) => range ? shipmentWeightHits(s, range) : null; // passende HUs (Gewicht) zur Anzeige an der Karte
             const local = Object.keys(shipments)
-                .filter(b => shipments[b] && infoMatches(b, shipments[b], text))
+                .filter(b => shipments[b] && infoMatches(b, shipments[b], text, range))
                 .map(b => ({ b, s: shipments[b], t: Date.parse(shipments[b].lastModified) || 0 }))
                 .sort((x, y) => y.t - x.t)
-                .map(r => ({ b: r.b, s: r.s, chip: r.s.truckId ? (nameOf[r.s.truckId] || r.s.truckId) : '' }));
+                .map(r => ({ b: r.b, s: r.s, chip: r.s.truckId ? (nameOf[r.s.truckId] || r.s.truckId) : '', hits: hitsOf(r.s) }));
             const archived = infoState.archiveOrder
-                .filter(b => infoArchiveCache[b] && !shipments[b] && infoMatches(b, infoArchiveCache[b], text))
-                .map(b => ({ b, s: infoArchiveCache[b], archived: true, chip: infoArchiveCache[b].truckId ? (nameOf[infoArchiveCache[b].truckId] || infoArchiveCache[b].truckId) : '' }));
+                .filter(b => infoArchiveCache[b] && !shipments[b] && infoMatches(b, infoArchiveCache[b], text, range))
+                .map(b => ({ b, s: infoArchiveCache[b], archived: true, chip: infoArchiveCache[b].truckId ? (nameOf[infoArchiveCache[b].truckId] || infoArchiveCache[b].truckId) : '', hits: hitsOf(infoArchiveCache[b]) }));
             const groups = [{ title: `Auf diesem Gerät (${local.length})`, rows: local }];
             let archiveInfo = '';
             if (infoState.archive) {
@@ -2923,7 +3012,8 @@ const PAGE_RENDERERS = {
             const total = local.length + (groups.length > 1 ? archived.length : 0);
             setPageHeader('Info & Suche', total ? `${total} Treffer` : '');
             const parts = [];
-            if (!total) parts.push('Kein Treffer' + (text ? ` zu „${text}“` : '') + '.');
+            if (!total) parts.push('Kein Treffer' + (text ? ` zu „${text}“` : '') + (range ? ` (Gewicht ${weightRangeText(range)})` : '') + '.');
+            else if (range) parts.push(`Gewicht ${weightRangeText(range)} – passende HUs stehen an der Sendung.`);
             if (archiveInfo) parts.push(archiveInfo);
             if (infoState.archiveTruncated && groups.length > 1) parts.push('Archiv zeigt nur die neuesten Treffer – Suche weiter eingrenzen.');
             note.textContent = parts.join(' ');
@@ -2965,6 +3055,8 @@ function handlePageShipmentRowClick(event, row) {
     const base = row.dataset.basenumber;
     const target = event.target;
     if (!base) return;
+    const hit = target.closest('.weight-hit[data-hu]');
+    if (hit) { showHuDetailsFromShipment(base, hit.dataset.hu, !!row.dataset.archived); return; }
     if (row.dataset.archived) {
         if (target.closest('button')) {
             if (target.classList.contains('restore-btn')) restoreArchivedShipment(base, false);
@@ -5587,15 +5679,26 @@ showUeberzaehligHusBtnEl.addEventListener('click', () => {
                 const huNumber = target.textContent.trim();
                 const data = findShipmentAndItemByHu(huNumber);
 
-                if (data && data.item) {
-                    huDetailsNumberEl.textContent = data.item.rawInput || 'N/A';
-                    huDetailsPackagingEl.textContent = data.item.packaging || 'N/A';
-                    huDetailsDimensionsEl.textContent = data.item.dimensions || 'N/A';
-                    huDetailsWeightEl.textContent = data.item.grossWeight || 'N/A';
-                    
-                    huDetailsModalEl.classList.add('visible');
-                    document.body.classList.add('modal-open');
-                }
+                if (data && data.item) showHuDetailsModal(data.item);
+            }
+            // Modal mit den Daten eines HU-Eintrags füllen und öffnen (Anzeige unverändert)
+            function showHuDetailsModal(item) {
+                huDetailsNumberEl.textContent = item.rawInput || 'N/A';
+                huDetailsPackagingEl.textContent = item.packaging || 'N/A';
+                huDetailsDimensionsEl.textContent = item.dimensions || 'N/A';
+                huDetailsWeightEl.textContent = item.grossWeight || 'N/A';
+
+                huDetailsModalEl.classList.add('visible');
+                document.body.classList.add('modal-open');
+            }
+            // HU-Details zu einer bestimmten Sendung (Info-Suche: Gewichts-Treffer, auch aus dem Archiv)
+            function showHuDetailsFromShipment(base, huNumber, archived) {
+                const s = (archived && infoArchiveCache[base]) || loadShipments()[base] || infoArchiveCache[base];
+                const items = s && Array.isArray(s.scannedItems) ? s.scannedItems : [];
+                const key = String(huNumber || '').trim().toUpperCase();
+                const same = items.filter(it => it && String(it.rawInput || '').toUpperCase() === key);
+                const item = same.find(it => it.grossWeight) || same[0];
+                if (item) showHuDetailsModal(item);
             }
 
             // Event Listeners für die drei Listen im "Offene HUs"-Modal

@@ -969,6 +969,42 @@ body.batch-mode-active .home-hub { display: none; } /* im Batch-Modus zählt nur
     color: var(--text);
 }
 .info-filters .info-archive input { width: 20px; height: 20px; margin: 0; }
+/* Gewichtsbereich „von – bis“ (kg): zwei kleine Felder in einer Zelle des Filterrasters */
+.info-filters .info-weight { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.info-weight-label { font-size: var(--fs-xs); font-weight: 600; color: var(--text-muted); }
+.info-weight-inputs { display: flex; align-items: center; gap: var(--sp-1); min-width: 0; }
+.info-weight-inputs input[type="text"] {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 40px;
+    padding: 0 var(--sp-2);
+    font-size: var(--fs-sm);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+}
+.info-weight-sep { flex-shrink: 0; color: var(--text-faint); }
+/* Treffer-HUs des Gewichtsfilters an der Sendungskarte (in der Übersichtszelle, tippbar → HU-Details) */
+.weight-hits { display: flex; flex-wrap: wrap; gap: var(--sp-1); flex-basis: 100%; margin-top: 2px; }
+.weight-hit {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 28px;
+    padding: 2px 9px;
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--accent-text);
+    background-color: var(--accent-soft);
+    border: 1px solid transparent;
+    border-radius: var(--r-full);
+    white-space: nowrap;
+    cursor: pointer;
+}
+.weight-hit:hover, .weight-hit:active { border-color: var(--accent); }
+.weight-hit-hu { font-weight: 600; opacity: .85; }
+.weight-hit-more { color: var(--text-muted); background-color: var(--surface-3); cursor: default; }
 
 .shipment-table { width: 100%; border-collapse: collapse; margin-top: var(--sp-3); }
 .shipment-table thead { display: none; }
@@ -2262,8 +2298,9 @@ body.modal-open { overflow: hidden; }
     .home-tile { min-height: 132px; }
     #pageView { padding: 0 var(--sp-6) var(--sp-8); }
     .page-content { max-width: 900px; margin: 0 auto; }
-    .info-filters { grid-template-columns: repeat(3, minmax(0, 1fr)) auto; align-items: end; }
+    .info-filters { grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.2fr) auto; align-items: end; }
     .info-filters .info-archive { grid-column: auto; }
+    .weight-hits { flex-basis: auto; margin-top: 0; }
 }
 
 

@@ -79,8 +79,9 @@ Archivsuche erscheint der Hinweis, das Skript neu bereitzustellen.
 ## Startseite (Kacheln) – nur App, keine Server-Änderung
 
 Unter der Scan-Box zeigt die App vier Kacheln: **Anlieferung** (LKW → seine Sendungen), **Dunkelalarm**,
-**Offene Sendungen**, **Info** (Suche mit Filtern Status / LKW / Zeitraum, optional inkl. Archiv über
-`searchArchive`). Die Liste darunter zeigt ohne Suchtext nur die **5 zuletzt bearbeiteten** Sendungen („Weitere
+**Offene Sendungen**, **Info** (Suche mit Filtern Status / LKW / Zeitraum / **Gewicht von–bis in kg**, optional inkl.
+Archiv über `searchArchive`). Der Gewichtsfilter prüft das Bruttogewicht der einzelnen HUs (aus HU-Liste bzw. VVL)
+und zeigt die passenden HUs mit Gewicht direkt an der Sendung; Archiv-Treffer werden in der App nachgefiltert. Die Liste darunter zeigt ohne Suchtext nur die **5 zuletzt bearbeiteten** Sendungen („Weitere
 anzeigen“ für den Rest); tippt man ins Scan-Feld, erscheinen die Treffer. Die Unterseiten öffnen als eigene
 **Vollbild-Seiten** (wie die Sendungsdetails) mit eigener Adresse (`?seite=anlieferung&lkw=…`, `?sendung=…`);
 die **Zurück-Geste/-Taste** schließt sie, Neuladen öffnet sie wieder. Sync läuft im Hintergrund weiter.
