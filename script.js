@@ -174,13 +174,18 @@ const suspicionDeclineBtnEl = document.getElementById('suspicionDeclineBtn');
 
     const shipments = loadShipments();
 
+    if (!shipments[mainOrderNumber] && isArchivedBase(mainOrderNumber)) {
+        alert(`Auftrag ${mainOrderNumber} liegt im Archiv.\n\nBitte zuerst wiederherstellen: Nummer ins Suchfeld eingeben → „Im Archiv“ → Wiederherstellen. Danach kann die HU-Liste ergänzt werden.`);
+        return { success: false };
+    }
+
     // --- START: AUTOMATISCHE UMBENENNUNG FÜR NACHLIEFERUNGEN ---
     if (mainOrderNumber.includes('NACHLIEFERUNG')) {
         let suffixNum = 1;
         let proposedName = mainOrderNumber;
         
-        // Solange der Name im System bereits existiert, zähle hoch
-        while (shipments[proposedName]) {
+        // Solange der Name im System bereits existiert (oder im Archiv liegt), zähle hoch
+        while (isBaseTaken(shipments, proposedName)) {
             proposedName = `NACHLIEFERUNG ${suffixNum}`;
             suffixNum++;
         }
@@ -875,6 +880,7 @@ const SYNC_LEGACY_MESSAGE = "Server-Skript ist veraltet (backend/Code.gs neu ber
 const SYNC_VERSION_KEY = LOCAL_STORAGE_KEY + '_syncVersion';    // zuletzt gesehene Server-Version
 const SYNC_SNAPSHOT_KEY = LOCAL_STORAGE_KEY + '_syncSnapshot';  // Server-Stand je Sendung, von dem die lokalen Daten ausgehen
 const SYNC_PENDING_KEY = LOCAL_STORAGE_KEY + '_syncPending';    // noch nicht bestätigte Änderungen/Löschungen
+const ARCHIVE_BASES_KEY = LOCAL_STORAGE_KEY + '_archiveBases';  // Nummern der Sendungen, die auf dem Server im Archiv liegen (nur die Nummern)
 const SYNC_POLL_INTERVAL_MS = 3000;      // Grundtakt des Abrufs (Server beantwortet "nichts Neues" aus dem Cache, ohne die Tabelle zu öffnen)
 const SYNC_POLL_MAX_INTERVAL_MS = 30000; // bei Verbindungsfehlern schrittweise bis hierhin verlangsamen, danach wieder Grundtakt
 const SYNC_DEVICE_ID = (function () {
@@ -903,7 +909,62 @@ function writeSnapshotFrom(shipments) {
 function readPending() { try { const p = JSON.parse(localStorage.getItem(SYNC_PENDING_KEY) || '{}'); return { changed: p.changed || {}, deleted: p.deleted || {} }; } catch (e) { return { changed: {}, deleted: {} }; } }
 function writePending(p) { localStorage.setItem(SYNC_PENDING_KEY, JSON.stringify(p)); }
 function hasPending(p) { p = p || readPending(); return Object.keys(p.changed).length > 0 || Object.keys(p.deleted).length > 0; }
-function clearSyncState() { [SYNC_VERSION_KEY, SYNC_SNAPSHOT_KEY, SYNC_PENDING_KEY].forEach(k => localStorage.removeItem(k)); }
+function clearSyncState() { [SYNC_VERSION_KEY, SYNC_SNAPSHOT_KEY, SYNC_PENDING_KEY, ARCHIVE_BASES_KEY].forEach(k => localStorage.removeItem(k)); archiveKnownBases = new Set(); }
+
+// ===================================================================
+// ARCHIV (siehe backend/Code.gs, Abschnitt ARCHIV)
+// Fertige, alte Sendungen verschiebt der Server ins Archiv: sie bleiben vollständig im Google Sheet, werden aber
+// nicht mehr an die Geräte ausgeliefert – das Gerät hält nur den laufenden Bestand. Lokal merken wir uns nur die
+// NUMMERN der archivierten Sendungen (klein), damit ein Scan einer archivierten Nummer sofort erkannt wird.
+// Regel (Server): Einzelsendung vollständig erfasst + 7 Tage unverändert; LKW-Sendungen (VVL/MAN) erst, wenn der
+// LKW im Menü deaktiviert wurde (+ 7 Tage). Jede Änderung an einer archivierten Sendung (Scan, Storno, Notiz,
+// „Wiederherstellen“) macht sie auf allen Geräten wieder aktiv. Gelöscht wird nie automatisch.
+// ===================================================================
+let archiveKnownBases = (() => { try { return new Set(JSON.parse(localStorage.getItem(ARCHIVE_BASES_KEY) || '[]')); } catch (e) { return new Set(); } })();
+let archiveUnsupported = false;     // Server-Skript kennt 'searchArchive' nicht (alte Bereitstellung)
+function saveArchiveKnownBases() { try { localStorage.setItem(ARCHIVE_BASES_KEY, JSON.stringify([...archiveKnownBases])); } catch (e) { console.warn('Archiv-Nummern konnten nicht gespeichert werden:', e); } }
+function setArchiveKnownBases(list) { archiveKnownBases = new Set(Array.isArray(list) ? list : []); saveArchiveKnownBases(); }
+function forgetArchivedBase(base) { if (archiveKnownBases.delete(base)) saveArchiveKnownBases(); }
+function isArchivedBase(base) { return !!base && archiveKnownBases.has(base); }
+// Für Importe: Nummer ist vergeben, wenn sie lokal existiert ODER im Archiv liegt. Sonst würde ein neuer Auftrag
+// unter derselben Nummer angelegt und auf dem Server mit dem archivierten (alte HUs!) zusammengeführt.
+function isBaseTaken(shipments, base) { return !!(shipments && shipments[base]) || isArchivedBase(base); }
+// Nächste freie Variante „NUMMER (2)“, „NUMMER (3)“ … (wie bei doppelten Kundennummern verschiedener VVLs)
+function nextFreeBaseName(shipments, base) {
+    let n = 2, name = `${base} (${n})`;
+    while (isBaseTaken(shipments, name)) { n++; name = `${base} (${n})`; }
+    return name;
+}
+function archiveKnownPrefixCount(filter) {
+    const head = String(filter || '').split('+')[0].toUpperCase();
+    if (!head) return 0;
+    let n = 0; archiveKnownBases.forEach(b => { if (String(b).toUpperCase().startsWith(head)) n++; }); return n;
+}
+// Archivierte Sendung wieder in den laufenden Bestand übernehmen. Sie wird als geändert vorgemerkt: der Server schreibt
+// die Zeile ohne Archiv-Markierung zurück (= aktiv), alle anderen Geräte erhalten sie beim nächsten Abruf.
+// Gehört die Sendung zu einem deaktivierten LKW, wird der LKW wieder aktiviert (sonst bliebe sie unsichtbar).
+// Rückgabe: Kennung des reaktivierten LKW oder null.
+function restoreArchivedShipmentLocally(base, shipmentObj) {
+    ensureItemIds(shipmentObj);
+    const shipments = loadShipments();
+    shipments[base] = shipmentObj;
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(shipments));
+    const snap = readSnapshot(); snap[base] = JSON.stringify(shipmentObj); writeSnapshot(snap); // Ausgangsstand = Serverstand (3-Wege-Merge)
+    const pending = readPending(); pending.changed[base] = true; writePending(pending);
+    forgetArchivedBase(base);
+    let lkwReactivated = null;
+    if (shipmentObj.truckId && !isLkwActive(shipmentObj.truckId)) {
+        const status = loadLkwStatus(); status[shipmentObj.truckId] = true; saveLkwStatus(status);
+        lkwReactivated = shipmentObj.truckId;
+    }
+    flushPendingChanges();
+    return lkwReactivated;
+}
+// Holt genau diese Nummern aus dem Archiv (nur die, die dort liegen). Antwort: { base: shipmentObj }
+async function fetchArchivedShipments(bases) {
+    const r = await postToServer('searchArchive', { bases });
+    return r.results || {};
+}
 
 // Stabile Kennung je Scan-Eintrag (gleiche Formel wie im Backend), damit Geräte denselben Eintrag erkennen –
 // auch wenn sich Zeitstempel/Status ändern (z. B. "Anstehend"-Platzhalter, der gescannt wird).
@@ -1011,6 +1072,7 @@ async function flushPendingChanges() {
                 });
                 changedBases.forEach(b => { if (!toSend[b]) delete p.changed[b]; });
                 writeSnapshot(snapNow); writePending(p);
+                { let k = false; Object.keys(merged).forEach(b => { if (archiveKnownBases.delete(b)) k = true; }); if (k) saveArchiveKnownBases(); } // gespeichert = (wieder) aktiv
                 if (touched) { localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(after)); refreshViewsAfterRemoteChange(); }
                 // Hinweis: die Server-Version wird bewusst NUR beim Abruf (pullRemoteChanges) weitergeschaltet,
                 // sonst würden zwischenzeitliche Änderungen anderer Geräte übersprungen.
@@ -1033,12 +1095,13 @@ async function flushPendingChanges() {
 
 // Übernimmt Sendungen vom Server in den lokalen Bestand.
 // Sendungen mit lokal wartenden Änderungen werden NICHT angefasst (sie gehen beim Senden durch den Server-Merge).
-function applyServerShipments(changed, deleted, fullSet) {
+function applyServerShipments(changed, deleted, fullSet, archived) {
     const local = loadShipments();
     const pending = readPending();
     const snap = readSnapshot();
-    let touched = false, skipped = false;
+    let touched = false, skipped = false, knownChanged = false;
     Object.keys(changed || {}).forEach(b => {
+        if (archiveKnownBases.delete(b)) knownChanged = true; // wieder aktiv (z. B. von einem anderen Gerät wiederhergestellt)
         if (pending.changed[b] || pending.deleted[b]) { skipped = true; return; }
         ensureItemIds(changed[b]);
         const serverJson = JSON.stringify(changed[b]);
@@ -1046,10 +1109,20 @@ function applyServerShipments(changed, deleted, fullSet) {
         if (JSON.stringify(local[b]) !== serverJson) { local[b] = changed[b]; touched = true; }
     });
     (deleted || []).forEach(b => {
+        if (archiveKnownBases.delete(b)) knownChanged = true;
         if (pending.changed[b]) { skipped = true; return; }
         delete snap[b];
         if (b in local) { delete local[b]; touched = true; }
     });
+    // Vom Server archiviert → vom Gerät nehmen (bleibt im Sheet, per Archivsuche erreichbar).
+    // Mit lokal wartender Änderung NICHT anfassen: unser Senden macht die Sendung auf dem Server ohnehin wieder aktiv.
+    (archived || []).forEach(b => {
+        if (pending.changed[b] || pending.deleted[b]) return;
+        if (!archiveKnownBases.has(b)) { archiveKnownBases.add(b); knownChanged = true; }
+        delete snap[b];
+        if (b in local) { delete local[b]; touched = true; }
+    });
+    if (knownChanged) saveArchiveKnownBases();
     if (fullSet) { // kompletter Bestand: alles Unbekannte entfernen (außer lokal Vorgemerktes)
         Object.keys(local).forEach(b => {
             if (!(b in changed) && !pending.changed[b]) { delete local[b]; delete snap[b]; touched = true; }
@@ -1101,7 +1174,8 @@ async function pullRemoteChanges() {
             applyServerShipments(r.data || {}, [], true);
         } else {
             const r = await postToServer('loadChanges', { sinceVersion: getSyncVersion() });
-            const skipped = applyServerShipments(r.changed || {}, r.deleted || [], !!r.full).skipped;
+            if (r.full && Array.isArray(r.archivedBases)) setArchiveKnownBases(r.archivedBases);
+            const skipped = applyServerShipments(r.changed || {}, r.deleted || [], !!r.full, r.archived || []).skipped;
             applyServerLkwStatus(r.lkwStatus);
             // Wurde eine Fremdänderung wegen lokal wartender Änderungen übersprungen, Version NICHT weiterschalten –
             // sie wird beim nächsten Abruf erneut geliefert (und ist dann nach dem Server-Merge längst enthalten).
@@ -1157,18 +1231,21 @@ async function loadDataFromServer() {
             serverData = r.changed || {}; version = r.version;
             Object.values(serverData).forEach(ensureItemIds);
             applyServerLkwStatus(r.lkwStatus);
+            setArchiveKnownBases(r.archivedBases || []); // Server ohne Archiv-Funktion → leere Liste
         } catch (e) {
             if (!isUnknownActionError(e)) throw e;
             serverIsLegacy = true;
             const r = await postToServer('loadAllData');
             serverData = r.data || {};
             Object.values(serverData).forEach(ensureItemIds);
+            setArchiveKnownBases([]);
             displayError(SYNC_LEGACY_MESSAGE, 'orange');
         }
         const pending = readPending();
         const data = Object.assign({}, serverData);
         Object.keys(pending.changed).forEach(b => { if (localRaw[b]) data[b] = localRaw[b]; });
         Object.keys(pending.deleted).forEach(b => { delete data[b]; });
+        { let k = false; Object.keys(pending.changed).concat(Object.keys(pending.deleted)).forEach(b => { if (archiveKnownBases.delete(b)) k = true; }); if (k) saveArchiveKnownBases(); }
         // Ausgangsstand = Serverstand (für Sendungen mit wartenden Änderungen bleibt der alte Ausgangsstand erhalten)
         const oldSnap = readSnapshot(); const snap = {};
         Object.keys(serverData).forEach(b => { snap[b] = pending.changed[b] && oldSnap[b] ? oldSnap[b] : JSON.stringify(serverData[b]); });
@@ -1673,7 +1750,11 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
     }
 
     const shipments = loadShipments();
-    const shipment = baseNumberToDisplay ? shipments[baseNumberToDisplay] : null;
+    // Archiv-Sendung (aus den Archiv-Treffern geöffnet): nur lesen – kein Storno, keine Notizen. Erst „Wiederherstellen“
+    // (oder ein Scan darauf) macht sie wieder zur normalen, bearbeitbaren Sendung.
+    const archivedView = !!(baseNumberToDisplay && !shipments[baseNumberToDisplay] && detailArchived && detailArchived.base === baseNumberToDisplay);
+    const shipment = baseNumberToDisplay ? (shipments[baseNumberToDisplay] || (archivedView ? detailArchived.shipment : null)) : null;
+    if (!archivedView) detailArchived = null;
 
     if (!baseNumberToDisplay || !shipment) {
         displayTarget.innerHTML = 'Geben Sie eine Sendungsnummer ein oder wählen Sie eine aus der Liste.';
@@ -1685,6 +1766,11 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
     // Änderungen werden auf die `displayTarget` Variable angewendet.
 
     let detailsHtml = '';
+
+    if (archivedView) {
+        detailsHtml += `<div class="archive-banner"><span class="archive-badge">Archiv</span><span>Abgeschlossen und archiviert – nur lesen.</span>`
+            + `<button type="button" id="detailRestoreBtn" class="restore-btn" data-basenumber="${escapeHtml(baseNumberToDisplay)}">Wiederherstellen</button></div>`;
+    }
 
     if (shipment.parentOrderNumber) {
         detailsHtml += `<div class="detail-meta detail-meta-strong">VVL: ${escapeHtml(shipment.parentOrderNumber)}</div>`;
@@ -1792,7 +1878,7 @@ detailsHtml += `${numberPart}<span class="hu-value" style="cursor:pointer;" titl
             detailsHtml += `<span class="cancelled-info"> (storniert am ${cancelDt ? cancelDt.toLocaleString('de-DE') : 'Unbekannt'})</span>`;
         }
         detailsHtml += `</div>`;
-        if (!isCancelled) {
+        if (!isCancelled && !archivedView) {
             detailsHtml += `<button class="cancel-button" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}">Storno</button>`;
         }
         detailsHtml += `<div class="scan-actions-and-notes">`;
@@ -1801,6 +1887,9 @@ detailsHtml += `${numberPart}<span class="hu-value" style="cursor:pointer;" titl
             item.notes.forEach((note, index) => {
                 if (isCancelled) {
                     notesListHtml += `<div class="note-item" style="color:var(--cancelled-color);">- ${escapeHtml(note)}</div>`;
+                } else if (archivedView) {
+                    // Archiv: Notiz wie gewohnt anzeigen, aber ohne Bearbeiten/Löschen
+                    notesListHtml += `<div class="note-item"><span class="note-prefix">Notiz:</span><span class="note-readonly">${escapeHtml(note)}</span></div>`;
                 } else {
                     notesListHtml += `<div class="note-item"><span class="note-prefix">Notiz:</span><span class="editable-note" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" data-note-index="${index}" title="Notiz bearbeiten">${escapeHtml(note)}</span><button class="delete-note-btn" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" data-note-index="${index}" title="Notiz L\u00F6schen">\u{1F5D1}</button></div>`;
                 }
@@ -1808,7 +1897,7 @@ detailsHtml += `${numberPart}<span class="hu-value" style="cursor:pointer;" titl
             notesListHtml += '</div>';
             detailsHtml += notesListHtml;
         }
-        if (!isCancelled) {
+        if (!isCancelled && !archivedView) {
             detailsHtml += `<a href="#" class="add-note-link" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" title="Weitere Notiz hinzuf\u00FCgen">Notiz hinzuf\u00FCgen</a>`;
         }
         detailsHtml += `<div class="inline-note-editor-placeholder"></div>`;
@@ -1864,7 +1953,7 @@ function shipmentMatchesListFilter(baseNumber, shipment, filter) {
 }
 function setListFilter(text) {
     const next = (text || '').trim().toUpperCase();
-    if (next !== listFilterText) { listFilterText = next; listLimit = LIST_PAGE_SIZE; }
+    if (next !== listFilterText) { listFilterText = next; listLimit = LIST_PAGE_SIZE; clearArchiveResults(); }
 }
 // Liste aus den Daten neu zeichnen; Filter = Inhalt des Eingabefelds (Signatur unverändert)
 function renderTable() { setListFilter(shipmentNumberInputEl.value); drawShipmentList(); }
@@ -1884,7 +1973,9 @@ function drawQrCode(container) {
         correctLevel: QRCode.CorrectLevel.L // Niedrige Fehlerkorrektur, gut für einfache Texte
     });
 }
+let lastListTotal = 0;
 function updateListFooter(total, shownCount) {
+    lastListTotal = total;
     const more = total - shownCount;
     if (listMoreBtnEl) {
         listMoreBtnEl.textContent = more > 0 ? `Weitere ${Math.min(more, LIST_PAGE_SIZE)} anzeigen (${shownCount} von ${total})` : '';
@@ -1895,11 +1986,147 @@ function updateListFooter(total, shownCount) {
         listEmptyHintEl.textContent = filter ? `Keine Sendung zu „${filter}“ gefunden.` : '';
         listEmptyHintEl.classList.toggle('hidden', !(filter && total === 0));
     }
+    updateArchiveHint(total);
+}
+
+// -------------------------------------------------------------------
+// ARCHIV-SUCHE IN DER LISTE
+// Unter der Liste erscheint bei einer Suche ein Knopf „Im Archiv: N Sendungen anzeigen“ (wenn die Nummern bekannt
+// sind) bzw. „Im Archiv suchen“ (kein lokaler Treffer). Die Treffer kommen vom Server und werden in einem eigenen
+// Block unter der Liste gezeigt – gleiche Karten, gekennzeichnet mit „Archiv“, statt Bearbeiten/Löschen ein
+// „Wiederherstellen“. Tippen öffnet die Detailansicht nur lesend.
+// -------------------------------------------------------------------
+const archiveHintBtnEl = document.getElementById('archiveHintBtn');
+const archiveResultsEl = document.getElementById('archiveResults');
+const archiveTableBodyEl = document.getElementById('archiveTableBody');
+const archiveResultsTitleEl = document.getElementById('archiveResultsTitle');
+const archiveResultsNoteEl = document.getElementById('archiveResultsNote');
+const archiveCloseBtnEl = document.getElementById('archiveCloseBtn');
+let archiveResultsFilter = '';   // Suchtext, zu dem die gezeigten Archiv-Treffer gehören
+let archiveResultsCache = {};    // base → Sendung (die gerade gezeigten Archiv-Treffer)
+let archiveSearchSeq = 0;        // entwertet veraltete Antworten
+let archiveAutoTimer = null;
+let detailArchived = null;         // { base, shipment } – in der Detailansicht gezeigte Archiv-Sendung (nur lesen)
+if (archiveHintBtnEl) archiveHintBtnEl.addEventListener('click', () => runArchiveSearch(listFilterText));
+if (archiveCloseBtnEl) archiveCloseBtnEl.addEventListener('click', () => { clearArchiveResults(); updateArchiveHint(lastListTotal); });
+
+function archiveAvailable() { return !archiveUnsupported && !serverIsLegacy; }
+function updateArchiveHint(total) {
+    if (!archiveHintBtnEl) return;
+    const filter = isBatchModeActive ? '' : listFilterText;
+    let label = '';
+    if (filter && archiveAvailable() && archiveResultsFilter !== filter && archiveKnownBases.size > 0) {
+        const n = archiveKnownPrefixCount(filter);
+        if (n > 0) label = n === 1 ? 'Im Archiv: 1 Sendung anzeigen' : `Im Archiv: ${n} Sendungen anzeigen`;
+        else if (total === 0 && filter.length >= 3) label = 'Im Archiv suchen'; // kein lokaler Treffer: z. B. HU/VSE-, VVL-Nummer, Notiztext
+    }
+    archiveHintBtnEl.textContent = label;
+    archiveHintBtnEl.classList.toggle('hidden', !label);
+}
+function clearArchiveResults() {
+    archiveSearchSeq++;
+    archiveResultsFilter = ''; archiveResultsCache = {};
+    if (archiveTableBodyEl) archiveTableBodyEl.innerHTML = '';
+    if (archiveResultsEl) archiveResultsEl.classList.add('hidden');
+}
+async function runArchiveSearch(query) {
+    const q = (query || '').trim().toUpperCase();
+    if (!q || !archiveResultsEl || !archiveAvailable()) return;
+    const seq = ++archiveSearchSeq;
+    if (archiveHintBtnEl) { archiveHintBtnEl.textContent = 'Archiv wird durchsucht …'; archiveHintBtnEl.disabled = true; }
+    try {
+        const r = await postToServer('searchArchive', { query: q, mode: 'prefix' });
+        if (seq !== archiveSearchSeq) return; // inzwischen anders gesucht oder geleert
+        archiveResultsFilter = q; archiveResultsCache = r.results || {};
+        const order = (Array.isArray(r.order) ? r.order : Object.keys(archiveResultsCache)).filter(b => archiveResultsCache[b]);
+        let k = false; order.forEach(b => { if (!archiveKnownBases.has(b)) { archiveKnownBases.add(b); k = true; } }); if (k) saveArchiveKnownBases();
+        drawArchiveResults(order, r.total || order.length, !!r.truncated);
+    } catch (e) {
+        if (seq !== archiveSearchSeq) return;
+        if (isUnknownActionError(e)) { archiveUnsupported = true; displayError('Archivsuche benötigt das neue Server-Skript (backend/Code.gs neu bereitstellen).', 'orange', 6000); }
+        else displayError(`Archiv nicht erreichbar: ${e.message}`, 'red', 5000);
+    } finally {
+        if (archiveHintBtnEl) archiveHintBtnEl.disabled = false;
+        if (seq === archiveSearchSeq) updateArchiveHint(lastListTotal);
+    }
+}
+function drawArchiveResults(order, total, truncated) {
+    if (!archiveResultsEl || !archiveTableBodyEl) return;
+    archiveTableBodyEl.innerHTML = '';
+    order.forEach(b => appendShipmentRow(archiveTableBodyEl, b, archiveResultsCache[b], true));
+    if (archiveResultsTitleEl) archiveResultsTitleEl.textContent = order.length === 0
+        ? `Archiv: kein Treffer zu „${archiveResultsFilter}“`
+        : `Archiv: ${order.length}${truncated ? ' von ' + total : ''} Treffer zu „${archiveResultsFilter}“`;
+    if (archiveResultsNoteEl) {
+        archiveResultsNoteEl.textContent = order.length === 0 ? ''
+            : truncated ? `Nur die neuesten ${order.length} von ${total} Treffern – Suche weiter eingrenzen.`
+            : 'Antippen zeigt die Sendung (nur lesen). „Wiederherstellen“ holt sie zurück in die Liste – ein Scan darauf tut das automatisch.';
+        archiveResultsNoteEl.classList.toggle('hidden', !archiveResultsNoteEl.textContent);
+    }
+    archiveResultsEl.classList.remove('hidden');
+}
+function removeArchiveResultRow(base) {
+    delete archiveResultsCache[base];
+    if (!archiveTableBodyEl) return;
+    [...archiveTableBodyEl.rows].forEach(tr => { if (tr.dataset.basenumber === base) tr.remove(); });
+    if (archiveResultsFilter && archiveTableBodyEl.rows.length === 0) { clearArchiveResults(); updateArchiveHint(lastListTotal); }
+}
+// „Wiederherstellen“ aus der Trefferliste oder der Detailansicht
+function restoreArchivedShipment(base, fromDetail) {
+    const obj = (fromDetail && detailArchived && detailArchived.base === base) ? detailArchived.shipment : archiveResultsCache[base];
+    if (!base || !obj) return;
+    const lkwReactivated = restoreArchivedShipmentLocally(base, JSON.parse(JSON.stringify(obj)));
+    removeArchiveResultRow(base);
+    detailArchived = null;
+    renderTable(); renderLkwMenu();
+    if (fromDetail) displayCurrentShipmentDetails(base); // jetzt mit Storno/Notizen
+    const lkwNote = lkwReactivated ? ` LKW ${escapeHtml(lkwReactivated)} wurde dafür wieder aktiviert.` : '';
+    displayError(`Sendung ${escapeHtml(base)} aus dem Archiv wiederhergestellt – sie steht wieder in der Liste.${lkwNote}`, 'blue', 4000);
+}
+// Eingabe einer bekannten Archiv-Nummer (z. B. Scan zum Nachsehen): Treffer automatisch holen
+function scheduleArchiveAutoSearch(value) {
+    if (archiveAutoTimer) { clearTimeout(archiveAutoTimer); archiveAutoTimer = null; }
+    const filter = (value || '').trim().toUpperCase();
+    const base = processShipmentNumber(filter).baseNumber;
+    if (!filter || !base || !archiveAvailable() || !isArchivedBase(base)) return;
+    archiveAutoTimer = setTimeout(() => { if (listFilterText === filter && archiveResultsFilter !== filter) runArchiveSearch(filter); }, 350);
+}
+// PDF für eine Archiv-Sendung: Daten aus den Treffern; bei einer VVL alle zugehörigen Aufträge aus dem Archiv dazuholen
+async function sendArchivedPdf(event, base) {
+    const s = archiveResultsCache[base];
+    if (!s) return;
+    const pool = Object.assign({}, loadShipments()); pool[base] = s;
+    if (s.parentOrderNumber) {
+        event.target.disabled = true;
+        try { const r = await postToServer('searchArchive', { query: s.parentOrderNumber, mode: 'vvl' }); Object.assign(pool, r.results || {}); }
+        catch (e) { event.target.disabled = false; displayError(`Archiv nicht erreichbar: ${e.message}`, 'red', 5000); return; }
+    }
+    sendPdfEmailViaBackend(event, pool);
+}
+// Scan auf eine archivierte Sendung: erst zurückholen, dann normal verbuchen. Antwort: weiter scannen? (true/false)
+async function restoreArchivedBeforeScan(base) {
+    if (archiveAutoTimer) { clearTimeout(archiveAutoTimer); archiveAutoTimer = null; } // keine parallele Archivsuche zur selben Nummer
+    mainActionButtonEl.disabled = true;
+    displayError(`Sendung ${escapeHtml(base)} liegt im Archiv – wird geholt …`, 'blue');
+    try {
+        const found = await fetchArchivedShipments([base]);
+        if (found[base]) { restoreArchivedShipmentLocally(base, found[base]); renderTable(); renderLkwMenu(); }
+        else forgetArchivedBase(base); // nicht (mehr) im Archiv → wie bisher (neue Sendung)
+        clearError();
+        return true;
+    } catch (e) {
+        if (isUnknownActionError(e)) { archiveUnsupported = true; displayError('Archivsuche benötigt das neue Server-Skript (backend/Code.gs neu bereitstellen).', 'orange', 6000); return true; }
+        displayError(`Archiv nicht erreichbar – Scan nicht gespeichert, bitte erneut versuchen. (${e.message})`, 'red', 6000);
+        return false;
+    } finally {
+        mainActionButtonEl.disabled = false;
+    }
 }
 
 function drawShipmentList() {
     const shipments = loadShipments();
     const filter = isBatchModeActive ? '' : listFilterText; // im Batch-Modus alle zeigen (wie bisher)
+    if (isBatchModeActive && archiveResultsFilter) clearArchiveResults();
     const matching = Object.keys(shipments)
         .filter(b => shipments[b] && isLkwActive(shipments[b].truckId) /* LKW deaktiviert → ausblenden */
                      && (!filter || shipmentMatchesListFilter(b, shipments[b], filter)))
@@ -1908,14 +2135,23 @@ function drawShipmentList() {
         .map(x => x[0]);
     const shown = matching.slice(0, listLimit);
 
-    if (qrObserver) qrObserver.disconnect();
+    if (qrObserver) {
+        qrObserver.disconnect();
+        // Archiv-Treffer weiter beobachten (deren QR-Codes sind evtl. noch nicht gezeichnet)
+        if (archiveTableBodyEl) archiveTableBodyEl.querySelectorAll('.qr-code-cell div').forEach(d => { if (d.childElementCount === 0) qrObserver.observe(d); });
+    }
     tableBodyEl.innerHTML = '';
-    shown.forEach(baseNumber => {
-            const shipment = shipments[baseNumber];
-
-            const row = tableBodyEl.insertRow();
+    shown.forEach(baseNumber => appendShipmentRow(tableBodyEl, baseNumber, shipments[baseNumber], false));
+    updateEditButtonVisibilityInTable();
+    updateListFooter(matching.length, shown.length);
+}
+// Eine Karte/Zeile zeichnen (Vorlage unverändert). archived = Archiv-Treffer: Kennzeichen „Archiv“,
+// „Wiederherstellen“ + PDF statt Bearbeiten/PDF/Löschen.
+function appendShipmentRow(tbody, baseNumber, shipment, archived) {
+            const row = tbody.insertRow();
             
             row.dataset.basenumber = baseNumber;
+            if (archived) { row.classList.add('archived'); row.dataset.archived = '1'; }
 
             const securityCount = calculateCurrentCountedPieces(shipment.scannedItems || []);
             const receiptCount = calculateGoodsReceiptCount(shipment.scannedItems || []);
@@ -1925,16 +2161,17 @@ function drawShipmentList() {
             let hawbCellHtml = '';
             let pdfButtonData = ''; 
 
+            const badgeHtml = archived ? `<span class="archive-badge">Archiv</span>` : '';
             if (shipment.parentOrderNumber) {
                 hawbCellHtml = `<td data-label="HAWB.">
                     <div class="vvl-table-entry">
                          <span class="vvl-prefix">VVL: </span>${escapeHtml(shipment.parentOrderNumber)}<br>
                          <span class="kundennr-prefix">Kundennr: </span>${escapeHtml(baseNumber)}
-                    </div>
+                    </div>${badgeHtml}
                 </td>`;
                 pdfButtonData = `data-parentordernumber="${escapeHtml(shipment.parentOrderNumber)}"`;
             } else {
-                hawbCellHtml = `<td data-label="HAWB.">${escapeHtml(baseNumber)}</td>`;
+                hawbCellHtml = `<td data-label="HAWB.">${escapeHtml(baseNumber)}${badgeHtml}</td>`;
             }
             row.insertCell().outerHTML = hawbCellHtml;
 
@@ -1961,7 +2198,10 @@ function drawShipmentList() {
             const actionsCell = row.insertCell();
             actionsCell.setAttribute('data-label', 'Aktionen');
             actionsCell.classList.add('actions-cell');
-            actionsCell.innerHTML = `
+            actionsCell.innerHTML = archived ? `
+                <button class="restore-btn" data-basenumber="${escapeHtml(baseNumber)}" title="Sendung ${escapeHtml(baseNumber)} aus dem Archiv zurück in die Liste holen">Wiederherstellen</button>
+                <button class="pdf-btn" data-basenumber="${escapeHtml(baseNumber)}" ${pdfButtonData}>PDF</button>
+            ` : `
                 <button class="edit-btn" data-basenumber="${escapeHtml(baseNumber)}" title="Sendung ${escapeHtml(baseNumber)} bearbeiten">Edit</button>
                 <button class="pdf-btn" data-basenumber="${escapeHtml(baseNumber)}" ${pdfButtonData}>PDF</button>
                 <button class="delete-btn main-delete-btn" data-basenumber="${escapeHtml(baseNumber)}">L\u00F6schen</button>
@@ -1975,7 +2215,7 @@ function drawShipmentList() {
             qrCell.setAttribute('data-label', 'QR-Code'); // Für mobile Ansicht, obwohl versteckt
             
             // Eindeutiger Container; gezeichnet wird erst, wenn er sichtbar wird (siehe qrObserver)
-            const qrContainerId = 'qrcode-' + baseNumber.replace(/[^a-zA-Z0-9]/g, ''); // Bereinige ID
+            const qrContainerId = (archived ? 'qrcode-archiv-' : 'qrcode-') + baseNumber.replace(/[^a-zA-Z0-9]/g, ''); // Bereinige ID (Archiv-Block eigener Namensraum)
             qrCell.innerHTML = `<div id="${qrContainerId}" data-qr-text="${escapeHtml(baseNumber)}"></div>`;
             const qrContainer = qrCell.firstElementChild;
             if (qrObserver) qrObserver.observe(qrContainer);
@@ -1983,9 +2223,6 @@ function drawShipmentList() {
             // ===============================================================
             // ENDE DER QR-CODE-LOGIK
             // ===============================================================
-        });
-    updateEditButtonVisibilityInTable();
-    updateListFooter(matching.length, shown.length);
 }
 function renderLkwMenu() {
     const container = document.getElementById('lkw-menu-container');
@@ -2977,8 +3214,33 @@ function skipNoteAndAddFirstBatchItem() {
 // --- START DER ÄNDERUNG: Die komplette Funktion wird aktualisiert ---
 // --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESER NEUEN VERSION ---
 
+let batchArchiveResolved = false; // Archiv-Rückholung für diesen Batch bereits erledigt
 function saveBatch() {
     if (currentBatch.length === 0) { displayError("Batch ist leer."); focusShipmentInput(); return; }
+
+    // Enthält der Batch Nummern archivierter Sendungen (lokal nicht vorhanden), diese ZUERST vom Server zurückholen –
+    // sonst würden neue Sendungen mit denselben Nummern angelegt. Danach läuft die Verarbeitung wie gewohnt.
+    if (!batchArchiveResolved && archiveAvailable() && archiveKnownBases.size > 0) {
+        const local = loadShipments();
+        const need = [...new Set(currentBatch.map(bi => processShipmentNumber(bi.rawInput).baseNumber))]
+            .filter(b => b && isArchivedBase(b) && !local[b]);
+        if (need.length > 0) {
+            saveBatchButtonEl.disabled = true;
+            displayError(`${need.length} Sendung(en) aus dem Batch liegen im Archiv – werden geholt …`, 'blue');
+            fetchArchivedShipments(need).then(found => {
+                Object.keys(found).forEach(b => restoreArchivedShipmentLocally(b, found[b]));
+                need.forEach(b => { if (!found[b]) forgetArchivedBase(b); });
+                clearError();
+                batchArchiveResolved = true;
+                saveBatch();
+            }).catch(e => {
+                if (isUnknownActionError(e)) { archiveUnsupported = true; batchArchiveResolved = true; saveBatch(); return; }
+                displayError(`Archiv nicht erreichbar – Batch nicht gespeichert, bitte erneut versuchen. (${e.message})`, 'red', 6000);
+            }).finally(() => { saveBatchButtonEl.disabled = false; });
+            return;
+        }
+    }
+    batchArchiveResolved = false;
     
     const statusesThatTriggerWE = STATUSES_THAT_TRIGGER_WE;
 
@@ -3629,7 +3891,7 @@ function generatePdfInBrowser(event) {
 // In script.js
 // --- ERSETZEN SIE DIE KOMPLETTE, ALTE FUNKTION MIT DIESER VERSION ---
 
-async function sendPdfEmailViaBackend(event) {
+async function sendPdfEmailViaBackend(event, shipmentsPool) {
     const pdfButton = event.target;
     pdfButton.disabled = true;
     const originalText = pdfButton.textContent;
@@ -3638,7 +3900,7 @@ async function sendPdfEmailViaBackend(event) {
     const clickedBaseNumber = pdfButton.dataset.basenumber;
     const parentOrderNumber = pdfButton.dataset.parentordernumber;
 
-    const allShipments = loadShipments();
+    const allShipments = shipmentsPool || loadShipments(); // Archiv-Treffer liefern ihren eigenen Datenpool
     let shipmentsToProcess = [];
     let pdfTitlePrefix = '';
 
@@ -3930,12 +4192,33 @@ tableBodyEl.addEventListener('click', (event) => {
 });
 
 
+if (archiveTableBodyEl) archiveTableBodyEl.addEventListener('click', (event) => {
+    const target = event.target;
+    const row = target.closest('tr');
+    if (!row || !row.dataset.basenumber) return;
+    const baseNumber = row.dataset.basenumber;
+    if (target.closest('button')) {
+        if (target.classList.contains('restore-btn')) restoreArchivedShipment(baseNumber, false);
+        else if (target.classList.contains('pdf-btn')) sendArchivedPdf(event, baseNumber);
+        return;
+    }
+    const cell = target.closest('td');
+    if (cell && cell === row.cells[0] && archiveResultsCache[baseNumber]) {
+        detailArchived = { base: baseNumber, shipment: archiveResultsCache[baseNumber] };
+        showDetailView(baseNumber);
+    }
+});
+
 document.addEventListener('click', (event) => {
     const target = event.target;
     const detailContainer = target.closest('#currentShipmentDetails');
     if (!detailContainer) return;
 
-    if (target.classList.contains('editable-note') || target.classList.contains('add-note-link')) {
+    if (target.id === 'detailRestoreBtn') {
+        event.preventDefault();
+        restoreArchivedShipment(target.dataset.basenumber, true);
+    }
+    else if (target.classList.contains('editable-note') || target.classList.contains('add-note-link')) {
         event.preventDefault();
         openNoteEditModal(target);
     } 
@@ -3996,6 +4279,16 @@ else if (target.closest('.hu-value')) {
             const rawInput = shipmentNumberInputEl.value;
             const status = securityStatusSelectEl.value;
             const isCombination = comboCheckboxEl.checked;
+            // Archivierte Sendung gescannt (Nummer bekannt, lokal nicht vorhanden) → erst vom Server zurückholen,
+            // dann ganz normal verbuchen. Ohne diesen Schritt würde eine NEUE Sendung mit derselben Nummer angelegt.
+            {
+                const scanBase = processShipmentNumber(rawInput).baseNumber;
+                if (scanBase && archiveAvailable() && isArchivedBase(scanBase) && !loadShipments()[scanBase] && !findShipmentByHuNumber(rawInput)) {
+                    if (mainActionButtonEl.disabled) return; // Rückholung läuft bereits
+                    restoreArchivedBeforeScan(scanBase).then(ok => { if (ok && !isBatchModeActive) mainActionButtonEl.click(); });
+                    return;
+                }
+            }
             const result = processAndSaveSingleScan(rawInput, status, isCombination);
             if (!result.waitingForTotal) {
                 if (result.success) {
@@ -4066,11 +4359,15 @@ const manTruckId = 'MAN ' + newManNumber;
                 let suffixNum = 1;
                 let proposedName = orderNumber;
                 
-                while (shipments[proposedName]) {
+                while (isBaseTaken(shipments, proposedName)) {
                     proposedName = `NACHLIEFERUNG ${suffixNum}`;
                     suffixNum++;
                 }
                 orderNumber = proposedName;
+            }
+            // Nummer liegt im Archiv (alter, abgeschlossener Auftrag) → neuen Auftrag unter „NUMMER (2)“ anlegen
+            else if (!shipments[orderNumber] && isArchivedBase(orderNumber)) {
+                orderNumber = nextFreeBaseName(shipments, orderNumber);
             }
                 
                 const hasFullMeta = metaParts.length >= 4;
@@ -4143,13 +4440,17 @@ else if (currentValue.startsWith('FRT_VVL_V1')) {
         // --- START NEU: Verhindert das Überschreiben bestehender LKWs ---
         // Wenn die Kundennummer schon im System ist, aber zu einer ANDEREN Vorverladeliste gehört,
         // hängen wir eine Nummer an (z.B. "12345 (2)"), damit der alte LKW seinen Auftrag behält.
-        if (shipments[kundennr] && shipments[kundennr].parentOrderNumber && shipments[kundennr].parentOrderNumber !== vorverladelisteNr) {
-            let suffixNum = 2;
-            while (shipments[`${originalKundennr} (${suffixNum})`]) {
-                suffixNum++;
-            }
-            kundennr = `${originalKundennr} (${suffixNum})`;
-        }
+        // Gleiches gilt, wenn die Kundennummer im Archiv liegt (alte VVL, längst abgeschlossen): der Server würde sonst
+        // den archivierten Auftrag mit dem neuen zusammenführen.
+        const takenByOtherVvl = (shipments[kundennr] && shipments[kundennr].parentOrderNumber && shipments[kundennr].parentOrderNumber !== vorverladelisteNr)
+            || (!shipments[kundennr] && isArchivedBase(kundennr));
+        if (takenByOtherVvl) {
+            let suffixNum = 2;
+            while (isBaseTaken(shipments, `${originalKundennr} (${suffixNum})`)) {
+                suffixNum++;
+            }
+            kundennr = `${originalKundennr} (${suffixNum})`;
+        }
         // --- ENDE NEU ---
 
         const positionen = huData.split('~~~').filter(Boolean);
@@ -4300,6 +4601,7 @@ else if (currentValue.startsWith('FRT_VVL_V1')) {
         }
         displayCurrentShipmentDetails(baseNumberToShow || processedDirectBase);
         filterTable(baseNumberToShow || currentValue);
+        if (!baseNumberToShow) scheduleArchiveAutoSearch(currentValue);
     });
 
     clearInputButtonEl.addEventListener('click', () => {

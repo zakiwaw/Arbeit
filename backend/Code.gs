@@ -1,16 +1,22 @@
 // ===================================================
 // FRACHT TRACKER – Google Apps Script Backend
-// Version 2: mehrgeräte-sicher.
+// Version 2.1: mehrgeräte-sicher + Archiv.
 //   - Jedes Gerät schickt nur die Sendungen, die es geändert hat (+ den Stand, von dem es ausging).
 //   - Der Server führt zusammen (3-Wege-Merge) statt zu überschreiben; Schreibzugriffe laufen unter Sperre.
 //   - Geräte holen regelmäßig nur die Änderungen ab ("loadChanges" seit Version X).
 //   - Die alten Aktionen (loadAllData/saveAllData/…) funktionieren weiterhin für ältere App-Versionen.
 //
-// Sheet "shipments":  A = baseNumber | B = JSON | C = Version | D = geändert am | E = gelöscht (TRUE) | F… = JSON-Fortsetzung
+// Sheet "shipments":  A = baseNumber | B = JSON | C = Version | D = geändert am | E = gelöscht (TRUE) bzw. archiviert (ARCHIV) | F… = JSON-Fortsetzung
 //   (Spalten C–E werden automatisch mitgeschrieben; alte Zeilen ohne Version gelten als Version 0.
 //    Sehr große Sendungen werden über mehrere Zellen verteilt, weil eine Zelle max. 50.000 Zeichen fasst.)
-// Sheet "lkw_status": A1 = JSON (unverändert)
-// Sheet "_meta":      A1 = globaler Versionszähler (wird automatisch angelegt, ausgeblendet)
+// Sheet "lkw_status": A1 = JSON (unverändert), B1 = JSON { truckId: Zeitpunkt der Deaktivierung } (neu, automatisch gepflegt)
+// Sheet "_meta":      A1 = globaler Versionszähler, B1 = Zeitpunkt des letzten Archiv-Durchlaufs (automatisch angelegt, ausgeblendet)
+//
+// ARCHIV (2.1): Fertige, alte Sendungen bekommen in Spalte E die Markierung ARCHIV (siehe shouldArchive_). Sie bleiben
+//   vollständig im Sheet, werden aber nicht mehr an die Geräte ausgeliefert – die App hält nur noch den laufenden
+//   Bestand (schnell, wenig Speicher). Über "searchArchive" holt die App archivierte Sendungen bei Bedarf zurück;
+//   sobald ein Gerät eine archivierte Sendung wieder speichert (Wiederherstellen, Scan, Storno, Notiz), schreibt der
+//   normale Speicherpfad die Zeile OHNE Markierung zurück = wieder aktiv. Gelöscht wird nie automatisch.
 // Script-Cache:       Versionszähler + LKW-Status für den Schnellpfad von loadChanges (siehe CACHE_TTL_S)
 // ===================================================
 
@@ -34,6 +40,22 @@ const CACHE_TTL_S = 30;
 const CACHE_KEY_VERSION = 'fracht_version';
 const CACHE_KEY_LKW = 'fracht_lkw';
 
+// ---- Archiv ----
+// Regel (mit dem Anwender abgestimmt):
+//   • Einzelsendungen ohne LKW: vollständig erfasst (Sicherungen [+ Dunkelalarm] = erwartete Stückzahl) und die letzte
+//     Änderung liegt ARCHIVE_AFTER_DAYS zurück. Ohne erwartete Stückzahl (N/A) ist „vollständig“ nicht feststellbar →
+//     bleibt aktiv, bis sie von Hand gelöscht wird.
+//   • Sendungen eines LKW (VVL / MAN, truckId gesetzt): erst, wenn der LKW im Menü DEAKTIVIERT wurde (lkw_status = false)
+//     und das ARCHIVE_LKW_AFTER_DAYS her ist – unabhängig davon, ob alle Positionen gescannt wurden. Die Frist ab der
+//     Deaktivierung schützt vor Versehen: solange sie läuft, steht der LKW noch im Menü und lässt sich wieder einschalten.
+const ARCHIVE_FLAG = 'ARCHIV';                 // Markierung in Spalte E
+const ARCHIVE_AFTER_DAYS = 7;                  // Einzelsendungen
+const ARCHIVE_LKW_AFTER_DAYS = 7;              // LKW-Sendungen (0 = sofort nach dem Deaktivieren, beim nächsten Durchlauf)
+const ARCHIVE_SWEEP_INTERVAL_MS = 6 * 3600000; // Durchlauf höchstens alle 6 h (von Hand jederzeit: runArchiveSweep im Editor)
+const ARCHIVE_SEARCH_LIMIT = 50;               // max. Treffer je Archivsuche
+const CACHE_KEY_SWEEP = 'fracht_sweep';        // „Durchlauf kürzlich geprüft“ – spart den Blick in _meta
+const NON_COUNTING_STATUSES_ = ['Dunkelalarm', 'Anstehend', 'NichtSichern', 'Abgelehnt', 'Wareneingang']; // wie in der App
+
 // ===================================================
 // HAUPTFUNKTION
 // ===================================================
@@ -48,6 +70,7 @@ function doPost(e) {
       case "saveShipments":   result = saveShipmentsMerged(payload); break;
       case "deleteShipment":  result = deleteShipmentRow(payload); break;
       case "loadChanges":     result = loadChangesSince(payload); break;
+      case "searchArchive":   result = searchArchive(payload); break;
 
       // ---- Bestehend (kompatibel) ----
       case "loadAllData":     result = loadAllDataFromSheet(); break;
@@ -203,7 +226,7 @@ function readIndex_(sheet) {
     const base = String(bases[i][0] == null ? '' : bases[i][0]).trim();
     if (!base) continue;
     const del = meta[i][2];
-    map[base] = { row: i + 2, version: Number(meta[i][0]) || 0, deleted: del === true || String(del).toUpperCase() === 'TRUE' };
+    map[base] = { row: i + 2, version: Number(meta[i][0]) || 0, deleted: isDeletedFlag_(del), archived: isArchivedFlag_(del) };
   }
   return map;
 }
@@ -221,7 +244,7 @@ function readAllRows_(sheet) {
     const base = String(values[i][COL_BASE - 1] == null ? '' : values[i][COL_BASE - 1]).trim();
     if (!base) continue;
     const del = values[i][COL_DELETED - 1];
-    map[base] = { row: i + 2, json: joinJson_(values[i]), version: Number(values[i][COL_VERSION - 1]) || 0, deleted: del === true || String(del).toUpperCase() === 'TRUE' };
+    map[base] = { row: i + 2, json: joinJson_(values[i]), version: Number(values[i][COL_VERSION - 1]) || 0, updatedAt: values[i][COL_UPDATED - 1], deleted: isDeletedFlag_(del), archived: isArchivedFlag_(del) };
   }
   return map;
 }
@@ -230,6 +253,8 @@ function parseJsonSafe_(s) {
   if (!s) return null;
   try { return JSON.parse(s); } catch (e) { return null; }
 }
+function isDeletedFlag_(v) { return v === true || String(v).toUpperCase() === 'TRUE'; }
+function isArchivedFlag_(v) { return String(v).toUpperCase() === ARCHIVE_FLAG; }
 
 // Stabile Kennung je Scan-Eintrag. Ältere Daten haben keine id → deterministisch aus Zeitstempel + Nummer
 // (dieselbe Formel benutzt die App, daher stimmen die ids auf allen Geräten überein).
@@ -275,6 +300,8 @@ function saveShipmentsMerged(payload) {
       const ours = incoming[base];
       if (!ours || typeof ours !== 'object') return;
       const current = index[base];
+      // Eine archivierte Zeile zählt als aktueller Serverstand; sie wird zusammengeführt und OHNE Markierung
+      // zurückgeschrieben – damit ist die Sendung wieder aktiv (Wiederherstellen aus dem Archiv).
       const theirs = current && !current.deleted ? parseJsonSafe_(readRowJson_(sheet, current.row)) : null;
       const common = bases[base] || null;
 
@@ -430,17 +457,24 @@ function loadChangesSince(payload) {
   // Schnellpfad: Gerät ist auf dem Stand des Caches → antworten, ohne die Tabelle zu öffnen
   const cached = getCachedState_();
   if (since > 0 && cached.version !== null && cached.lkw !== null && since === cached.version) {
-    return { status: 'success', version: cached.version, changed: {}, deleted: [], full: false, lkwStatus: cached.lkw, cached: true };
+    return { status: 'success', version: cached.version, changed: {}, deleted: [], archived: [], full: false, lkwStatus: cached.lkw, cached: true };
   }
+
+  // Gelegentlich (höchstens alle ARCHIVE_SWEEP_INTERVAL_MS) fertige alte Sendungen ins Archiv verschieben.
+  // Bewusst nur hier im langsamen Pfad – der Schnellpfad oben bleibt unberührt.
+  maybeArchiveSweep_();
 
   const version = getGlobalVersion_();          // ZUERST lesen (siehe saveShipmentsMerged)
   const lkwStatus = loadLkwStatusFromSheet();
   const changed = {};
   const deleted = [];
+  const archived = [];       // seit „since“ archiviert → Gerät legt sie lokal ab
+  const archivedBases = [];  // nur bei Komplettabruf: alle archivierten Nummern (klein; erlaubt der App eine Archivprüfung ohne Serveranfrage)
   if (since === 0) {
     const rows = readAllRows_(getShipmentSheet_());
     Object.keys(rows).forEach(function (base) {
       if (rows[base].deleted) return;
+      if (rows[base].archived) { archivedBases.push(base); return; }   // Archiv bleibt auf dem Server
       const obj = parseJsonSafe_(rows[base].json);
       if (obj) changed[base] = obj;
     });
@@ -451,6 +485,7 @@ function loadChangesSince(payload) {
       const r = index[base];
       if (r.version <= since) return;
       if (r.deleted) { deleted.push(base); return; }
+      if (r.archived) { archived.push(base); return; }
       const obj = parseJsonSafe_(readRowJson_(sheet, r.row));
       if (obj) changed[base] = obj;
     });
@@ -458,7 +493,187 @@ function loadChangesSince(payload) {
   // Cache fehlt oder hinkt hinterher → nachziehen (damit die nächsten Abrufe wieder über den Schnellpfad gehen)
   if (cached.version === null || cached.lkw === null || cached.version < version) refreshCache_();
 
-  return { status: 'success', version: version, changed: changed, deleted: deleted, full: since === 0, lkwStatus: lkwStatus };
+  const out = { status: 'success', version: version, changed: changed, deleted: deleted, archived: archived, full: since === 0, lkwStatus: lkwStatus };
+  if (since === 0) out.archivedBases = archivedBases;
+  return out;
+}
+
+// ===================================================
+// ARCHIV
+// ===================================================
+function lastChangeMs_(s, updatedAt) {
+  let last = Date.parse(s.lastModified || '') || 0;
+  if (!last && Array.isArray(s.scannedItems)) {
+    s.scannedItems.forEach(function (it) { const t = Date.parse((it && it.timestamp) || '') || 0; if (t > last) last = t; });
+  }
+  if (!last && updatedAt) last = (updatedAt instanceof Date) ? updatedAt.getTime() : (Date.parse(String(updatedAt)) || 0);
+  return last;
+}
+// „Vollständig erfasst“ – gleiche Zählweise wie in der App (calculateCurrentCountedPieces / calculateDunkelalarmCount)
+function isShipmentComplete_(s) {
+  const items = Array.isArray(s.scannedItems) ? s.scannedItems : [];
+  if (s.isHuListOrder) {
+    return items.length > 0 && !items.some(function (it) { return it && !it.isCancelled && it.status === 'Anstehend'; });
+  }
+  const expected = Number(s.totalPiecesExpected);
+  if (!expected || expected <= 0) return false;           // N/A → nie automatisch
+  let counted = 0, dunkel = 0;
+  items.forEach(function (it) {
+    if (!it || it.isCancelled) return;
+    if (it.status === 'Dunkelalarm') dunkel++;
+    else if (!it.isCombination && NON_COUNTING_STATUSES_.indexOf(it.status) === -1) counted++;
+  });
+  return counted >= expected || counted + dunkel >= expected;
+}
+function shouldArchive_(s, lkwStatus, deactivatedAt, nowMs, updatedAt) {
+  const last = lastChangeMs_(s, updatedAt);
+  if (!last) return false;
+  if (s.truckId) {
+    if (!lkwStatus || lkwStatus[s.truckId] !== false) return false;
+    // Frist läuft ab Deaktivierung ODER letzter Änderung – je nachdem, was später war.
+    // (Ohne bekannten Deaktivierungszeitpunkt – Deaktivierungen vor dieser Version – zählt die letzte Änderung.)
+    const off = Date.parse((deactivatedAt && deactivatedAt[s.truckId]) || '') || 0;
+    return (nowMs - Math.max(last, off)) / 86400000 >= ARCHIVE_LKW_AFTER_DAYS;
+  }
+  return (nowMs - last) / 86400000 >= ARCHIVE_AFTER_DAYS && isShipmentComplete_(s);
+}
+
+// Prüft billig, ob ein Durchlauf fällig ist, und führt ihn dann unter Sperre aus.
+function maybeArchiveSweep_() {
+  try {
+    if (cache_().get(CACHE_KEY_SWEEP)) return;
+    const meta = getMetaSheet_();
+    const last = Number(meta.getRange('B1').getValue()) || 0;
+    if (Date.now() - last < ARCHIVE_SWEEP_INTERVAL_MS) { rememberSweep_(); return; }
+    const lock = LockService.getScriptLock();
+    if (!lock.tryLock(3000)) return;                       // gerade schreibt jemand → beim nächsten Mal
+    try {
+      const last2 = Number(meta.getRange('B1').getValue()) || 0;     // unter Sperre erneut prüfen
+      if (Date.now() - last2 >= ARCHIVE_SWEEP_INTERVAL_MS) {
+        archiveSweep_();
+        meta.getRange('B1').setValue(Date.now());
+        SpreadsheetApp.flush();
+      }
+      rememberSweep_();
+    } finally { lock.releaseLock(); }
+  } catch (e) { Logger.log('Archiv-Durchlauf übersprungen: ' + e.message); }
+}
+function rememberSweep_() {
+  try { cache_().put(CACHE_KEY_SWEEP, '1', Math.min(21600, Math.floor(ARCHIVE_SWEEP_INTERVAL_MS / 1000))); } catch (e) {}
+}
+
+// Der eigentliche Durchlauf (nur unter Sperre aufrufen). Schreibt ausschließlich die Spalten C–E in EINEM Zug;
+// die JSON-Daten bleiben unangetastet. Räumt außerdem lkw_status-Einträge von LKWs auf, die keine aktive Sendung mehr
+// haben – sonst gälte ein später erneut importierter LKW mit gleichem Namen sofort als deaktiviert.
+function archiveSweep_() {
+  const sheet = getShipmentSheet_();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return 0;
+  ensureGrid_(sheet, lastRow, COL_DELETED);
+  const lkwStatus = loadLkwStatusFromSheet() || {};
+  const deactivatedAt = loadLkwDeactivatedAt_();
+  const values = sheet.getRange(2, 1, lastRow - 1, dataWidth_(sheet)).getValues();
+  const nowMs = Date.now(), now = new Date(nowMs).toISOString();
+  const meta = values.map(function (r) { return [r[COL_VERSION - 1], r[COL_UPDATED - 1], r[COL_DELETED - 1]]; });
+  const activeTrucks = {};
+  const toArchive = [];
+  values.forEach(function (r, i) {
+    const base = String(r[COL_BASE - 1] == null ? '' : r[COL_BASE - 1]).trim();
+    if (!base) return;
+    const flag = r[COL_DELETED - 1];
+    if (isDeletedFlag_(flag) || isArchivedFlag_(flag)) return;
+    const s = parseJsonSafe_(joinJson_(r));
+    if (!s) return;
+    if (shouldArchive_(s, lkwStatus, deactivatedAt, nowMs, r[COL_UPDATED - 1])) toArchive.push(i);
+    else if (s.truckId) activeTrucks[s.truckId] = true;
+  });
+  if (toArchive.length > 0) {
+    const version = getGlobalVersion_() + 1;
+    toArchive.forEach(function (i) { meta[i] = [version, now, ARCHIVE_FLAG]; });
+    sheet.getRange(2, COL_VERSION, meta.length, 3).setValues(meta);
+    setGlobalVersion_(version);
+  }
+  let statusChanged = false;
+  Object.keys(lkwStatus).forEach(function (t) { if (!activeTrucks[t]) { delete lkwStatus[t]; statusChanged = true; } });
+  Object.keys(deactivatedAt).forEach(function (t) { if (!activeTrucks[t]) { delete deactivatedAt[t]; statusChanged = true; } });
+  if (statusChanged) {
+    const ls = getOrCreateLkwSheet();
+    ls.getRange('A1').setValue(JSON.stringify(lkwStatus));
+    ls.getRange('B1').setValue(JSON.stringify(deactivatedAt));
+    SpreadsheetApp.flush();
+    cacheLkw_(lkwStatus);
+  }
+  Logger.log('Archiv-Durchlauf: ' + toArchive.length + ' Sendung(en) archiviert.');
+  return toArchive.length;
+}
+
+// Von Hand im Skript-Editor ausführen: Archiv-Durchlauf sofort (ohne auf das Intervall zu warten).
+function runArchiveSweep() {
+  return withLock_(function () {
+    const n = archiveSweep_();
+    getMetaSheet_().getRange('B1').setValue(Date.now());
+    rememberSweep_();
+    return n;
+  });
+}
+
+// Archivsuche.
+//   payload { bases: [..] }                → genau diese Nummern, sofern archiviert (billig: nur Index + betroffene Zeilen)
+//   payload { query, mode: 'prefix' }      → wie die Suche in der App: Sendungsnummer/Kundennr, VVL-Nummer, HU/VSE-Nummer
+//                                            (jeweils Anfang), ab 4 Zeichen auch Notiztext (enthält)
+//   payload { query, mode: 'vvl' }         → alle Aufträge einer Vorverladeliste (parentOrderNumber)
+//   payload { query, mode: 'truck' }       → alle Aufträge eines LKW (truckId, z. B. "VVL-12345" oder "MAN 3")
+// Antwort: { status, results: { base: shipmentObj }, order: [base, …] (neueste zuerst), total, truncated }
+// Kein Treffer bei einer Nummer, die aktiv oder gelöscht ist – durchsucht wird ausschließlich das Archiv.
+function searchArchive(payload) {
+  payload = payload || {};
+  const results = {};
+  if (Array.isArray(payload.bases)) {
+    const sheet = getShipmentSheet_();
+    const index = readIndex_(sheet);
+    payload.bases.forEach(function (b) {
+      const base = String(b == null ? '' : b).trim();
+      const r = index[base];
+      if (!r || !r.archived || r.deleted) return;
+      const obj = parseJsonSafe_(readRowJson_(sheet, r.row));
+      if (obj) results[base] = ensureItemIds_(obj);
+    });
+    const order = Object.keys(results);
+    return { status: 'success', results: results, order: order, total: order.length, truncated: false };
+  }
+  const q = String(payload.query || '').trim().toUpperCase();
+  const mode = String(payload.mode || 'prefix');
+  if (!q) return { status: 'success', results: {}, total: 0, truncated: false };
+  const head = q.split('+')[0];
+  const rows = readAllRows_(getShipmentSheet_());
+  const hits = [];
+  Object.keys(rows).forEach(function (base) {
+    const r = rows[base];
+    if (!r.archived || r.deleted) return;
+    // billige Vorauswahl auf dem Rohtext, erst dann JSON parsen
+    if (base.toUpperCase().indexOf(head) === -1 && r.json.toUpperCase().indexOf(head) === -1) return;
+    const s = parseJsonSafe_(r.json);
+    if (s && archiveMatches_(base.toUpperCase(), s, q, head, mode)) hits.push({ base: base, s: s, t: lastChangeMs_(s, r.updatedAt) });
+  });
+  hits.sort(function (a, b) { return b.t - a.t; });
+  const order = [];
+  hits.slice(0, ARCHIVE_SEARCH_LIMIT).forEach(function (h) { results[h.base] = ensureItemIds_(h.s); order.push(h.base); });
+  return { status: 'success', results: results, order: order, total: hits.length, truncated: hits.length > ARCHIVE_SEARCH_LIMIT };
+}
+function archiveMatches_(B, s, q, head, mode) {
+  if (mode === 'vvl') return String(s.parentOrderNumber || '').toUpperCase() === q;
+  if (mode === 'truck') return String(s.truckId || '').toUpperCase() === q;
+  const items = Array.isArray(s.scannedItems) ? s.scannedItems : [];
+  const raw = function (it) { return String((it && it.rawInput) || '').toUpperCase(); };
+  const parts = q.split('+');
+  const hasSuffix = parts.length > 1 && parts[1].length === 4 && /^\d+$/.test(parts[1]);
+  if (hasSuffix ? B === head : B.indexOf(head) === 0) return true;
+  if (s.parentOrderNumber && String(s.parentOrderNumber).toUpperCase().indexOf(head) === 0) return true;
+  if (items.some(function (it) { return raw(it).indexOf(q) === 0; })) return true;
+  if (q.length > 3 && items.some(function (it) {
+    return it && Array.isArray(it.notes) && it.notes.some(function (n) { return String(n).toUpperCase().indexOf(q) !== -1; });
+  })) return true;
+  return false;
 }
 
 // ===================================================
@@ -468,7 +683,7 @@ function loadAllDataFromSheet() {
   const rows = readAllRows_(getShipmentSheet_());
   const shipments = {};
   Object.keys(rows).forEach(function (base) {
-    if (rows[base].deleted) return;
+    if (rows[base].deleted || rows[base].archived) return;   // Archiv wird auch an alte App-Versionen nicht ausgeliefert
     const obj = parseJsonSafe_(rows[base].json);
     if (obj) shipments[base] = obj;
     else Logger.log("Fehler beim Parsen der Daten für " + base);
@@ -526,11 +741,27 @@ function getOrCreateLkwSheet() {
 }
 
 function saveLkwStatusToSheet(statusObj) {
+  statusObj = statusObj || {};
   withLock_(function () {
-    getOrCreateLkwSheet().getRange('A1').setValue(JSON.stringify(statusObj));
+    const sheet = getOrCreateLkwSheet();
+    // Zeitpunkt der Deaktivierung je LKW mitführen (für die Archiv-Frist); beim Wiedereinschalten wieder entfernen
+    const prev = loadLkwStatusFromSheet();
+    const when = loadLkwDeactivatedAt_();
+    const nowIso = new Date().toISOString();
+    Object.keys(statusObj).forEach(function (t) {
+      if (statusObj[t] === false) { if (prev[t] !== false || !when[t]) when[t] = nowIso; }
+      else delete when[t];
+    });
+    Object.keys(when).forEach(function (t) { if (statusObj[t] !== false) delete when[t]; });
+    sheet.getRange('A1').setValue(JSON.stringify(statusObj));
+    sheet.getRange('B1').setValue(JSON.stringify(when));
     SpreadsheetApp.flush();
     cacheLkw_(statusObj);
   });
+}
+function loadLkwDeactivatedAt_() {
+  const val = getOrCreateLkwSheet().getRange('B1').getValue();
+  try { const o = JSON.parse(val || '{}'); return (o && typeof o === 'object') ? o : {}; } catch (e) { return {}; }
 }
 
 function loadLkwStatusFromSheet() {

@@ -14,7 +14,8 @@ V2 ändert das:
 | Aktion | Zweck |
 |---|---|
 | `saveShipments` | Gerät schickt **nur die geänderten Sendungen** plus den Serverstand, von dem es ausging. Der Server führt zusammen (3-Wege-Merge) und antwortet mit dem gemeinsamen Stand. Läuft unter `LockService`-Sperre. |
-| `loadChanges` | Gerät holt **nur die Änderungen seit Version X** (alle 3 s, beim Zurückkehren in den Vordergrund, bei „online“). „Nichts Neues“ wird aus dem Script-Cache beantwortet, ohne die Tabelle zu öffnen. Liefert auch den LKW-Status mit. |
+| `loadChanges` | Gerät holt **nur die Änderungen seit Version X** (alle 3 s, beim Zurückkehren in den Vordergrund, bei „online“). „Nichts Neues“ wird aus dem Script-Cache beantwortet, ohne die Tabelle zu öffnen. Liefert auch den LKW-Status mit; archivierte Sendungen werden nicht ausgeliefert (siehe Archiv). |
+| `searchArchive` | Archivsuche (siehe Abschnitt Archiv). |
 | `deleteShipment` | Löschung als Markierung (Tombstone, Spalte E = TRUE), damit andere Geräte die Sendung nicht wiederbeleben. |
 | `loadAllData`, `saveAllData`, `clearAllData`, `sendPdfEmail`, `saveLkwStatus`, `loadLkwStatus` | Wie bisher – `saveAllData` läuft jetzt ebenfalls durch den Merge, ein altes Gerät kann also nichts mehr überschreiben. |
 
@@ -33,6 +34,47 @@ Sheet-Layout `shipments`: A = Sendungsnummer, B = JSON (wie bisher), **neu:** C 
 E = gelöscht, F… = Fortsetzung des JSON bei sehr großen Sendungen (eine Zelle fasst max. 50.000 Zeichen –
 ein großer VVL-Import würde sonst nicht gespeichert). Alte Zeilen ohne C–E funktionieren weiterhin.
 Das Sheet `_meta` (ausgeblendet) hält den globalen Versionszähler in A1 und wird automatisch angelegt.
+
+## Version 2.1 – Archiv
+
+Ab einigen hundert Sendungen wurde die App langsam, weil **jedes Gerät immer den kompletten Bestand** hielt
+(Laden, Speicherplatz auf dem Handy – Safari erlaubt nur ca. 5 MB). Deshalb legt der Server fertige, alte Sendungen
+jetzt ins **Archiv**: Sie bleiben vollständig im Sheet `shipments` (nichts wird gelöscht), bekommen in Spalte E die
+Markierung `ARCHIV` und werden **nicht mehr an die Geräte ausgeliefert**. Die App hält nur noch den laufenden Bestand.
+
+Wann wird archiviert (Durchlauf höchstens alle 6 h, ausgelöst durch einen normalen Abruf)?
+
+| Sendungsart | Bedingung |
+|---|---|
+| Einzelsendung (ohne LKW) | **vollständig erfasst** (Sicherungen ggf. + Dunkelalarm = erwartete Stückzahl) **und 7 Tage** keine Änderung. Ohne erwartete Stückzahl („N/A“) nie automatisch. |
+| LKW-Sendung (VVL / MAN, HU-Liste) | **erst wenn der LKW im Menü deaktiviert wurde**, und das ist 7 Tage her (bzw. die letzte Änderung – was später war). Ob alle Positionen gescannt sind, spielt keine Rolle. Solange die Frist läuft, steht der LKW noch im Menü und kann wieder eingeschaltet werden. |
+
+Damit ein später neu importierter LKW mit gleichem Namen nicht sofort als „deaktiviert“ gilt, räumt der Durchlauf
+`lkw_status`-Einträge auf, zu denen keine aktive Sendung mehr gehört. Der Zeitpunkt der Deaktivierung wird in
+`lkw_status!B1` mitgeführt (automatisch).
+
+In der App:
+- Suchfeld zeigt unter der Liste **„Im Archiv: N Sendungen anzeigen“** (Nummer bekannt) bzw. **„Im Archiv suchen“**
+  (kein lokaler Treffer, z. B. HU/VSE-Nummer oder Notiztext). Treffer erscheinen als eigener Block, gekennzeichnet
+  mit „Archiv“; Antippen öffnet die Details **nur lesend**, PDF geht weiterhin.
+- **Wiederherstellen** (Knopf) holt die Sendung zurück in die Liste; ein zugehöriger deaktivierter LKW wird dabei
+  wieder aktiviert. **Ein Scan auf eine archivierte Nummer** (einzeln oder im Batch) holt sie automatisch zurück und
+  verbucht den Scan ganz normal – es entsteht keine zweite Sendung mit gleicher Nummer.
+- Sobald ein Gerät eine archivierte Sendung speichert, schreibt `saveShipments` die Zeile **ohne** Markierung zurück:
+  auf allen Geräten wieder aktiv. Umgekehrt melden `loadChanges`-Antworten neu archivierte Nummern (`archived`), damit
+  die Geräte sie ablegen; der Komplettabruf liefert zusätzlich die Liste aller archivierten Nummern (`archivedBases`).
+- Importe (HU-Liste, Multi-QR, VVL) legen bei einer archivierten Nummer keinen Auftrag *unter derselben Nummer* an
+  (Kollision mit alten HUs), sondern `NUMMER (2)` – wie bisher bei doppelten Kundennummern verschiedener VVLs.
+
+Neue Aktion: `searchArchive` mit `{ bases: [...] }` (bestimmte Nummern), `{ query, mode: 'prefix' }` (wie die Suche
+in der App, max. 50 Treffer, neueste zuerst), `{ query, mode: 'vvl' }` (alle Aufträge einer Vorverladeliste) oder
+`{ query, mode: 'truck' }` (alle Aufträge eines LKW).
+
+Von Hand im Skript-Editor: `runArchiveSweep()` führt den Durchlauf sofort aus (z. B. direkt nach der Bereitstellung).
+Einstellungen oben in `Code.gs`: `ARCHIVE_AFTER_DAYS`, `ARCHIVE_LKW_AFTER_DAYS`, `ARCHIVE_SWEEP_INTERVAL_MS`.
+
+Solange das alte Skript läuft, arbeitet die App ohne Archiv (alles bleibt in der Liste); beim Versuch einer
+Archivsuche erscheint der Hinweis, das Skript neu bereitzustellen.
 
 ## Neue Version bereitstellen (gleiche URL bleibt gültig)
 
@@ -68,3 +110,4 @@ Bei deutlich mehr Geräten `SYNC_POLL_INTERVAL_MS` in `script.js` erhöhen.
 ## Optional: Aufräumen
 
 `purgeDeletedRows()` im Skript-Editor manuell ausführen, um Lösch-Markierungen physisch aus dem Sheet zu entfernen.
+Archivierte Zeilen (`ARCHIV`) bleiben davon unberührt – sie werden nie automatisch gelöscht.

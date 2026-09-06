@@ -163,7 +163,22 @@
         <p id="listEmptyHint" class="list-empty-hint hidden"></p>
         <div class="list-footer">
             <button type="button" id="listMoreBtn" class="list-more-btn hidden">Weitere anzeigen</button>
+            <!-- Archiv: Sendungen, die der Server als abgeschlossen abgelegt hat (bleiben im Sheet, per Suche abrufbar) -->
+            <button type="button" id="archiveHintBtn" class="archive-hint-btn hidden">Im Archiv suchen</button>
         </div>
+        <section id="archiveResults" class="archive-results hidden" aria-live="polite">
+            <div class="archive-results-header">
+                <h3 id="archiveResultsTitle">Archiv</h3>
+                <button type="button" id="archiveCloseBtn" class="archive-close-btn" title="Archiv-Treffer ausblenden" aria-label="Archiv-Treffer ausblenden">×</button>
+            </div>
+            <p id="archiveResultsNote" class="archive-results-note hidden"></p>
+            <table class="shipment-table archive-table">
+                <thead>
+                    <tr><th>HAWB.</th><th>Übersicht</th><th>Letzte Änd.</th><th>Aktionen</th><th class="qr-code-header">QR-Code</th></tr>
+                </thead>
+                <tbody id="archiveTableBody"></tbody>
+            </table>
+        </section>
     </div>
 </div> <!-- ENDE von #mainView -->
 
