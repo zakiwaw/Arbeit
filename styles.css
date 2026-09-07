@@ -145,6 +145,12 @@
 
 html { -webkit-text-size-adjust: 100%; }
 
+/* Kein Browser-Zoom (Pinch / Doppeltipp): Scrollen in beide Richtungen bleibt erlaubt, Zoomgesten nicht.
+   Bewusst auf ALLE Elemente, weil touch-action nicht vererbt wird und Scroll-Container (Modals, Seitenmenü,
+   Unterseiten) den Wert sonst für ihren Inhalt zurücksetzen würden. Ergänzt das Viewport-Meta (user-scalable=no),
+   das Safari auf iOS seit Version 10 ignoriert, und den Gesten-Schutz in script.js. */
+* { touch-action: pan-x pan-y; }
+
 body {
     margin: 0;
     padding: 0;

@@ -5,6 +5,29 @@ const jsPDF = (window.jspdf && window.jspdf.jsPDF) || null;
 if (!jsPDF) console.error('jsPDF konnte nicht geladen werden – PDF-Export ist deaktiviert.');
 if (typeof window.QRCode === 'undefined') console.error('qrcode.js konnte nicht geladen werden – QR-Codes werden nicht angezeigt.');
 
+// Browser-Zoom unterbinden. Schicht 1 ist das Viewport-Meta (user-scalable=no, maximum-scale=1), Schicht 2
+// touch-action: pan-x pan-y in styles.css. Safari auf iOS ignoriert user-scalable=no seit iOS 10 – dort greifen
+// zusätzlich die WebKit-Gestenereignisse und der Zwei-Finger-Schutz bei touchmove. Einfaches Scrollen und Tippen
+// bleiben unberührt; die Bedienungshilfen-Lupe des Systems lässt sich (gewollt) nicht blockieren.
+(function preventBrowserZoom() {
+    const block = (e) => { if (e.cancelable) e.preventDefault(); };
+    // WebKit (iPhone/iPad): Pinch löst gesturestart/-change/-end aus – hier komplett unterbinden
+    ['gesturestart', 'gesturechange', 'gestureend'].forEach(type => document.addEventListener(type, block, { passive: false }));
+    // Zwei-Finger-Bewegung (Pinch) – nur auf WebKit registrieren; Android/Chrome respektiert bereits touch-action
+    // und soll keinen blockierenden touchmove-Listener bekommen (Scroll-Performance).
+    if (typeof window.GestureEvent !== 'undefined') {
+        document.addEventListener('touchmove', (e) => {
+            if (e.touches.length > 1 || (typeof e.scale === 'number' && e.scale !== 1)) block(e);
+        }, { passive: false });
+    }
+    // Desktop/Tablet mit Trackpad oder Tastatur: Strg/Cmd + Mausrad/Pinch sowie Strg/Cmd + Plus/Minus.
+    // Strg/Cmd + 0 (Zoom zurücksetzen) bleibt absichtlich erlaubt.
+    document.addEventListener('wheel', (e) => { if (e.ctrlKey || e.metaKey) block(e); }, { passive: false });
+    document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && ['+', '-', '=', 'Add', 'Subtract'].includes(e.key)) block(e);
+    });
+})();
+
 document.addEventListener('DOMContentLoaded', function() {
 
     const mainInputFormEl = document.getElementById('main-input-form'); // Dieser sollte schon da sein
