@@ -130,18 +130,36 @@ function bigData() {
     assert(await page.$eval('#detailView', v => getComputedStyle(v).display !== 'none'), 'Adresse ?sendung=… öffnet die Details auch beim ersten Laden');
     await page.close();
 
-    // ---- Detailansicht: volle Breite; normale Sendung (ohne HU-Liste) bekommt eine Stücktabelle ----
+    // ---- Dunkelalarm gilt als erledigt, sobald dieselbe HU danach gesichert wurde (Ampel/Zähler/Kachel) ----
     {
       const d = bigData(); const now = Date.now(); const iso = ago => new Date(now - ago * 60e3).toISOString();
       const it = (hu, st, ago, extra) => Object.assign({ rawInput: hu, status: st, timestamp: iso(ago), isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null }, extra || {});
-      d['123'].totalPiecesExpected = 3;
-      d['123'].scannedItems = [it('123', 'Wareneingang', 50), it('123', 'XRY', 30, { notes: ['Karton offen'] }), it('123', 'EDD', 20)];
+      d['9008296222'] = { hawb: '9008296222', lastModified: iso(1), totalPiecesExpected: 2, mitarbeiter: 'T', isHuListOrder: true, truckId: 'MAN 1', originalManNumber: 1, freightForwarder: 'AIT', destinationCountry: 'CHINA', plsoNumber: '1',
+        scannedItems: [it('DA0001', 'Dunkelalarm', 30, { position: 1 }), it('DA0001', 'Wareneingang', 30, { position: 1 }), it('DA0001', 'EDD', 10, { position: 1 }), it('DA0002', 'Anstehend', 0, { position: 2 })] };
+      d['9008296223'] = { hawb: '9008296223', lastModified: iso(1), totalPiecesExpected: 1, mitarbeiter: 'T', isHuListOrder: true, truckId: 'MAN 1', originalManNumber: 1, freightForwarder: 'AIT', destinationCountry: 'CHINA', plsoNumber: '1',
+        scannedItems: [it('DB0001', 'Dunkelalarm', 5, { position: 1 }), it('DB0001', 'Anstehend', 0, { position: 1 })] };
+      d['123'].totalPiecesExpected = 2;
+      d['123'].scannedItems = [it('123', 'Wareneingang', 50), it('123', 'Dunkelalarm', 40, { notes: ['Alarm Tor 3'] }), it('123', 'XRY', 30), it('123', 'EDD', 20)];
       page = await openApp(browser, makeBackend(d, {}), { viewport: { width: 1600, height: 900, deviceScaleFactor: 1 } }); await wait(500);
-      await page.evaluate(() => document.querySelector('tr[data-basenumber="123"] .hawb-cell').click()); await wait(400);
+      const st = await page.evaluate(() => { const g = b => { const r = document.querySelector(`tr[data-basenumber="${b}"]`); return r.querySelector('.dt-status').textContent.trim() + '/' + r.querySelectorAll('.dt-num')[1].textContent.trim() + '/' + (r.querySelectorAll('.dt-num')[1].classList.contains('over') ? 'rot' : 'ok'); }; return { erledigt: g('9008296222'), offen: g('9008296223'), normal: g('123'), tile: document.getElementById('tileDunkelalarmCount').textContent }; });
+      assert(st.erledigt === 'Offen/1/2/ok', `Dunkelalarm + danach EDD → Sendung „Offen“, Sich. nicht rot (${st.erledigt})`);
+      assert(st.offen === 'Dunkelalarm/1/1/rot', `Dunkelalarm ohne Sicherung bleibt rot (${st.offen})`);
+      assert(st.normal === 'Fertig/2/2/ok', `Normale Sendung: Dunkelalarm + volle Sicherung → „Fertig“ (${st.normal})`);
+      assert(st.tile === '3', `Kachel zählt nur offene Dunkelalarme: 2 aus bigData + 1 neu, der erledigte nicht (${st.tile})`);
+      await page.evaluate(() => document.querySelector('tr[data-basenumber="9008296222"] .hawb-cell').click()); await wait(400);
+      const pack = await page.$$eval('.pack-table tbody tr', rs => rs.map(r => r.className + ':' + r.cells[6].textContent.trim()).join(' '));
+      assert(pack === 'pack-row-done:EDDnach Dunkelalarm pack-row-open:Offen', `Packstücktabelle: „EDD · nach Dunkelalarm“ statt rot (${pack})`);
       assert((await page.$eval('#detailViewContent', e => e.getBoundingClientRect().width)) > 1400, 'Detailansicht nutzt am Desktop die volle Breite');
-      const plain = await page.$$eval('.pack-table-plain tbody tr', rs => rs.map(r => r.className + ':' + [...r.cells].map(c => c.textContent.trim()).join('/')).join(' | '));
-      assert(/^pack-row-done:1\.\/WE\/XRY\/\d\d:\d\d\/Karton offen \| pack-row-done:2\.\/–\/EDD\/\d\d:\d\d\/ \| pack-row-open:3\.\/–\/Offen\/\/$/.test(plain), `Normale Sendung: Stücktabelle WE/Sicherung/Zeit/Notiz, 3. Platz offen (${plain})`);
-      assert(page.__errors.length === 0, `Stücktabelle: keine JS-Fehler (${page.__errors.join('; ')})`);
+      await page.evaluate(() => document.getElementById('backToMainViewBtn').click()); await wait(300);
+      await page.evaluate(() => document.querySelector('tr[data-basenumber="123"] .hawb-cell').click()); await wait(400);
+      const plain = await page.$$eval('.pack-table-plain tbody tr', rs => rs.map(r => [...r.cells].map(c => c.textContent.trim()).join('/')).join(' | '));
+      assert(/^1\.\/WE\/XRY\/\d\d:\d\d\/ \| 2\.\/–\/EDD\/\d\d:\d\d\/ \| \/\/Dunkelalarm \(erledigt\)\/\d\d:\d\d\/Alarm Tor 3$/.test(plain), `Normale Sendung: Stücktabelle mit WE/Sicherung/Zeit/Notiz (${plain})`);
+      assert(page.__errors.length === 0, `Dunkelalarm-Szenario: keine JS-Fehler (${page.__errors.join('; ')})`);
+      await page.close();
+      // Handy: dieselbe Regel in der Karte (Sich.-Chip nicht rot) – Karte selbst unverändert
+      page = await openApp(browser, makeBackend(d, {})); await wait(400);
+      const mobChip = await page.$eval('tr[data-basenumber="9008296222"] .summary-cell strong:last-of-type', e => e.className + ':' + e.textContent.trim());
+      assert(mobChip === 'mismatch:Sich.: 1/2', `Handy-Karte: Sich.-Chip nach erledigtem Dunkelalarm nicht rot (${mobChip})`);
       await page.close();
     }
 

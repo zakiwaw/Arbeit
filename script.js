@@ -1929,13 +1929,15 @@ function buildDetailPackTable(shipment, readOnly, base) {
         const hu = item.rawInput;
         const detail = items.find(i => i && String(i.rawInput).toUpperCase() === String(hu).toUpperCase() && (i.packaging || i.dimensions || i.grossWeight)) || item;
         const we = byHu(hu, i => i.status === 'Wareneingang').length > 0;
-        const dunkel = byHu(hu, i => i.status === 'Dunkelalarm');
+        const dunkelAll = byHu(hu, i => i.status === 'Dunkelalarm');
+        // offen = nach dem Dunkelalarm keine Sicherung mehr auf dieser HU
+        const dunkel = dunkelAll.filter(a => !byHu(hu, i => EXCLUSIVE_SECURITY_STATUSES.includes(i.status) && (Date.parse(i.timestamp) || 0) >= (Date.parse(a.timestamp) || 0)).length);
         const notes = byHu(hu, () => true).reduce((arr, i) => arr.concat(Array.isArray(i.notes) ? i.notes : []), []);
         const open = item.status === 'Anstehend';
         let statusHtml;
         if (dunkel.length) statusHtml = `<span class="pack-status danger">Dunkelalarm</span>`;
         else if (open) statusHtml = `<span class="pack-status open">Offen</span>`;
-        else statusHtml = `<span class="pack-status ok">${escapeHtml(item.status)}${item.isCombination ? ' (Kombi)' : ''}</span>`;
+        else statusHtml = `<span class="pack-status ok">${escapeHtml(item.status)}${item.isCombination ? ' (Kombi)' : ''}</span>${dunkelAll.length ? '<span class="pack-status-note" title="Dunkelalarm erledigt – danach gesichert">nach Dunkelalarm</span>' : ''}`;
         const weHtml = we ? `<span class="pack-we ok" title="Wareneingang erfasst">WE</span>` : `<span class="pack-we" title="Kein Wareneingang">–</span>`;
         const timeHtml = open ? '' : escapeHtml(fmtTime(item.timestamp));
         const rowClass = dunkel.length ? 'pack-row-danger' : (open ? 'pack-row-open' : 'pack-row-done');
@@ -2555,7 +2557,7 @@ function appendShipmentRow(tbody, baseNumber, shipment, archived) {
             row.insertCell().outerHTML = hawbCellHtml;
 
             const receiptClass = getStatusClass(receiptCount, expected);
-            const dunkelalarmCount = calculateDunkelalarmCount(shipment.scannedItems || []);
+            const dunkelalarmCount = calculateOpenDunkelalarmCount(shipment.scannedItems || [], shipment); // offene Dunkelalarme
             let securityClass = '';
 
             if (expected !== null && (securityCount + dunkelalarmCount) === expected && dunkelalarmCount > 0) {
@@ -2925,7 +2927,7 @@ function expectedPiecesOf(s) {
 function shipmentProgress(s) {
     const items = Array.isArray(s && s.scannedItems) ? s.scannedItems : [];
     const counted = calculateCurrentCountedPieces(items);
-    const dunkel = calculateDunkelalarmCount(items);
+    const dunkel = calculateOpenDunkelalarmCount(items, s); // nur OFFENE Dunkelalarme (erledigt = danach gesichert)
     const we = calculateGoodsReceiptCount(items);
     const expected = expectedPiecesOf(s);
     if (s && s.isHuListOrder) {
@@ -4652,6 +4654,29 @@ function saveBatch() {
                 item.status === 'Dunkelalarm' && 
                 !item.isCancelled
             ).length;
+        }
+        // OFFENE Dunkelalarme: ein Dunkelalarm gilt als erledigt, sobald dieselbe HU DANACH mit einem Sicherungsstatus
+        // (XRY/ETD/EDD/PHS/VCK) erfasst wurde. Der Dunkelalarm-Eintrag bleibt als Protokoll in der Zeitleiste
+        // (und auf der Seite „Dunkelalarm“) – nur Ampel, Zähler und Kachel werten ihn nicht mehr als offen.
+        // Normale Sendungen (kein HU-Auftrag, alle Scans tragen dieselbe Nummer): erledigt, sobald genug
+        // Sicherungsscans für die Stückzahl vorliegen – sonst: ein Dunkelalarm nach dem Zeitpunkt gilt als erledigt,
+        // wenn danach eine Sicherung folgte.
+        function calculateOpenDunkelalarmCount(scannedItems, shipment) {
+            if (!Array.isArray(scannedItems)) return 0;
+            const alarms = scannedItems.filter(item => item && item.status === 'Dunkelalarm' && !item.isCancelled);
+            if (!alarms.length) return 0;
+            const isSecured = it => it && !it.isCancelled && EXCLUSIVE_SECURITY_STATUSES.includes(it.status);
+            if (shipment && !shipment.isHuListOrder) {
+                const expected = shipment.totalPiecesExpected;
+                const secured = scannedItems.filter(it => isSecured(it) && !it.isCombination).length;
+                if (expected !== null && expected !== undefined && expected > 0 && secured >= expected) return 0;
+            }
+            return alarms.filter(a => {
+                const t = Date.parse(a.timestamp) || 0;
+                return !scannedItems.some(it => isSecured(it)
+                    && String(it.rawInput).toUpperCase() === String(a.rawInput).toUpperCase()
+                    && (Date.parse(it.timestamp) || 0) >= t);
+            }).length;
         }
         // --- ENDE: NEUE HILFSFUNKTION FÜR DUNKELALARM ---
         function requestCancelScanItem(baseNumber, itemTimestamp) {
