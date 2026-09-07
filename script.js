@@ -2050,9 +2050,12 @@ detailsHtml += `${numberPart}<span class="hu-value" style="cursor:pointer;" titl
 // ===================================================================
 const LIST_PAGE_SIZE = 30;
 const HOME_RECENT_LIMIT = 5;        // Startseite ohne Suchtext: nur die zuletzt bearbeiteten Karten (Rest über Kacheln/Suche)
+const HOME_RECENT_LIMIT_DESKTOP = 15; // Desktop-Tabelle: 15 Zeilen passen bequem unter Scanfeld + Kacheln
 let listFilterText = '';            // aktueller Suchtext (getrimmt, Großschrift)
 let listExtra = 0;                  // über „Weitere anzeigen“ zusätzlich aufgeklappte Karten
-function currentListLimit(filter) { return ((filter || isBatchModeActive) ? LIST_PAGE_SIZE : HOME_RECENT_LIMIT) + listExtra; }
+// Desktop (breiter Bildschirm, dichte Tabelle): mehr Zeilen auf einen Blick – dafür ist der Platz da
+const isDesktopLayout = () => window.matchMedia && window.matchMedia('(min-width: 992px)').matches;
+function currentListLimit(filter) { return ((filter || isBatchModeActive) ? LIST_PAGE_SIZE : (isDesktopLayout() ? HOME_RECENT_LIMIT_DESKTOP : HOME_RECENT_LIMIT)) + listExtra; }
 const listMoreBtnEl = document.getElementById('listMoreBtn');
 const listEmptyHintEl = document.getElementById('listEmptyHint');
 if (listMoreBtnEl) listMoreBtnEl.addEventListener('click', () => { listExtra += LIST_PAGE_SIZE; drawShipmentList(); });
@@ -2283,7 +2286,7 @@ function appendShipmentRow(tbody, baseNumber, shipment, archived) {
 
             const badgeHtml = archived ? `<span class="archive-badge">Archiv</span>` : '';
             if (shipment.parentOrderNumber) {
-                hawbCellHtml = `<td data-label="HAWB.">
+                hawbCellHtml = `<td data-label="HAWB." class="hawb-cell">
                     <div class="vvl-table-entry">
                          <span class="vvl-prefix">VVL: </span>${escapeHtml(shipment.parentOrderNumber)}<br>
                          <span class="kundennr-prefix">Kundennr: </span>${escapeHtml(baseNumber)}
@@ -2291,7 +2294,7 @@ function appendShipmentRow(tbody, baseNumber, shipment, archived) {
                 </td>`;
                 pdfButtonData = `data-parentordernumber="${escapeHtml(shipment.parentOrderNumber)}"`;
             } else {
-                hawbCellHtml = `<td data-label="HAWB.">${escapeHtml(baseNumber)}${badgeHtml}</td>`;
+                hawbCellHtml = `<td data-label="HAWB." class="hawb-cell">${escapeHtml(baseNumber)}${badgeHtml}</td>`;
             }
             row.insertCell().outerHTML = hawbCellHtml;
 
@@ -2313,7 +2316,7 @@ function appendShipmentRow(tbody, baseNumber, shipment, archived) {
             
             row.insertCell().outerHTML = `<td data-label="\u00DCbersicht" class="summary-cell">${summaryHtml}</td>`;
             
-            row.insertCell().outerHTML = `<td data-label="Letzte Änd.">${shipment.lastModified ? new Date(shipment.lastModified).toLocaleString('de-DE') : '-'}</td>`;
+            row.insertCell().outerHTML = `<td data-label="Letzte Änd." class="time-cell">${shipment.lastModified ? new Date(shipment.lastModified).toLocaleString('de-DE') : '-'}</td>`;
             
             const actionsCell = row.insertCell();
             actionsCell.setAttribute('data-label', 'Aktionen');
@@ -2343,7 +2346,93 @@ function appendShipmentRow(tbody, baseNumber, shipment, archived) {
             // ===============================================================
             // ENDE DER QR-CODE-LOGIK
             // ===============================================================
+
+            // Desktop-Spalten (ab 992 px sichtbar, auf dem Handy per CSS ausgeblendet) – direkt hinter der HAWB-Zelle.
+            // Klick-Handler und Zusatzinhalte nutzen deshalb Klassen (.hawb-cell / .summary-cell) statt Zellenindizes.
+            insertDesktopCells(row, baseNumber, shipment);
 }
+// ---- Desktop-Tabelle: Zusatzspalten + Sortierung -------------------------------------------------------------
+// Status-Ampel: rot = Dunkelalarm dabei, grün = fertig, gelb = offen, grau = ohne Stückzahl
+function shipmentTrafficLight(s) {
+    const p = shipmentProgress(s);
+    if (p.dunkel > 0) return { cls: 'danger', text: 'Dunkelalarm', order: 0 };
+    if (p.unknown) return { cls: 'muted', text: 'ohne Stückzahl', order: 2 };
+    if (p.open) return { cls: 'warn', text: 'Offen', order: 1 };
+    return { cls: 'ok', text: 'Fertig', order: 3 };
+}
+// Gesamtgewicht aus den HU-Gewichten (nur wo Angaben vorliegen); null = keine Gewichtsangabe
+function shipmentTotalKg(s) {
+    let sum = 0, any = false;
+    (Array.isArray(s.scannedItems) ? s.scannedItems : []).forEach(i => {
+        if (!i || i.isCancelled) return;
+        const kg = parseWeightKg(i.grossWeight);
+        if (kg !== null) { sum += kg; any = true; }
+    });
+    return any ? sum : null;
+}
+function shipmentNoteCount(s) {
+    return (Array.isArray(s.scannedItems) ? s.scannedItems : []).reduce((n, i) => n + (i && Array.isArray(i.notes) ? i.notes.length : 0), 0);
+}
+function truckShortName(truckId) {
+    if (!truckId) return '';
+    if (truckId.startsWith('VVL-')) return 'VW ' + truckId.slice(4);
+    if (truckId === 'MAN-legacy') return 'MAN importiert';
+    return truckId;
+}
+function insertDesktopCells(row, baseNumber, shipment) {
+    const p = shipmentProgress(shipment);
+    const light = shipmentTrafficLight(shipment);
+    const expectedText = p.expected === null ? '–' : p.expected;
+    const kg = shipmentTotalKg(shipment);
+    const notes = shipmentNoteCount(shipment);
+    const truck = truckShortName(shipment.truckId);
+    const secDone = p.counted + p.dunkel;
+    row.dataset.sortStatus = light.order;
+    row.dataset.sortTruck = truck.toLowerCase();
+    row.dataset.sortWe = p.we;
+    row.dataset.sortSich = secDone;
+    row.dataset.sortKg = kg === null ? -1 : kg;
+    row.dataset.sortTime = Date.parse(shipment.lastModified) || 0;
+    const cells = [
+        `<td class="dt-cell dt-status" data-label="Status"><span class="dt-light ${light.cls}" title="${escapeHtml(light.text)}"></span>${escapeHtml(light.text)}</td>`,
+        `<td class="dt-cell dt-truck" data-label="LKW">${truck ? `<span class="dt-truck-chip">${escapeHtml(truck)}</span>` : '<span class="dt-dim">–</span>'}</td>`,
+        `<td class="dt-cell dt-num ${chipClass(p.we, p.expected)}" data-label="WE">${p.we}<span class="dt-dim">/${expectedText}</span></td>`,
+        `<td class="dt-cell dt-num ${p.dunkel > 0 ? 'over' : chipClass(secDone, p.expected)}" data-label="Sich.">${secDone}<span class="dt-dim">/${expectedText}</span></td>`,
+        `<td class="dt-cell dt-num dt-kg" data-label="Gewicht">${kg === null ? '<span class="dt-dim">–</span>' : escapeHtml(formatKg(kg))}</td>`,
+        `<td class="dt-cell dt-notes" data-label="Notizen">${notes ? `<span class="dt-note-badge" title="${notes} Notiz${notes === 1 ? '' : 'en'}">${notes}</span>` : ''}</td>`,
+    ];
+    row.cells[0].insertAdjacentHTML('afterend', cells.join(''));
+}
+// Klick auf einen sortierbaren Spaltenkopf (Desktop): Zeilen der zugehörigen Tabelle umsortieren
+const DESKTOP_SORT_KEYS = { hawb: 'text', status: 'sortStatus', truck: 'sortTruck', we: 'sortWe', sich: 'sortSich', kg: 'sortKg', time: 'sortTime' };
+function sortShipmentTable(table, key, dir) {
+    const tbody = table.tBodies[0];
+    if (!tbody) return;
+    const rows = Array.from(tbody.rows).filter(r => r.dataset.basenumber);
+    const field = DESKTOP_SORT_KEYS[key];
+    const val = (r) => {
+        if (field === 'text') return (r.dataset.basenumber || '').toLowerCase();
+        if (field === 'sortTruck') return r.dataset.sortTruck || '';
+        return Number(r.dataset[field] || 0);
+    };
+    rows.sort((a, b) => { const x = val(a), y = val(b); const c = typeof x === 'string' ? x.localeCompare(y, 'de') : x - y; return dir === 'desc' ? -c : c; });
+    rows.forEach(r => tbody.appendChild(r));
+    table.querySelectorAll('th[data-sort]').forEach(th => { th.classList.remove('sorted-asc', 'sorted-desc'); th.removeAttribute('aria-sort'); });
+    const th = table.querySelector(`th[data-sort="${key}"]`);
+    if (th) { th.classList.add(dir === 'desc' ? 'sorted-desc' : 'sorted-asc'); th.setAttribute('aria-sort', dir === 'desc' ? 'descending' : 'ascending'); }
+}
+document.addEventListener('click', (event) => {
+    const th = event.target.closest('.shipment-table th[data-sort]');
+    if (!th) return;
+    const table = th.closest('table');
+    const key = th.dataset.sort;
+    // Erster Klick: Zahlen/Zeit absteigend (Größtes/Neuestes oben), Text aufsteigend; jeder weitere Klick dreht um
+    let dir;
+    if (th.classList.contains('sorted-asc')) dir = 'desc';
+    else if (th.classList.contains('sorted-desc')) dir = 'asc';
+    else dir = ['we', 'sich', 'kg', 'time'].includes(key) ? 'desc' : 'asc';
+    sortShipmentTable(table, key, dir);
+});
 function renderLkwMenu() {
     const container = document.getElementById('lkw-menu-container');
     if (!container) return;
@@ -2743,7 +2832,10 @@ function renderCurrentPage(fresh) {
     if (fresh || !r.update) r.render(); else r.update();
     updateHomeLayout();
 }
-const SHIPMENT_TABLE_HEAD = '<thead><tr><th>HAWB.</th><th>Übersicht</th><th>Letzte Änd.</th><th>Aktionen</th><th class="qr-code-header">QR-Code</th></tr></thead>';
+const SHIPMENT_TABLE_HEAD = '<thead><tr><th data-sort="hawb">HAWB.</th>'
+    + '<th class="dt-cell" data-sort="status">Status</th><th class="dt-cell" data-sort="truck">LKW</th><th class="dt-cell dt-num" data-sort="we" title="Wareneingang erfasst / erwartet">WE</th>'
+    + '<th class="dt-cell dt-num" data-sort="sich" title="Gesichert (inkl. Dunkelalarm) / erwartet">Sich.</th><th class="dt-cell dt-num" data-sort="kg">Gewicht</th><th class="dt-cell dt-notes" title="Notizen">✎</th>'
+    + '<th>Übersicht</th><th data-sort="time">Letzte Änd.</th><th>Aktionen</th><th class="qr-code-header">QR-Code</th></tr></thead>';
 // Eine Sendungskarte (gleiche Vorlage wie in der Liste) in eine Seitentabelle; chip = Zusatzkennzeichen (z. B. LKW)
 function appendPageShipmentRow(tbody, base, s, archived, chip, hits) {
     appendShipmentRow(tbody, base, s, !!archived);
@@ -2751,12 +2843,12 @@ function appendPageShipmentRow(tbody, base, s, archived, chip, hits) {
     if (!row) return;
     const qr = row.querySelector('.qr-code-cell div');
     if (qr) qr.id = 'qrcode-page-' + base.replace(/[^a-zA-Z0-9]/g, ''); // eigener Namensraum (Liste kann dieselbe Sendung zeigen)
-    if (chip) row.cells[0].insertAdjacentHTML('beforeend', `<span class="row-chip">${escapeHtml(chip)}</span>`);
+    if (chip) row.querySelector('.hawb-cell').insertAdjacentHTML('beforeend', `<span class="row-chip">${escapeHtml(chip)}</span>`);
     if (hits && hits.length) { // Gewichtsfilter: die passenden HUs mit Gewicht in der Übersichtszelle (Tippen → HU-Details)
         const shown = hits.slice(0, 6);
         let html = shown.map(h => `<button type="button" class="weight-hit" data-hu="${escapeHtml(h.hu)}" title="HU ${escapeHtml(h.hu)}: ${escapeHtml(h.raw)}"><span class="weight-hit-hu">${escapeHtml(h.hu)}</span>${escapeHtml(formatKg(h.kg))}</button>`).join('');
         if (hits.length > shown.length) html += `<span class="weight-hit weight-hit-more">+${hits.length - shown.length} weitere</span>`;
-        row.cells[1].insertAdjacentHTML('beforeend', `<span class="weight-hits">${html}</span>`);
+        row.querySelector('.summary-cell').insertAdjacentHTML('beforeend', `<span class="weight-hits">${html}</span>`);
     }
 }
 // Gruppen von Sendungskarten mit gemeinsamer Seitenblätterung („Weitere anzeigen“)
@@ -3211,7 +3303,7 @@ function handlePageShipmentRowClick(event, row) {
             return;
         }
         const cell = target.closest('td');
-        if (cell && cell === row.cells[0] && infoArchiveCache[base]) { detailArchived = { base, shipment: infoArchiveCache[base] }; showDetailView(base); }
+        if (cell && cell.classList.contains('hawb-cell') && infoArchiveCache[base]) { detailArchived = { base, shipment: infoArchiveCache[base] }; showDetailView(base); }
         return;
     }
     if (target.closest('button')) {
@@ -3221,7 +3313,7 @@ function handlePageShipmentRowClick(event, row) {
         return;
     }
     const cell = target.closest('td');
-    if (cell && cell === row.cells[0]) showDetailView(base);
+    if (cell && cell.classList.contains('hawb-cell')) showDetailView(base);
 }
 // Menü-Links (href="#") sollen keinen Verlaufseintrag „#“ erzeugen – sonst schließt die Zurück-Geste erst den Hash
 if (sideMenuEl) sideMenuEl.addEventListener('click', (e) => { const a = e.target.closest('a[href="#"]'); if (a) e.preventDefault(); });
@@ -5012,8 +5104,8 @@ tableBodyEl.addEventListener('click', (event) => {
     const cell = target.closest('td');
 
     // Fall 2: Nur wenn auf die ERSTE Zelle geklickt wurde, die Detailansicht zeigen.
-    // row.cells[0] greift auf die erste <td> der Zeile zu.
-    if (cell && cell === row.cells[0]) {
+    // (die HAWB-Zelle trägt die Klasse .hawb-cell – am Desktop stehen dahinter weitere Spalten)
+    if (cell && cell.classList.contains('hawb-cell')) {
         showDetailView(baseNumber);
     }
     // Klicks auf andere Zellen (die keine Buttons sind) tun nun nichts mehr.
@@ -5032,7 +5124,7 @@ if (archiveTableBodyEl) archiveTableBodyEl.addEventListener('click', (event) => 
         return;
     }
     const cell = target.closest('td');
-    if (cell && cell === row.cells[0] && archiveResultsCache[baseNumber]) {
+    if (cell && cell.classList.contains('hawb-cell') && archiveResultsCache[baseNumber]) {
         detailArchived = { base: baseNumber, shipment: archiveResultsCache[baseNumber] };
         showDetailView(baseNumber);
     }
