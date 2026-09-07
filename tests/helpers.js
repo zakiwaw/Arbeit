@@ -34,9 +34,13 @@ function makeBackend(initial, lkwStatus) {
     const action = body.action || ''; state.actions.push(action);
     let resp = { status: 'success' };
     if (action === 'loadChanges') resp = { status: 'success', version: state.version, changed: JSON.parse(JSON.stringify(state.store)), deleted: [], archived: [], full: true, lkwStatus: state.lkwStatus, archivedBases: [] };
-    else if (action === 'saveShipments') { state.version++; Object.assign(state.store, body.shipments || {}); resp = { status: 'success', version: state.version, applied: Object.keys(body.shipments || {}) }; }
+    else if (action === 'saveShipments') { // wie das Backend: Sendungen kommen unter payload.shipments; Antwort enthält den übernommenen Stand
+      const incoming = (body.payload && body.payload.shipments) || {};
+      state.version++; Object.keys(incoming).forEach(b => { state.store[b] = JSON.parse(JSON.stringify(incoming[b])); });
+      resp = { status: 'success', version: state.version, merged: JSON.parse(JSON.stringify(incoming)) };
+    }
     else if (action === 'loadLkwStatus') resp = { status: 'success', data: state.lkwStatus };
-    else if (action === 'saveLkwStatus') { state.lkwStatus = body.lkwStatus || {}; resp = { status: 'success' }; }
+    else if (action === 'saveLkwStatus') { state.lkwStatus = (body.payload && body.payload.lkwStatus) || body.lkwStatus || {}; resp = { status: 'success' }; }
     else if (action === 'searchArchive') resp = { status: 'success', results: {}, order: [], total: 0, truncated: false };
     await req.respond({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(resp) });
   };

@@ -1652,7 +1652,7 @@ function fitTextToContainer(element, container, initialFontSize, minFontSize, pa
         function focusShipmentInput() {
             const isModalVisible = (sel) => document.querySelector(sel)?.classList.contains('visible');
             // ANFORDERUNG 2: Das neue HU-Import-Modal zur Prüfung hinzufügen
-            if (isModalVisible('#editModal') || isModalVisible('#batchNoteModal') || isModalVisible('#importHuModal') ||
+            if (isModalVisible('#editModal') || isModalVisible('#batchNoteModal') || isModalVisible('#importHuModal') || isModalVisible('#huEditModal') ||
                 (sideMenuEl && sideMenuEl.classList.contains('open')) ||
                 (newTotalSectionEl && newTotalSectionEl.classList.contains('visible')) ||
                 document.querySelector('#currentShipmentDetails .inline-note-editor')) {
@@ -1914,7 +1914,7 @@ function buildDetailHead(base, shipment, archivedView) {
 }
 // Packstücke eines HU-Listen-Auftrags: pro Platz (Anstehend bzw. Sicherungsstatus) eine Zeile; Wareneingang, Dunkelalarm
 // und Notizen werden über die HU-Nummer zugeordnet. Zählung wie in der Zusammenfassung (calculate…-Funktionen).
-function buildDetailPackTable(shipment) {
+function buildDetailPackTable(shipment, readOnly, base) {
     const items = Array.isArray(shipment.scannedItems) ? shipment.scannedItems : [];
     const slots = items.filter(i => i && !i.isCancelled && (i.status === 'Anstehend' || EXCLUSIVE_SECURITY_STATUSES.includes(i.status)));
     if (!slots.length) return '';
@@ -1949,13 +1949,100 @@ function buildDetailPackTable(shipment) {
             + `<td>${statusHtml}</td>`
             + `<td class="pack-time">${timeHtml}</td>`
             + `<td class="pack-notes">${notes.map(n => `<span class="pack-note">${escapeHtml(n)}</span>`).join('')}</td>`
+            + (readOnly ? '' : `<td class="pack-edit-cell"><button type="button" class="pack-edit-btn" data-basenumber="${escapeHtml(base || shipment.hawb || '')}" data-hu="${escapeHtml(hu)}" title="Packstück ${escapeHtml(hu)} bearbeiten (Nummer, Verpackung, Maße, Gewicht)" aria-label="Packstück bearbeiten"></button></td>`)
             + `</tr>`;
     }).join('');
 
     return `<div class="detail-pack">`
         + `<div class="detail-pack-head"><h4>Packstücke (${slots.length})</h4><span class="detail-pack-meta">${openCount ? `${openCount} offen` : 'alle gesichert'}</span></div>`
-        + `<table class="pack-table"><thead><tr>${hasPos ? '<th>Pos.</th>' : ''}<th>${isVvl ? 'VSE / Sendungs-Nr.' : 'HU'}</th><th>Verpackung</th><th>Maße</th><th>Gewicht</th><th>WE</th><th>Sicherung</th><th>Zeit</th><th>Notiz</th></tr></thead>`
+        + `<table class="pack-table"><thead><tr>${hasPos ? '<th>Pos.</th>' : ''}<th>${isVvl ? 'VSE / Sendungs-Nr.' : 'HU'}</th><th>Verpackung</th><th>Maße</th><th>Gewicht</th><th>WE</th><th>Sicherung</th><th>Zeit</th><th>Notiz</th>${readOnly ? '' : '<th class="pack-edit-head"></th>'}</tr></thead>`
         + `<tbody>${rows}</tbody></table></div>`;
+}
+
+// ---- Packstück bearbeiten (Desktop-Tabelle): HU-Nummer, Verpackung, Maße, Gewicht -------------------------------
+// Alle Einträge derselben HU (Platz „Anstehend“, Wareneingang, Sicherung, Dunkelalarm, Stornos) werden gemeinsam
+// geändert – die HU-Nummer ist der Schlüssel, über den der Scanner das Packstück findet. Zählung/Status bleiben unberührt.
+function huItemsOf(shipment, hu) {
+    const key = String(hu).toUpperCase();
+    return (Array.isArray(shipment.scannedItems) ? shipment.scannedItems : []).filter(i => i && String(i.rawInput).toUpperCase() === key);
+}
+function openHuEditModal(base, hu) {
+    const modal = document.getElementById('huEditModal');
+    if (!modal) return;
+    const shipments = loadShipments();
+    const shipment = shipments[base];
+    if (!shipment) { displayError(`Sendung ${escapeHtml(base)} nicht gefunden.`); return; }
+    const items = huItemsOf(shipment, hu);
+    if (!items.length) { displayError(`Packstück ${escapeHtml(hu)} nicht gefunden.`); return; }
+    const detail = items.find(i => i.packaging || i.dimensions || i.grossWeight) || items[0];
+    const scans = items.filter(i => i.status !== 'Anstehend' && !i.isCancelled).length;
+    document.getElementById('huEditBaseNumber').value = base;
+    document.getElementById('huEditOriginalHu').value = hu;
+    document.getElementById('huEditNumber').value = hu;
+    document.getElementById('huEditPackaging').value = detail.packaging && detail.packaging !== 'N/A' ? detail.packaging : '';
+    document.getElementById('huEditDimensions').value = detail.dimensions && detail.dimensions !== 'N/A' ? detail.dimensions : '';
+    document.getElementById('huEditWeight').value = detail.grossWeight && detail.grossWeight !== 'N/A' ? detail.grossWeight : '';
+    document.getElementById('huEditContext').textContent = `${shipment.freightForwarder && shipment.destinationCountry ? 'Rechnung' : 'Auftrag'} ${base}` + (detail.position ? ` · Position ${detail.position}` : '') + (scans ? ` · ${pluralize(scans, 'Scan', 'Scans')} auf diesem Packstück` : ' · noch nicht gescannt');
+    const err = document.getElementById('huEditError'); err.textContent = ''; err.classList.add('hidden');
+    modal.classList.add('visible');
+    document.body.classList.add('modal-open');
+    setTimeout(() => document.getElementById('huEditNumber').select(), 50);
+}
+function closeHuEditModal() {
+    const modal = document.getElementById('huEditModal');
+    if (modal) modal.classList.remove('visible');
+    document.body.classList.remove('modal-open');
+    focusShipmentInput();
+}
+function saveHuEditFromModal() {
+    const base = document.getElementById('huEditBaseNumber').value;
+    const oldHu = document.getElementById('huEditOriginalHu').value;
+    const newHu = document.getElementById('huEditNumber').value.trim().toUpperCase().replace(/\s+/g, '');
+    const packaging = document.getElementById('huEditPackaging').value.trim();
+    const dimensions = document.getElementById('huEditDimensions').value.trim();
+    const weightRaw = document.getElementById('huEditWeight').value.trim();
+    const err = document.getElementById('huEditError');
+    const fail = msg => { err.textContent = msg; err.classList.remove('hidden'); };
+
+    if (!newHu) return fail('Bitte eine HU-Nummer eingeben.');
+    if (!/^[0-9A-Z-]+$/.test(newHu)) return fail('HU-Nummer darf nur Ziffern, Großbuchstaben und Bindestrich enthalten.');
+    let grossWeight = null;
+    if (weightRaw) {
+        if (parseWeightKg(weightRaw) === null) return fail('Gewicht nicht lesbar – z. B. „42 KG“ oder „0,700 KG“.');
+        grossWeight = /KG/i.test(weightRaw) ? weightRaw.toUpperCase() : `${weightRaw} KG`;
+    }
+
+    const shipments = loadShipments();
+    const shipment = shipments[base];
+    if (!shipment) { closeHuEditModal(); displayError(`Sendung ${escapeHtml(base)} nicht mehr gefunden.`); return; }
+    const items = huItemsOf(shipment, oldHu);
+    if (!items.length) { closeHuEditModal(); displayError(`Packstück ${escapeHtml(oldHu)} nicht mehr gefunden.`); return; }
+
+    const renamed = newHu !== String(oldHu).toUpperCase();
+    if (renamed) {
+        // Neue Nummer darf in keinem Auftrag (auch nicht in diesem) schon vergeben sein
+        for (const b in shipments) {
+            const other = shipments[b];
+            if (!other || !other.isHuListOrder) continue;
+            if (huItemsOf(other, newHu).length) return fail(`HU ${newHu} gibt es bereits${b === base ? ' in diesem Auftrag' : ` im Auftrag ${b}`}.`);
+        }
+        const scans = items.filter(i => i.status !== 'Anstehend' && !i.isCancelled).length;
+        if (scans && !confirm(`HU ${oldHu} → ${newHu}\n\n${pluralize(scans, 'Scan wird', 'Scans werden')} mit umbenannt. Fortfahren?`)) return;
+    }
+
+    const now = new Date().toISOString();
+    items.forEach(i => {
+        if (renamed) i.rawInput = newHu;
+        i.packaging = packaging || null;
+        i.dimensions = dimensions || null;
+        i.grossWeight = grossWeight;
+    });
+    shipment.lastModified = now;
+    saveShipments(shipments);
+    closeHuEditModal();
+    renderTable();
+    displayCurrentShipmentDetails(base);
+    displayError(`Packstück ${escapeHtml(renamed ? `${oldHu} → ${newHu}` : newHu)} gespeichert.`, 'green', 2500);
 }
 
 function displayCurrentShipmentDetails(baseNumberToDisplay) {
@@ -2032,7 +2119,7 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
     // Desktop: alle Packstücke als Tabelle (Pos. · HU · Verpackung · Maße · Gewicht · Status · Zeit · Notiz) statt des
     // gelben Kastens mit den offenen Positionen – die Scan-Zeitleiste darunter bleibt unverändert.
     const desktopPackTable = shipment.isHuListOrder && isDesktopLayout();
-    if (desktopPackTable) detailsHtml += buildDetailPackTable(shipment);
+    if (desktopPackTable) detailsHtml += buildDetailPackTable(shipment, archivedView, baseNumberToDisplay);
 
     if (shipment.isHuListOrder && !desktopPackTable) {
         const securityClearanceStatuses = EXCLUSIVE_SECURITY_STATUSES;
@@ -5311,6 +5398,11 @@ document.addEventListener('click', (event) => {
             if (confirm(`Sendung ${escapeHtml(base)} wirklich löschen?`)) { deleteShipment(base); goBackFromDetail(); }
         }
     }
+    // Packstücktabelle: Stift → Packstück bearbeiten
+    else if (target.closest('.pack-edit-btn')) {
+        const btn = target.closest('.pack-edit-btn');
+        if (!isBatchModeActive) openHuEditModal(btn.dataset.basenumber, btn.dataset.hu);
+    }
     // Desktop-Kopfzeile: Pfad (Startseite › Anlieferung › LKW) – schließt die Details und zeigt die gewählte Seite
     else if (target.closest('.detail-crumb')) {
         event.preventDefault();
@@ -5776,6 +5868,13 @@ noteEditFormEl.addEventListener('submit', (e) => {
     saveOrUpdateNote(baseNumber, timestamp, noteIndex, newNoteValue); // Speichert die Notiz EINMAL
     closeNoteEditModal(); // Schließt das Modal
 });
+
+const huEditFormEl = document.getElementById('hu-edit-form');
+if (huEditFormEl) {
+    huEditFormEl.addEventListener('submit', (e) => { e.preventDefault(); saveHuEditFromModal(); });
+    document.getElementById('cancelHuEditButton').addEventListener('click', closeHuEditModal);
+    document.getElementById('huEditModal').addEventListener('click', (e) => { if (e.target.id === 'huEditModal') closeHuEditModal(); });
+}
 
 // Der separate 'click'-Listener für saveNoteEditButtonEl wird komplett entfernt.
 

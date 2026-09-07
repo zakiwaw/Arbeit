@@ -14,7 +14,8 @@ function bigData() {
   const browser = await launch();
   try {
     // ---- Desktop ----
-    let page = await openApp(browser, makeBackend(bigData(), {}), { viewport: { width: 1600, height: 900, deviceScaleFactor: 1 } });
+    const backend = makeBackend(bigData(), {});
+    let page = await openApp(browser, backend, { viewport: { width: 1600, height: 900, deviceScaleFactor: 1 } });
     const rows = await page.$$eval('#shipmentTableBody tr[data-basenumber]', r => r.length);
     assert(rows === 15, `Desktop-Startseite zeigt 15 Zeilen (${rows})`);
     const head = await page.$eval('#shipmentTableBody', tb => [...tb.closest('table').querySelectorAll('thead th')].filter(t => getComputedStyle(t).display !== 'none').map(t => t.textContent.trim()));
@@ -101,6 +102,21 @@ function bigData() {
     await page.evaluate(() => document.querySelector('.detail-actions .edit-btn').click()); await wait(300);
     assert(await page.evaluate(() => document.getElementById('editModal').classList.contains('visible')), 'Desktop-Details: „Bearbeiten“ im Kopf öffnet das Bearbeiten-Modal');
     await page.evaluate(() => document.getElementById('cancelEditButton') ? document.getElementById('cancelEditButton').click() : document.getElementById('editModal').classList.remove('visible')); await wait(200);
+    // ---- Packstück bearbeiten (Stift in der Tabelle): Prüfungen, Umbenennen zieht alle Einträge mit, Sync ----
+    await page.evaluate(() => document.querySelector('.pack-edit-btn[data-hu="HU5001"]').click()); await wait(300);
+    assert(await page.evaluate(() => document.getElementById('huEditModal').classList.contains('visible') && document.getElementById('huEditNumber').value === 'HU5001' && document.activeElement.id === 'huEditNumber'), 'Packstück-Fenster öffnet mit HU-Nummer im Fokus');
+    await page.evaluate(() => { document.getElementById('huEditNumber').value = 'HU5002'; document.getElementById('saveHuEditButton').click(); }); await wait(300);
+    assert(/gibt es bereits/.test(await page.$eval('#huEditError', e => e.textContent)), 'Packstück: doppelte HU-Nummer wird abgelehnt');
+    await page.evaluate(() => { document.getElementById('huEditNumber').value = 'HU5001'; document.getElementById('huEditWeight').value = 'schwer'; document.getElementById('saveHuEditButton').click(); }); await wait(300);
+    assert(/Gewicht nicht lesbar/.test(await page.$eval('#huEditError', e => e.textContent)), 'Packstück: unlesbares Gewicht wird abgelehnt');
+    await page.evaluate(() => { document.getElementById('huEditNumber').value = 'HU5001X'; document.getElementById('huEditWeight').value = '40'; document.getElementById('huEditPackaging').value = 'Gitterbox'; document.getElementById('saveHuEditButton').click(); }); await wait(1200);
+    const edited = await page.evaluate(() => {
+      const s = JSON.parse(localStorage.getItem('frachtSicherungMobile_V8_18_Refactored'))['9007000005'];
+      return { modal: document.getElementById('huEditModal').classList.contains('visible'), items: s.scannedItems.map(i => i.rawInput + ':' + i.status + ':' + i.grossWeight + ':' + i.packaging).join(' '), row: [...document.querySelectorAll('.pack-table tbody tr')[0].cells].map(c => c.textContent.trim()).slice(0, 4).join('|'), kg: [...document.querySelectorAll('.detail-fact')].find(f => /Gewicht/.test(f.textContent)).textContent.replace(/\s+/g, ' ') };
+    });
+    assert(!edited.modal && edited.items === 'HU5001X:Anstehend:40 KG:Gitterbox HU5002:Anstehend:30 KG:undefined', `Packstück gespeichert – alle Einträge der HU umbenannt (${edited.items})`);
+    assert(edited.row === 'HU5001X|Gitterbox|–|40 KG' && /70 kg/.test(edited.kg), `Tabelle und Kopf-Gewicht aktualisiert (${edited.row}; ${edited.kg})`);
+    assert(backend.store['9007000005'] && backend.store['9007000005'].scannedItems.map(i => i.rawInput).join() === 'HU5001X,HU5002', 'Änderung ist beim Server angekommen (andere Geräte bekommen sie per Sync)');
     // Pfad: LKW-Krümel schließt die Details und öffnet die LKW-Seite
     await page.evaluate(() => document.querySelector('.detail-crumb[data-crumb-page="lkw"]').click()); await wait(500);
     const afterCrumb = await page.evaluate(() => ({ detail: getComputedStyle(document.getElementById('detailView')).display === 'none', title: document.getElementById('pageTitle').textContent.trim(), url: location.search }));
