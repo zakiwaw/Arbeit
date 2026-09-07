@@ -1340,29 +1340,91 @@ function isHuExpected(huNumber) {
  * Spielt den Fehlerton für eine definierte Dauer (500ms) mit maximaler Lautstärke ab.
  */
 // ---- Töne (Überzählig / Nachlieferung) ----------------------------------------------------------
-// Jeder Scan startet seinen Ton SOFORT – auch wenn der vorherige noch läuft – und jeder Ton spielt VOLLSTÄNDIG
-// zu Ende (die Töne überlagern sich dann kurz). Dafür bekommt jeder Ton eine eigene Kopie des <audio>-Elements
-// (ein einzelnes Element kann nur einmal gleichzeitig spielen und würde beim Neustart abgeschnitten).
-// (Vorher: Neustart bei jedem Scan + 500-ms-Stopp-Timer → abgehackte Töne beim schnellen Scannen.)
-const SOUND_MAX_PARALLEL = 4;           // mehr gleichzeitige Kopien bringen hörbar nichts (nur Lärm)
-const activeSounds = { error: [], nachlieferung: [] };
+// Web Audio: beide Dateien werden EINMAL geladen und dekodiert; jeder Scan startet daraus sofort eine eigene
+// Wiedergabe – ohne Verzögerung, beliebig oft parallel, jeder Ton läuft vollständig zu Ende. Solange Web Audio
+// noch nicht bereit ist (erster Start, Freischaltung steht noch aus), springen die <audio>-Elemente als
+// Fallback ein (Kopie pro Ton, damit sich auch dort nichts abschneidet).
+//
+// iPhone/iPad: Der Browser gibt Ton erst nach der ersten Berührung/Taste frei. Das erledigt unlockAudio() beim
+// ersten touchend/mousedown/keydown irgendwo auf der Seite – auch ein Enter vom Bluetooth-Scanner zählt.
+// navigator.audioSession.type = 'playback' (iOS 17+) sorgt dafür, dass Web-Audio-Töne wie Medien behandelt
+// werden – sonst wären sie bei umgelegtem Klingelschalter stumm, obwohl <audio> weiter hörbar wäre.
+const SOUND_FILES = { error: 'assets/error-sound.mp3', nachlieferung: 'assets/nachlieferung-sound.mp3' };
+const SOUND_MAX_PARALLEL = 4;           // mehr gleichzeitige Wiedergaben pro Ton bringen hörbar nichts (nur Lärm)
+const soundBuffers = {};                // kind → AudioBuffer (dekodiert)
+const soundActive = { error: 0, nachlieferung: 0 };
+const fallbackActive = { error: [], nachlieferung: [] };
+let audioCtx = null;
+let audioUnlocked = false;
 
-function soundElementFor(kind) { return kind === 'nachlieferung' ? nachlieferungSoundEl : errorSoundEl; }
+if ('audioSession' in navigator) { try { navigator.audioSession.type = 'playback'; } catch (e) { /* optional */ } }
+
+function getAudioContext() {
+    if (audioCtx) return audioCtx;
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return null;
+    try { audioCtx = new Ctx(); } catch (e) { console.warn('Web Audio nicht verfügbar:', e); return null; }
+    Object.keys(SOUND_FILES).forEach(loadSoundBuffer);
+    return audioCtx;
+}
+
+function loadSoundBuffer(kind) {
+    if (!audioCtx || soundBuffers[kind]) return;
+    fetch(SOUND_FILES[kind])
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
+        .then(data => new Promise((resolve, reject) => {
+            // Callback-Form: ältere Safari-Versionen liefern in decodeAudioData kein Promise
+            const p = audioCtx.decodeAudioData(data, resolve, reject);
+            if (p && p.then) p.then(resolve, reject);
+        }))
+        .then(buffer => { soundBuffers[kind] = buffer; })
+        .catch(e => console.warn(`Ton "${kind}" konnte nicht geladen werden – nutze <audio>-Fallback:`, e));
+}
+
+/** Beim ersten Nutzerkontakt Audio freischalten (iOS/Android/Chrome verlangen eine Interaktion vor dem ersten Ton). */
+function unlockAudio() {
+    const ctx = getAudioContext();
+    if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
+    if (!audioUnlocked) {
+        audioUnlocked = true;
+        // <audio>-Elemente ebenfalls „anfassen“: stumm abspielen + sofort stoppen erlaubt späteres play() ohne Geste
+        [errorSoundEl, nachlieferungSoundEl].forEach(el => {
+            if (!el) return;
+            try { el.muted = true; const p = el.play(); const done = () => { el.pause(); el.currentTime = 0; el.muted = false; };
+                  if (p && p.then) p.then(done, () => { el.muted = false; }); else done(); } catch (e) { el.muted = false; }
+        });
+    }
+}
+['touchend', 'mousedown', 'keydown'].forEach(type => document.addEventListener(type, unlockAudio, { passive: true }));
 
 function playSoundNow(kind) {
-    const base = soundElementFor(kind);
+    const ctx = getAudioContext();
+    const buffer = soundBuffers[kind];
+    if (ctx && buffer && ctx.state === 'running') {
+        if (soundActive[kind] >= SOUND_MAX_PARALLEL) return; // es spielen schon genug – der Hinweis ist längst hörbar
+        try {
+            const src = ctx.createBufferSource();
+            src.buffer = buffer;
+            src.connect(ctx.destination);
+            soundActive[kind]++;
+            src.onended = () => { soundActive[kind] = Math.max(0, soundActive[kind] - 1); try { src.disconnect(); } catch (e) { /* egal */ } };
+            src.start(0);
+            return;
+        } catch (e) { console.warn(`Web Audio (${kind}) fehlgeschlagen, nutze <audio>:`, e); }
+    }
+    if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {}); // z. B. nach Tab-Wechsel – nächster Ton läuft dann wieder über Web Audio
+    playSoundViaElement(kind);
+}
+
+// Fallback über <audio>: eigene Kopie je Ton (ein einzelnes Element könnte den laufenden Ton nur abschneiden)
+function playSoundViaElement(kind) {
+    const base = kind === 'nachlieferung' ? nachlieferungSoundEl : errorSoundEl;
     if (!base) return;
-    const list = activeSounds[kind];
-    // Abgelaufene Kopien aufräumen
+    const list = fallbackActive[kind];
     for (let i = list.length - 1; i >= 0; i--) { if (list[i].ended || list[i].paused) list.splice(i, 1); }
-    if (list.length >= SOUND_MAX_PARALLEL) return; // es spielen schon genug – der Hinweis ist längst hörbar
+    if (list.length >= SOUND_MAX_PARALLEL) return;
     let el;
-    try {
-        el = base.cloneNode(false);             // eigene Kopie: gleiche Quelle (bereits geladen/gepuffert), eigener Abspielkopf
-        el.removeAttribute('id');
-        el.volume = 1.0;
-        el.currentTime = 0;
-    } catch (e) { el = base; }
+    try { el = base.cloneNode(false); el.removeAttribute('id'); el.muted = false; el.volume = 1.0; el.currentTime = 0; } catch (e) { el = base; }
     const done = () => { const i = list.indexOf(el); if (i !== -1) list.splice(i, 1); el.removeEventListener('ended', done); el.removeEventListener('error', done); };
     el.addEventListener('ended', done);
     el.addEventListener('error', done);
@@ -1373,10 +1435,10 @@ function playSoundNow(kind) {
     } catch (e) { console.warn(`Audio (${kind}) Fehler:`, e); done(); }
 }
 
-/** Fehlerton (Überzählig): startet sofort, spielt vollständig – auch parallel zu einem noch laufenden Ton. */
+/** Fehlerton (Überzählig, ~0,7 s): startet sofort, spielt vollständig – auch parallel zu laufenden Tönen. */
 function playShortErrorSound() { playSoundNow('error'); }
 
-/** Nachlieferungs-Ton: startet sofort, spielt vollständig – auch parallel zu einem noch laufenden Ton. */
+/** Nachlieferungs-Ton (~2,2 s): startet sofort, spielt vollständig – auch parallel zu laufenden Tönen. */
 function playNachlieferungSound() { playSoundNow('nachlieferung'); }
 
 
