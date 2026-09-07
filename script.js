@@ -1964,7 +1964,7 @@ function buildDetailPackTable(shipment, readOnly, base) {
 // Normale Sendung (kein HU-Auftrag, alle Scans tragen dieselbe Nummer): Tabelle mit einer Zeile je erwartetem Stück.
 // Zeile n = n-ter Sicherungsscan (chronologisch); Wareneingang wird dem gleichen Platz zugeordnet; Dunkelalarme und
 // Kombi-Scans erscheinen als eigene Zeilen dahinter. Reine Darstellung der Zeitleiste – Zählung wie in der Zusammenfassung.
-function buildDetailScanTable(shipment, base) {
+function buildDetailScanTable(shipment, base, readOnly) {
     const items = (Array.isArray(shipment.scannedItems) ? shipment.scannedItems : []).filter(i => i && !i.isCancelled && i.status !== 'Anstehend');
     const expected = expectedPiecesOf(shipment);
     const byTime = (a, b) => (Date.parse(a.timestamp) || 0) - (Date.parse(b.timestamp) || 0);
@@ -1980,27 +1980,36 @@ function buildDetailScanTable(shipment, base) {
     const lastAlarm = alarms.length ? Date.parse(alarms[alarms.length - 1].timestamp) || 0 : 0;
     const openAlarm = alarms.length && !(expected > 0 && secured.length >= expected) && !secured.some(i => (Date.parse(i.timestamp) || 0) >= lastAlarm);
     const notesOf = it => (it && Array.isArray(it.notes) ? it.notes : []).map(n => `<span class="pack-note">${escapeHtml(n)}</span>`).join('');
+    const hasDetail = it => !!(it && (it.packaging || it.dimensions || it.grossWeight));
+    const detailCells = d => `<td class="pack-text">${escapeHtml((d && d.packaging) || '–')}</td><td class="pack-text">${escapeHtml((d && d.dimensions) || '–')}</td><td class="pack-num">${escapeHtml((d && d.grossWeight) || '–')}</td>`;
+    const baseAttr = escapeHtml(base || shipment.hawb || '');
     let rows = '';
     for (let n = 0; n < rowsCount; n++) {
         const sec = secured[n], we = receipts[n];
         const open = !sec;
+        // Angaben zum Stück (Verpackung/Maße/Gewicht) hängen am Sicherungsscan, sonst am Wareneingang dieses Platzes
+        const anchor = sec || we || null;
+        const detail = [sec, we].find(hasDetail) || null;
         const cls = open ? (openAlarm && n === secured.length ? 'pack-row-danger' : 'pack-row-open') : 'pack-row-done';
+        const editCell = readOnly ? '' : `<td class="pack-edit-cell">${anchor ? `<button type="button" class="pack-edit-btn" data-basenumber="${baseAttr}" data-item-id="${escapeHtml(anchor.id || '')}" data-partner-id="${escapeHtml(sec && we ? we.id || '' : '')}" data-piece="${n + 1}" data-piece-total="${rowsCount}" title="Stück ${n + 1} bearbeiten (Verpackung, Maße, Gewicht)" aria-label="Stück bearbeiten"></button>` : ''}</td>`;
         rows += `<tr class="${cls}">`
             + `<td class="pack-pos">${n + 1}.</td>`
+            + detailCells(detail)
             + `<td class="pack-we-cell">${we ? `<span class="pack-we ok" title="Wareneingang ${escapeHtml(fmtTime(we.timestamp))}">WE</span>` : '<span class="pack-we" title="Kein Wareneingang">–</span>'}</td>`
             + `<td>${sec ? `<span class="pack-status ok">${escapeHtml(sec.status)}</span>` : (openAlarm && n === secured.length ? '<span class="pack-status danger">Dunkelalarm</span>' : '<span class="pack-status open">Offen</span>')}</td>`
             + `<td class="pack-time">${sec ? escapeHtml(fmtTime(sec.timestamp)) : (we ? `<span class="dt-dim">WE ${escapeHtml(fmtTime(we.timestamp))}</span>` : '')}</td>`
             + `<td class="pack-notes">${notesOf(sec)}${notesOf(we)}</td>`
+            + editCell
             + `</tr>`;
     }
-    const extra = (list, label, cls) => list.map(it => `<tr class="${cls}"><td class="pack-pos"></td><td class="pack-we-cell"></td><td><span class="pack-status ${cls === 'pack-row-danger' ? 'danger' : 'ok'}">${escapeHtml(label || it.status)}</span></td><td class="pack-time">${escapeHtml(fmtTime(it.timestamp))}</td><td class="pack-notes">${notesOf(it)}</td></tr>`).join('');
+    const extra = (list, label, cls) => list.map(it => `<tr class="${cls}"><td class="pack-pos"></td>${detailCells(null)}<td class="pack-we-cell"></td><td><span class="pack-status ${cls === 'pack-row-danger' ? 'danger' : 'ok'}">${escapeHtml(label || it.status)}</span></td><td class="pack-time">${escapeHtml(fmtTime(it.timestamp))}</td><td class="pack-notes">${notesOf(it)}</td>${readOnly ? '' : '<td class="pack-edit-cell"></td>'}</tr>`).join('');
     rows += extra(alarms, openAlarm ? 'Dunkelalarm' : 'Dunkelalarm (erledigt)', openAlarm ? 'pack-row-danger' : 'pack-row-done');
     rows += extra(kombis.map(k => Object.assign({}, k, { status: k.status + ' (Kombi)' })), null, 'pack-row-done');
     rows += extra(others, null, 'pack-row-done');
     const openCount = Math.max(0, rowsCount - secured.length);
     return `<div class="detail-pack">`
         + `<div class="detail-pack-head"><h4>Stücke (${rowsCount}${expected === null ? ' erfasst' : ''})</h4><span class="detail-pack-meta">${openCount ? `${openCount} offen` : 'alle gesichert'}</span></div>`
-        + `<table class="pack-table pack-table-plain"><thead><tr><th>Nr.</th><th>WE</th><th>Sicherung</th><th>Zeit</th><th>Notiz</th></tr></thead>`
+        + `<table class="pack-table pack-table-plain"><thead><tr><th>Nr.</th><th>Verpackung</th><th>Maße</th><th>Gewicht</th><th>WE</th><th>Sicherung</th><th>Zeit</th><th>Notiz</th>${readOnly ? '' : '<th class="pack-edit-head"></th>'}</tr></thead>`
         + `<tbody>${rows}</tbody></table></div>`;
 }
 
@@ -2033,13 +2042,76 @@ function openHuEditModal(base, hu) {
     document.body.classList.add('modal-open');
     setTimeout(() => document.getElementById('huEditNumber').select(), 50);
 }
+// Stück einer normalen Sendung (ohne HU-Liste): Verpackung/Maße/Gewicht am Scan-Eintrag des Stücks (Sicherung, sonst WE).
+// Gleiches Modal wie „Packstück bearbeiten“, nur ohne HU-Nummer – die Nummer ist hier die Sendungsnummer selbst.
+function openPieceEditModal(base, itemId, partnerId, pieceNo, pieceTotal) {
+    const modal = document.getElementById('huEditModal');
+    if (!modal) return;
+    const shipments = loadShipments();
+    const shipment = shipments[base];
+    if (!shipment) { displayError(`Sendung ${escapeHtml(base)} nicht gefunden.`); return; }
+    const items = Array.isArray(shipment.scannedItems) ? shipment.scannedItems : [];
+    const item = items.find(i => i && i.id === itemId);
+    if (!item) { displayError('Stück nicht gefunden – bitte Ansicht neu öffnen.'); return; }
+    const partner = partnerId ? items.find(i => i && i.id === partnerId) : null;
+    const detail = (item.packaging || item.dimensions || item.grossWeight) ? item : (partner && (partner.packaging || partner.dimensions || partner.grossWeight) ? partner : item);
+    modal.classList.add('piece-mode');
+    modal.querySelector('h3').textContent = 'Stück bearbeiten';
+    document.getElementById('huEditBaseNumber').value = base;
+    document.getElementById('huEditOriginalHu').value = '';
+    document.getElementById('huEditItemId').value = itemId;
+    document.getElementById('huEditPartnerId').value = partner ? partnerId : '';
+    document.getElementById('huEditNumber').value = String(item.rawInput || base);
+    document.getElementById('huEditPackaging').value = detail.packaging && detail.packaging !== 'N/A' ? detail.packaging : '';
+    document.getElementById('huEditDimensions').value = detail.dimensions && detail.dimensions !== 'N/A' ? detail.dimensions : '';
+    document.getElementById('huEditWeight').value = detail.grossWeight && detail.grossWeight !== 'N/A' ? detail.grossWeight : '';
+    const when = new Date(item.timestamp);
+    document.getElementById('huEditContext').textContent = `Sendung ${base} · Stück ${pieceNo} von ${pieceTotal} · ${item.status}${isNaN(when) ? '' : ' ' + when.toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`;
+    const err = document.getElementById('huEditError'); err.textContent = ''; err.classList.add('hidden');
+    modal.classList.add('visible');
+    document.body.classList.add('modal-open');
+    setTimeout(() => document.getElementById('huEditPackaging').focus(), 50);
+}
+function savePieceEditFromModal() {
+    const base = document.getElementById('huEditBaseNumber').value;
+    const itemId = document.getElementById('huEditItemId').value;
+    const partnerId = document.getElementById('huEditPartnerId').value;
+    const packaging = document.getElementById('huEditPackaging').value.trim();
+    const dimensions = document.getElementById('huEditDimensions').value.trim();
+    const weightRaw = document.getElementById('huEditWeight').value.trim();
+    const err = document.getElementById('huEditError');
+    const fail = msg => { err.textContent = msg; err.classList.remove('hidden'); };
+    let grossWeight = null;
+    if (weightRaw) {
+        if (parseWeightKg(weightRaw) === null) return fail('Gewicht nicht lesbar – z. B. „42 KG“ oder „0,700 KG“.');
+        grossWeight = /KG/i.test(weightRaw) ? weightRaw.toUpperCase() : `${weightRaw} KG`;
+    }
+    const shipments = loadShipments();
+    const shipment = shipments[base];
+    const items = shipment && Array.isArray(shipment.scannedItems) ? shipment.scannedItems : [];
+    const item = items.find(i => i && i.id === itemId);
+    if (!item) { closeHuEditModal(); displayError('Stück nicht mehr gefunden – Ansicht wurde aktualisiert.'); displayCurrentShipmentDetails(base); return; }
+    item.packaging = packaging || null;
+    item.dimensions = dimensions || null;
+    item.grossWeight = grossWeight;
+    // Wareneingang desselben Platzes trägt die Angaben nicht doppelt (Gewicht zählt sonst zweimal)
+    const partner = partnerId ? items.find(i => i && i.id === partnerId) : null;
+    if (partner && (partner.packaging || partner.dimensions || partner.grossWeight)) { partner.packaging = null; partner.dimensions = null; partner.grossWeight = null; }
+    shipment.lastModified = new Date().toISOString();
+    saveShipments(shipments);
+    closeHuEditModal();
+    renderTable();
+    displayCurrentShipmentDetails(base);
+    displayError('Stück gespeichert.', 'green', 2500);
+}
 function closeHuEditModal() {
     const modal = document.getElementById('huEditModal');
-    if (modal) modal.classList.remove('visible');
+    if (modal) { modal.classList.remove('visible'); modal.classList.remove('piece-mode'); modal.querySelector('h3').textContent = 'Packstück bearbeiten'; }
     document.body.classList.remove('modal-open');
     focusShipmentInput();
 }
 function saveHuEditFromModal() {
+    if (document.getElementById('huEditModal').classList.contains('piece-mode')) return savePieceEditFromModal();
     const base = document.getElementById('huEditBaseNumber').value;
     const oldHu = document.getElementById('huEditOriginalHu').value;
     const newHu = document.getElementById('huEditNumber').value.trim().toUpperCase().replace(/\s+/g, '');
@@ -2166,7 +2238,7 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
     const desktopPackTable = shipment.isHuListOrder && isDesktopLayout();
     if (desktopPackTable) detailsHtml += buildDetailPackTable(shipment, archivedView, baseNumberToDisplay);
     // Normale Sendung (ohne HU-Liste): Scans als Tabelle – ein Platz je erwartetem Stück
-    else if (isDesktopLayout()) detailsHtml += buildDetailScanTable(shipment, baseNumberToDisplay);
+    else if (isDesktopLayout()) detailsHtml += buildDetailScanTable(shipment, baseNumberToDisplay, archivedView);
 
     if (shipment.isHuListOrder && !desktopPackTable) {
         const securityClearanceStatuses = EXCLUSIVE_SECURITY_STATUSES;
@@ -3120,7 +3192,7 @@ function appendPageShipmentRow(tbody, base, s, archived, chip, hits) {
     if (chip) row.querySelector('.hawb-cell').insertAdjacentHTML('beforeend', `<span class="row-chip">${escapeHtml(chip)}</span>`);
     if (hits && hits.length) { // Gewichtsfilter: die passenden HUs mit Gewicht in der Übersichtszelle (Tippen → HU-Details)
         const shown = hits.slice(0, 6);
-        let html = shown.map(h => `<button type="button" class="weight-hit" data-hu="${escapeHtml(h.hu)}" title="HU ${escapeHtml(h.hu)}: ${escapeHtml(h.raw)}"><span class="weight-hit-hu">${escapeHtml(h.hu)}</span>${escapeHtml(formatKg(h.kg))}</button>`).join('');
+        let html = shown.map(h => `<button type="button" class="weight-hit" data-hu="${escapeHtml(h.hu)}" data-item-id="${escapeHtml(h.id || '')}" title="HU ${escapeHtml(h.hu)}: ${escapeHtml(h.raw)}"><span class="weight-hit-hu">${escapeHtml(h.hu)}</span>${escapeHtml(formatKg(h.kg))}</button>`).join('');
         if (hits.length > shown.length) html += `<span class="weight-hit weight-hit-more">+${hits.length - shown.length} weitere</span>`;
         row.querySelector('.summary-cell').insertAdjacentHTML('beforeend', `<span class="weight-hits">${html}</span>`);
     }
@@ -3244,11 +3316,12 @@ function shipmentWeightHits(s, range) {
         if (!it || !it.rawInput) return;
         const kg = parseWeightKg(it.grossWeight);
         if (kg === null) return;
-        const key = String(it.rawInput).toUpperCase();
+        if (it.isCancelled && !s.isHuListOrder) return; // Stück einer normalen Sendung: Storno zählt nicht
+        const key = s.isHuListOrder ? String(it.rawInput).toUpperCase() : String(it.id || it.timestamp);
         if (seen.has(key)) return;
         seen.add(key);
         if ((range.min !== null && kg < range.min - 1e-9) || (range.max !== null && kg > range.max + 1e-9)) return;
-        hits.push({ hu: String(it.rawInput), kg, raw: String(it.grossWeight) });
+        hits.push({ hu: String(it.rawInput), kg, raw: String(it.grossWeight), id: it.id || '' });
     });
     return hits;
 }
@@ -3585,7 +3658,7 @@ function handlePageShipmentRowClick(event, row) {
     const target = event.target;
     if (!base) return;
     const hit = target.closest('.weight-hit[data-hu]');
-    if (hit) { showHuDetailsFromShipment(base, hit.dataset.hu, !!row.dataset.archived); return; }
+    if (hit) { showHuDetailsFromShipment(base, hit.dataset.hu, !!row.dataset.archived, hit.dataset.itemId); return; }
     if (row.dataset.archived) {
         if (target.closest('button')) {
             if (target.classList.contains('restore-btn')) restoreArchivedShipment(base, false);
@@ -5471,7 +5544,9 @@ document.addEventListener('click', (event) => {
     // Packstücktabelle: Stift → Packstück bearbeiten
     else if (target.closest('.pack-edit-btn')) {
         const btn = target.closest('.pack-edit-btn');
-        if (!isBatchModeActive) openHuEditModal(btn.dataset.basenumber, btn.dataset.hu);
+        if (isBatchModeActive) return;
+        if (btn.dataset.itemId) openPieceEditModal(btn.dataset.basenumber, btn.dataset.itemId, btn.dataset.partnerId || '', btn.dataset.piece, btn.dataset.pieceTotal);
+        else openHuEditModal(btn.dataset.basenumber, btn.dataset.hu);
     }
     // Desktop-Kopfzeile: Pfad (Startseite › Anlieferung › LKW) – schließt die Details und zeigt die gewählte Seite
     else if (target.closest('.detail-crumb')) {
@@ -6284,12 +6359,12 @@ showUeberzaehligHusBtnEl.addEventListener('click', () => {
                 document.body.classList.add('modal-open');
             }
             // HU-Details zu einer bestimmten Sendung (Info-Suche: Gewichts-Treffer, auch aus dem Archiv)
-            function showHuDetailsFromShipment(base, huNumber, archived) {
+            function showHuDetailsFromShipment(base, huNumber, archived, itemId) {
                 const s = (archived && infoArchiveCache[base]) || loadShipments()[base] || infoArchiveCache[base];
                 const items = s && Array.isArray(s.scannedItems) ? s.scannedItems : [];
                 const key = String(huNumber || '').trim().toUpperCase();
                 const same = items.filter(it => it && String(it.rawInput || '').toUpperCase() === key);
-                const item = same.find(it => it.grossWeight) || same[0];
+                const item = (itemId && same.find(it => it.id === itemId)) || same.find(it => it.grossWeight) || same[0];
                 if (item) showHuDetailsModal(item);
             }
 

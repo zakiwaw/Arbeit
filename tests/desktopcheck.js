@@ -153,13 +153,47 @@ function bigData() {
       await page.evaluate(() => document.getElementById('backToMainViewBtn').click()); await wait(300);
       await page.evaluate(() => document.querySelector('tr[data-basenumber="123"] .hawb-cell').click()); await wait(400);
       const plain = await page.$$eval('.pack-table-plain tbody tr', rs => rs.map(r => [...r.cells].map(c => c.textContent.trim()).join('/')).join(' | '));
-      assert(/^1\.\/WE\/XRY\/\d\d:\d\d\/ \| 2\.\/–\/EDD\/\d\d:\d\d\/ \| \/\/Dunkelalarm \(erledigt\)\/\d\d:\d\d\/Alarm Tor 3$/.test(plain), `Normale Sendung: Stücktabelle mit WE/Sicherung/Zeit/Notiz (${plain})`);
+      assert(/^1\.\/–\/–\/–\/WE\/XRY\/\d\d:\d\d\/\/ \| 2\.\/–\/–\/–\/–\/EDD\/\d\d:\d\d\/\/ \| \/–\/–\/–\/\/Dunkelalarm \(erledigt\)\/\d\d:\d\d\/Alarm Tor 3\/$/.test(plain), `Normale Sendung: Stücktabelle mit Verpackung/Maße/Gewicht/WE/Sicherung/Zeit/Notiz (${plain})`);
       assert(page.__errors.length === 0, `Dunkelalarm-Szenario: keine JS-Fehler (${page.__errors.join('; ')})`);
       await page.close();
       // Handy: dieselbe Regel in der Karte (Sich.-Chip nicht rot) – Karte selbst unverändert
       page = await openApp(browser, makeBackend(d, {})); await wait(400);
       const mobChip = await page.$eval('tr[data-basenumber="9008296222"] .summary-cell strong:last-of-type', e => e.className + ':' + e.textContent.trim());
       assert(mobChip === 'mismatch:Sich.: 1/2', `Handy-Karte: Sich.-Chip nach erledigtem Dunkelalarm nicht rot (${mobChip})`);
+      await page.close();
+    }
+
+    // ---- Stück bearbeiten (normale Sendung ohne HU-Liste): Verpackung/Maße/Gewicht am Scan-Eintrag ----
+    {
+      const d = bigData(); const now = Date.now(); const iso = ago => new Date(now - ago * 60e3).toISOString();
+      const it = (st, ago, extra) => Object.assign({ rawInput: '123', status: st, timestamp: iso(ago), isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null }, extra || {});
+      d['123'].totalPiecesExpected = 3;
+      d['123'].scannedItems = [it('Wareneingang', 50), it('Wareneingang', 49), it('XRY', 30), it('EDD', 20)];
+      const be = makeBackend(d, {});
+      page = await openApp(browser, be, { viewport: { width: 1600, height: 900, deviceScaleFactor: 1 } }); await wait(500);
+      await page.evaluate(() => document.querySelector('tr[data-basenumber="123"] .hawb-cell').click()); await wait(400);
+      const head = await page.$$eval('.pack-table-plain thead th', th => th.map(x => x.textContent.trim()).join('|'));
+      assert(head === 'Nr.|Verpackung|Maße|Gewicht|WE|Sicherung|Zeit|Notiz|', `Stücktabelle hat Verpackung/Maße/Gewicht (${head})`);
+      const pens = await page.$$eval('.pack-table-plain .pack-edit-btn', b => b.map(x => x.dataset.piece).join());
+      assert(pens === '1,2', `Stift nur an Stücken mit Scan-Eintrag, nicht am offenen Platz (${pens})`);
+      await page.evaluate(() => document.querySelector('.pack-edit-btn[data-piece="1"]').click()); await wait(300);
+      const m = await page.evaluate(() => ({ vis: document.getElementById('huEditModal').classList.contains('visible'), title: document.querySelector('#huEditModal h3').textContent, hu: getComputedStyle(document.querySelector('.hu-edit-number-group')).display, focus: document.activeElement.id, ctx: document.getElementById('huEditContext').textContent }));
+      assert(m.vis && m.title === 'Stück bearbeiten' && m.hu === 'none' && m.focus === 'huEditPackaging' && /Stück 1 von 3 · XRY/.test(m.ctx), `Modal „Stück bearbeiten“ ohne HU-Feld, Fokus auf Verpackung (${JSON.stringify(m)})`);
+      await page.evaluate(() => { document.getElementById('huEditWeight').value = 'viel'; document.getElementById('saveHuEditButton').click(); }); await wait(200);
+      assert(/Gewicht nicht lesbar/.test(await page.$eval('#huEditError', e => e.textContent)), 'Stück: unlesbares Gewicht wird abgelehnt');
+      await page.evaluate(() => { document.getElementById('huEditPackaging').value = 'Karton'; document.getElementById('huEditDimensions').value = '60 x 40 x 30 CM'; document.getElementById('huEditWeight').value = '12,5'; document.getElementById('saveHuEditButton').click(); }); await wait(600);
+      const after = await page.evaluate(() => ({ modal: document.getElementById('huEditModal').classList.contains('visible'), row: [...document.querySelector('.pack-table-plain tbody tr').cells].slice(0, 4).map(c => c.textContent.trim()).join('|'), kg: [...document.querySelectorAll('.detail-fact')].map(f => f.textContent.replace(/\s+/g, ' ')).find(x => /Gewicht/.test(x)), items: JSON.parse(localStorage.getItem('frachtSicherungMobile_V8_18_Refactored'))['123'].scannedItems.map(i => i.status + ':' + (i.grossWeight || '')).join(' ') }));
+      assert(!after.modal && after.row === '1.|Karton|60 x 40 x 30 CM|12,5 KG' && /12,5 kg/.test(after.kg), `Stück gespeichert: Zeile + Kopf-Gewicht (${after.row}; ${after.kg})`);
+      assert(after.items === 'Wareneingang: Wareneingang: XRY:12,5 KG EDD:', `Gewicht hängt nur am Sicherungsscan des Stücks – Zählung unverändert (${after.items})`);
+      assert(be.store['123'] && be.store['123'].scannedItems.some(i => i.grossWeight === '12,5 KG' && i.packaging === 'Karton'), 'Stück-Angaben sind beim Server angekommen');
+      // Titel/HU-Feld nach Schließen wieder für MAN-Packstücke bereit
+      await page.evaluate(() => document.getElementById('backToMainViewBtn').click()); await wait(300);
+      await page.evaluate(() => document.querySelector('tr[data-basenumber="9007000005"] .hawb-cell').click()); await wait(400);
+      await page.evaluate(() => document.querySelector('.pack-edit-btn[data-hu="HU5001"]').click()); await wait(300);
+      const man = await page.evaluate(() => ({ title: document.querySelector('#huEditModal h3').textContent, hu: getComputedStyle(document.querySelector('.hu-edit-number-group')).display, val: document.getElementById('huEditNumber').value }));
+      assert(man.title === 'Packstück bearbeiten' && man.hu !== 'none' && man.val === 'HU5001', `MAN-Packstück: Modal wieder mit HU-Nummer (${JSON.stringify(man)})`);
+      await page.evaluate(() => document.getElementById('cancelHuEditButton').click()); await wait(200);
+      assert(page.__errors.length === 0, `Stück bearbeiten: keine JS-Fehler (${page.__errors.join('; ')})`);
       await page.close();
     }
 
