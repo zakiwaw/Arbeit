@@ -1851,6 +1851,113 @@ function fitTextToContainer(element, container, initialFontSize, minFontSize, pa
 // =========================================================================
 // ERSETZEN SIE IHRE ALTE 'displayCurrentShipmentDetails' FUNKTION MIT DIESER
 
+// ---- Detailansicht am Desktop: Kopfzeile und Packstücktabelle (nur Darstellung, keine Datenänderung) --------------
+function detailTruckInfo(shipment) {
+    if (!shipment || !shipment.truckId) return null;
+    const t = collectTrucks(loadShipments(), loadLkwStatus()).find(x => x.truckId === shipment.truckId);
+    return t || { truckId: shipment.truckId, icon: '🚚', name: truckShortName(shipment.truckId) };
+}
+function detailUniqueKg(shipment) {
+    const seen = new Set(); let sum = 0, any = false;
+    (Array.isArray(shipment.scannedItems) ? shipment.scannedItems : []).forEach(i => {
+        if (!i || i.isCancelled) return;
+        const key = String(i.rawInput).toUpperCase();
+        const kg = parseWeightKg(i.grossWeight);
+        if (kg === null || seen.has(key)) return;
+        seen.add(key); sum += kg; any = true;
+    });
+    return any ? sum : null;
+}
+function buildDetailHead(base, shipment, archivedView) {
+    const truck = detailTruckInfo(shipment);
+    const light = shipmentTrafficLight(shipment);
+    // Gewicht: pro HU nur einmal zählen (Scan-Einträge derselben HU tragen ggf. dasselbe Gewicht)
+    const kg = shipment.isHuListOrder ? detailUniqueKg(shipment) : shipmentTotalKg(shipment);
+    const notes = shipmentNoteCount(shipment);
+    const expected = expectedPiecesOf(shipment);
+    const changed = shipment.lastModified ? new Date(shipment.lastModified).toLocaleString('de-DE') : '–';
+    const pdfData = shipment.parentOrderNumber ? ` data-parentordernumber="${escapeHtml(shipment.parentOrderNumber)}"` : '';
+    const qrId = 'qrcode-detail-' + String(base).replace(/[^a-zA-Z0-9]/g, '');
+
+    let crumbs = `<a href="#" class="detail-crumb" data-crumb-page="home">Startseite</a>`;
+    if (truck && !archivedView) {
+        crumbs += `<span class="detail-crumb-sep">›</span><a href="#" class="detail-crumb" data-crumb-page="anlieferung">Anlieferung</a>`
+            + `<span class="detail-crumb-sep">›</span><a href="#" class="detail-crumb" data-crumb-page="lkw" data-crumb-truck="${escapeHtml(truck.truckId)}">${truckLabelHtml(truck)}</a>`;
+    } else if (archivedView) {
+        crumbs += `<span class="detail-crumb-sep">›</span><a href="#" class="detail-crumb" data-crumb-page="info">Info &amp; Suche</a>`;
+    }
+    crumbs += `<span class="detail-crumb-sep">›</span><span class="detail-crumb-current">${escapeHtml(base)}</span>`;
+
+    const facts = [
+        ['Status', `<span class="dt-light ${light.cls}"></span>${escapeHtml(light.text)}`],
+        ['LKW', truck ? truckLabelHtml(truck) : '–'],
+        ['Kolli', expected !== null && expected !== undefined ? String(expected) : '–'],
+        ['Gewicht', kg === null ? '–' : escapeHtml(formatKg(kg))],
+        ['Notizen', notes ? String(notes) : '–'],
+        ['Letzte Änd.', escapeHtml(changed)]
+    ];
+    if (shipment.mitarbeiter) facts.push(['Erfasst von', escapeHtml(shipment.mitarbeiter)]);
+    const factsHtml = facts.map(([k, v]) => `<div class="detail-fact"><span class="detail-fact-label">${k}</span><span class="detail-fact-value">${v}</span></div>`).join('');
+
+    const actions = archivedView
+        ? `<button type="button" class="pdf-btn" data-basenumber="${escapeHtml(base)}"${pdfData}>PDF</button>`
+        : `<button type="button" class="edit-btn" data-basenumber="${escapeHtml(base)}" title="Sendung ${escapeHtml(base)} bearbeiten">Edit</button>`
+          + `<button type="button" class="pdf-btn" data-basenumber="${escapeHtml(base)}"${pdfData}>PDF</button>`
+          + `<button type="button" class="delete-btn main-delete-btn" data-basenumber="${escapeHtml(base)}" title="Sendung ${escapeHtml(base)} löschen">Löschen</button>`;
+
+    return `<div class="detail-head">`
+        + `<div class="detail-crumbs">${crumbs}</div>`
+        + `<div class="detail-head-row"><div class="detail-facts">${factsHtml}</div>`
+        + `<div class="detail-head-side"><div class="detail-actions actions-cell">${actions}</div>`
+        + `<div class="detail-qr" title="QR-Code ${escapeHtml(base)}"><div id="${qrId}" data-qr-text="${escapeHtml(base)}"></div></div></div></div>`
+        + `</div>`;
+}
+// Packstücke eines HU-Listen-Auftrags: pro Platz (Anstehend bzw. Sicherungsstatus) eine Zeile; Wareneingang, Dunkelalarm
+// und Notizen werden über die HU-Nummer zugeordnet. Zählung wie in der Zusammenfassung (calculate…-Funktionen).
+function buildDetailPackTable(shipment) {
+    const items = Array.isArray(shipment.scannedItems) ? shipment.scannedItems : [];
+    const slots = items.filter(i => i && !i.isCancelled && (i.status === 'Anstehend' || EXCLUSIVE_SECURITY_STATUSES.includes(i.status)));
+    if (!slots.length) return '';
+    const byHu = (hu, pred) => items.filter(i => i && !i.isCancelled && String(i.rawInput).toUpperCase() === String(hu).toUpperCase() && pred(i));
+    const isVvl = slots.some(i => i.sendnr);
+    const todayStr = new Date().toLocaleDateString('de-DE');
+    const fmtTime = iso => { const d = new Date(iso); if (isNaN(d)) return ''; const ds = d.toLocaleDateString('de-DE'); return ds === todayStr ? d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : ds + ' ' + d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }); };
+    const openCount = slots.filter(i => i.status === 'Anstehend').length;
+    const hasPos = slots.some(i => i.position);   // VVL-Positionen tragen keine Nummer → Spalte weglassen
+
+    const rows = slots.slice().sort((a, b) => ((a.position || 9999) - (b.position || 9999)) || String(a.rawInput).localeCompare(String(b.rawInput))).map(item => {
+        const hu = item.rawInput;
+        const detail = items.find(i => i && String(i.rawInput).toUpperCase() === String(hu).toUpperCase() && (i.packaging || i.dimensions || i.grossWeight)) || item;
+        const we = byHu(hu, i => i.status === 'Wareneingang').length > 0;
+        const dunkel = byHu(hu, i => i.status === 'Dunkelalarm');
+        const notes = byHu(hu, () => true).reduce((arr, i) => arr.concat(Array.isArray(i.notes) ? i.notes : []), []);
+        const open = item.status === 'Anstehend';
+        let statusHtml;
+        if (dunkel.length) statusHtml = `<span class="pack-status danger">Dunkelalarm</span>`;
+        else if (open) statusHtml = `<span class="pack-status open">Offen</span>`;
+        else statusHtml = `<span class="pack-status ok">${escapeHtml(item.status)}${item.isCombination ? ' (Kombi)' : ''}</span>`;
+        const weHtml = we ? `<span class="pack-we ok" title="Wareneingang erfasst">WE</span>` : `<span class="pack-we" title="Kein Wareneingang">–</span>`;
+        const timeHtml = open ? '' : escapeHtml(fmtTime(item.timestamp));
+        const rowClass = dunkel.length ? 'pack-row-danger' : (open ? 'pack-row-open' : 'pack-row-done');
+        return `<tr class="${rowClass}">`
+            + (hasPos ? `<td class="pack-pos">${item.position ? escapeHtml(String(item.position)) + '.' : ''}</td>` : '')
+            + `<td class="pack-hu"><span class="hu-value${dunkel.length ? ' has-dunkelalarm' : ''}" title="Klicken zum Kopieren">${escapeHtml(hu)}</span>${isVvl && item.sendnr ? `<span class="pack-sendnr">${escapeHtml(item.sendnr)}</span>` : ''}</td>`
+            + `<td class="pack-text">${escapeHtml(detail.packaging || '–')}</td>`
+            + `<td class="pack-text">${escapeHtml(detail.dimensions || '–')}</td>`
+            + `<td class="pack-num">${escapeHtml(detail.grossWeight || '–')}</td>`
+            + `<td class="pack-we-cell">${weHtml}</td>`
+            + `<td>${statusHtml}</td>`
+            + `<td class="pack-time">${timeHtml}</td>`
+            + `<td class="pack-notes">${notes.map(n => `<span class="pack-note">${escapeHtml(n)}</span>`).join('')}</td>`
+            + `</tr>`;
+    }).join('');
+
+    return `<div class="detail-pack">`
+        + `<div class="detail-pack-head"><h4>Packstücke (${slots.length})</h4><span class="detail-pack-meta">${openCount ? `${openCount} offen` : 'alle gesichert'}</span></div>`
+        + `<table class="pack-table"><thead><tr>${hasPos ? '<th>Pos.</th>' : ''}<th>${isVvl ? 'VSE / Sendungs-Nr.' : 'HU'}</th><th>Verpackung</th><th>Maße</th><th>Gewicht</th><th>WE</th><th>Sicherung</th><th>Zeit</th><th>Notiz</th></tr></thead>`
+        + `<tbody>${rows}</tbody></table></div>`;
+}
+
 function displayCurrentShipmentDetails(baseNumberToDisplay) {
     clearError();
     removeActiveInlineNoteEditor();
@@ -1882,6 +1989,12 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
     // Änderungen werden auf die `displayTarget` Variable angewendet.
 
     let detailsHtml = '';
+
+    // Desktop (≥ 992 px): Kopfzeile wie in einem Arbeitsplatz-System – Pfad (Startseite › Anlieferung › LKW › Nummer),
+    // Kennzahlen, dieselben Aktionen wie in der Liste (Bearbeiten · PDF · Löschen) und der QR-Code.
+    // Reine Darstellung: die Knöpfe tragen dieselben Klassen/data-Attribute wie die Listen-Icons und rufen dieselben Funktionen.
+    // Auf dem Handy wird nichts davon erzeugt.
+    if (isDesktopLayout()) detailsHtml += buildDetailHead(baseNumberToDisplay, shipment, archivedView);
 
     if (archivedView) {
         detailsHtml += `<div class="archive-banner"><span class="archive-badge">Archiv</span><span>Abgeschlossen und archiviert – nur lesen.</span>`
@@ -1916,7 +2029,12 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
         // --- ENDE DER ÄNDERUNG ---
     }
 
-    if (shipment.isHuListOrder) {
+    // Desktop: alle Packstücke als Tabelle (Pos. · HU · Verpackung · Maße · Gewicht · Status · Zeit · Notiz) statt des
+    // gelben Kastens mit den offenen Positionen – die Scan-Zeitleiste darunter bleibt unverändert.
+    const desktopPackTable = shipment.isHuListOrder && isDesktopLayout();
+    if (desktopPackTable) detailsHtml += buildDetailPackTable(shipment);
+
+    if (shipment.isHuListOrder && !desktopPackTable) {
         const securityClearanceStatuses = EXCLUSIVE_SECURITY_STATUSES;
         const manifestSlots = shipment.scannedItems.filter(item => 
             item.status === 'Anstehend' || securityClearanceStatuses.includes(item.status)
@@ -2023,6 +2141,8 @@ detailsHtml += `${numberPart}<span class="hu-value" style="cursor:pointer;" titl
     detailsHtml += `</ul>`;
 
     displayTarget.innerHTML = detailsHtml;
+    const headQr = displayTarget.querySelector('.detail-qr div[data-qr-text]');
+    if (headQr) drawQrCode(headQr);
 
     if (expected !== null && expected !== undefined) {
         if (receiptScansCount > expected || securityScansCount > expected) displayTarget.style.borderColor = 'red';
@@ -2807,6 +2927,22 @@ function closePage() {
 function goBackFromDetail() {
     if (history.state && history.state.frtDetail) history.back();
     else hideDetailView();
+}
+// Aus der Detailansicht direkt zu einer Seite springen (Pfad in der Desktop-Kopfzeile). Der Verlaufseintrag der Details
+// wird ERSETZT (kein history.back(): das käme asynchron und würde die neue Seite gleich wieder überschreiben) –
+// „Zurück“ führt danach dorthin, wo man vor den Details war.
+function jumpFromDetail(page) {
+    detailViewEl.classList.add('hidden');
+    if (page && PAGE_RENDERERS[page.id]) {
+        currentPage = { id: page.id, truckId: page.truckId || null };
+        replaceHistory({ frtPage: currentPage });
+        renderCurrentPage(true);
+        if (pageViewEl) pageViewEl.scrollTop = 0;
+    } else {
+        replaceHistory({ frtHome: true });
+        showHome();
+    }
+    focusShipmentInput();
 }
 window.addEventListener('popstate', (e) => {
     const st = (e.state && typeof e.state === 'object') ? e.state : {};
@@ -5160,6 +5296,29 @@ document.addEventListener('click', (event) => {
     if (target.id === 'detailRestoreBtn') {
         event.preventDefault();
         restoreArchivedShipment(target.dataset.basenumber, true);
+    }
+    // Desktop-Kopfzeile: dieselben Aktionen wie die Icons in der Liste (gleiche Funktionen, gleiche Rückfragen)
+    else if (target.closest('.detail-actions') && target.closest('button')) {
+        const btn = target.closest('button');
+        const base = btn.dataset.basenumber;
+        if (!base) return;
+        if (btn.classList.contains('edit-btn')) { if (!isBatchModeActive) openEditModal(base); }
+        else if (btn.classList.contains('pdf-btn')) {
+            if (detailArchived && detailArchived.base === base && !loadShipments()[base]) sendArchivedPdf({ target: btn }, base);
+            else sendPdfEmailViaBackend({ target: btn });
+        }
+        else if (btn.classList.contains('main-delete-btn')) {
+            if (confirm(`Sendung ${escapeHtml(base)} wirklich löschen?`)) { deleteShipment(base); goBackFromDetail(); }
+        }
+    }
+    // Desktop-Kopfzeile: Pfad (Startseite › Anlieferung › LKW) – schließt die Details und zeigt die gewählte Seite
+    else if (target.closest('.detail-crumb')) {
+        event.preventDefault();
+        const crumb = target.closest('.detail-crumb');
+        const pageId = crumb.dataset.crumbPage;
+        if (pageId === 'home') jumpFromDetail(null);
+        else if (pageId === 'lkw') jumpFromDetail({ id: 'lkw', truckId: crumb.dataset.crumbTruck });
+        else if (PAGE_RENDERERS[pageId]) jumpFromDetail({ id: pageId });
     }
     else if (target.classList.contains('editable-note') || target.classList.contains('add-note-link')) {
         event.preventDefault();

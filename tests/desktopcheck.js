@@ -77,6 +77,34 @@ function bigData() {
     assert(!(await page.$eval('#infoResetBtn', b => b.classList.contains('hidden'))), 'Info: „Zurücksetzen“ erscheint bei aktivem Filter');
     await page.evaluate(() => document.getElementById('infoResetBtn').click()); await wait(400);
     assert((await page.$$eval('#infoResults tr[data-basenumber]', r => r.length)) === 15 && (await page.$eval('#infoStatusSelect', s => s.value)) === 'all', 'Info: „Zurücksetzen“ leert Filter und zeigt wieder alle');
+    // ---- Detailansicht am Desktop: Kopfzeile (Pfad, Kennzahlen, Aktionen, QR) und Packstücktabelle ----
+    await page.evaluate(() => document.querySelector('#infoResults tr[data-basenumber="9007000005"] .hawb-cell').click()); await wait(500);
+    const det = await page.evaluate(() => ({
+      open: getComputedStyle(document.getElementById('detailView')).display !== 'none',
+      head: !!document.querySelector('.detail-head'),
+      crumbs: [...document.querySelectorAll('.detail-crumb')].map(a => a.dataset.crumbPage).join(','),
+      facts: [...document.querySelectorAll('.detail-fact-label')].map(l => l.textContent).join(','),
+      actions: [...document.querySelectorAll('.detail-actions button')].map(b => b.className).join(','),
+      qr: document.querySelectorAll('.detail-qr img, .detail-qr canvas').length > 0,
+      packRows: document.querySelectorAll('.pack-table tbody tr').length,
+      pendingBox: !!document.getElementById('pendingHuList'),
+      firstRow: [...document.querySelectorAll('.pack-table tbody tr')[0].cells].map(c => c.textContent.trim()).slice(0, 5).join('|')
+    }));
+    assert(det.open && det.head, 'Desktop-Details: Kopfzeile vorhanden');
+    assert(det.crumbs === 'home,anlieferung,lkw', `Desktop-Details: Pfad Startseite › Anlieferung › LKW (${det.crumbs})`);
+    assert(/^Status,LKW,Kolli,Gewicht,Notizen,Letzte Änd\./.test(det.facts), `Desktop-Details: Kennzahlen (${det.facts})`);
+    assert(det.actions === 'edit-btn,pdf-btn,delete-btn main-delete-btn', `Desktop-Details: Aktionen Bearbeiten · PDF · Löschen (${det.actions})`);
+    assert(det.qr, 'Desktop-Details: QR-Code gezeichnet');
+    assert(det.packRows === 2 && !det.pendingBox, `Desktop-Details: Packstücktabelle mit 2 Zeilen statt gelbem Kasten (${det.packRows}, Kasten: ${det.pendingBox})`);
+    assert(det.firstRow === 'HU5001|–|–|37.5 KG|–', `Desktop-Details: erste Packstückzeile (${det.firstRow})`);
+    // Aktion im Kopf: Bearbeiten öffnet dasselbe Modal wie das Listen-Icon
+    await page.evaluate(() => document.querySelector('.detail-actions .edit-btn').click()); await wait(300);
+    assert(await page.evaluate(() => document.getElementById('editModal').classList.contains('visible')), 'Desktop-Details: „Bearbeiten“ im Kopf öffnet das Bearbeiten-Modal');
+    await page.evaluate(() => document.getElementById('cancelEditButton') ? document.getElementById('cancelEditButton').click() : document.getElementById('editModal').classList.remove('visible')); await wait(200);
+    // Pfad: LKW-Krümel schließt die Details und öffnet die LKW-Seite
+    await page.evaluate(() => document.querySelector('.detail-crumb[data-crumb-page="lkw"]').click()); await wait(500);
+    const afterCrumb = await page.evaluate(() => ({ detail: getComputedStyle(document.getElementById('detailView')).display === 'none', title: document.getElementById('pageTitle').textContent.trim(), url: location.search }));
+    assert(afterCrumb.detail && /MAN 1/.test(afterCrumb.title) && /seite=anlieferung/.test(afterCrumb.url) && /lkw=MAN/.test(afterCrumb.url), `Pfad „MAN 1“ → LKW-Seite (${JSON.stringify(afterCrumb)})`);
     assert(page.__errors.length === 0, `Desktop: keine JS-Fehler (${page.__errors.join('; ')})`);
     await page.close();
 
@@ -99,6 +127,8 @@ function bigData() {
     assert(mob.h > 100 && mob.h < 170, `Handy: Kartenhöhe wie bisher (${Math.round(mob.h)} px)`);
     await page.evaluate(() => document.querySelector('tr[data-basenumber="9007000001"] .hawb-cell').click()); await wait(400);
     assert(await page.$eval('#detailView', v => getComputedStyle(v).display !== 'none'), 'Handy: Tipp auf HAWB öffnet Detailansicht');
+    const mobDet = await page.evaluate(() => ({ head: !!document.querySelector('.detail-head'), pack: !!document.querySelector('.pack-table'), pending: !!document.getElementById('pendingHuList') }));
+    assert(!mobDet.head && !mobDet.pack && mobDet.pending, `Handy-Details unverändert: kein Kopf, keine Tabelle, gelber Kasten (${JSON.stringify(mobDet)})`);
     await page.goBack(); await wait(300);
     await page.evaluate(() => document.querySelector('.home-tile[data-page="info"]').click()); await wait(500);
     const mobInfo = await page.evaluate(() => ({ rows: document.querySelectorAll('#infoResults tr[data-basenumber]').length, head: getComputedStyle(document.querySelector('.info-form-head')).display, cols: getComputedStyle(document.querySelector('.info-layout')).gridTemplateColumns, note: document.getElementById('infoResultNote').textContent.slice(0, 20) }));

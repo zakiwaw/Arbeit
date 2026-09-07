@@ -2422,7 +2422,69 @@ body.modal-open { overflow: hidden; }
 
     #detailView { padding: 0 var(--sp-6) var(--sp-8); }
     .detail-view-header { margin: 0 calc(-1 * var(--sp-6)) var(--sp-4); padding: var(--sp-2) var(--sp-6); }
-    #detailViewContent { max-width: 900px; margin: 0 auto; }
+    #detailViewContent { max-width: 1240px; margin: 0 auto; }   /* Packstücktabelle braucht Platz */
+
+    /* Detailansicht am Desktop: Kopfzeile (Pfad · Kennzahlen · Aktionen · QR) und Packstücktabelle.
+       Wird nur ≥ 992 px erzeugt (script.js: buildDetailHead / buildDetailPackTable) – das Handy zeigt weiterhin die Karte. */
+    #currentShipmentDetails { padding: var(--sp-5) var(--sp-6); }
+    #currentShipmentDetails > strong { font-size: var(--fs-2xl); }
+    .detail-head { margin: 0 0 var(--sp-4); padding: 0 0 var(--sp-4); border-bottom: 1px solid var(--border); }
+    .detail-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-2); margin-bottom: var(--sp-3); font-size: var(--fs-sm); color: var(--text-muted); }
+    .detail-crumb { color: var(--accent-text); text-decoration: none; padding: 2px 4px; border-radius: var(--r-sm); }
+    .detail-crumb:hover { background-color: var(--accent-soft); text-decoration: none; }
+    .detail-crumb-sep { color: var(--text-faint); }
+    .detail-crumb-current { font-family: var(--font-mono); font-weight: 700; color: var(--text); }
+    .detail-head-row { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-4); }
+    .detail-facts { display: flex; flex-wrap: wrap; gap: var(--sp-2); flex: 1 1 auto; }
+    .detail-fact { min-width: 96px; padding: 6px 10px; background-color: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md); }
+    .detail-fact-label { display: block; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); }
+    .detail-fact-value { display: block; margin-top: 2px; font-size: var(--fs-sm); font-weight: 600; color: var(--text); white-space: nowrap; }
+    .detail-fact-value .dt-light { margin-bottom: 2px; }
+    .detail-head-side { display: flex; align-items: center; gap: var(--sp-3); flex: 0 0 auto; }
+    .detail-actions { display: flex; align-items: center; gap: 2px; padding: 2px; background-color: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md); }
+    .detail-actions button { position: relative; width: 36px; height: 36px; min-width: 0; padding: 0; font-size: 0; color: var(--text-muted); background: none; border: none; border-radius: var(--r-sm); transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+    .detail-actions button::before { content: ""; display: block; width: 22px; height: 22px; margin: 0 auto; background-color: currentColor; -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat; }
+    .detail-actions button:hover { background-color: var(--surface-3); color: var(--text); }
+    .detail-actions button.edit-btn { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z'/%3E%3C/svg%3E"); }
+    .detail-actions button.pdf-btn { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 12h8v2H8v-2zm0 4h8v2H8v-2z'/%3E%3C/svg%3E"); color: var(--accent-text); }
+    .detail-actions button.pdf-btn:hover { background-color: var(--accent-soft); }
+    .detail-actions button.pdf-btn:disabled { opacity: .5; }
+    .detail-actions button.main-delete-btn { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z'/%3E%3C/svg%3E"); color: var(--danger-text); }
+    .detail-actions button.main-delete-btn:hover { background-color: var(--danger-soft); }
+    body.batch-mode-active .detail-actions button.edit-btn { display: none; }   /* wie in der Liste */
+    .detail-qr { width: 68px; height: 68px; padding: 4px; background: #fff; border: 1px solid var(--border); border-radius: var(--r-md); }
+    .detail-qr div, .detail-qr img, .detail-qr canvas { width: 58px !important; height: 58px !important; display: block; }
+
+    .detail-pack { margin: 0 0 var(--sp-4); }
+    .detail-pack-head { display: flex; align-items: baseline; gap: var(--sp-2); margin-bottom: var(--sp-2); }
+    .detail-pack-head h4 { margin: 0; font-size: var(--fs-sm); font-weight: 700; color: var(--text); }
+    .detail-pack-meta { font-size: var(--fs-xs); font-weight: 600; color: var(--text-muted); }
+    .pack-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); background-color: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
+    .pack-table th { padding: 6px 10px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; text-align: left; white-space: nowrap; color: var(--text-muted); background-color: var(--surface-2); border-bottom: 1px solid var(--border); }
+    .pack-table td { padding: 5px 10px; height: 34px; vertical-align: middle; border-bottom: 1px solid var(--border); }
+    .pack-table tbody tr:last-child td { border-bottom: none; }
+    .pack-table tbody tr:hover td { background-color: var(--surface-2); }
+    .pack-table tr.pack-row-open td { background-color: color-mix(in srgb, var(--warning-soft) 55%, transparent); }
+    .pack-table tr.pack-row-danger td { background-color: color-mix(in srgb, var(--danger-soft) 60%, transparent); }
+    .pack-table td.pack-pos { width: 40px; font-family: var(--font-mono); color: var(--text-faint); }
+    .pack-table td.pack-hu .hu-value { font-family: var(--font-mono); font-weight: 700; cursor: pointer; padding: 2px 6px; border-radius: var(--r-sm); position: relative; }
+    .pack-table td.pack-hu .hu-value:hover { background-color: var(--accent-soft); }
+    .pack-table td.pack-hu .hu-value.copied::after { content: 'Kopiert!'; position: absolute; left: 100%; top: 50%; transform: translateY(-50%); margin-left: 6px; padding: 2px 8px; font-family: var(--font-sans); font-size: var(--fs-xs); font-weight: 700; color: #fff; white-space: nowrap; background-color: var(--success); border-radius: var(--r-sm); animation: fade-in-out 1.5s ease-in-out; }
+    .pack-table .pack-sendnr { display: block; font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-muted); }
+    .pack-table td.pack-text { color: var(--text-muted); white-space: nowrap; }
+    .pack-table td.pack-num { font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+    .pack-table td.pack-we-cell { width: 40px; text-align: center; }
+    .pack-we { font-size: var(--fs-xs); font-weight: 700; color: var(--text-faint); }
+    .pack-we.ok { color: var(--success-text); }
+    .pack-status { display: inline-block; padding: 2px 8px; font-size: var(--fs-xs); font-weight: 700; border-radius: var(--r-full); white-space: nowrap; }
+    .pack-status.ok { color: var(--success-text); background-color: var(--success-soft); }
+    .pack-status.open { color: var(--warning-text); background-color: var(--warning-soft); }
+    .pack-status.danger { color: var(--danger-text); background-color: var(--danger-soft); }
+    .pack-table td.pack-time { font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--text-muted); }
+    .pack-table td.pack-notes { max-width: 240px; }
+    .pack-note { display: block; font-size: var(--fs-xs); color: var(--warning-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #currentShipmentDetails .summary { max-width: 560px; }
+    #currentShipmentDetails > ul { max-width: 900px; }
 
     /* Startseite: vier Kacheln nebeneinander; Unterseiten wie die Detailansicht; Filter der Info-Seite in einer Reihe */
     .home-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-4); }
