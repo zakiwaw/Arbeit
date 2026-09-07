@@ -2422,7 +2422,7 @@ body.modal-open { overflow: hidden; }
 
     #detailView { padding: 0 var(--sp-6) var(--sp-8); }
     .detail-view-header { margin: 0 calc(-1 * var(--sp-6)) var(--sp-4); padding: var(--sp-2) var(--sp-6); }
-    #detailViewContent { max-width: 1240px; margin: 0 auto; }   /* Packstücktabelle braucht Platz */
+    #detailViewContent { max-width: none; margin: 0 auto; }   /* volle Breite: Packstücktabelle braucht Platz */
 
     /* Detailansicht am Desktop: Kopfzeile (Pfad · Kennzahlen · Aktionen · QR) und Packstücktabelle.
        Wird nur ≥ 992 px erzeugt (script.js: buildDetailHead / buildDetailPackTable) – das Handy zeigt weiterhin die Karte. */
@@ -2484,7 +2484,10 @@ body.modal-open { overflow: hidden; }
     .pack-table td.pack-notes { max-width: 240px; }
     .pack-note { display: block; font-size: var(--fs-xs); color: var(--warning-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     #currentShipmentDetails .summary { max-width: 560px; }
-    #currentShipmentDetails > ul { max-width: 900px; }
+    #currentShipmentDetails > ul { max-width: 1100px; }
+    .pack-status-note { display: inline-block; margin-left: 6px; font-size: 10px; font-weight: 600; color: var(--text-faint); white-space: nowrap; }
+    .pack-table-plain td.pack-pos { width: 44px; }
+    .pack-table-plain td.pack-time { width: 160px; }
     .pack-table th.pack-edit-head, .pack-table td.pack-edit-cell { width: 36px; padding: 0 4px; text-align: center; }
     .pack-edit-btn { width: 30px; height: 30px; padding: 0; font-size: 0; color: var(--text-faint); background: none; border: none; border-radius: var(--r-sm); opacity: .55; transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease), opacity var(--dur) var(--ease); }
     .pack-edit-btn::before { content: ""; display: block; width: 18px; height: 18px; margin: 0 auto; background-color: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z'/%3E%3C/svg%3E") center / contain no-repeat; }

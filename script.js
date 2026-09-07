@@ -1959,6 +1959,49 @@ function buildDetailPackTable(shipment, readOnly, base) {
         + `<tbody>${rows}</tbody></table></div>`;
 }
 
+// Normale Sendung (kein HU-Auftrag, alle Scans tragen dieselbe Nummer): Tabelle mit einer Zeile je erwartetem Stück.
+// Zeile n = n-ter Sicherungsscan (chronologisch); Wareneingang wird dem gleichen Platz zugeordnet; Dunkelalarme und
+// Kombi-Scans erscheinen als eigene Zeilen dahinter. Reine Darstellung der Zeitleiste – Zählung wie in der Zusammenfassung.
+function buildDetailScanTable(shipment, base) {
+    const items = (Array.isArray(shipment.scannedItems) ? shipment.scannedItems : []).filter(i => i && !i.isCancelled && i.status !== 'Anstehend');
+    const expected = expectedPiecesOf(shipment);
+    const byTime = (a, b) => (Date.parse(a.timestamp) || 0) - (Date.parse(b.timestamp) || 0);
+    const secured = items.filter(i => EXCLUSIVE_SECURITY_STATUSES.includes(i.status) && !i.isCombination).sort(byTime);
+    const receipts = items.filter(i => i.status === 'Wareneingang').sort(byTime);
+    const alarms = items.filter(i => i.status === 'Dunkelalarm').sort(byTime);
+    const kombis = items.filter(i => i.isCombination).sort(byTime);
+    const others = items.filter(i => !EXCLUSIVE_SECURITY_STATUSES.includes(i.status) && i.status !== 'Wareneingang' && i.status !== 'Dunkelalarm' && !i.isCombination).sort(byTime);
+    const rowsCount = Math.max(expected || 0, secured.length, receipts.length);
+    if (!rowsCount && !alarms.length && !kombis.length && !others.length) return '';
+    const todayStr = new Date().toLocaleDateString('de-DE');
+    const fmtTime = iso => { const d = new Date(iso); if (isNaN(d)) return ''; const ds = d.toLocaleDateString('de-DE'); const ts = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }); return ds === todayStr ? ts : ds + ' ' + ts; };
+    const lastAlarm = alarms.length ? Date.parse(alarms[alarms.length - 1].timestamp) || 0 : 0;
+    const openAlarm = alarms.length && !(expected > 0 && secured.length >= expected) && !secured.some(i => (Date.parse(i.timestamp) || 0) >= lastAlarm);
+    const notesOf = it => (it && Array.isArray(it.notes) ? it.notes : []).map(n => `<span class="pack-note">${escapeHtml(n)}</span>`).join('');
+    let rows = '';
+    for (let n = 0; n < rowsCount; n++) {
+        const sec = secured[n], we = receipts[n];
+        const open = !sec;
+        const cls = open ? (openAlarm && n === secured.length ? 'pack-row-danger' : 'pack-row-open') : 'pack-row-done';
+        rows += `<tr class="${cls}">`
+            + `<td class="pack-pos">${n + 1}.</td>`
+            + `<td class="pack-we-cell">${we ? `<span class="pack-we ok" title="Wareneingang ${escapeHtml(fmtTime(we.timestamp))}">WE</span>` : '<span class="pack-we" title="Kein Wareneingang">–</span>'}</td>`
+            + `<td>${sec ? `<span class="pack-status ok">${escapeHtml(sec.status)}</span>` : (openAlarm && n === secured.length ? '<span class="pack-status danger">Dunkelalarm</span>' : '<span class="pack-status open">Offen</span>')}</td>`
+            + `<td class="pack-time">${sec ? escapeHtml(fmtTime(sec.timestamp)) : (we ? `<span class="dt-dim">WE ${escapeHtml(fmtTime(we.timestamp))}</span>` : '')}</td>`
+            + `<td class="pack-notes">${notesOf(sec)}${notesOf(we)}</td>`
+            + `</tr>`;
+    }
+    const extra = (list, label, cls) => list.map(it => `<tr class="${cls}"><td class="pack-pos"></td><td class="pack-we-cell"></td><td><span class="pack-status ${cls === 'pack-row-danger' ? 'danger' : 'ok'}">${escapeHtml(label || it.status)}</span></td><td class="pack-time">${escapeHtml(fmtTime(it.timestamp))}</td><td class="pack-notes">${notesOf(it)}</td></tr>`).join('');
+    rows += extra(alarms, openAlarm ? 'Dunkelalarm' : 'Dunkelalarm (erledigt)', openAlarm ? 'pack-row-danger' : 'pack-row-done');
+    rows += extra(kombis.map(k => Object.assign({}, k, { status: k.status + ' (Kombi)' })), null, 'pack-row-done');
+    rows += extra(others, null, 'pack-row-done');
+    const openCount = Math.max(0, rowsCount - secured.length);
+    return `<div class="detail-pack">`
+        + `<div class="detail-pack-head"><h4>Stücke (${rowsCount}${expected === null ? ' erfasst' : ''})</h4><span class="detail-pack-meta">${openCount ? `${openCount} offen` : 'alle gesichert'}</span></div>`
+        + `<table class="pack-table pack-table-plain"><thead><tr><th>Nr.</th><th>WE</th><th>Sicherung</th><th>Zeit</th><th>Notiz</th></tr></thead>`
+        + `<tbody>${rows}</tbody></table></div>`;
+}
+
 // ---- Packstück bearbeiten (Desktop-Tabelle): HU-Nummer, Verpackung, Maße, Gewicht -------------------------------
 // Alle Einträge derselben HU (Platz „Anstehend“, Wareneingang, Sicherung, Dunkelalarm, Stornos) werden gemeinsam
 // geändert – die HU-Nummer ist der Schlüssel, über den der Scanner das Packstück findet. Zählung/Status bleiben unberührt.
@@ -2120,6 +2163,8 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
     // gelben Kastens mit den offenen Positionen – die Scan-Zeitleiste darunter bleibt unverändert.
     const desktopPackTable = shipment.isHuListOrder && isDesktopLayout();
     if (desktopPackTable) detailsHtml += buildDetailPackTable(shipment, archivedView, baseNumberToDisplay);
+    // Normale Sendung (ohne HU-Liste): Scans als Tabelle – ein Platz je erwartetem Stück
+    else if (isDesktopLayout()) detailsHtml += buildDetailScanTable(shipment, baseNumberToDisplay);
 
     if (shipment.isHuListOrder && !desktopPackTable) {
         const securityClearanceStatuses = EXCLUSIVE_SECURITY_STATUSES;

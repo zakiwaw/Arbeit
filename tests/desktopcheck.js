@@ -130,6 +130,21 @@ function bigData() {
     assert(await page.$eval('#detailView', v => getComputedStyle(v).display !== 'none'), 'Adresse ?sendung=… öffnet die Details auch beim ersten Laden');
     await page.close();
 
+    // ---- Detailansicht: volle Breite; normale Sendung (ohne HU-Liste) bekommt eine Stücktabelle ----
+    {
+      const d = bigData(); const now = Date.now(); const iso = ago => new Date(now - ago * 60e3).toISOString();
+      const it = (hu, st, ago, extra) => Object.assign({ rawInput: hu, status: st, timestamp: iso(ago), isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null }, extra || {});
+      d['123'].totalPiecesExpected = 3;
+      d['123'].scannedItems = [it('123', 'Wareneingang', 50), it('123', 'XRY', 30, { notes: ['Karton offen'] }), it('123', 'EDD', 20)];
+      page = await openApp(browser, makeBackend(d, {}), { viewport: { width: 1600, height: 900, deviceScaleFactor: 1 } }); await wait(500);
+      await page.evaluate(() => document.querySelector('tr[data-basenumber="123"] .hawb-cell').click()); await wait(400);
+      assert((await page.$eval('#detailViewContent', e => e.getBoundingClientRect().width)) > 1400, 'Detailansicht nutzt am Desktop die volle Breite');
+      const plain = await page.$$eval('.pack-table-plain tbody tr', rs => rs.map(r => r.className + ':' + [...r.cells].map(c => c.textContent.trim()).join('/')).join(' | '));
+      assert(/^pack-row-done:1\.\/WE\/XRY\/\d\d:\d\d\/Karton offen \| pack-row-done:2\.\/–\/EDD\/\d\d:\d\d\/ \| pack-row-open:3\.\/–\/Offen\/\/$/.test(plain), `Normale Sendung: Stücktabelle WE/Sicherung/Zeit/Notiz, 3. Platz offen (${plain})`);
+      assert(page.__errors.length === 0, `Stücktabelle: keine JS-Fehler (${page.__errors.join('; ')})`);
+      await page.close();
+    }
+
     // ---- Handy: unverändert ----
     page = await openApp(browser, makeBackend(bigData(), {}));
     const mob = await page.evaluate(() => {
