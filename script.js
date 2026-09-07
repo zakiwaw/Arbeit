@@ -3145,7 +3145,12 @@ const PAGE_RENDERERS = {
             const trucks = collectTrucks(loadShipments(), loadLkwStatus());
             const truckOptions = this.truckOptions(trucks);
             pageContentEl.innerHTML = `
+              <div class="info-layout">
                 <form id="infoForm" class="info-form" autocomplete="off">
+                    <div class="info-form-head">
+                        <span class="info-form-title">Filter</span>
+                        <button type="button" id="infoResetBtn" class="info-reset-btn hidden" title="Alle Filter zurücksetzen">Zurücksetzen</button>
+                    </div>
                     <div class="input-wrapper info-search-wrapper">
                         <input type="search" id="infoSearchInput" placeholder="Sendungsnummer, VVL, HU/VSE, Notiz …" autocapitalize="characters" autocomplete="off" enterkeyhint="search" value="${escapeHtml(infoState.text)}">
                     </div>
@@ -3172,8 +3177,11 @@ const PAGE_RENDERERS = {
                         <label class="info-archive"><input type="checkbox" id="infoArchiveToggle"${infoState.archive ? ' checked' : ''}${archiveAvailable() ? '' : ' disabled'}> Archiv einbeziehen${archiveAvailable() ? '' : ' (Server ohne Archiv)'}</label>
                     </div>
                 </form>
-                <p id="infoResultNote" class="page-note"></p>
-                <div id="infoResults"></div>`;
+                <div class="info-main">
+                    <p id="infoResultNote" class="page-note"></p>
+                    <div id="infoResults"></div>
+                </div>
+              </div>`;
             const form = document.getElementById('infoForm');
             const input = document.getElementById('infoSearchInput');
             const setAndUpdate = () => { pageLimit = PAGE_LIST_STEP; scheduleInfoArchiveSearch(); PAGE_RENDERERS.info.update(); };
@@ -3203,6 +3211,10 @@ const PAGE_RENDERERS = {
                 el.addEventListener('input', apply); el.addEventListener('change', apply);
             });
             document.getElementById('infoArchiveToggle').addEventListener('change', (e) => { infoState.archive = e.target.checked; setAndUpdate(); });
+            document.getElementById('infoResetBtn').addEventListener('click', () => {
+                Object.assign(infoState, { text: '', status: 'all', truck: 'all', period: 'all', dateFrom: '', dateTo: '', weightMin: '', weightMax: '' });
+                this.render(); // Formular mit leeren Werten neu aufbauen
+            });
             scheduleInfoArchiveSearch();
             this.update();
             // Am Desktop gleich ins Suchfeld; auf Touch-Geräten nicht (Tastatur würde aufklappen, Scanner-Eingaben landeten hier)
@@ -3215,8 +3227,12 @@ const PAGE_RENDERERS = {
             const text = infoState.text;
             const range = infoWeightRange();
             const anyFilter = infoState.status !== 'all' || infoState.truck !== 'all' || infoState.period !== 'all' || !!range;
+            const resetBtn = document.getElementById('infoResetBtn');
+            if (resetBtn) resetBtn.classList.toggle('hidden', !text && !anyFilter);
             results.innerHTML = '';
-            if (!text && !anyFilter) {
+            // Handy: erst nach Eingabe/Filter suchen (kurze Liste, wenig Scrollen). Desktop: sofort alle Sendungen als
+            // Tabelle zeigen – die Seitenleiste filtert dann live.
+            if (!text && !anyFilter && !isDesktopLayout()) {
                 note.textContent = 'Suchbegriff eingeben oder Filter wählen. Gefunden werden Sendungs-, VVL-, HU/VSE-Nummern und (ab 4 Zeichen) Notiztexte – auf diesem Gerät und auf Wunsch im Archiv.';
                 setPageHeader('Info & Suche', '');
                 this.syncTruckSelect(collectTrucks(loadShipments(), loadLkwStatus()));
@@ -3236,7 +3252,7 @@ const PAGE_RENDERERS = {
             const archived = infoState.archiveOrder
                 .filter(b => infoArchiveCache[b] && !shipments[b] && infoMatches(b, infoArchiveCache[b], text, range))
                 .map(b => ({ b, s: infoArchiveCache[b], archived: true, chip: infoArchiveCache[b].truckId ? (nameOf[infoArchiveCache[b].truckId] || infoArchiveCache[b].truckId) : '', hits: hitsOf(infoArchiveCache[b]) }));
-            const groups = [{ title: `Auf diesem Gerät (${local.length})`, rows: local }];
+            const groups = [{ title: (!text && !anyFilter) ? `Alle Sendungen auf diesem Gerät (${local.length})` : `Auf diesem Gerät (${local.length})`, rows: local }];
             let archiveInfo = '';
             if (infoState.archive) {
                 if (!archiveAvailable()) archiveInfo = 'Archiv: nicht verfügbar.';

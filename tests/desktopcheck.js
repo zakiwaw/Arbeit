@@ -64,6 +64,19 @@ function bigData() {
     await page.evaluate(() => document.querySelector('.page-row[data-truckid="MAN 1"]').click()); await wait(500);
     const pageCols = await page.$eval('#pageView .shipment-table tbody tr', tr => [...tr.cells].filter(t => getComputedStyle(t).display !== 'none').length);
     assert(pageCols === 11, `LKW-Seite: Tabelle mit allen Desktop-Spalten (${pageCols} Zellen sichtbar)`);
+    // Info & Suche: Seitenleiste links, sofort alle Sendungen, Filter live, Zurücksetzen
+    await page.goBack(); await wait(300); await page.goBack(); await wait(300);
+    await page.evaluate(() => document.querySelector('.home-tile[data-page="info"]').click()); await wait(500);
+    const layout = await page.evaluate(() => { const f = document.getElementById('infoForm'), m = document.querySelector('.info-main'); const a = f.getBoundingClientRect(), b = m.getBoundingClientRect(); return { side: a.right <= b.left, formW: Math.round(a.width), head: getComputedStyle(document.querySelector('.info-form-head')).display }; });
+    assert(layout.side && layout.formW > 200 && layout.formW < 300 && layout.head !== 'none', `Info: Filter als Seitenleiste links (${layout.formW} px), Ergebnisse rechts`);
+    assert((await page.$$eval('#infoResults tr[data-basenumber]', r => r.length)) === 15, 'Info am Desktop: ohne Filter sofort alle Sendungen (15)');
+    assert(await page.$eval('#infoResetBtn', b => b.classList.contains('hidden')), 'Info: „Zurücksetzen“ ohne aktive Filter ausgeblendet');
+    await page.evaluate(() => { const s = document.getElementById('infoStatusSelect'); s.value = 'dunkel'; s.dispatchEvent(new Event('change', { bubbles: true })); }); await wait(400);
+    const dunkel = await page.$$eval('#infoResults tr[data-basenumber]', r => r.map(x => x.dataset.basenumber));
+    assert(dunkel.join() === '9007000004,9007000008', `Info-Filter „Mit Dunkelalarm“ live: ${dunkel.join(', ')}`);
+    assert(!(await page.$eval('#infoResetBtn', b => b.classList.contains('hidden'))), 'Info: „Zurücksetzen“ erscheint bei aktivem Filter');
+    await page.evaluate(() => document.getElementById('infoResetBtn').click()); await wait(400);
+    assert((await page.$$eval('#infoResults tr[data-basenumber]', r => r.length)) === 15 && (await page.$eval('#infoStatusSelect', s => s.value)) === 'all', 'Info: „Zurücksetzen“ leert Filter und zeigt wieder alle');
     assert(page.__errors.length === 0, `Desktop: keine JS-Fehler (${page.__errors.join('; ')})`);
     await page.close();
 
@@ -80,6 +93,10 @@ function bigData() {
     assert(mob.h > 100 && mob.h < 170, `Handy: Kartenhöhe wie bisher (${Math.round(mob.h)} px)`);
     await page.evaluate(() => document.querySelector('tr[data-basenumber="9007000001"] .hawb-cell').click()); await wait(400);
     assert(await page.$eval('#detailView', v => getComputedStyle(v).display !== 'none'), 'Handy: Tipp auf HAWB öffnet Detailansicht');
+    await page.goBack(); await wait(300);
+    await page.evaluate(() => document.querySelector('.home-tile[data-page="info"]').click()); await wait(500);
+    const mobInfo = await page.evaluate(() => ({ rows: document.querySelectorAll('#infoResults tr[data-basenumber]').length, head: getComputedStyle(document.querySelector('.info-form-head')).display, cols: getComputedStyle(document.querySelector('.info-layout')).gridTemplateColumns, note: document.getElementById('infoResultNote').textContent.slice(0, 20) }));
+    assert(mobInfo.rows === 0 && mobInfo.head === 'none' && mobInfo.cols === 'none' && /Suchbegriff/.test(mobInfo.note), `Handy-Info unverändert: Filter oben, erst nach Eingabe Treffer (${JSON.stringify(mobInfo)})`);
     assert(page.__errors.length === 0, `Handy: keine JS-Fehler (${page.__errors.join('; ')})`);
   } finally { await browser.close(); finish(); }
 })().catch(e => { console.error('ERR', e); process.exit(1); });

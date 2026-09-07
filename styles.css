@@ -942,6 +942,20 @@ body.batch-mode-active .home-hub { display: none; } /* im Batch-Modus zählt nur
 
 /* Info-Seite: Suche + Filter */
 .info-form { margin-bottom: var(--sp-3); }
+.info-form-head { display: none; }   /* nur in der Desktop-Seitenleiste sichtbar */
+.info-reset-btn {
+    min-height: 28px;
+    padding: 0 var(--sp-2);
+    font: inherit;
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    color: var(--accent);
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    cursor: pointer;
+}
+.info-reset-btn:hover { background-color: var(--accent-soft); border-color: transparent; }
 .info-search-wrapper input[type="search"] {
     width: 100%;
     height: var(--control-h);
@@ -2417,10 +2431,33 @@ body.modal-open { overflow: hidden; }
     .page-content { max-width: 1240px; margin: 0 auto; }   /* so breit wie die Startseite: dichte Tabelle braucht Platz */
     .page-shipments .row-chip { display: none; }            /* LKW steht am Desktop in der eigenen Spalte */
     .page-summary, .page-banner, .page-details, .page-list { max-width: 900px; margin-left: auto; margin-right: auto; }
-    .info-filters { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); align-items: end; }
-    .info-filters .info-dates { grid-column: span 2; }
-    .info-filters .info-archive { grid-column: auto; white-space: nowrap; }
     .weight-hits { flex-basis: auto; margin-top: 0; }
+
+    /* Info & Suche: Filter als feste Seitenleiste links, Ergebnisse rechts – wie ein Arbeitsplatz-System */
+    .info-layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: var(--sp-5); align-items: start; }
+    .info-main .shipment-table td.hawb-cell { width: 18%; min-width: 130px; }
+    .info-form {
+        position: sticky;
+        top: 72px;
+        margin: 0;
+        padding: var(--sp-4);
+        background-color: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--r-lg);
+        box-shadow: var(--shadow-sm);
+    }
+    .info-form-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); margin-bottom: var(--sp-3); }
+    .info-form-title { font-size: var(--fs-xs); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); }
+    .info-search-wrapper input[type="search"] { height: 40px; font-size: var(--fs-sm); }
+    .info-search-wrapper input[type="search"]::placeholder { font-size: var(--fs-xs); }
+    .info-filters { grid-template-columns: 1fr; gap: var(--sp-3); margin-top: var(--sp-3); }
+    .info-filters label, .info-filters .info-weight, .info-filters .info-dates { grid-column: auto; }
+    .info-filters select { height: 36px; }
+    .info-weight-inputs input[type="text"], .info-weight-inputs input[type="date"] { height: 36px; }
+    .info-filters .info-archive { grid-column: auto; min-height: 0; padding-top: var(--sp-2); border-top: 1px solid var(--border); font-size: var(--fs-sm); }
+    .info-main { min-width: 0; }
+    .info-main .page-note { margin-top: 0; }
+    .info-main .page-section-title:first-child { margin-top: 0; }
 }
 
 
