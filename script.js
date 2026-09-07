@@ -2077,7 +2077,11 @@ function setListFilter(text) {
     if (next !== listFilterText) { listFilterText = next; listExtra = 0; clearArchiveResults(); }
 }
 // Liste aus den Daten neu zeichnen; Filter = Inhalt des Eingabefelds (Signatur unverändert)
-function renderTable() { setListFilter(shipmentNumberInputEl.value); drawShipmentList(); }
+function renderTable() {
+    setListFilter(shipmentNumberInputEl.value); drawShipmentList();
+    // Adresse ?sendung=… beim Start: Sendung lag noch nicht lokal vor (Daten kommen erst vom Server) → jetzt öffnen
+    if (pendingDetailFromUrl && loadShipments()[pendingDetailFromUrl]) { const b = pendingDetailFromUrl; pendingDetailFromUrl = null; showDetailView(b); }
+}
 // Liste nach einem bestimmten Text filtern (Signatur unverändert)
 function filterTable(filterText) { setListFilter(filterText); drawShipmentList(); }
 
@@ -3335,6 +3339,7 @@ function handlePageShipmentRowClick(event, row) {
 if (sideMenuEl) sideMenuEl.addEventListener('click', (e) => { const a = e.target.closest('a[href="#"]'); if (a) e.preventDefault(); });
 
 // Verlauf beim Start normalisieren; eine offene Seite (Adresse ?seite=… – z. B. nach Neuladen/Import) wieder öffnen
+let pendingDetailFromUrl = null; // ?sendung=… aus der Adresse, das beim Start noch nicht lokal vorlag (s. renderTable)
 (function initHistory() {
     let saved = (history.state && history.state.frtPage) ? history.state.frtPage : null;
     if (!saved) {
@@ -3346,6 +3351,7 @@ if (sideMenuEl) sideMenuEl.addEventListener('click', (e) => { const a = e.target
     replaceHistory({ frtHome: true });
     if (saved && saved.id && PAGE_RENDERERS[saved.id]) openPage(saved);
     if (sendung && loadShipments()[sendung]) showDetailView(sendung); // Adresse ?sendung=… (z. B. geteilter Link)
+    else if (sendung) pendingDetailFromUrl = sendung;                  // Daten kommen erst vom Server – s. renderTable
 })();
 
 

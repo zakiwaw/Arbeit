@@ -80,6 +80,12 @@ function bigData() {
     assert(page.__errors.length === 0, `Desktop: keine JS-Fehler (${page.__errors.join('; ')})`);
     await page.close();
 
+    // ---- ?sendung=… als frisch geladene Adresse (Daten kommen erst vom Server) ----
+    page = await openApp(browser, makeBackend(bigData(), {}), { viewport: { width: 1600, height: 900, deviceScaleFactor: 1 }, query: '?sendung=9007000006' });
+    await wait(600);
+    assert(await page.$eval('#detailView', v => getComputedStyle(v).display !== 'none'), 'Adresse ?sendung=… öffnet die Details auch beim ersten Laden');
+    await page.close();
+
     // ---- Handy: unverändert ----
     page = await openApp(browser, makeBackend(bigData(), {}));
     const mob = await page.evaluate(() => {
