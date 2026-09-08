@@ -1238,6 +1238,9 @@ td.actions-cell button.restore-btn:hover, td.actions-cell button.restore-btn:act
     transform: rotate(-45deg);
 }
 .vvl-table-entry { font-size: var(--fs-md); line-height: 1.35; }
+.vvl-table-entry .vvl-col { display: block; }
+.vvl-table-entry .vvl-prefix, .vvl-table-entry .kundennr-prefix { margin-right: 5px; }
+.vvl-table-entry .vvl-prefix::after, .vvl-table-entry .kundennr-prefix::after { content: ":"; }
 .vvl-table-entry .vvl-prefix, .vvl-table-entry .kundennr-prefix {
     font-family: var(--font-sans);
     font-size: var(--fs-xs);
@@ -2331,9 +2334,13 @@ body.modal-open { overflow: hidden; }
     .shipment-table td::before, .shipment-table td.hawb-cell::after { display: none; }
     .shipment-table td.hawb-cell { display: table-cell; min-height: 0; margin: 0; padding: 3px 10px; font-size: var(--fs-sm); font-weight: 700; letter-spacing: 0; }
     .shipment-table td.hawb-cell:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
-    .vvl-table-entry { font-size: var(--fs-sm); line-height: 1.25; }
-    .vvl-table-entry br { display: none; }
-    .vvl-table-entry .kundennr-prefix { margin-left: 8px; }
+    .vvl-table-entry { display: grid; grid-template-columns: minmax(120px, 1.3fr) minmax(90px, 1fr); gap: 0 var(--sp-3); font-size: var(--fs-sm); line-height: 1.2; }
+    .vvl-table-entry .vvl-col { display: flex; flex-direction: column; min-width: 0; }
+    .vvl-table-entry .vvl-col-kunde { padding-left: var(--sp-3); border-left: 1px solid var(--border); }
+    .vvl-table-entry .vvl-prefix, .vvl-table-entry .kundennr-prefix { margin: 0; font-size: 10px; line-height: 1.3; }
+    .vvl-table-entry .vvl-prefix::after, .vvl-table-entry .kundennr-prefix::after { content: none; }
+    .vvl-table-entry .vvl-no { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .shipment-table td.hawb-cell-vvl { padding-top: 4px; padding-bottom: 4px; }
     .shipment-table td.time-cell { display: table-cell; margin: 0; white-space: nowrap; font-size: var(--fs-xs); font-variant-numeric: tabular-nums; color: var(--text-muted); }
     .shipment-table td.time-cell::before { display: none; }
     /* „Übersicht“-Pills wiederholen am Desktop nur die WE-/Sich.-Spalten → Spalte bleibt schmal und zeigt
@@ -2472,7 +2479,8 @@ body.modal-open { overflow: hidden; }
     .pack-table td.pack-hu .hu-value { font-family: var(--font-mono); font-weight: 700; cursor: pointer; padding: 2px 6px; border-radius: var(--r-sm); position: relative; }
     .pack-table td.pack-hu .hu-value:hover { background-color: var(--accent-soft); }
     .pack-table td.pack-hu .hu-value.copied::after { content: 'Kopiert!'; position: absolute; left: 100%; top: 50%; transform: translateY(-50%); margin-left: 6px; padding: 2px 8px; font-family: var(--font-sans); font-size: var(--fs-xs); font-weight: 700; color: #fff; white-space: nowrap; background-color: var(--success); border-radius: var(--r-sm); animation: fade-in-out 1.5s ease-in-out; }
-    .pack-table .pack-sendnr { display: block; font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-muted); }
+    .pack-table .pack-sendnr { display: block; font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted); white-space: nowrap; }
+    .pack-table td.pack-sendnr-cell { white-space: nowrap; }
     .pack-table td.pack-text { color: var(--text-muted); white-space: nowrap; }
     .pack-table td.pack-num { font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
     .pack-table td.pack-we-cell { width: 40px; text-align: center; }
@@ -2587,6 +2595,9 @@ body.modal-open { overflow: hidden; }
     .page-content { max-width: 1240px; margin: 0 auto; }   /* so breit wie die Startseite: dichte Tabelle braucht Platz */
     .page-shipments .row-chip { display: none; }            /* LKW steht am Desktop in der eigenen Spalte */
     .page-summary, .page-banner, .page-details, .page-list { max-width: 900px; margin-left: auto; margin-right: auto; }
+    .shipment-table td.hawb-cell-vvl { width: 24%; min-width: 250px; }
+    .shipment-table:has(td.hawb-cell-vvl) td.dt-status { width: 10%; }   /* VW-Zeilen: Status-Spalte etwas schmaler, damit QR-Spalte Platz behält */
+    .page-list:has(td.hawb-cell-vvl), #pageContent:has(td.hawb-cell-vvl) .page-shipments { max-width: none; }   /* VW-LKW-Seite: Tabelle darf die volle Seitenbreite nutzen */
     .weight-hits { flex-basis: auto; margin-top: 0; }
 
     /* Info & Suche: Filter als feste Seitenleiste links, Ergebnisse rechts – wie ein Arbeitsplatz-System */

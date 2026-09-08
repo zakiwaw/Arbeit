@@ -367,6 +367,40 @@ function bigData() {
       await page.close();
     }
 
+    // ---- VW-LKW: VVL und Kundennr als zwei Spalten in der Liste, VSE und Sendungs-Nr. getrennt in der Packstücktabelle ----
+    {
+      const d = bigData(); const now = new Date().toISOString(); const vvl = '100004158949', tid = 'VVL-' + vvl;
+      [['863', 3], ['959201', 9]].forEach(([k, cnt]) => { d[k] = { hawb: k, lastModified: now, totalPiecesExpected: cnt, mitarbeiter: 'T', isHuListOrder: true, truckId: tid, parentOrderNumber: vvl,
+        scannedItems: Array.from({ length: cnt }, (_, i) => ({ rawInput: '88122' + (6843 + i), sendnr: '8386256', status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null, grossWeight: '30 KG' })) }; });
+      page = await openApp(browser, makeBackend(d, {}), { viewport: { width: 1600, height: 900, deviceScaleFactor: 1 }, query: '?seite=anlieferung&lkw=' + encodeURIComponent(tid) }); await wait(600);
+      const vw = await page.evaluate(() => {
+        const cell = document.querySelector('tr[data-basenumber="959201"] .hawb-cell');
+        const cols = [...cell.querySelectorAll('.vvl-col')];
+        const t = document.querySelector('#pageContent .shipment-table');
+        return { cls: cell.className, grid: getComputedStyle(cell.querySelector('.vvl-table-entry')).display, cols: cols.map(c => c.textContent.replace(/\s+/g, ' ').trim()).join(' | '),
+          side: Math.round(cols[0].getBoundingClientRect().top) === Math.round(cols[1].getBoundingClientRect().top), rowH: Math.round(cell.getBoundingClientRect().height),
+          qr: Math.round(t.rows[1].cells[t.rows[1].cells.length - 1].getBoundingClientRect().width), fits: t.scrollWidth <= t.clientWidth + 1 };
+      });
+      assert(/hawb-cell-vvl/.test(vw.cls) && vw.grid === 'grid' && vw.cols === 'VVL100004158949 | Kundennr959201' && vw.side, `VW-Liste: VVL und Kundennr nebeneinander in zwei Spalten (${JSON.stringify(vw)})`);
+      assert(vw.rowH <= 44 && vw.qr >= 40 && vw.fits, `VW-Liste: Zeile bleibt flach, QR-Spalte vollständig, kein Querscrollen (${JSON.stringify(vw)})`);
+      await page.evaluate(() => document.querySelector('tr[data-basenumber="959201"] .hawb-cell').click()); await wait(500);
+      const pk = await page.evaluate(() => ({ head: [...document.querySelectorAll('.pack-table thead th')].map(t => t.textContent.trim()).join('|'), row: [...document.querySelectorAll('.pack-table tbody tr')[0].cells].map(c => c.textContent.trim()).slice(1, 3).join('|'), inHu: !!document.querySelector('.pack-table td.pack-hu .pack-sendnr') }));
+      assert(pk.head === '|VSE|Sendungs-Nr.|Verpackung|Maße|Gewicht|WE|Sicherung|Zeit|Notiz|' && pk.row === '881226843|8386256' && !pk.inHu, `VW-Packstücke: VSE und Sendungs-Nr. als eigene Spalten (${JSON.stringify(pk)})`);
+      // MAN-Auftrag ohne VVL: keine Sendungs-Nr.-Spalte, Liste wie bisher
+      await page.evaluate(() => document.getElementById('backToMainViewBtn').click()); await wait(300);
+      await page.evaluate(() => document.getElementById('pageBackBtn').click()); await wait(300);
+      await page.evaluate(() => document.querySelector('tr[data-basenumber="9007000001"] .hawb-cell').click()); await wait(400);
+      assert(await page.evaluate(() => [...document.querySelectorAll('.pack-table thead th')].map(t => t.textContent.trim()).join('|')) === '|HU|Verpackung|Maße|Gewicht|WE|Sicherung|Zeit|Notiz|', 'MAN-Auftrag: Packstücktabelle unverändert (keine Sendungs-Nr.-Spalte)');
+      assert(await page.evaluate(() => !document.querySelector('tr[data-basenumber="9007000001"] .hawb-cell').classList.contains('hawb-cell-vvl')), 'MAN-Zeile: HAWB-Zelle unverändert');
+      assert(page.__errors.length === 0, `VW-Spalten: keine JS-Fehler (${page.__errors.join('; ')})`);
+      await page.close();
+      // Handy: VW-Karte weiterhin untereinander (VVL über Kundennr)
+      page = await openApp(browser, makeBackend(d, {}), { query: '?seite=anlieferung&lkw=' + encodeURIComponent(tid) }); await wait(600);
+      const ph = await page.evaluate(() => { const e = document.querySelector('tr[data-basenumber="863"] .vvl-table-entry'); const c = [...e.querySelectorAll('.vvl-col')]; return { display: getComputedStyle(e).display, stacked: c[1].getBoundingClientRect().top > c[0].getBoundingClientRect().bottom - 2, text: e.textContent.replace(/\s+/g, ' ').trim() }; });
+      assert(ph.display === 'block' && ph.stacked && ph.text === 'VVL100004158949 Kundennr863', `Handy: VW-Karte wie bisher untereinander (${JSON.stringify(ph)})`);
+      await page.close();
+    }
+
     // ---- Handy: unverändert ----
     page = await openApp(browser, makeBackend(bigData(), {}));
     const mob = await page.evaluate(() => {

@@ -1947,7 +1947,8 @@ function buildDetailPackTable(shipment, readOnly, base) {
         return `<tr class="${rowClass}">`
             + selectCell
             + (hasPos ? `<td class="pack-pos">${item.position ? escapeHtml(String(item.position)) + '.' : ''}</td>` : '')
-            + `<td class="pack-hu"><span class="hu-value${dunkel.length ? ' has-dunkelalarm' : ''}" title="Klicken zum Kopieren">${escapeHtml(hu)}</span>${isVvl && item.sendnr ? `<span class="pack-sendnr">${escapeHtml(item.sendnr)}</span>` : ''}</td>`
+            + `<td class="pack-hu"><span class="hu-value${dunkel.length ? ' has-dunkelalarm' : ''}" title="Klicken zum Kopieren">${escapeHtml(hu)}</span></td>`
+            + (isVvl ? `<td class="pack-sendnr-cell">${item.sendnr ? `<span class="pack-sendnr">${escapeHtml(item.sendnr)}</span>` : '<span class="dt-dim">–</span>'}</td>` : '')
             + `<td class="pack-text">${escapeHtml(detail.packaging || '–')}</td>`
             + `<td class="pack-text">${escapeHtml(detail.dimensions || '–')}</td>`
             + `<td class="pack-num">${escapeHtml(detail.grossWeight || '–')}</td>`
@@ -1971,7 +1972,7 @@ function buildDetailPackTable(shipment, readOnly, base) {
     return `<div class="detail-pack">`
         + `<div class="detail-pack-head"><h4>Packstücke (${slots.length})</h4><span class="detail-pack-meta">${openCount ? `${openCount} offen` : 'alle gesichert'}</span>${readOnly ? '' : `<button type="button" class="pack-add-btn" data-basenumber="${escapeHtml(base || shipment.hawb || '')}" title="Weiteres Packstück zu diesem Auftrag aufnehmen">+ Packstück</button>`}</div>`
         + selectBar
-        + `<table class="pack-table"><thead><tr>${readOnly ? '' : `<th class="pack-select-cell"><input type="checkbox" class="pack-select-all" title="Alle Packstücke auswählen" aria-label="Alle Packstücke auswählen"></th>`}${hasPos ? '<th>Pos.</th>' : ''}<th>${isVvl ? 'VSE / Sendungs-Nr.' : 'HU'}</th><th>Verpackung</th><th>Maße</th><th>Gewicht</th><th>WE</th><th>Sicherung</th><th>Zeit</th><th>Notiz</th>${readOnly ? '' : '<th class="pack-edit-head"></th>'}</tr></thead>`
+        + `<table class="pack-table"><thead><tr>${readOnly ? '' : `<th class="pack-select-cell"><input type="checkbox" class="pack-select-all" title="Alle Packstücke auswählen" aria-label="Alle Packstücke auswählen"></th>`}${hasPos ? '<th>Pos.</th>' : ''}<th>${isVvl ? 'VSE' : 'HU'}</th>${isVvl ? '<th>Sendungs-Nr.</th>' : ''}<th>Verpackung</th><th>Maße</th><th>Gewicht</th><th>WE</th><th>Sicherung</th><th>Zeit</th><th>Notiz</th>${readOnly ? '' : '<th class="pack-edit-head"></th>'}</tr></thead>`
         + `<tbody>${rows}</tbody></table></div>`;
 }
 
@@ -2908,10 +2909,12 @@ function appendShipmentRow(tbody, baseNumber, shipment, archived) {
 
             const badgeHtml = archived ? `<span class="archive-badge">Archiv</span>` : '';
             if (shipment.parentOrderNumber) {
-                hawbCellHtml = `<td data-label="HAWB." class="hawb-cell">
+                // VVL und Kundennr als zwei getrennte Spalten innerhalb der Zelle (Desktop: nebeneinander mit fester
+                // Breite → alle Zeilen fluchten; Handy: untereinander wie bisher). Die Zelle bleibt das Klickziel.
+                hawbCellHtml = `<td data-label="HAWB." class="hawb-cell hawb-cell-vvl">
                     <div class="vvl-table-entry">
-                         <span class="vvl-prefix">VVL: </span>${escapeHtml(shipment.parentOrderNumber)}<br>
-                         <span class="kundennr-prefix">Kundennr: </span>${escapeHtml(baseNumber)}
+                         <span class="vvl-col vvl-col-vvl"><span class="vvl-prefix">VVL</span><span class="vvl-no">${escapeHtml(shipment.parentOrderNumber)}</span></span>
+                         <span class="vvl-col vvl-col-kunde"><span class="kundennr-prefix">Kundennr</span><span class="vvl-no">${escapeHtml(baseNumber)}</span></span>
                     </div>${badgeHtml}
                 </td>`;
                 pdfButtonData = `data-parentordernumber="${escapeHtml(shipment.parentOrderNumber)}"`;
