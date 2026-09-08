@@ -89,7 +89,7 @@ function bigData() {
       qr: document.querySelectorAll('.detail-qr img, .detail-qr canvas').length > 0,
       packRows: document.querySelectorAll('.pack-table tbody tr').length,
       pendingBox: !!document.getElementById('pendingHuList'),
-      firstRow: [...document.querySelectorAll('.pack-table tbody tr')[0].cells].map(c => c.textContent.trim()).slice(0, 5).join('|')
+      firstRow: [...document.querySelectorAll('.pack-table tbody tr')[0].cells].map(c => c.textContent.trim()).slice(1, 6).join('|')   /* Zelle 0 = Auswahl-Kästchen */
     }));
     assert(det.open && det.head, 'Desktop-Details: Kopfzeile vorhanden');
     assert(det.crumbs === 'home,anlieferung,lkw', `Desktop-Details: Pfad Startseite › Anlieferung › LKW (${det.crumbs})`);
@@ -112,7 +112,7 @@ function bigData() {
     await page.evaluate(() => { document.getElementById('huEditNumber').value = 'HU5001X'; document.getElementById('huEditWeight').value = '40'; document.getElementById('huEditPackaging').value = 'Gitterbox'; document.getElementById('saveHuEditButton').click(); }); await wait(1200);
     const edited = await page.evaluate(() => {
       const s = JSON.parse(localStorage.getItem('frachtSicherungMobile_V8_18_Refactored'))['9007000005'];
-      return { modal: document.getElementById('huEditModal').classList.contains('visible'), items: s.scannedItems.map(i => i.rawInput + ':' + i.status + ':' + i.grossWeight + ':' + i.packaging).join(' '), row: [...document.querySelectorAll('.pack-table tbody tr')[0].cells].map(c => c.textContent.trim()).slice(0, 4).join('|'), kg: [...document.querySelectorAll('.detail-fact')].find(f => /Gewicht/.test(f.textContent)).textContent.replace(/\s+/g, ' ') };
+      return { modal: document.getElementById('huEditModal').classList.contains('visible'), items: s.scannedItems.map(i => i.rawInput + ':' + i.status + ':' + i.grossWeight + ':' + i.packaging).join(' '), row: [...document.querySelectorAll('.pack-table tbody tr')[0].cells].map(c => c.textContent.trim()).slice(1, 5).join('|'), kg: [...document.querySelectorAll('.detail-fact')].find(f => /Gewicht/.test(f.textContent)).textContent.replace(/\s+/g, ' ') };
     });
     assert(!edited.modal && edited.items === 'HU5001X:Anstehend:40 KG:Gitterbox HU5002:Anstehend:30 KG:undefined', `Packstück gespeichert – alle Einträge der HU umbenannt (${edited.items})`);
     assert(edited.row === 'HU5001X|Gitterbox|–|40 KG' && /70 kg/.test(edited.kg), `Tabelle und Kopf-Gewicht aktualisiert (${edited.row}; ${edited.kg})`);
@@ -147,7 +147,7 @@ function bigData() {
       assert(st.normal === 'Fertig/2/2/ok', `Normale Sendung: Dunkelalarm + volle Sicherung → „Fertig“ (${st.normal})`);
       assert(st.tile === '3', `Kachel zählt nur offene Dunkelalarme: 2 aus bigData + 1 neu, der erledigte nicht (${st.tile})`);
       await page.evaluate(() => document.querySelector('tr[data-basenumber="9008296222"] .hawb-cell').click()); await wait(400);
-      const pack = await page.$$eval('.pack-table tbody tr', rs => rs.map(r => r.className + ':' + r.cells[6].textContent.trim()).join(' '));
+      const pack = await page.$$eval('.pack-table tbody tr', rs => rs.map(r => r.className + ':' + r.cells[7].textContent.trim()).join(' '));
       assert(pack === 'pack-row-done:EDDnach Dunkelalarm pack-row-open:Offen', `Packstücktabelle: „EDD · nach Dunkelalarm“ statt rot (${pack})`);
       assert((await page.$eval('#detailViewContent', e => e.getBoundingClientRect().width)) > 1400, 'Detailansicht nutzt am Desktop die volle Breite');
       await page.evaluate(() => document.getElementById('backToMainViewBtn').click()); await wait(300);
@@ -265,6 +265,50 @@ function bigData() {
       await page.evaluate(() => document.querySelector('tr[data-basenumber="9008296222"] .hawb-cell').click()); await wait(400);
       assert(await page.evaluate(() => !!document.querySelector('.pack-add-btn') && getComputedStyle(document.querySelector('.pack-add-btn')).display !== 'none'), 'Batch-Modus aus, Details neu geöffnet: „+ Packstück“ wieder da');
       assert(page.__errors.length === 0, `Packstück hinzufügen: keine JS-Fehler (${page.__errors.join('; ')})`);
+      await page.close();
+    }
+
+    // ---- Auswahl je Packstück: Kästchen + „Alle“, Kontrollmethode für die Auswahl wie ein Scan verbuchen ----
+    {
+      const d = bigData(); const now = Date.now(); const iso = ago => new Date(now - ago * 60e3).toISOString();
+      const mk = (hu, pos, st) => ({ rawInput: hu, position: pos, status: st, timestamp: iso(30), isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null, packaging: 'Carton', dimensions: '10x10x10 CM', grossWeight: '5 KG' });
+      d['9008295951'] = { hawb: '9008295951', lastModified: iso(1), totalPiecesExpected: 4, mitarbeiter: 'T', isHuListOrder: true, truckId: 'MAN 1', originalManNumber: 1, freightForwarder: 'DHL', destinationCountry: 'AUSTRALIEN',
+        scannedItems: [mk('SEL0001', 1, 'Anstehend'), mk('SEL0002', 2, 'Anstehend'), mk('SEL0003', 3, 'Anstehend'), mk('SEL0004', 4, 'Anstehend')] };
+      const be = makeBackend(d, {});
+      page = await openApp(browser, be, { viewport: { width: 1600, height: 900, deviceScaleFactor: 1 } }); await wait(500);
+      await page.evaluate(() => document.querySelector('tr[data-basenumber="9008295951"] .hawb-cell').click()); await wait(400);
+      const sel0 = await page.evaluate(() => ({ boxes: document.querySelectorAll('.pack-table tbody .pack-select').length, all: !!document.querySelector('.pack-table thead .pack-select-all'), bar: document.querySelector('.pack-select-bar').classList.contains('hidden'),
+        options: [...document.querySelectorAll('.pack-select-status option')].map(o => o.value).join(',') }));
+      assert(sel0.boxes === 4 && sel0.all && sel0.bar && sel0.options === 'XRY,ETD,EDD,PHS,VCK,Wareneingang,Dunkelalarm', `Kästchen je Packstück + „Alle“, Leiste zunächst verborgen, Methoden wie im Scan-Feld (${JSON.stringify(sel0)})`);
+      await page.evaluate(() => { const b = document.querySelectorAll('.pack-select'); b[1].click(); b[2].click(); }); await wait(150);
+      const sel1 = await page.evaluate(() => ({ bar: !document.querySelector('.pack-select-bar').classList.contains('hidden'), count: document.querySelector('.pack-select-count').textContent, indet: document.querySelector('.pack-select-all').indeterminate }));
+      assert(sel1.bar && sel1.count === '2 ausgewählt' && sel1.indet, `2 angehakt → Leiste „2 ausgewählt“, „Alle“ halb (${JSON.stringify(sel1)})`);
+      await page.evaluate(() => { document.querySelector('.pack-select-status').value = 'ETD'; document.querySelector('.pack-select-apply').click(); }); await wait(700);
+      const sel2 = await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('frachtSicherungMobile_V8_18_Refactored'))['9008295951'];
+        return { items: s.scannedItems.map(i => i.rawInput + ':' + i.status + '@' + i.position).join(' '), dis: [...document.querySelectorAll('.pack-select')].map(b => b.disabled ? 1 : 0).join(''), bar: document.querySelector('.pack-select-bar').classList.contains('hidden'), meta: document.querySelector('.detail-pack-meta').textContent }; });
+      assert(sel2.items === 'SEL0001:Anstehend@1 SEL0002:ETD@2 SEL0003:ETD@3 SEL0004:Anstehend@4 SEL0002:Wareneingang@2 SEL0003:Wareneingang@3', `ETD für die Auswahl: Plätze 2+3 gesichert, Wareneingang automatisch – wie beim Scan (${sel2.items})`);
+      assert(sel2.dis === '0110' && sel2.bar && sel2.meta === '2 offen', `Gesicherte Packstücke nicht mehr anwählbar, Leiste wieder zu, „2 offen“ (${JSON.stringify(sel2)})`);
+      assert(be.store['9008295951'].scannedItems.filter(i => i.status === 'ETD').length === 2, 'Manuell vergebene Leistungen sind beim Server angekommen');
+      // „Alle“ → XRY für den Rest; danach Auftrag fertig und nichts mehr anwählbar
+      await page.evaluate(() => document.querySelector('.pack-select-all').click()); await wait(150);
+      assert(await page.$eval('.pack-select-count', e => e.textContent) === '2 ausgewählt', '„Alle“ wählt nur die offenen Packstücke');
+      await page.evaluate(() => document.querySelector('.pack-select-apply').click()); await wait(700);
+      const sel3 = await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('frachtSicherungMobile_V8_18_Refactored'))['9008295951'];
+        return { sec: s.scannedItems.filter(i => i.status !== 'Wareneingang').map(i => i.status).join(','), we: s.scannedItems.filter(i => i.status === 'Wareneingang').length, allDis: document.querySelector('.pack-select-all').disabled, status: document.querySelector('.detail-fact .status-text, .detail-fact')?.textContent.replace(/\s+/g, ' ') }; });
+      assert(sel3.sec === 'XRY,ETD,ETD,XRY' && sel3.we === 4 && sel3.allDis && /Fertig/.test(sel3.status), `Rest per „Alle“ auf XRY: Auftrag fertig, „Alle“ gesperrt (${JSON.stringify(sel3)})`);
+      // Abbruch im Bestätigungsdialog verbucht nichts
+      await page.evaluate(() => document.querySelector('.pack-add-btn').click()); await wait(300);
+      await page.keyboard.type('SEL0005'); await page.keyboard.press('Enter'); await page.evaluate(() => document.getElementById('saveHuAddButton').click()); await wait(600);
+      page.off('dialog'); const declineOnce = dlg => { dlg.dismiss(); page.off('dialog', declineOnce); page.on('dialog', dd => dd.accept()); }; page.on('dialog', declineOnce);
+      await page.evaluate(() => { document.querySelector('.pack-select:not(:disabled)').click(); document.querySelector('.pack-select-apply').click(); }); await wait(400);
+      assert(await page.evaluate(() => JSON.parse(localStorage.getItem('frachtSicherungMobile_V8_18_Refactored'))['9008295951'].scannedItems.filter(i => i.rawInput === 'SEL0005').map(i => i.status).join() === 'Anstehend'), 'Rückfrage abgelehnt → nichts verbucht');
+      // Batch-Modus: Auswahl nicht erreichbar
+      await page.evaluate(() => document.getElementById('backToMainViewBtn').click()); await wait(300);
+      await setBatchMode(page, true); await wait(300);
+      await page.evaluate(() => document.querySelector('tr[data-basenumber="9008295951"] .hawb-cell').click()); await wait(400);
+      assert(await page.evaluate(() => { const c = document.querySelector('.pack-select-cell'); return !c || getComputedStyle(c).display === 'none'; }), 'Batch-Modus: keine Auswahl-Kästchen');
+      await setBatchMode(page, false); await wait(300);
+      assert(page.__errors.length === 0, `Auswahl: keine JS-Fehler (${page.__errors.join('; ')})`);
       await page.close();
     }
 

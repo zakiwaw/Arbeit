@@ -1941,7 +1941,10 @@ function buildDetailPackTable(shipment, readOnly, base) {
         const weHtml = we ? `<span class="pack-we ok" title="Wareneingang erfasst">WE</span>` : `<span class="pack-we" title="Kein Wareneingang">–</span>`;
         const timeHtml = open ? '' : escapeHtml(fmtTime(item.timestamp));
         const rowClass = dunkel.length ? 'pack-row-danger' : (open ? 'pack-row-open' : 'pack-row-done');
+        // Auswahl-Kästchen: nur offene Packstücke lassen sich auswählen (gesicherte haben nichts mehr zu bekommen)
+        const selectCell = readOnly ? '' : `<td class="pack-select-cell"><input type="checkbox" class="pack-select" data-hu="${escapeHtml(hu)}"${open ? '' : ' disabled'} title="${open ? `${escapeHtml(hu)} auswählen` : 'bereits gesichert'}" aria-label="${escapeHtml(hu)} auswählen"></td>`;
         return `<tr class="${rowClass}">`
+            + selectCell
             + (hasPos ? `<td class="pack-pos">${item.position ? escapeHtml(String(item.position)) + '.' : ''}</td>` : '')
             + `<td class="pack-hu"><span class="hu-value${dunkel.length ? ' has-dunkelalarm' : ''}" title="Klicken zum Kopieren">${escapeHtml(hu)}</span>${isVvl && item.sendnr ? `<span class="pack-sendnr">${escapeHtml(item.sendnr)}</span>` : ''}</td>`
             + `<td class="pack-text">${escapeHtml(detail.packaging || '–')}</td>`
@@ -1955,9 +1958,18 @@ function buildDetailPackTable(shipment, readOnly, base) {
             + `</tr>`;
     }).join('');
 
+    // Leiste für die Auswahl: erscheint, sobald mindestens ein Packstück angehakt ist – Kontrollmethode wählen, „Übernehmen“
+    // verbucht sie für jede gewählte HU genau wie einen Scan (gleiche Funktion, gleiche Regeln, gleicher Sync)
+    const selectBar = readOnly ? '' : `<div class="pack-select-bar hidden" data-basenumber="${escapeHtml(base || shipment.hawb || '')}">`
+        + `<span class="pack-select-count">0 ausgewählt</span>`
+        + `<label class="pack-select-label">Kontrollmethode <select class="pack-select-status">${EXCLUSIVE_SECURITY_STATUSES.map(s => `<option value="${s}">${s}</option>`).join('')}<option value="Wareneingang">Wareneingang</option><option value="Dunkelalarm">Dunkelalarm</option></select></label>`
+        + `<button type="button" class="pack-select-apply">Übernehmen</button>`
+        + `<button type="button" class="pack-select-clear">Auswahl aufheben</button>`
+        + `</div>`;
     return `<div class="detail-pack">`
         + `<div class="detail-pack-head"><h4>Packstücke (${slots.length})</h4><span class="detail-pack-meta">${openCount ? `${openCount} offen` : 'alle gesichert'}</span>${readOnly ? '' : `<button type="button" class="pack-add-btn" data-basenumber="${escapeHtml(base || shipment.hawb || '')}" title="Weiteres Packstück zu diesem Auftrag aufnehmen">+ Packstück</button>`}</div>`
-        + `<table class="pack-table"><thead><tr>${hasPos ? '<th>Pos.</th>' : ''}<th>${isVvl ? 'VSE / Sendungs-Nr.' : 'HU'}</th><th>Verpackung</th><th>Maße</th><th>Gewicht</th><th>WE</th><th>Sicherung</th><th>Zeit</th><th>Notiz</th>${readOnly ? '' : '<th class="pack-edit-head"></th>'}</tr></thead>`
+        + selectBar
+        + `<table class="pack-table"><thead><tr>${readOnly ? '' : `<th class="pack-select-cell"><input type="checkbox" class="pack-select-all" title="Alle offenen Packstücke auswählen" aria-label="Alle offenen Packstücke auswählen"${openCount ? '' : ' disabled'}></th>`}${hasPos ? '<th>Pos.</th>' : ''}<th>${isVvl ? 'VSE / Sendungs-Nr.' : 'HU'}</th><th>Verpackung</th><th>Maße</th><th>Gewicht</th><th>WE</th><th>Sicherung</th><th>Zeit</th><th>Notiz</th>${readOnly ? '' : '<th class="pack-edit-head"></th>'}</tr></thead>`
         + `<tbody>${rows}</tbody></table></div>`;
 }
 
@@ -2249,6 +2261,37 @@ function saveHuAddFromModal() {
     renderTable();
     displayCurrentShipmentDetails(base);
     displayError(`${pluralize(rows.length, 'Packstück', 'Packstücke')} zu ${escapeHtml(base)} hinzugefügt${position ? ` (Pos. ${position}${rows.length > 1 ? `–${position + rows.length - 1}` : ''})` : ''}.`, 'green', 3000);
+}
+// Auswahl in der Packstücktabelle: Leiste ein-/ausblenden, Zähler und „Alle“-Kästchen nachführen (reine Anzeige)
+function updatePackSelectionBar() {
+    const bar = currentDetailsDivEl ? currentDetailsDivEl.querySelector('.pack-select-bar') : null;
+    if (!bar) return;
+    const boxes = Array.from(currentDetailsDivEl.querySelectorAll('.pack-select:not(:disabled)'));
+    const n = boxes.filter(cb => cb.checked).length;
+    bar.classList.toggle('hidden', n === 0);
+    bar.querySelector('.pack-select-count').textContent = `${n} ausgewählt`;
+    const all = currentDetailsDivEl.querySelector('.pack-select-all');
+    if (all) { all.checked = boxes.length > 0 && n === boxes.length; all.indeterminate = n > 0 && n < boxes.length; }
+}
+// Gewählte Kontrollmethode für alle angehakten Packstücke verbuchen – je HU exakt wie ein Scan über das Eingabefeld
+// (processAndSaveSingleScan: Anstehend → Status, automatischer Wareneingang, Limits, Sync). Keine eigene Buchungslogik.
+function applyStatusToSelectedPacks(bar) {
+    if (!bar) return;
+    const base = bar.dataset.basenumber;
+    const status = bar.querySelector('.pack-select-status').value;
+    const hus = Array.from(currentDetailsDivEl.querySelectorAll('.pack-select:checked:not(:disabled)')).map(cb => cb.dataset.hu);
+    if (!hus.length) { displayError('Bitte zuerst Packstücke auswählen.'); return; }
+    if (!confirm(`${status} für ${pluralize(hus.length, 'Packstück', 'Packstücke')} eintragen?\n\n${hus.join(', ')}`)) return;
+    const done = [], failed = [];
+    hus.forEach(hu => {
+        const r = processAndSaveSingleScan(hu, status, false);   // Kombi-Sicherung gibt es hier nicht
+        if (r && r.success) done.push(hu); else failed.push(`${hu}: ${(r && r.message) || 'unbekannter Fehler'}`);
+    });
+    resetSingleScanNoteInputState();
+    renderTable();
+    displayCurrentShipmentDetails(base);
+    if (done.length) displayError(`${status} für ${pluralize(done.length, 'Packstück', 'Packstücke')} eingetragen.`, 'green', 2500);
+    if (failed.length) displayError(`Nicht übernommen – ${failed.join(' · ')}`.replace(/<[^>]+>/g, ''), 'orange');
 }
 function closeHuEditModal() {
     const modal = document.getElementById('huEditModal');
@@ -5773,6 +5816,21 @@ document.addEventListener('click', (event) => {
         else if (btn.classList.contains('main-delete-btn')) {
             if (confirm(`Sendung ${escapeHtml(base)} wirklich löschen?`)) { deleteShipment(base); goBackFromDetail(); }
         }
+    }
+    // Packstücktabelle: Auswahl-Kästchen und Leiste („Alle“, Zähler, Übernehmen, Aufheben)
+    else if (target.classList.contains('pack-select') || target.classList.contains('pack-select-all')) {
+        if (target.classList.contains('pack-select-all')) {
+            const on = target.checked;
+            detailContainer.querySelectorAll('.pack-select:not(:disabled)').forEach(cb => { cb.checked = on; });
+        }
+        updatePackSelectionBar();
+    }
+    else if (target.closest('.pack-select-clear')) {
+        detailContainer.querySelectorAll('.pack-select, .pack-select-all').forEach(cb => { cb.checked = false; });
+        updatePackSelectionBar();
+    }
+    else if (target.closest('.pack-select-apply')) {
+        if (!isBatchModeActive) applyStatusToSelectedPacks(target.closest('.pack-select-bar'));
     }
     // Packstücktabelle: „+ Packstück“ → weitere HU aufnehmen
     else if (target.closest('.pack-add-btn')) {
