@@ -2145,15 +2145,14 @@ function nextHuPosition(shipment) {
 // angelegt (wie beim Import), Positionen fortlaufend ab der höchsten vorhandenen, Kolli steigt um die Anzahl.
 const HU_ADD_MIN_ROWS = 3;
 // VW-Auftrag (Positionen tragen eine Sendungs-Nr.): Spalten VSE · Sendungs-Nr. statt Pos. · HU-Nummer – wie die Tabelle
-// der bisherigen Packstücke rechts daneben. Die Sendungs-Nr. wird aus der Zeile darüber bzw. den vorhandenen Packstücken
-// vorbelegt (in der Vorverladeliste hat fast immer der ganze Auftrag dieselbe Nummer) und lässt sich je Zeile ändern.
+// der bisherigen Packstücke rechts daneben. Die Sendungs-Nr. ist optional und startet leer (keine Vorbelegung).
 function huAddIsVvl() { return document.getElementById('huAddRows').dataset.vvl === '1'; }
 function huAddRowHtml(pos) {
     const vvl = huAddIsVvl();
     return `<tr class="hu-add-row">`
         + (vvl ? '' : `<td class="hu-add-pos"><span class="hu-add-pos-no">${pos ? pos + '.' : ''}</span></td>`)
         + `<td><input type="text" class="hu-add-hu" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="${vvl ? 'VSE eintippen oder scannen' : 'eintippen oder scannen'}"></td>`
-        + (vvl ? `<td class="hu-add-sendnr-cell"><input type="text" class="hu-add-sendnr" autocomplete="off" inputmode="numeric" spellcheck="false" placeholder="Sendungs-Nr."></td>` : '')
+        + (vvl ? `<td class="hu-add-sendnr-cell"><input type="text" class="hu-add-sendnr" autocomplete="off" inputmode="numeric" spellcheck="false" placeholder="optional"></td>` : '')
         + `<td><input type="text" class="hu-add-pack" autocomplete="off" placeholder="optional"></td>`
         + `<td><input type="text" class="hu-add-dim" autocomplete="off" placeholder="optional"></td>`
         + `<td class="hu-add-kg"><input type="text" class="hu-add-weight" autocomplete="off" inputmode="decimal" placeholder="optional"></td>`
@@ -2169,11 +2168,7 @@ function huAddAppendRow() {
     const tbody = document.getElementById('huAddRows');
     tbody.insertAdjacentHTML('beforeend', huAddRowHtml(0));
     huAddRenumber();
-    const row = tbody.rows[tbody.rows.length - 1];
-    // VW: Sendungs-Nr. aus der Zeile darüber übernehmen, für die erste Zeile aus den vorhandenen Packstücken
-    const sn = row.querySelector('.hu-add-sendnr');
-    if (sn) { const prev = row.previousElementSibling; const prevSn = prev ? prev.querySelector('.hu-add-sendnr') : null; sn.value = (prevSn && prevSn.value.trim()) || tbody.dataset.sendnr || ''; }
-    return row;
+    return tbody.rows[tbody.rows.length - 1];
 }
 function huAddEnsureTrailingEmptyRow() {
     const tbody = document.getElementById('huAddRows');
@@ -2222,10 +2217,7 @@ function openHuAddModal(base) {
     const tbody = document.getElementById('huAddRows');
     const items = Array.isArray(shipment.scannedItems) ? shipment.scannedItems : [];
     const isVvl = !!shipment.parentOrderNumber || items.some(i => i && i.sendnr);
-    // häufigste Sendungs-Nr. der vorhandenen Packstücke als Vorbelegung
-    const snCount = {}; items.forEach(i => { if (i && !i.isCancelled && i.sendnr) snCount[i.sendnr] = (snCount[i.sendnr] || 0) + 1; });
     tbody.dataset.vvl = isVvl ? '1' : '';
-    tbody.dataset.sendnr = Object.keys(snCount).sort((a, b) => snCount[b] - snCount[a])[0] || '';
     tbody.dataset.startPos = pos === null ? '' : String(pos);
     // Kopfzeile passend zum Auftrag: VW = VSE · Sendungs-Nr. (ohne Pos.), sonst Pos. · HU-Nummer
     const thead = tbody.parentElement.tHead;
@@ -2272,14 +2264,12 @@ function saveHuAddFromModal() {
         packaging: tr.querySelector('.hu-add-pack').value.trim(),
         dimensions: tr.querySelector('.hu-add-dim').value.trim(),
         weightRaw: tr.querySelector('.hu-add-weight').value.trim()
-    })).filter(r => r.hu || r.packaging || r.dimensions || r.weightRaw || (r.sendnr && r.sendnr !== tbody.dataset.sendnr));   // nur vorbelegte Sendungs-Nr. = leere Zeile
+    })).filter(r => r.hu || r.sendnr || r.packaging || r.dimensions || r.weightRaw);
     if (!rows.length) return fail(`Bitte mindestens eine ${label} eingeben (oder scannen).`);
     const noHu = rows.find(r => !r.hu);
     if (noHu) return fail(`Eine Zeile hat Angaben, aber keine ${label}.`);
-    if (isVvl) {
-        const noSn = rows.find(r => !r.sendnr);
-        if (noSn) return fail(`Bitte die Sendungs-Nr. zu VSE ${noSn.hu} eintragen.`);
-        const badSn = rows.find(r => !/^[0-9A-Z-]+$/i.test(r.sendnr));
+    if (isVvl) {   // Sendungs-Nr. ist optional – wenn angegeben, nur Ziffern/Buchstaben/Bindestrich
+        const badSn = rows.find(r => r.sendnr && !/^[0-9A-Z-]+$/i.test(r.sendnr));
         if (badSn) return fail(`Sendungs-Nr. „${badSn.sendnr}“ nicht lesbar – nur Ziffern, Buchstaben und Bindestrich.`);
     }
     if (huAddValidateRows()) return fail(`Bitte die rot markierten ${isVvl ? 'VSE-Nummern' : 'HU-Nummern'} korrigieren (doppelt oder bereits vergeben).`);
@@ -6544,7 +6534,7 @@ if (huEditFormEl) {
         rowsEl.addEventListener('click', (e) => {
             const btn = e.target.closest('.hu-add-remove'); if (!btn) return;
             const tr = btn.closest('tr');
-            if (rowsEl.rows.length > HU_ADD_MIN_ROWS) tr.remove(); else tr.querySelectorAll('input').forEach(i => { i.value = i.classList.contains('hu-add-sendnr') ? (rowsEl.dataset.sendnr || '') : ''; i.title = ''; });
+            if (rowsEl.rows.length > HU_ADD_MIN_ROWS) tr.remove(); else tr.querySelectorAll('input').forEach(i => { i.value = ''; i.title = ''; });
             tr.classList.remove('hu-add-row-bad');
             huAddRenumber(); huAddEnsureTrailingEmptyRow(); huAddValidateRows(); huAddUpdateCount();
             const first = rowsEl.querySelector('.hu-add-hu'); if (first) first.focus();
