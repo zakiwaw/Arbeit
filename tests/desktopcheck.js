@@ -18,7 +18,7 @@ function bigData() {
     let page = await openApp(browser, backend, { viewport: { width: 1600, height: 900, deviceScaleFactor: 1 } });
     const rows = await page.$$eval('#shipmentTableBody tr[data-basenumber]', r => r.length);
     assert(rows === 15, `Desktop-Startseite zeigt 15 Zeilen (${rows})`);
-    const head = await page.$eval('#shipmentTableBody', tb => [...tb.closest('table').querySelectorAll('thead th')].filter(t => getComputedStyle(t).display !== 'none').map(t => t.textContent.trim()));
+    const head = await page.$eval('#shipmentTableBody', tb => [...tb.closest('table').querySelectorAll('thead th')].filter(t => getComputedStyle(t).display !== 'none').map(t => [...t.childNodes].filter(n => n.nodeType === 3 || getComputedStyle(n).display !== 'none').map(n => n.textContent).join('').trim()));
     assert(head.join('|') === 'HAWB.|Status|LKW|WE|Sich.|Gewicht|✎|Übersicht|Letzte Änd.|Aktionen|QR-Code', `Spaltenköpfe: ${head.join(' | ')}`);
     const h = await page.$eval('#shipmentTableBody tr[data-basenumber]', r => r.getBoundingClientRect().height);
     assert(h >= 30 && h <= 44, `Zeilenhöhe dicht: ${Math.round(h)} px`);
@@ -383,6 +383,15 @@ function bigData() {
       });
       assert(/hawb-cell-vvl/.test(vw.cls) && vw.grid === 'grid' && vw.cols === 'VVL100004158949 | Kundennr959201' && vw.side, `VW-Liste: VVL und Kundennr nebeneinander in zwei Spalten (${JSON.stringify(vw)})`);
       assert(vw.rowH <= 44 && vw.qr >= 40 && vw.fits, `VW-Liste: Zeile bleibt flach, QR-Spalte vollständig, kein Querscrollen (${JSON.stringify(vw)})`);
+      const vh = await page.evaluate(() => {
+        const t = document.querySelector('#pageContent .shipment-table'); const th = t.querySelector('th[data-sort="hawb"]');
+        const labels = [...th.querySelectorAll('.th-vvl span')]; const cell = t.querySelector('tr[data-basenumber="959201"] .hawb-cell'); const nos = [...cell.querySelectorAll('.vvl-col')];
+        return { vwOnly: t.classList.contains('vw-only'), hawbHidden: getComputedStyle(th.querySelector('.th-hawb')).display === 'none', labels: labels.map(l => l.textContent).join('|'),
+          prefixHidden: [...cell.querySelectorAll('.vvl-prefix, .kundennr-prefix')].every(e => getComputedStyle(e).display === 'none'),
+          aligned: Math.abs(labels[0].getBoundingClientRect().left - nos[0].getBoundingClientRect().left) < 2 && Math.abs(labels[1].getBoundingClientRect().left - nos[1].getBoundingClientRect().left) < 2,
+          rowH: Math.round(cell.getBoundingClientRect().height) };
+      });
+      assert(vh.vwOnly && vh.hawbHidden && vh.labels === 'VVL|Kundennr' && vh.prefixHidden && vh.aligned && vh.rowH <= 38, `VW-Liste: Kopf „VVL | Kundennr“ statt HAWB., Zeilen nur Nummern, bündig unter dem Kopf (${JSON.stringify(vh)})`);
       await page.evaluate(() => document.querySelector('tr[data-basenumber="959201"] .hawb-cell').click()); await wait(500);
       const pk = await page.evaluate(() => ({ head: [...document.querySelectorAll('.pack-table thead th')].map(t => t.textContent.trim()).join('|'), row: [...document.querySelectorAll('.pack-table tbody tr')[0].cells].map(c => c.textContent.trim()).slice(1, 3).join('|'), inHu: !!document.querySelector('.pack-table td.pack-hu .pack-sendnr') }));
       assert(pk.head === '|VSE|Sendungs-Nr.|Verpackung|Maße|Gewicht|WE|Sicherung|Zeit|Notiz|' && pk.row === '881226843|8386256' && !pk.inHu, `VW-Packstücke: VSE und Sendungs-Nr. als eigene Spalten (${JSON.stringify(pk)})`);
@@ -392,6 +401,7 @@ function bigData() {
       await page.evaluate(() => document.querySelector('tr[data-basenumber="9007000001"] .hawb-cell').click()); await wait(400);
       assert(await page.evaluate(() => [...document.querySelectorAll('.pack-table thead th')].map(t => t.textContent.trim()).join('|')) === '|HU|Verpackung|Maße|Gewicht|WE|Sicherung|Zeit|Notiz|', 'MAN-Auftrag: Packstücktabelle unverändert (keine Sendungs-Nr.-Spalte)');
       assert(await page.evaluate(() => !document.querySelector('tr[data-basenumber="9007000001"] .hawb-cell').classList.contains('hawb-cell-vvl')), 'MAN-Zeile: HAWB-Zelle unverändert');
+      assert(await page.evaluate(() => { const t = document.querySelector('#shipmentTableBody').closest('table'); const th = t.querySelector('th[data-sort="hawb"]'); return !t.classList.contains('vw-only') && getComputedStyle(th.querySelector('.th-hawb')).display !== 'none' && getComputedStyle(th.querySelector('.th-vvl')).display === 'none'; }), 'Startseite: Kopf weiterhin „HAWB.“');
       assert(page.__errors.length === 0, `VW-Spalten: keine JS-Fehler (${page.__errors.join('; ')})`);
       await page.close();
       // Handy: VW-Karte weiterhin untereinander (VVL über Kundennr)

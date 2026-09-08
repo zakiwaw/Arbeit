@@ -1237,6 +1237,7 @@ td.actions-cell button.restore-btn:hover, td.actions-cell button.restore-btn:act
     border-bottom: 2px solid var(--text-faint);
     transform: rotate(-45deg);
 }
+.th-vvl { display: none; }   /* Kopf „VVL | Kundennr“ nur in reinen VW-Tabellen am Desktop (Klasse vw-only, setzt script.js) */
 .vvl-table-entry { font-size: var(--fs-md); line-height: 1.35; }
 .vvl-table-entry .vvl-col { display: block; }
 .vvl-table-entry .vvl-prefix, .vvl-table-entry .kundennr-prefix { margin-right: 5px; }
@@ -2334,6 +2335,7 @@ body.modal-open { overflow: hidden; }
     .shipment-table td::before, .shipment-table td.hawb-cell::after { display: none; }
     .shipment-table td.hawb-cell { display: table-cell; min-height: 0; margin: 0; padding: 3px 10px; font-size: var(--fs-sm); font-weight: 700; letter-spacing: 0; }
     .shipment-table td.hawb-cell:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+    /* VW-Zeilen: VVL und Kundennr als zwei Spalten in einem Raster (Beschriftung klein darüber – für gemischte Listen) */
     .vvl-table-entry { display: grid; grid-template-columns: minmax(120px, 1.3fr) minmax(90px, 1fr); gap: 0 var(--sp-3); font-size: var(--fs-sm); line-height: 1.2; }
     .vvl-table-entry .vvl-col { display: flex; flex-direction: column; min-width: 0; }
     .vvl-table-entry .vvl-col-kunde { padding-left: var(--sp-3); border-left: 1px solid var(--border); }
@@ -2341,6 +2343,14 @@ body.modal-open { overflow: hidden; }
     .vvl-table-entry .vvl-prefix::after, .vvl-table-entry .kundennr-prefix::after { content: none; }
     .vvl-table-entry .vvl-no { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .shipment-table td.hawb-cell-vvl { padding-top: 4px; padding-bottom: 4px; }
+    /* Reine VW-Tabellen (LKW-Seite eines VW-LKW): Beschriftung EINMAL im Kopf – „HAWB.“ wird zu „VVL | KUNDENNR“ im selben
+       Raster wie die Zeilen (gleiche Spaltenbreiten → die Nummern fluchten darunter); die Zeilen zeigen nur noch die Nummern */
+    .shipment-table.vw-only th[data-sort="hawb"] .th-hawb, .shipment-table.vw-only th[data-sort="hawb"]::after { display: none; }
+    .shipment-table.vw-only th[data-sort="hawb"] .th-vvl { display: grid; grid-template-columns: minmax(120px, 1.3fr) minmax(90px, 1fr); gap: 0 var(--sp-3); }
+    .shipment-table.vw-only th[data-sort="hawb"] .th-vvl span:last-child { padding-left: var(--sp-3); border-left: 1px solid transparent; }   /* gleiche Einrückung wie die Zeilen (dort mit Trennlinie) */
+    .shipment-table.vw-only th[data-sort="hawb"].sorted-asc .th-vvl, .shipment-table.vw-only th[data-sort="hawb"].sorted-desc .th-vvl { color: var(--accent); }
+    .shipment-table.vw-only .vvl-table-entry .vvl-prefix, .shipment-table.vw-only .vvl-table-entry .kundennr-prefix { display: none; }
+    .shipment-table.vw-only td.hawb-cell-vvl { padding-top: 3px; padding-bottom: 3px; }
     .shipment-table td.time-cell { display: table-cell; margin: 0; white-space: nowrap; font-size: var(--fs-xs); font-variant-numeric: tabular-nums; color: var(--text-muted); }
     .shipment-table td.time-cell::before { display: none; }
     /* „Übersicht“-Pills wiederholen am Desktop nur die WE-/Sich.-Spalten → Spalte bleibt schmal und zeigt

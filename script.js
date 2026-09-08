@@ -3473,7 +3473,7 @@ function renderCurrentPage(fresh) {
     if (fresh || !r.update) r.render(); else r.update();
     updateHomeLayout();
 }
-const SHIPMENT_TABLE_HEAD = '<thead><tr><th data-sort="hawb">HAWB.</th>'
+const SHIPMENT_TABLE_HEAD = '<thead><tr><th data-sort="hawb"><span class="th-hawb">HAWB.</span><span class="th-vvl"><span>VVL</span><span>Kundennr</span></span></th>'
     + '<th class="dt-cell" data-sort="status">Status</th><th class="dt-cell" data-sort="truck">LKW</th><th class="dt-cell dt-num" data-sort="we" title="Wareneingang erfasst / erwartet">WE</th>'
     + '<th class="dt-cell dt-num" data-sort="sich" title="Gesichert (inkl. Dunkelalarm) / erwartet">Sich.</th><th class="dt-cell dt-num" data-sort="kg">Gewicht</th><th class="dt-cell dt-notes" title="Notizen">✎</th>'
     + '<th>Übersicht</th><th data-sort="time">Letzte Änd.</th><th>Aktionen</th><th class="qr-code-header">QR-Code</th></tr></thead>';
@@ -3506,6 +3506,8 @@ function appendShipmentGroups(container, groups) {
         table.innerHTML = SHIPMENT_TABLE_HEAD + '<tbody></tbody>';
         const tbody = table.tBodies[0];
         slice.forEach(r => appendPageShipmentRow(tbody, r.b, r.s, r.archived, r.chip, r.hits));
+        // Nur VW-Sendungen (alle mit VVL) → Kopf „VVL | Kundennr“ statt „HAWB.“, Beschriftung nicht mehr in jeder Zeile
+        if (slice.length && slice.every(r => r.s && r.s.parentOrderNumber)) table.classList.add('vw-only');
         container.appendChild(table);
     });
     if (shown < total) {
