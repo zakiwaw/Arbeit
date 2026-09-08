@@ -2584,8 +2584,6 @@ body.modal-open { overflow: hidden; }
     .hu-add-new .hu-add-table-vvl th:nth-child(1), .hu-add-new .hu-add-table-vvl td:nth-child(1) { width: 30%; min-width: 200px; padding-left: 6px; }
     .hu-add-new .hu-add-table-vvl th:nth-child(2), .hu-add-new .hu-add-table-vvl td:nth-child(2) { width: auto; min-width: 0; }
     .hu-add-table th.hu-add-sendnr-cell, .hu-add-table td.hu-add-sendnr-cell { width: 150px; }
-    .hu-add-table input.hu-add-sendnr { font-family: var(--font-mono, ui-monospace, monospace); color: var(--text-muted); }
-    .hu-add-table input.hu-add-sendnr:focus { color: var(--text); }
     .hu-add-existing .pack-table { table-layout: auto; }
     /* rechts zählt nur „was ist schon da“: Zeit- und Notiz-Spalte weglassen, damit alles ohne Querscrollen passt */
     .hu-add-existing .pack-table th:nth-last-child(-n+2), .hu-add-existing .pack-table td:nth-last-child(-n+2) { display: none; }
@@ -2613,7 +2611,7 @@ body.modal-open { overflow: hidden; }
     .hu-add-table input[type="text"] { height: 36px; padding: 0 var(--sp-2); font-size: var(--fs-sm); border-color: transparent; background: transparent; box-shadow: none; }
     .hu-add-table input[type="text"]:hover { border-color: var(--border); }
     .hu-add-table input[type="text"]:focus { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px var(--accent-soft); }
-    .hu-add-table input.hu-add-hu { font-family: var(--font-mono, ui-monospace, monospace); font-weight: 600; letter-spacing: .02em; }
+    .hu-add-table input.hu-add-hu { font-weight: 600; }   /* gleiche Schrift wie die übrigen Eingabefelder der Zeile, nur fett */
     .hu-add-row-bad td { background: var(--danger-soft); }
     .hu-add-row-bad input.hu-add-hu { color: var(--danger-text); }
     .hu-add-remove { width: 26px; height: 26px; padding: 0; font-size: 16px; line-height: 1; color: var(--text-faint); background: none; border: none; border-radius: var(--r-sm); cursor: pointer; }
