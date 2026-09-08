@@ -2256,7 +2256,7 @@ body.modal-open { overflow: hidden; }
    14. DESKTOP-LAYOUT (≥ 992px)
    =================================================================== */
 @media (min-width: 992px) {
-    .container { max-width: 1400px; margin: 0 auto; padding: var(--sp-5); }
+    .container { max-width: 1280px; margin: 0 auto; padding: var(--sp-5); }
     .app-bar { padding: var(--sp-2) var(--sp-6); }
 
     /* Tabelle wieder als Tabelle – dicht wie ein Arbeitsplatz-System: 1 Sendung = 1 Zeile (~36 px),
@@ -2484,7 +2484,7 @@ body.modal-open { overflow: hidden; }
     .pack-table td.pack-notes { max-width: 240px; }
     .pack-note { display: block; font-size: var(--fs-xs); color: var(--warning-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     #currentShipmentDetails .summary { max-width: 560px; }
-    #currentShipmentDetails > ul { max-width: none; }
+    #currentShipmentDetails > ul { max-width: 1100px; }
     .pack-status-note { display: inline-block; margin-left: 6px; font-size: 10px; font-weight: 600; color: var(--text-faint); white-space: nowrap; }
     .pack-table-plain td.pack-pos { width: 44px; }
     #huEditModal.piece-mode .hu-edit-number-group { display: none; }   /* Stück einer normalen Sendung: keine HU-Nummer */
@@ -2533,9 +2533,9 @@ body.modal-open { overflow: hidden; }
     .home-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-4); }
     .home-tile { min-height: 132px; }
     #pageView { padding: 0 var(--sp-6) var(--sp-8); }
-    .page-content { max-width: 1400px; margin: 0 auto; }   /* so breit wie die Startseite: dichte Tabelle braucht Platz */
+    .page-content { max-width: 1240px; margin: 0 auto; }   /* so breit wie die Startseite: dichte Tabelle braucht Platz */
     .page-shipments .row-chip { display: none; }            /* LKW steht am Desktop in der eigenen Spalte */
-    .page-summary, .page-banner, .page-details, .page-list { max-width: none; margin-left: 0; margin-right: 0; }
+    .page-summary, .page-banner, .page-details, .page-list { max-width: 900px; margin-left: auto; margin-right: auto; }
     .weight-hits { flex-basis: auto; margin-top: 0; }
 
     /* Info & Suche: Filter als feste Seitenleiste links, Ergebnisse rechts – wie ein Arbeitsplatz-System */
@@ -2640,40 +2640,3 @@ body.modal-open { overflow: hidden; }
 
 .lkw-empty { padding: var(--sp-2) var(--sp-3); font-size: var(--fs-xs); color: var(--text-faint); list-style: none; }
 .lkw-menu-item { width: 100%; overflow: hidden; -webkit-user-select: none; user-select: none; }
-
-/* ===== Große Bildschirme (Arbeitsplatz-Monitor): alles wächst mit, nichts bleibt in der Mitte klein ===== */
-@media (min-width: 1400px) {
-    html { font-size: 18px; }                          /* rem-basierte Schriften, Abstände und Zeilen skalieren mit */
-    .container, .page-content { max-width: none; padding-left: var(--sp-8); padding-right: var(--sp-8); }
-    #pageView, #detailView { padding-left: var(--sp-8); padding-right: var(--sp-8); }
-    .shipment-table th { font-size: 12px; padding: 8px 12px; }
-    .shipment-table th.qr-code-header { font-size: 0; }          /* Kopf „QR“ kommt weiter aus ::before */
-    .shipment-table th.qr-code-header::before { font-size: 12px; }
-    .shipment-table th:nth-child(8) { font-size: 0; padding: 0; }
-    .shipment-table:has(.weight-hits) th:nth-child(8) { font-size: 12px; padding: 8px 12px; }
-    .shipment-table td { height: 42px; padding: 4px 12px; }
-    .shipment-table td.actions-cell { width: 128px; }
-    td.actions-cell button { width: 34px; height: 34px; }
-    .home-tile { min-height: 150px; }
-    .pack-table th { font-size: 12px; padding: 8px 12px; }
-    .pack-table td { height: 40px; padding: 6px 12px; }
-    .pack-table td.pack-notes { max-width: 360px; }
-    .detail-fact-label { font-size: 11px; }
-    .detail-actions button { width: 40px; height: 40px; }
-    .modal-content { max-width: 640px; }
-    #huEditModal .modal-content { max-width: 560px; }
-    #huAddModal .modal-content { max-width: min(1400px, 92vw); }
-    .hu-add-table-wrap { max-height: 60vh; }
-    .hu-add-table input[type="text"] { height: 40px; }
-    .order-add-content { max-width: 720px; }
-    #openHusModal .modal-content, #importHuModal .modal-content { max-width: 760px; }
-    .info-layout { grid-template-columns: 290px minmax(0, 1fr); gap: var(--sp-6); }
-}
-@media (min-width: 1900px) {
-    html { font-size: 20px; }
-    .shipment-table td { height: 46px; }
-    .pack-table td { height: 44px; }
-    .home-tile { min-height: 170px; }
-    .info-layout { grid-template-columns: 320px minmax(0, 1fr); }
-    #huAddModal .modal-content { max-width: min(1600px, 90vw); }
-}
