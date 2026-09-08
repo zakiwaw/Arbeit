@@ -2507,6 +2507,24 @@ body.modal-open { overflow: hidden; }
     .pack-edit-btn:hover { background-color: var(--accent-soft); color: var(--accent-text) !important; opacity: 1; }
     body.batch-mode-active .pack-edit-btn { display: none; }   /* wie „Bearbeiten“ in der Liste */
     #huEditModal .modal-content { max-width: 460px; }
+    #huAddModal .modal-content { max-width: 960px; }
+    .hu-add-table-wrap { max-height: 52vh; overflow: auto; margin: 0 0 var(--sp-2); border: 1px solid var(--border); border-radius: var(--r-md); }
+    .hu-add-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+    .hu-add-table th { position: sticky; top: 0; z-index: 1; padding: 6px 8px; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; text-align: left; color: var(--text-muted); background: var(--surface-2); border-bottom: 1px solid var(--border); }
+    .hu-add-table td { padding: 4px 4px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    .hu-add-table tr:last-child td { border-bottom: none; }
+    .hu-add-table th.hu-add-pos, .hu-add-table td.hu-add-pos { width: 52px; padding-left: 10px; font-family: var(--font-mono, ui-monospace, monospace); font-size: var(--fs-sm); color: var(--text-faint); white-space: nowrap; }
+    .hu-add-table th.hu-add-kg, .hu-add-table td.hu-add-kg { width: 120px; }
+    .hu-add-table th.hu-add-x, .hu-add-table td.hu-add-x { width: 34px; padding: 0 4px; text-align: center; }
+    .hu-add-table input[type="text"] { height: 36px; padding: 0 var(--sp-2); font-size: var(--fs-sm); border-color: transparent; background: transparent; box-shadow: none; }
+    .hu-add-table input[type="text"]:hover { border-color: var(--border); }
+    .hu-add-table input[type="text"]:focus { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px var(--accent-soft); }
+    .hu-add-table input.hu-add-hu { font-family: var(--font-mono, ui-monospace, monospace); font-weight: 600; letter-spacing: .02em; }
+    .hu-add-row-bad td { background: var(--danger-soft); }
+    .hu-add-row-bad input.hu-add-hu { color: var(--danger-text); }
+    .hu-add-remove { width: 26px; height: 26px; padding: 0; font-size: 16px; line-height: 1; color: var(--text-faint); background: none; border: none; border-radius: var(--r-sm); cursor: pointer; }
+    .hu-add-remove:hover { color: var(--danger-text); background: var(--danger-soft); }
+    .hu-add-hint { margin: 0 0 var(--sp-3); font-size: var(--fs-xs); color: var(--text-faint); }
     .hu-edit-context { margin: calc(-1 * var(--sp-2)) 0 var(--sp-4); font-size: var(--fs-sm); color: var(--text-muted); }
     #huEditNumber { font-family: var(--font-mono); font-weight: 700; letter-spacing: .02em; }
     .hu-edit-error { margin: calc(-1 * var(--sp-2)) 0 var(--sp-3); padding: var(--sp-2) var(--sp-3); font-size: var(--fs-sm); font-weight: 600; color: var(--danger-text); background-color: var(--danger-soft); border-radius: var(--r-md); }

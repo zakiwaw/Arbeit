@@ -197,7 +197,7 @@ function bigData() {
       await page.close();
     }
 
-    // ---- „+ Packstück“: weitere HU zu einem HU-Auftrag aufnehmen (Pos. automatisch, Kolli +1) ----
+    // ---- „+ Packstück“: mehrere HUs auf einmal (Zeilentabelle, Enter/Scan → nächste Zeile, Pos. fortlaufend, Kolli +n) ----
     {
       const d = bigData(); const now = Date.now(); const iso = ago => new Date(now - ago * 60e3).toISOString();
       const mk = (hu, pos, st, ago) => ({ rawInput: hu, position: pos, status: st, timestamp: iso(ago), isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null, packaging: 'Carton', dimensions: '10x10x10 CM', grossWeight: '3 KG' });
@@ -208,36 +208,42 @@ function bigData() {
       await page.evaluate(() => document.querySelector('tr[data-basenumber="9008296222"] .hawb-cell').click()); await wait(400);
       assert(await page.$eval('.detail-pack-head .pack-add-btn', b => b.textContent.trim()) === '+ Packstück', '„+ Packstück“ in der Kopfzeile der Packstücktabelle');
       await page.evaluate(() => document.querySelector('.pack-add-btn').click()); await wait(300);
-      const m = await page.evaluate(() => ({ title: document.querySelector('#huEditModal h3').textContent, ctx: document.getElementById('huEditContext').textContent, focus: document.activeElement.id, hu: document.getElementById('huEditNumber').value }));
-      assert(m.title === 'Packstück hinzufügen' && m.ctx === 'Rechnung 9008296222 · neue Position 10 · Kolli 9 → 10' && m.focus === 'huEditNumber' && m.hu === '', `Modal „Packstück hinzufügen“: Pos. 10, Kolli 9 → 10, Fokus HU (${JSON.stringify(m)})`);
-      await page.evaluate(() => document.getElementById('saveHuEditButton').click()); await wait(200);
-      assert(/HU-Nummer eingeben/.test(await page.$eval('#huEditError', e => e.textContent)), 'Hinzufügen: leere HU wird abgelehnt');
-      await page.evaluate(() => { document.getElementById('huEditNumber').value = 'ADD0012'; document.getElementById('saveHuEditButton').click(); }); await wait(200);
-      assert(/gibt es bereits in diesem Auftrag/.test(await page.$eval('#huEditError', e => e.textContent)), 'Hinzufügen: doppelte HU im selben Auftrag wird abgelehnt');
-      await page.evaluate(() => { document.getElementById('huEditNumber').value = 'HU5002'; document.getElementById('saveHuEditButton').click(); }); await wait(200);
-      assert(/gibt es bereits im Auftrag 9007000005/.test(await page.$eval('#huEditError', e => e.textContent)), 'Hinzufügen: HU aus anderem Auftrag wird abgelehnt');
-      await page.evaluate(() => { document.getElementById('huEditNumber').value = 'ADD0099'; document.getElementById('huEditWeight').value = '5'; document.getElementById('saveHuEditButton').click(); }); await wait(600);
+      const m = await page.evaluate(() => ({ vis: document.getElementById('huAddModal').classList.contains('visible'), ctx: document.getElementById('huAddContext').textContent, rows: document.querySelectorAll('#huAddRows tr').length, pos: [...document.querySelectorAll('.hu-add-pos-no')].map(e => e.textContent).join(), focus: document.activeElement.className, width: Math.round(document.querySelector('#huAddModal .modal-content').getBoundingClientRect().width) }));
+      assert(m.vis && m.ctx === 'Rechnung 9008296222 · ab Position 10 · bisher 9 Packstücke' && m.rows === 3 && m.pos === '10.,11.,12.' && m.focus === 'hu-add-hu' && m.width >= 900, `Breites Modal mit 3 Leerzeilen ab Pos. 10, Fokus in der ersten HU-Zelle (${JSON.stringify(m)})`);
+      // Scanner-Simulation: HU + Enter, viermal
+      for (const hu of ['ADD0091', 'ADD0092', 'ADD0093', 'ADD0094']) { await page.keyboard.type(hu); await page.keyboard.press('Enter'); await wait(60); }
+      const typed = await page.evaluate(() => ({ rows: document.querySelectorAll('#huAddRows tr').length, hus: [...document.querySelectorAll('.hu-add-hu')].map(e => e.value).join('|'), focusRow: document.activeElement.closest('tr').rowIndex }));
+      assert(typed.rows === 5 && typed.hus === 'ADD0091|ADD0092|ADD0093|ADD0094|' && typed.focusRow === 5, `Enter springt zur nächsten Zeile, neue Leerzeile wird angehängt (${JSON.stringify(typed)})`);
+      await page.keyboard.type('ADD0092'); await wait(120);
+      const bad = await page.$$eval('.hu-add-row-bad .hu-add-hu', e => e.map(x => x.value + ':' + x.title).join('|'));
+      assert(bad === 'ADD0092:Doppelt in dieser Liste', `Doppelte HU wird sofort rot markiert (${bad})`);
+      await page.evaluate(() => document.getElementById('saveHuAddButton').click()); await wait(200);
+      assert(/rot markierten/.test(await page.$eval('#huAddError', e => e.textContent)), 'Speichern mit Duplikat wird abgelehnt');
+      await page.evaluate(() => { document.querySelector('.hu-add-row-bad .hu-add-hu').value = 'HU5002'; document.querySelector('#huAddRows .hu-add-hu').dispatchEvent(new Event('input', { bubbles: true })); }); await wait(120);
+      assert(/im Auftrag 9007000005/.test(await page.$eval('.hu-add-row-bad .hu-add-hu', e => e.title)), 'HU aus anderem Auftrag wird rot markiert');
+      await page.evaluate(() => document.querySelector('.hu-add-row-bad .hu-add-remove').click()); await wait(100);
+      await page.evaluate(() => { const rows = document.querySelectorAll('#huAddRows tr'); rows[1].querySelector('.hu-add-weight').value = '12,5'; rows[1].querySelector('.hu-add-pack').value = 'Palette'; rows[2].querySelector('.hu-add-weight').value = 'schwer'; });
+      await page.evaluate(() => document.getElementById('saveHuAddButton').click()); await wait(200);
+      assert(/Gewicht bei HU ADD0093 nicht lesbar/.test(await page.$eval('#huAddError', e => e.textContent)), 'Unlesbares Gewicht wird mit HU-Nummer gemeldet');
+      await page.evaluate(() => { document.querySelectorAll('#huAddRows tr')[2].querySelector('.hu-add-weight').value = ''; document.getElementById('saveHuAddButton').click(); }); await wait(700);
       const after = await page.evaluate(() => {
         const s = JSON.parse(localStorage.getItem('frachtSicherungMobile_V8_18_Refactored'))['9008296222'];
-        const last = s.scannedItems[s.scannedItems.length - 1];
-        const rows = [...document.querySelectorAll('.pack-table tbody tr')];
-        return { modal: document.getElementById('huEditModal').classList.contains('visible'), tot: s.totalPiecesExpected, last: last.rawInput + ':' + last.status + ':' + last.position + ':' + last.grossWeight, rows: rows.length, lastRow: rows[rows.length - 1].cells[0].textContent.trim() + rows[rows.length - 1].cells[1].textContent.trim(), h4: document.querySelector('.detail-pack-head h4').textContent, kolli: [...document.querySelectorAll('.detail-fact')].map(f => f.textContent.replace(/\s+/g, ' ')).find(x => /Kolli/.test(x)) };
+        return { modal: document.getElementById('huAddModal').classList.contains('visible'), tot: s.totalPiecesExpected, added: s.scannedItems.slice(9).map(i => i.rawInput + '@' + i.position + ':' + i.status + ':' + (i.grossWeight || '') + ':' + (i.packaging || '')).join(' '), rows: document.querySelectorAll('.pack-table tbody tr').length, h4: document.querySelector('.detail-pack-head h4').textContent, kolli: [...document.querySelectorAll('.detail-fact')].map(f => f.textContent.replace(/\s+/g, ' ')).find(x => /Kolli/.test(x)) };
       });
-      assert(!after.modal && after.tot === 10 && after.last === 'ADD0099:Anstehend:10:5 KG', `Neue HU als Platz „Anstehend“ mit Pos. 10, Kolli 10 (${JSON.stringify(after)})`);
-      assert(after.rows === 10 && after.lastRow === '10.ADD0099' && after.h4 === 'Packstücke (10)' && /Kolli ?10/.test(after.kolli), `Tabelle/Kopf zeigen das neue Packstück (${after.lastRow}, ${after.h4}, ${after.kolli})`);
-      assert(be.store['9008296222'] && be.store['9008296222'].totalPiecesExpected === 10 && be.store['9008296222'].scannedItems.some(i => i.rawInput === 'ADD0099'), 'Neues Packstück ist beim Server angekommen');
-      // Scan der neuen HU sichert den Platz ganz normal
+      assert(!after.modal && after.tot === 13 && after.added === 'ADD0091@10:Anstehend:: ADD0092@11:Anstehend:12,5 KG:Palette ADD0093@12:Anstehend:: ADD0094@13:Anstehend::', `4 Packstücke auf einmal: Pos. 10–13 als „Anstehend“, Kolli 13 (${JSON.stringify(after)})`);
+      assert(after.rows === 13 && after.h4 === 'Packstücke (13)' && /Kolli ?13/.test(after.kolli), `Tabelle/Kopf zeigen 13 Packstücke (${after.h4}, ${after.kolli})`);
+      assert(be.store['9008296222'] && be.store['9008296222'].totalPiecesExpected === 13 && be.store['9008296222'].scannedItems.filter(i => /^ADD009/.test(i.rawInput)).length === 4, 'Neue Packstücke sind beim Server angekommen');
+      // Scan einer neuen HU sichert ihren Platz ganz normal
       await page.evaluate(() => document.getElementById('backToMainViewBtn').click()); await wait(300);
-      await scan(page, 'ADD0099', 600);
-      const scanned = await page.evaluate(() => JSON.parse(localStorage.getItem('frachtSicherungMobile_V8_18_Refactored'))['9008296222'].scannedItems.filter(i => i.rawInput === 'ADD0099').map(i => i.status + '@' + i.position).join(','));
-      assert(scanned === 'XRY@10,Wareneingang@10', `Scan der neuen HU wird wie jede HU auf Platz 10 verbucht (${scanned})`);
-      // Batch-Modus: die App leert die Detailansicht (displayCurrentShipmentDetails('')) → kein „+ Packstück“ erreichbar;
-      // nach dem Ausschalten ist die Detailansicht samt Button wieder da
+      await scan(page, 'ADD0093', 600);
+      const scanned = await page.evaluate(() => JSON.parse(localStorage.getItem('frachtSicherungMobile_V8_18_Refactored'))['9008296222'].scannedItems.filter(i => i.rawInput === 'ADD0093').map(i => i.status + '@' + i.position).join(','));
+      assert(scanned === 'XRY@12,Wareneingang@12', `Scan der neuen HU wird wie jede HU auf Platz 12 verbucht (${scanned})`);
+      // Batch-Modus: die App leert die Detailansicht → kein „+ Packstück“; danach wieder da
       await page.evaluate(() => { const v = document.getElementById('detailView'); if (getComputedStyle(v).display !== 'none') document.getElementById('backToMainViewBtn').click(); }); await wait(300);
       await page.evaluate(() => document.querySelector('tr[data-basenumber="9008296222"] .hawb-cell').click()); await wait(400);
       assert(await page.$eval('.pack-add-btn', b => getComputedStyle(b).display !== 'none'), 'Nach dem Scan: „+ Packstück“ wieder sichtbar');
       await setBatchMode(page, true); await wait(300);
-      assert(await page.evaluate(() => document.body.classList.contains('batch-mode-active') && !document.querySelector('.pack-add-btn:not([style*="display: none"])') || !document.querySelector('.pack-add-btn') || getComputedStyle(document.querySelector('.pack-add-btn')).display === 'none'), 'Batch-Modus: „+ Packstück“ nicht erreichbar');
+      assert(await page.evaluate(() => !document.querySelector('.pack-add-btn') || getComputedStyle(document.querySelector('.pack-add-btn')).display === 'none'), 'Batch-Modus: „+ Packstück“ nicht erreichbar');
       await setBatchMode(page, false); await wait(300);
       await page.evaluate(() => document.getElementById('backToMainViewBtn').click()); await wait(300);
       await page.evaluate(() => document.querySelector('tr[data-basenumber="9008296222"] .hawb-cell').click()); await wait(400);
