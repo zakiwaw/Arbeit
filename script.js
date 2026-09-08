@@ -1941,8 +1941,9 @@ function buildDetailPackTable(shipment, readOnly, base) {
         const weHtml = we ? `<span class="pack-we ok" title="Wareneingang erfasst">WE</span>` : `<span class="pack-we" title="Kein Wareneingang">–</span>`;
         const timeHtml = open ? '' : escapeHtml(fmtTime(item.timestamp));
         const rowClass = dunkel.length ? 'pack-row-danger' : (open ? 'pack-row-open' : 'pack-row-done');
-        // Auswahl-Kästchen: nur offene Packstücke lassen sich auswählen (gesicherte haben nichts mehr zu bekommen)
-        const selectCell = readOnly ? '' : `<td class="pack-select-cell"><input type="checkbox" class="pack-select" data-hu="${escapeHtml(hu)}"${open ? '' : ' disabled'} title="${open ? `${escapeHtml(hu)} auswählen` : 'bereits gesichert'}" aria-label="${escapeHtml(hu)} auswählen"></td>`;
+        // Auswahl-Kästchen an jeder Zeile: offene Packstücke können eine Kontrollmethode bekommen, gesicherte storniert werden
+        // (data-state steuert, welche Knöpfe die Leiste zeigt; data-timestamp = der Sicherungs-Eintrag für den Storno)
+        const selectCell = readOnly ? '' : `<td class="pack-select-cell"><input type="checkbox" class="pack-select" data-hu="${escapeHtml(hu)}" data-state="${open ? 'open' : 'secured'}"${open ? '' : ` data-timestamp="${escapeHtml(item.timestamp)}"`} title="${escapeHtml(hu)} auswählen" aria-label="${escapeHtml(hu)} auswählen"></td>`;
         return `<tr class="${rowClass}">`
             + selectCell
             + (hasPos ? `<td class="pack-pos">${item.position ? escapeHtml(String(item.position)) + '.' : ''}</td>` : '')
@@ -1962,14 +1963,15 @@ function buildDetailPackTable(shipment, readOnly, base) {
     // verbucht sie für jede gewählte HU genau wie einen Scan (gleiche Funktion, gleiche Regeln, gleicher Sync)
     const selectBar = readOnly ? '' : `<div class="pack-select-bar hidden" data-basenumber="${escapeHtml(base || shipment.hawb || '')}">`
         + `<span class="pack-select-count">0 ausgewählt</span>`
-        + `<label class="pack-select-label">Kontrollmethode <select class="pack-select-status">${EXCLUSIVE_SECURITY_STATUSES.map(s => `<option value="${s}">${s}</option>`).join('')}<option value="Wareneingang">Wareneingang</option><option value="Dunkelalarm">Dunkelalarm</option></select></label>`
-        + `<button type="button" class="pack-select-apply">Übernehmen</button>`
+        + `<span class="pack-select-group pack-select-group-apply"><label class="pack-select-label">Kontrollmethode <select class="pack-select-status">${EXCLUSIVE_SECURITY_STATUSES.map(s => `<option value="${s}">${s}</option>`).join('')}<option value="Wareneingang">Wareneingang</option><option value="Dunkelalarm">Dunkelalarm</option></select></label>`
+        + `<button type="button" class="pack-select-apply">Übernehmen</button></span>`
+        + `<span class="pack-select-group pack-select-group-cancel"><button type="button" class="pack-select-cancel">Storno</button></span>`
         + `<button type="button" class="pack-select-clear">Auswahl aufheben</button>`
         + `</div>`;
     return `<div class="detail-pack">`
         + `<div class="detail-pack-head"><h4>Packstücke (${slots.length})</h4><span class="detail-pack-meta">${openCount ? `${openCount} offen` : 'alle gesichert'}</span>${readOnly ? '' : `<button type="button" class="pack-add-btn" data-basenumber="${escapeHtml(base || shipment.hawb || '')}" title="Weiteres Packstück zu diesem Auftrag aufnehmen">+ Packstück</button>`}</div>`
         + selectBar
-        + `<table class="pack-table"><thead><tr>${readOnly ? '' : `<th class="pack-select-cell"><input type="checkbox" class="pack-select-all" title="Alle offenen Packstücke auswählen" aria-label="Alle offenen Packstücke auswählen"${openCount ? '' : ' disabled'}></th>`}${hasPos ? '<th>Pos.</th>' : ''}<th>${isVvl ? 'VSE / Sendungs-Nr.' : 'HU'}</th><th>Verpackung</th><th>Maße</th><th>Gewicht</th><th>WE</th><th>Sicherung</th><th>Zeit</th><th>Notiz</th>${readOnly ? '' : '<th class="pack-edit-head"></th>'}</tr></thead>`
+        + `<table class="pack-table"><thead><tr>${readOnly ? '' : `<th class="pack-select-cell"><input type="checkbox" class="pack-select-all" title="Alle Packstücke auswählen" aria-label="Alle Packstücke auswählen"></th>`}${hasPos ? '<th>Pos.</th>' : ''}<th>${isVvl ? 'VSE / Sendungs-Nr.' : 'HU'}</th><th>Verpackung</th><th>Maße</th><th>Gewicht</th><th>WE</th><th>Sicherung</th><th>Zeit</th><th>Notiz</th>${readOnly ? '' : '<th class="pack-edit-head"></th>'}</tr></thead>`
         + `<tbody>${rows}</tbody></table></div>`;
 }
 
@@ -2267,9 +2269,13 @@ function updatePackSelectionBar() {
     const bar = currentDetailsDivEl ? currentDetailsDivEl.querySelector('.pack-select-bar') : null;
     if (!bar) return;
     const boxes = Array.from(currentDetailsDivEl.querySelectorAll('.pack-select:not(:disabled)'));
-    const n = boxes.filter(cb => cb.checked).length;
+    const checked = boxes.filter(cb => cb.checked);
+    const n = checked.length, open = checked.filter(cb => cb.dataset.state === 'open').length, secured = n - open;
     bar.classList.toggle('hidden', n === 0);
-    bar.querySelector('.pack-select-count').textContent = `${n} ausgewählt`;
+    const parts = []; if (open) parts.push(`${open} offen`); if (secured) parts.push(`${secured} gesichert`);
+    bar.querySelector('.pack-select-count').textContent = `${n} ausgewählt` + (n && parts.length ? ` (${parts.join(' · ')})` : '');
+    bar.querySelector('.pack-select-group-apply').classList.toggle('hidden', open === 0);     // Kontrollmethode nur für offene
+    bar.querySelector('.pack-select-group-cancel').classList.toggle('hidden', secured === 0); // Storno nur für gesicherte
     const all = currentDetailsDivEl.querySelector('.pack-select-all');
     if (all) { all.checked = boxes.length > 0 && n === boxes.length; all.indeterminate = n > 0 && n < boxes.length; }
 }
@@ -2279,8 +2285,8 @@ function applyStatusToSelectedPacks(bar) {
     if (!bar) return;
     const base = bar.dataset.basenumber;
     const status = bar.querySelector('.pack-select-status').value;
-    const hus = Array.from(currentDetailsDivEl.querySelectorAll('.pack-select:checked:not(:disabled)')).map(cb => cb.dataset.hu);
-    if (!hus.length) { displayError('Bitte zuerst Packstücke auswählen.'); return; }
+    const hus = Array.from(currentDetailsDivEl.querySelectorAll('.pack-select:checked:not(:disabled)')).filter(cb => cb.dataset.state === 'open').map(cb => cb.dataset.hu);
+    if (!hus.length) { displayError('Bitte zuerst offene Packstücke auswählen.'); return; }
     if (!confirm(`${status} für ${pluralize(hus.length, 'Packstück', 'Packstücke')} eintragen?\n\n${hus.join(', ')}`)) return;
     const done = [], failed = [];
     hus.forEach(hu => {
@@ -2292,6 +2298,19 @@ function applyStatusToSelectedPacks(bar) {
     displayCurrentShipmentDetails(base);
     if (done.length) displayError(`${status} für ${pluralize(done.length, 'Packstück', 'Packstücke')} eingetragen.`, 'green', 2500);
     if (failed.length) displayError(`Nicht übernommen – ${failed.join(' · ')}`.replace(/<[^>]+>/g, ''), 'orange');
+}
+// Storno für die Auswahl: je gesichertem Packstück wird der Sicherungs-Eintrag storniert – über dieselbe Funktion wie der
+// Storno-Knopf in der Zeitleiste (Eintrag bleibt als „storniert“ sichtbar, die HU bekommt wieder einen offenen Platz).
+function cancelSelectedPacks(bar) {
+    if (!bar) return;
+    const base = bar.dataset.basenumber;
+    const picks = Array.from(currentDetailsDivEl.querySelectorAll('.pack-select:checked:not(:disabled)')).filter(cb => cb.dataset.state === 'secured' && cb.dataset.timestamp).map(cb => ({ hu: cb.dataset.hu, ts: cb.dataset.timestamp }));
+    if (!picks.length) { displayError('Bitte zuerst gesicherte Packstücke auswählen.'); return; }
+    if (!confirm(`Sicherung von ${pluralize(picks.length, 'Packstück', 'Packstücken')} stornieren?\n\n${picks.map(p => p.hu).join(', ')}\n\nDie Packstücke sind danach wieder offen; die Einträge bleiben als „storniert“ in der Zeitleiste.`)) return;
+    picks.forEach(p => cancelScanItem(base, p.ts));   // zeichnet die Details je Aufruf neu und speichert
+    renderTable();
+    displayCurrentShipmentDetails(base);
+    displayError(`${pluralize(picks.length, 'Sicherung', 'Sicherungen')} storniert – ${picks.map(p => p.hu).join(', ')} wieder offen.`, 'green', 3000);
 }
 function closeHuEditModal() {
     const modal = document.getElementById('huEditModal');
@@ -5056,7 +5075,10 @@ function saveBatch() {
                         isCombination: false,
                         notes: [],
                         isCancelled: false,
-                        cancelledTimestamp: null
+                        cancelledTimestamp: null,
+                        // Platz behält seine Nummer und Packdaten – sonst rutscht er ohne Position ans Ende der Packstücktabelle
+                        position: itemToCancel.position, sendnr: itemToCancel.sendnr,
+                        packaging: itemToCancel.packaging || null, dimensions: itemToCancel.dimensions || null, grossWeight: itemToCancel.grossWeight || null
                     };
                     shipment.scannedItems.push(newPlaceholderItem);
                 }
@@ -5831,6 +5853,9 @@ document.addEventListener('click', (event) => {
     }
     else if (target.closest('.pack-select-apply')) {
         if (!isBatchModeActive) applyStatusToSelectedPacks(target.closest('.pack-select-bar'));
+    }
+    else if (target.closest('.pack-select-cancel')) {
+        if (!isBatchModeActive) cancelSelectedPacks(target.closest('.pack-select-bar'));
     }
     // Packstücktabelle: „+ Packstück“ → weitere HU aufnehmen
     else if (target.closest('.pack-add-btn')) {

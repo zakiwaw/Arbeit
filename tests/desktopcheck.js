@@ -282,20 +282,30 @@ function bigData() {
       assert(sel0.boxes === 4 && sel0.all && sel0.bar && sel0.options === 'XRY,ETD,EDD,PHS,VCK,Wareneingang,Dunkelalarm', `Kästchen je Packstück + „Alle“, Leiste zunächst verborgen, Methoden wie im Scan-Feld (${JSON.stringify(sel0)})`);
       await page.evaluate(() => { const b = document.querySelectorAll('.pack-select'); b[1].click(); b[2].click(); }); await wait(150);
       const sel1 = await page.evaluate(() => ({ bar: !document.querySelector('.pack-select-bar').classList.contains('hidden'), count: document.querySelector('.pack-select-count').textContent, indet: document.querySelector('.pack-select-all').indeterminate }));
-      assert(sel1.bar && sel1.count === '2 ausgewählt' && sel1.indet, `2 angehakt → Leiste „2 ausgewählt“, „Alle“ halb (${JSON.stringify(sel1)})`);
+      assert(sel1.bar && sel1.count === '2 ausgewählt (2 offen)' && sel1.indet, `2 angehakt → Leiste „2 ausgewählt (2 offen)“, „Alle“ halb (${JSON.stringify(sel1)})`);
       await page.evaluate(() => { document.querySelector('.pack-select-status').value = 'ETD'; document.querySelector('.pack-select-apply').click(); }); await wait(700);
       const sel2 = await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('frachtSicherungMobile_V8_18_Refactored'))['9008295951'];
         return { items: s.scannedItems.map(i => i.rawInput + ':' + i.status + '@' + i.position).join(' '), dis: [...document.querySelectorAll('.pack-select')].map(b => b.disabled ? 1 : 0).join(''), bar: document.querySelector('.pack-select-bar').classList.contains('hidden'), meta: document.querySelector('.detail-pack-meta').textContent }; });
       assert(sel2.items === 'SEL0001:Anstehend@1 SEL0002:ETD@2 SEL0003:ETD@3 SEL0004:Anstehend@4 SEL0002:Wareneingang@2 SEL0003:Wareneingang@3', `ETD für die Auswahl: Plätze 2+3 gesichert, Wareneingang automatisch – wie beim Scan (${sel2.items})`);
-      assert(sel2.dis === '0110' && sel2.bar && sel2.meta === '2 offen', `Gesicherte Packstücke nicht mehr anwählbar, Leiste wieder zu, „2 offen“ (${JSON.stringify(sel2)})`);
+      assert(sel2.dis === '0000' && sel2.bar && sel2.meta === '2 offen', `Alle Kästchen bleiben anwählbar (gesicherte für Storno), Leiste wieder zu, „2 offen“ (${JSON.stringify(sel2)})`);
       assert(be.store['9008295951'].scannedItems.filter(i => i.status === 'ETD').length === 2, 'Manuell vergebene Leistungen sind beim Server angekommen');
       // „Alle“ → XRY für den Rest; danach Auftrag fertig und nichts mehr anwählbar
       await page.evaluate(() => document.querySelector('.pack-select-all').click()); await wait(150);
-      assert(await page.$eval('.pack-select-count', e => e.textContent) === '2 ausgewählt', '„Alle“ wählt nur die offenen Packstücke');
+      assert(await page.$eval('.pack-select-count', e => e.textContent) === '4 ausgewählt (2 offen · 2 gesichert)', '„Alle“ wählt alle Packstücke; Zähler nennt offen/gesichert');
+      assert(await page.evaluate(() => !document.querySelector('.pack-select-group-apply').classList.contains('hidden') && !document.querySelector('.pack-select-group-cancel').classList.contains('hidden')), 'Gemischte Auswahl: „Übernehmen“ und „Storno“ sichtbar');
       await page.evaluate(() => document.querySelector('.pack-select-apply').click()); await wait(700);
       const sel3 = await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('frachtSicherungMobile_V8_18_Refactored'))['9008295951'];
         return { sec: s.scannedItems.filter(i => i.status !== 'Wareneingang').map(i => i.status).join(','), we: s.scannedItems.filter(i => i.status === 'Wareneingang').length, allDis: document.querySelector('.pack-select-all').disabled, status: document.querySelector('.detail-fact .status-text, .detail-fact')?.textContent.replace(/\s+/g, ' ') }; });
-      assert(sel3.sec === 'XRY,ETD,ETD,XRY' && sel3.we === 4 && sel3.allDis && /Fertig/.test(sel3.status), `Rest per „Alle“ auf XRY: Auftrag fertig, „Alle“ gesperrt (${JSON.stringify(sel3)})`);
+      assert(sel3.sec === 'XRY,ETD,ETD,XRY' && sel3.we === 4 && !sel3.allDis && /Fertig/.test(sel3.status), `„Übernehmen“ wirkt nur auf die offenen: Rest XRY, Auftrag fertig (${JSON.stringify(sel3)})`);
+      // Storno für die Auswahl: nur gesicherte, Einträge bleiben als storniert, Packstücke wieder offen
+      await page.evaluate(() => { const b = document.querySelectorAll('.pack-select'); b[1].click(); b[2].click(); }); await wait(150);
+      const st0 = await page.evaluate(() => ({ count: document.querySelector('.pack-select-count').textContent, apply: !document.querySelector('.pack-select-group-apply').classList.contains('hidden'), cancel: !document.querySelector('.pack-select-group-cancel').classList.contains('hidden') }));
+      assert(st0.count === '2 ausgewählt (2 gesichert)' && !st0.apply && st0.cancel, `Nur gesicherte gewählt → nur „Storno“ (${JSON.stringify(st0)})`);
+      await page.evaluate(() => document.querySelector('.pack-select-cancel').click()); await wait(800);
+      const st1 = await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('frachtSicherungMobile_V8_18_Refactored'))['9008295951'];
+        return { cancelled: s.scannedItems.filter(i => i.isCancelled).map(i => i.rawInput + ':' + i.status).join(','), open: s.scannedItems.filter(i => !i.isCancelled && i.status === 'Anstehend').map(i => i.rawInput).join(','), we: s.scannedItems.filter(i => i.status === 'Wareneingang' && !i.isCancelled).length, meta: document.querySelector('.detail-pack-meta').textContent, bar: document.querySelector('.pack-select-bar').classList.contains('hidden'), status: document.querySelector('.detail-fact')?.textContent.replace(/\s+/g, ' ') }; });
+      assert(st1.cancelled === 'SEL0002:ETD,SEL0003:ETD' && st1.open === 'SEL0002,SEL0003' && st1.we === 4 && st1.meta === '2 offen' && st1.bar && /Offen/.test(st1.status), `Storno der Auswahl: ETD-Einträge storniert, HUs wieder offen, Wareneingang bleibt (${JSON.stringify(st1)})`);
+      assert(be.store['9008295951'].scannedItems.filter(i => i.isCancelled).length === 2, 'Storno ist beim Server angekommen');
       // Abbruch im Bestätigungsdialog verbucht nichts
       await page.evaluate(() => document.querySelector('.pack-add-btn').click()); await wait(300);
       await page.keyboard.type('SEL0005'); await page.keyboard.press('Enter'); await page.evaluate(() => document.getElementById('saveHuAddButton').click()); await wait(600);
