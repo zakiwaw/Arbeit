@@ -1956,7 +1956,7 @@ function buildDetailPackTable(shipment, readOnly, base) {
     }).join('');
 
     return `<div class="detail-pack">`
-        + `<div class="detail-pack-head"><h4>Packstücke (${slots.length})</h4><span class="detail-pack-meta">${openCount ? `${openCount} offen` : 'alle gesichert'}</span></div>`
+        + `<div class="detail-pack-head"><h4>Packstücke (${slots.length})</h4><span class="detail-pack-meta">${openCount ? `${openCount} offen` : 'alle gesichert'}</span>${readOnly ? '' : `<button type="button" class="pack-add-btn" data-basenumber="${escapeHtml(base || shipment.hawb || '')}" title="Weiteres Packstück zu diesem Auftrag aufnehmen">+ Packstück</button>`}</div>`
         + `<table class="pack-table"><thead><tr>${hasPos ? '<th>Pos.</th>' : ''}<th>${isVvl ? 'VSE / Sendungs-Nr.' : 'HU'}</th><th>Verpackung</th><th>Maße</th><th>Gewicht</th><th>WE</th><th>Sicherung</th><th>Zeit</th><th>Notiz</th>${readOnly ? '' : '<th class="pack-edit-head"></th>'}</tr></thead>`
         + `<tbody>${rows}</tbody></table></div>`;
 }
@@ -2104,13 +2104,86 @@ function savePieceEditFromModal() {
     displayCurrentShipmentDetails(base);
     displayError('Stück gespeichert.', 'green', 2500);
 }
+// Nächste freie Position eines HU-Auftrags (höchste vorhandene + 1; Stornos zählen mit, damit keine Nummer doppelt vergeben wird)
+function nextHuPosition(shipment) {
+    const items = Array.isArray(shipment.scannedItems) ? shipment.scannedItems : [];
+    let max = 0, any = false;
+    items.forEach(i => { const n = Number(i && i.position); if (Number.isFinite(n) && n > 0) { any = true; if (n > max) max = n; } });
+    return any ? max + 1 : (items.length ? null : 1);
+}
+// „+ Packstück“: weitere HU zu einem HU-Auftrag aufnehmen – gleiches Modal wie „Packstück bearbeiten“,
+// die neue HU wird als Platz „Anstehend“ angelegt (wie beim Import), Kolli (Stückzahl) steigt um 1.
+function openHuAddModal(base) {
+    const modal = document.getElementById('huEditModal');
+    if (!modal) return;
+    const shipment = loadShipments()[base];
+    if (!shipment) { displayError(`Auftrag ${escapeHtml(base)} nicht gefunden.`); return; }
+    if (!shipment.isHuListOrder) { displayError(`${escapeHtml(base)} ist eine normale Sendung – Packstücke gibt es nur bei HU-Aufträgen.`); return; }
+    const pos = nextHuPosition(shipment);
+    modal.classList.add('add-mode');
+    modal.querySelector('h3').textContent = 'Packstück hinzufügen';
+    document.getElementById('huEditBaseNumber').value = base;
+    document.getElementById('huEditOriginalHu').value = '';
+    document.getElementById('huEditItemId').value = '';
+    document.getElementById('huEditPartnerId').value = '';
+    document.getElementById('huEditNewPosition').value = pos === null ? '' : String(pos);
+    ['huEditNumber', 'huEditPackaging', 'huEditDimensions', 'huEditWeight'].forEach(id => { document.getElementById(id).value = ''; });
+    const expected = expectedPiecesOf(shipment);
+    document.getElementById('huEditContext').textContent = `${shipment.freightForwarder && shipment.destinationCountry ? 'Rechnung' : 'Auftrag'} ${base}` + (pos === null ? '' : ` · neue Position ${pos}`) + (expected !== null ? ` · Kolli ${expected} → ${expected + 1}` : '');
+    const err = document.getElementById('huEditError'); err.textContent = ''; err.classList.add('hidden');
+    modal.classList.add('visible');
+    document.body.classList.add('modal-open');
+    setTimeout(() => document.getElementById('huEditNumber').focus(), 50);
+}
+function saveHuAddFromModal() {
+    const base = document.getElementById('huEditBaseNumber').value;
+    const newHu = document.getElementById('huEditNumber').value.trim().toUpperCase().replace(/\s+/g, '');
+    const packaging = document.getElementById('huEditPackaging').value.trim();
+    const dimensions = document.getElementById('huEditDimensions').value.trim();
+    const weightRaw = document.getElementById('huEditWeight').value.trim();
+    const err = document.getElementById('huEditError');
+    const fail = msg => { err.textContent = msg; err.classList.remove('hidden'); };
+
+    if (!newHu) return fail('Bitte die HU-Nummer eingeben (oder scannen).');
+    if (!/^[0-9A-Z-]+$/.test(newHu)) return fail('HU-Nummer darf nur Ziffern, Großbuchstaben und Bindestrich enthalten.');
+    let grossWeight = null;
+    if (weightRaw) {
+        if (parseWeightKg(weightRaw) === null) return fail('Gewicht nicht lesbar – z. B. „42 KG“ oder „0,700 KG“.');
+        grossWeight = /KG/i.test(weightRaw) ? weightRaw.toUpperCase() : `${weightRaw} KG`;
+    }
+    const shipments = loadShipments();
+    const shipment = shipments[base];
+    if (!shipment || !shipment.isHuListOrder) { closeHuEditModal(); displayError(`Auftrag ${escapeHtml(base)} nicht mehr gefunden.`); return; }
+    for (const b in shipments) {
+        const other = shipments[b];
+        if (!other || !other.isHuListOrder) continue;
+        if (huItemsOf(other, newHu).length) return fail(`HU ${newHu} gibt es bereits${b === base ? ' in diesem Auftrag' : ` im Auftrag ${b}`}.`);
+    }
+    if (shipments[newHu] || isArchivedBase(newHu)) return fail(`${newHu} ist bereits als eigene Sendung erfasst.`);
+
+    const now = new Date().toISOString();
+    const position = nextHuPosition(shipment); // erneut bestimmen – seit dem Öffnen kann ein Sync etwas ergänzt haben
+    shipment.scannedItems.push({
+        rawInput: newHu, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null,
+        position: position, packaging: packaging || null, dimensions: dimensions || null, grossWeight: grossWeight
+    });
+    const expected = expectedPiecesOf(shipment);
+    shipment.totalPiecesExpected = (expected === null ? 0 : expected) + 1;
+    shipment.lastModified = now;
+    saveShipments(shipments);
+    closeHuEditModal();
+    renderTable();
+    displayCurrentShipmentDetails(base);
+    displayError(`Packstück ${escapeHtml(newHu)}${position ? ` (Pos. ${position})` : ''} zu ${escapeHtml(base)} hinzugefügt.`, 'green', 3000);
+}
 function closeHuEditModal() {
     const modal = document.getElementById('huEditModal');
-    if (modal) { modal.classList.remove('visible'); modal.classList.remove('piece-mode'); modal.querySelector('h3').textContent = 'Packstück bearbeiten'; }
+    if (modal) { modal.classList.remove('visible'); modal.classList.remove('piece-mode'); modal.classList.remove('add-mode'); modal.querySelector('h3').textContent = 'Packstück bearbeiten'; }
     document.body.classList.remove('modal-open');
     focusShipmentInput();
 }
 function saveHuEditFromModal() {
+    if (document.getElementById('huEditModal').classList.contains('add-mode')) return saveHuAddFromModal();
     if (document.getElementById('huEditModal').classList.contains('piece-mode')) return savePieceEditFromModal();
     const base = document.getElementById('huEditBaseNumber').value;
     const oldHu = document.getElementById('huEditOriginalHu').value;
@@ -5540,6 +5613,10 @@ document.addEventListener('click', (event) => {
         else if (btn.classList.contains('main-delete-btn')) {
             if (confirm(`Sendung ${escapeHtml(base)} wirklich löschen?`)) { deleteShipment(base); goBackFromDetail(); }
         }
+    }
+    // Packstücktabelle: „+ Packstück“ → weitere HU aufnehmen
+    else if (target.closest('.pack-add-btn')) {
+        if (!isBatchModeActive) openHuAddModal(target.closest('.pack-add-btn').dataset.basenumber);
     }
     // Packstücktabelle: Stift → Packstück bearbeiten
     else if (target.closest('.pack-edit-btn')) {
