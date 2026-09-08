@@ -440,6 +440,60 @@ function bigData() {
       await page.close();
     }
 
+    // ---- Anlieferung (Desktop): LKW umbenennen (Anzeigename, per Sync überall) und LKW mit allen Aufträgen löschen ----
+    {
+      const be = makeBackend(bigData(), {});
+      page = await openApp(browser, be, { viewport: { width: 1400, height: 900, deviceScaleFactor: 1 }, query: '?seite=anlieferung' }); await wait(600);
+      const tools = await page.evaluate(() => ({ rows: document.querySelectorAll('.page-row[data-truckid]').length, rename: document.querySelectorAll('[data-lkw-rename]').length, del: document.querySelectorAll('[data-lkw-delete]').length,
+        nested: !!document.querySelector('.page-row [data-lkw-rename]'), visible: getComputedStyle(document.querySelector('.page-row-tool')).display !== 'none', icon: getComputedStyle(document.querySelector('.page-row-rename'), '::before').maskImage !== 'none' }));
+      assert(tools.rows === 2 && tools.rename === 2 && tools.del === 2 && !tools.nested && tools.visible && tools.icon, `Anlieferung: je LKW Stift und Papierkorb (nicht im Zeilen-Knopf verschachtelt) (${JSON.stringify(tools)})`);
+      // Umbenennen: Dialog öffnet mit Standardname als Platzhalter, Speichern setzt truckName an alle Sendungen des LKW
+      await page.evaluate(() => document.querySelector('[data-lkw-rename="MAN 1"]').click()); await wait(200);
+      const dlg = await page.evaluate(() => ({ open: document.getElementById('lkwRenameModal').classList.contains('visible'), ph: document.getElementById('lkwRenameName').placeholder, val: document.getElementById('lkwRenameName').value, ctx: document.getElementById('lkwRenameContext').textContent, pageStill: !!document.querySelector('.page-row[data-truckid="MAN 1"]') }));
+      assert(dlg.open && dlg.ph === 'MAN 1' && dlg.val === '' && /MAN 1 · 8 Aufträge/.test(dlg.ctx) && dlg.pageStill, `Umbenennen-Dialog: offen, Standardname als Platzhalter, Seite bleibt (${JSON.stringify(dlg)})`);
+      await page.evaluate(() => { const i = document.getElementById('lkwRenameName'); i.value = '  Wolfsburg   Dienstag '; document.getElementById('saveLkwRenameButton').click(); }); await wait(500);
+      const renamed = await page.evaluate(() => { const st = JSON.parse(localStorage.getItem('frachtSicherungMobile_V8_18_Refactored')); const man = Object.values(st).filter(s => s.truckId === 'MAN 1'); const vw = Object.values(st).filter(s => s.truckId === 'VVL-4711');
+        return { closed: !document.getElementById('lkwRenameModal').classList.contains('visible'), names: [...new Set(man.map(s => s.truckName))].join(), ids: [...new Set(man.map(s => s.truckId))].join(), vwUntouched: vw.every(s => !s.truckName),
+          title: document.querySelector('.page-row[data-truckid="MAN 1"] .page-row-title').textContent, sub: document.querySelector('.page-row[data-truckid="MAN 1"] .page-row-sub').textContent, menu: document.querySelector('.lkw-menu-item[data-truckid="MAN 1"]').textContent.replace(/\s+/g, ' ').trim() }; });
+      assert(renamed.closed && renamed.names === 'Wolfsburg Dienstag' && renamed.ids === 'MAN 1' && renamed.vwUntouched, `Umbenennen: truckName an allen 8 MAN-Aufträgen, Kennung unverändert, VW unberührt (${JSON.stringify(renamed)})`);
+      assert(renamed.title === 'Wolfsburg Dienstag' && /^MAN 1 · 8 Aufträge/.test(renamed.sub) && /Wolfsburg Dienstag/.test(renamed.menu), `Anzeigename in Anlieferung (mit Kennung darunter) und im Menü (${JSON.stringify({ title: renamed.title, sub: renamed.sub, menu: renamed.menu })})`);
+      const sent = be.actions.filter(a => a === 'saveShipments').length;
+      assert(sent >= 1 && Object.values(be.store).filter(s => s.truckId === 'MAN 1').every(s => s.truckName === 'Wolfsburg Dienstag'), `Anzeigename ging an den Server (saveShipments ×${sent}) – erreicht so alle Geräte`);
+      // LKW-Seite, Sendungsliste, Info-Auswahl und Sendungsdetails zeigen den Namen; Adresse nutzt weiter die Kennung
+      await page.evaluate(() => document.querySelector('.page-row[data-truckid="MAN 1"]').click()); await wait(500);
+      const lkwPage = await page.evaluate(() => ({ title: document.getElementById('pageTitle').textContent.trim(), url: new URL(location.href).searchParams.get('lkw'), chip: document.querySelector('#pageContent tr[data-basenumber="9007000001"] .dt-truck-chip').textContent }));
+      assert(/Wolfsburg Dienstag$/.test(lkwPage.title) && lkwPage.url === 'MAN 1' && lkwPage.chip === 'Wolfsburg Dienstag', `LKW-Seite: Titel und LKW-Spalte mit Anzeigename, Adresse ?lkw=MAN 1 (${JSON.stringify(lkwPage)})`);
+      await page.evaluate(() => document.querySelector('#pageContent tr[data-basenumber="9007000001"] .hawb-cell').click()); await wait(500);
+      assert(await page.evaluate(() => /Wolfsburg Dienstag/.test(document.querySelector('#detailView .detail-crumb[data-crumb-page="lkw"]').textContent)), 'Sendungsdetails: Pfad zeigt den Anzeigenamen');
+      await page.evaluate(() => document.getElementById('backToMainViewBtn').click()); await wait(200);
+      await page.evaluate(() => document.getElementById('pageBackBtn').click()); await wait(300);
+      // Doppelter Name wird abgelehnt; leer = zurück zum Standardnamen
+      await page.evaluate(() => document.querySelector('[data-lkw-rename="VVL-4711"]').click()); await wait(200);
+      await page.evaluate(() => { document.getElementById('lkwRenameName').value = 'Wolfsburg Dienstag'; document.getElementById('saveLkwRenameButton').click(); }); await wait(300);
+      const dup = await page.evaluate(() => ({ open: document.getElementById('lkwRenameModal').classList.contains('visible'), err: document.getElementById('lkwRenameError').textContent }));
+      assert(dup.open && /gibt es schon/.test(dup.err), `Doppelter Anzeigename wird abgelehnt (${JSON.stringify(dup)})`);
+      await page.evaluate(() => document.getElementById('cancelLkwRenameButton').click()); await wait(200);
+      await page.evaluate(() => document.querySelector('[data-lkw-rename="MAN 1"]').click()); await wait(200);
+      assert(await page.evaluate(() => document.getElementById('lkwRenameName').value === 'Wolfsburg Dienstag'), 'Dialog zeigt den vergebenen Namen zum Ändern');
+      await page.evaluate(() => { document.getElementById('lkwRenameName').value = ''; document.getElementById('saveLkwRenameButton').click(); }); await wait(500);
+      const reset = await page.evaluate(() => ({ title: document.querySelector('.page-row[data-truckid="MAN 1"] .page-row-title').textContent, stored: Object.values(JSON.parse(localStorage.getItem('frachtSicherungMobile_V8_18_Refactored'))).filter(s => s.truckId === 'MAN 1').every(s => !('truckName' in s)) }));
+      assert(reset.title === 'MAN 1' && reset.stored, `Leer speichern = Standardname zurück, truckName entfernt (${JSON.stringify(reset)})`);
+      // Löschen: Rückfrage (Dialoge werden im Test bestätigt) → alle Aufträge des LKW weg, LKW-Status-Eintrag weg, Löschvermerke an den Server
+      await page.evaluate(() => { const st = JSON.parse(localStorage.getItem('frachtLkwStatusV1') || '{}'); st['VVL-4711'] = false; localStorage.setItem('frachtLkwStatusV1', JSON.stringify(st)); });
+      const beforeDel = be.actions.length;
+      await page.evaluate(() => document.querySelector('[data-lkw-delete="VVL-4711"]').click()); await wait(800);
+      const del = await page.evaluate(() => { const st = JSON.parse(localStorage.getItem('frachtSicherungMobile_V8_18_Refactored')); return { left: Object.values(st).filter(s => s.truckId === 'VVL-4711').length, man: Object.values(st).filter(s => s.truckId === 'MAN 1').length, single: !!st['123'],
+        rows: [...document.querySelectorAll('.page-row[data-truckid]')].map(r => r.dataset.truckid).join(), status: 'VVL-4711' in JSON.parse(localStorage.getItem('frachtLkwStatusV1') || '{}') }; });
+      const delActions = be.actions.slice(beforeDel).filter(a => a === 'deleteShipment').length;
+      assert(del.left === 0 && del.man === 8 && del.single && del.rows === 'MAN 1' && !del.status && delActions === 6, `LKW löschen: 6 VW-Aufträge weg (MAN 1 und Einzelsendung bleiben), Status-Eintrag entfernt, 6 Löschvermerke an den Server (${JSON.stringify(del)}, deleteShipment ×${delActions})`);
+      assert(page.__errors.length === 0, `LKW umbenennen/löschen: keine JS-Fehler (${page.__errors.join('; ')})`);
+      await page.close();
+      // Handy: Anlieferung ohne Stift/Papierkorb, Karte unverändert
+      page = await openApp(browser, makeBackend(bigData(), {}), { query: '?seite=anlieferung' }); await wait(500);
+      assert(await page.evaluate(() => !document.querySelector('[data-lkw-rename], [data-lkw-delete], .page-row-wrap') && document.querySelectorAll('.page-row[data-truckid]').length === 2), 'Handy: Anlieferung unverändert (kein Umbenennen/Löschen)');
+      await page.close();
+    }
+
     // ---- Handy: unverändert ----
     page = await openApp(browser, makeBackend(bigData(), {}));
     const mob = await page.evaluate(() => {

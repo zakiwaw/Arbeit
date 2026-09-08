@@ -390,6 +390,7 @@ const LKWSTATUSKEY = 'frachtLkwStatusV1';
     let lastScrollPosition = 0;
     let isBatchModeActive = false;
     let packTableSort = null;   // Sortierung der Packstücktabelle in den Details: { key, dir } oder null = wie bisher (Position, dann HU/VSE)
+    let truckNameMap = {};      // Anzeigenamen der LKW (truckName an den Sendungen), aufgefrischt von refreshTruckNames()
     const PACK_SORT_NUMERIC = ['pos', 'kg', 'we', 'time', 'notes'];
     let currentBatch = [];
     let batchStatus = '';
@@ -2884,6 +2885,7 @@ async function restoreArchivedBeforeScan(base) {
 
 function drawShipmentList() {
     const shipments = loadShipments();
+    refreshTruckNames(shipments);
     const filter = isBatchModeActive ? '' : listFilterText; // im Batch-Modus alle zeigen (wie bisher)
     if (isBatchModeActive && archiveResultsFilter) clearArchiveResults();
     const matching = Object.keys(shipments)
@@ -3012,11 +3014,23 @@ function shipmentTotalKg(s) {
 function shipmentNoteCount(s) {
     return (Array.isArray(s.scannedItems) ? s.scannedItems : []).reduce((n, i) => n + (i && Array.isArray(i.notes) ? i.notes.length : 0), 0);
 }
-function truckShortName(truckId) {
+function truckDefaultName(truckId) {
     if (!truckId) return '';
     if (truckId.startsWith('VVL-')) return 'VW ' + truckId.slice(4);
     if (truckId === 'MAN-legacy') return 'MAN importiert';
     return truckId;
+}
+// Anzeigename (vom Nutzer vergeben, liegt als truckName an den Sendungen des LKW) – sonst der Standardname aus der Kennung
+function truckShortName(truckId) {
+    if (!truckId) return '';
+    return truckNameMap[truckId] || truckDefaultName(truckId);
+}
+// Anzeigenamen einsammeln – läuft vor jedem Zeichnen der Liste (drawShipmentList) und der Seiten (collectTrucks)
+function refreshTruckNames(shipments) {
+    const map = {};
+    Object.values(shipments || {}).forEach(s => { if (s && s.truckId && s.truckName && !map[s.truckId]) map[s.truckId] = String(s.truckName); });
+    truckNameMap = map;
+    return map;
 }
 function insertDesktopCells(row, baseNumber, shipment) {
     const p = shipmentProgress(shipment);
@@ -3120,7 +3134,8 @@ function renderLkwMenu() {
     // In renderLkwMenu():
 Object.values(shipments).forEach(s => {
     if (!s.truckId) return;
-    if (!trucks[s.truckId]) trucks[s.truckId] = { count: 0 };
+    if (!trucks[s.truckId]) trucks[s.truckId] = { count: 0, name: '' };
+    if (s.truckName && !trucks[s.truckId].name) trucks[s.truckId].name = String(s.truckName);
 
     if (s.isHuListOrder) {
         // ✅ KORREKTUR: Verwende totalPiecesExpected, da diese Zahl exakt
@@ -3190,6 +3205,9 @@ Object.values(shipments).forEach(s => {
 
 
         
+
+        // Vom Nutzer vergebener Anzeigename (Seite „Anlieferung“ → Stift): ersetzt die Beschriftung, Symbol bleibt
+        if (info.name) { prefix = prefix.startsWith('🚛') ? '🚛 ' : '🚚 '; scrollingText = info.name; isVw = true; }
 
         const animationStyle = (isVw && scrollingText.length > 11) 
             ? 'animation: scrollVwNumber 4s linear infinite alternate;' 
@@ -3359,6 +3377,7 @@ function shipmentProgress(s) {
 // LKW mit Kennzahlen; Bezeichnung und Reihenfolge wie im Seitenmenü (renderLkwMenu)
 function collectTrucks(shipments, lkwStatus) {
     const trucks = {};
+    const names = refreshTruckNames(shipments);
     let manCount = 1;
     Object.keys(shipments).forEach(base => {
         const s = shipments[base];
@@ -3371,7 +3390,7 @@ function collectTrucks(shipments, lkwStatus) {
             else if (id === 'MAN-legacy') { icon = '🚛'; name = 'MAN importiert'; }
             else if (id.startsWith('MAN-')) { icon = '🚛'; name = 'MAN ' + (manCount++); }
             else if (id.startsWith('MAN ')) { icon = '🚛'; }
-            t = trucks[id] = { truckId: id, icon, name, active: lkwStatus[id] !== false, bases: [], hus: 0,
+            t = trucks[id] = { truckId: id, icon, name: names[id] || name, defaultName: name, custom: !!names[id], active: lkwStatus[id] !== false, bases: [], hus: 0,
                                counted: 0, dunkel: 0, we: 0, expected: 0, openOrders: 0, unknown: 0, lastModified: 0 };
         }
         const p = shipmentProgress(s);
@@ -3573,15 +3592,78 @@ function truckRowHtml(t) {
     const progress = t.expected > 0 ? Math.min(100, Math.round((t.counted + t.dunkel) / t.expected * 100)) : 0;
     const state = t.openOrders > 0 ? `<span class="page-chip warn">${t.openOrders} offen</span>`
         : (t.unknown ? `<span class="page-chip">${t.unknown} ohne Stückzahl</span>` : `<span class="page-chip ok">fertig</span>`);
-    return `<li><button type="button" class="page-row" data-truckid="${escapeHtml(t.truckId)}" title="Sendungen von ${escapeHtml(t.name)} anzeigen">
+    // Desktop: Stift (Anzeigename) und Papierkorb (LKW mit allen Aufträgen löschen) rechts in der Karte – als Geschwister
+    // des Zeilen-Knopfs (kein Knopf im Knopf); Klicks landen im pageContent-Handler (data-lkw-rename / data-lkw-delete)
+    const tools = isDesktopLayout() ? `<span class="page-row-tools">`
+        + `<button type="button" class="page-row-tool page-row-rename" data-lkw-rename="${escapeHtml(t.truckId)}" title="LKW umbenennen – Anzeigename auf allen Geräten" aria-label="LKW umbenennen">Umbenennen</button>`
+        + `<button type="button" class="page-row-tool page-row-delete" data-lkw-delete="${escapeHtml(t.truckId)}" title="LKW mit allen Aufträgen löschen" aria-label="LKW löschen">Löschen</button></span>` : '';
+    return `<li${tools ? ' class="page-row-wrap"' : ''}><button type="button" class="page-row" data-truckid="${escapeHtml(t.truckId)}" title="Sendungen von ${escapeHtml(t.name)} anzeigen">
         <span class="page-row-icon emoji" aria-hidden="true">${t.icon}</span>
         <span class="page-row-body">
             <span class="page-row-title">${escapeHtml(t.name)}</span>
-            <span class="page-row-sub">${pluralize(t.bases.length, 'Auftrag', 'Aufträge')} · ${t.hus} HUs · WE ${ratioText(t.we, t.expected)} · Sich. ${ratioText(t.counted, t.expected)}${t.dunkel ? ` · <span class="text-danger">${t.dunkel} Dunkelalarm</span>` : ''}</span>
+            <span class="page-row-sub">${t.custom ? escapeHtml(t.defaultName) + ' · ' : ''}${pluralize(t.bases.length, 'Auftrag', 'Aufträge')} · ${t.hus} HUs · WE ${ratioText(t.we, t.expected)} · Sich. ${ratioText(t.counted, t.expected)}${t.dunkel ? ` · <span class="text-danger">${t.dunkel} Dunkelalarm</span>` : ''}</span>
             <span class="page-progress"><span style="width:${progress}%"></span></span>
         </span>
         <span class="page-row-end">${state}<span class="page-chevron" aria-hidden="true"></span></span>
-    </button></li>`;
+    </button>${tools}</li>`;
+}
+// ---- LKW umbenennen / löschen (Seite „Anlieferung“, Desktop) ---------------------------------------------------------
+// Der Anzeigename liegt als truckName an jeder Sendung des LKW und wandert über den normalen Sync auf alle Geräte.
+// Die Kennung (truckId: „VVL-…“ / „MAN n“) bleibt unverändert – Importe, Adressen (?lkw=…) und der Archivlauf arbeiten damit.
+function openLkwRenameModal(truckId) {
+    const modal = document.getElementById('lkwRenameModal');
+    if (!modal) return;
+    const t = collectTrucks(loadShipments(), loadLkwStatus()).find(x => x.truckId === truckId);
+    if (!t) { displayError(`LKW ${escapeHtml(truckId)} nicht gefunden.`); return; }
+    document.getElementById('lkwRenameTruckId').value = truckId;
+    const input = document.getElementById('lkwRenameName');
+    input.value = t.custom ? t.name : '';
+    input.placeholder = t.defaultName;
+    document.getElementById('lkwRenameContext').textContent = `${t.icon} ${t.defaultName} · ${pluralize(t.bases.length, 'Auftrag', 'Aufträge')}`;
+    const err = document.getElementById('lkwRenameError'); err.textContent = ''; err.classList.add('hidden');
+    modal.classList.add('visible');
+    document.body.classList.add('modal-open');
+    setTimeout(() => { input.focus(); input.select(); }, 50);
+}
+function closeLkwRenameModal() {
+    const modal = document.getElementById('lkwRenameModal');
+    if (modal) modal.classList.remove('visible');
+    document.body.classList.remove('modal-open');
+    focusShipmentInput();
+}
+function saveLkwRenameFromModal() {
+    const truckId = document.getElementById('lkwRenameTruckId').value;
+    const name = document.getElementById('lkwRenameName').value.trim().replace(/\s+/g, ' ');
+    const err = document.getElementById('lkwRenameError');
+    const fail = msg => { err.textContent = msg; err.classList.remove('hidden'); };
+    if (name.length > 40) return fail('Höchstens 40 Zeichen.');
+    const shipments = loadShipments();
+    const trucks = collectTrucks(shipments, loadLkwStatus());
+    const t = trucks.find(x => x.truckId === truckId);
+    if (!t) { closeLkwRenameModal(); displayError(`LKW ${escapeHtml(truckId)} nicht mehr gefunden.`); return; }
+    const custom = name && name !== t.defaultName ? name : null;   // leer oder Standardname → Anzeigename entfernen
+    // Kein doppelter Name – sonst wären zwei LKW in Listen und Auswahlfeldern nicht mehr zu unterscheiden
+    if (custom && trucks.some(x => x.truckId !== truckId && x.name === custom)) return fail(`„${custom}“ gibt es schon – bitte einen anderen Namen wählen.`);
+    t.bases.forEach(b => { const s = shipments[b]; if (!s) return; if (custom) s.truckName = custom; else delete s.truckName; });
+    saveShipments(shipments);   // nur tatsächlich geänderte Sendungen gehen an den Server; lastModified bleibt (kein „zuletzt bearbeitet“-Sprung)
+    closeLkwRenameModal();
+    renderTable(); renderLkwMenu();
+    displayError(custom ? `LKW heißt jetzt „${custom}“.` : `LKW heißt wieder „${t.defaultName}“.`, 'green', 3000);
+}
+// LKW löschen = alle seine Aufträge löschen (wie das Papierkorb-Symbol je Sendung, nur für den ganzen LKW) – mit Rückfrage.
+// Läuft über saveShipments → Löschvermerke → auf allen Geräten weg. Bereits archivierte Aufträge bleiben im Archiv suchbar.
+function deleteTruckFromPage(truckId) {
+    const shipments = loadShipments();
+    const t = collectTrucks(shipments, loadLkwStatus()).find(x => x.truckId === truckId);
+    if (!t || !t.bases.length) { displayError(`LKW ${escapeHtml(truckId)} nicht mehr gefunden.`); renderTable(); return; }
+    const what = `${pluralize(t.bases.length, 'Auftrag', 'Aufträge')} mit ${t.hus} HUs`;
+    if (!confirm(`LKW „${t.name}“ löschen?\n\n${what} werden mit allen Scans auf allen Geräten entfernt. Das lässt sich nicht rückgängig machen.`)) return;
+    t.bases.forEach(b => { delete shipments[b]; });
+    const status = loadLkwStatus();
+    if (truckId in status) { delete status[truckId]; saveLkwStatus(status); }   // sonst gälte ein später neu importierter LKW gleicher Kennung als deaktiviert
+    saveShipments(shipments);
+    renderTable(); renderLkwMenu();
+    displayError(`LKW „${t.name}“ gelöscht (${what}).`, 'green', 3000);
 }
 async function setLkwActiveFromPage(truckId, active) {
     const status = loadLkwStatus();
@@ -3947,7 +4029,7 @@ const PAGE_RENDERERS = {
                 .map(r => ({ b: r.b, s: r.s, chip: r.s.truckId ? (nameOf[r.s.truckId] || r.s.truckId) : '', hits: hitsOf(r.s) }));
             const archived = infoState.archiveOrder
                 .filter(b => infoArchiveCache[b] && !shipments[b] && infoMatches(b, infoArchiveCache[b], text, range))
-                .map(b => ({ b, s: infoArchiveCache[b], archived: true, chip: infoArchiveCache[b].truckId ? (nameOf[infoArchiveCache[b].truckId] || infoArchiveCache[b].truckId) : '', hits: hitsOf(infoArchiveCache[b]) }));
+                .map(b => ({ b, s: infoArchiveCache[b], archived: true, chip: infoArchiveCache[b].truckId ? (nameOf[infoArchiveCache[b].truckId] || infoArchiveCache[b].truckName || infoArchiveCache[b].truckId) : '', hits: hitsOf(infoArchiveCache[b]) }));
             const groups = [{ title: (!text && !anyFilter) ? `Alle Sendungen auf diesem Gerät (${local.length})` : `Auf diesem Gerät (${local.length})`, rows: local }];
             let archiveInfo = '';
             if (infoState.archive) {
@@ -3983,6 +4065,10 @@ if (pageContentEl) pageContentEl.addEventListener('click', (event) => {
     const target = event.target;
     const truckBtn = target.closest('.page-row[data-truckid]');
     if (truckBtn) { openPage({ id: 'lkw', truckId: truckBtn.dataset.truckid }); return; }
+    const rename = target.closest('[data-lkw-rename]');
+    if (rename) { if (!isBatchModeActive) openLkwRenameModal(rename.dataset.lkwRename); return; }
+    const delTruck = target.closest('[data-lkw-delete]');
+    if (delTruck) { if (!isBatchModeActive) deleteTruckFromPage(delTruck.dataset.lkwDelete); return; }
     const act = target.closest('[data-lkw-activate]');
     if (act) { setLkwActiveFromPage(act.dataset.lkwActivate, true); return; }
     const addOrder = target.closest('[data-order-add]');
@@ -6437,6 +6523,12 @@ if (huEditFormEl) {
         orderAddFormEl.addEventListener('submit', (e) => { e.preventDefault(); saveOrderAddFromModal(); });
         document.getElementById('cancelOrderAddButton').addEventListener('click', closeOrderAddModal);
         document.getElementById('orderAddModal').addEventListener('click', (e) => { if (e.target.id === 'orderAddModal') closeOrderAddModal(); });
+    }
+    const lkwRenameFormEl = document.getElementById('lkw-rename-form');
+    if (lkwRenameFormEl) {
+        lkwRenameFormEl.addEventListener('submit', (e) => { e.preventDefault(); saveLkwRenameFromModal(); });
+        document.getElementById('cancelLkwRenameButton').addEventListener('click', closeLkwRenameModal);
+        document.getElementById('lkwRenameModal').addEventListener('click', (e) => { if (e.target.id === 'lkwRenameModal') closeLkwRenameModal(); });
     }
 }
 

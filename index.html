@@ -362,6 +362,17 @@
         <div class="modal-actions"><button type="submit" id="saveOrderAddButton" class="main-action-button">Auftrag anlegen</button><button type="button" id="cancelOrderAddButton">Abbrechen</button></div>
     </form>
 </div>
+<div id="lkwRenameModal" class="modal-overlay">
+    <form id="lkw-rename-form" action="#" class="modal-content lkw-rename-content">
+        <h3>LKW umbenennen</h3>
+        <div id="lkwRenameContext" class="hu-edit-context"></div>
+        <input type="hidden" id="lkwRenameTruckId">
+        <div class="form-group"><label for="lkwRenameName">Anzeigename:</label><input type="text" id="lkwRenameName" autocomplete="off" maxlength="40" placeholder="z. B. VW Wolfsburg Di"></div>
+        <p class="lkw-rename-hint">Der Name erscheint auf allen Geräten – in der Anlieferung, im Menü, in den Listen und in den Sendungsdetails. Die Kennung für Importe bleibt gleich. Leer lassen = Standardname.</p>
+        <div id="lkwRenameError" class="hu-edit-error hidden"></div>
+        <div class="modal-actions"><button type="submit" id="saveLkwRenameButton" class="main-action-button">Speichern</button><button type="button" id="cancelLkwRenameButton">Abbrechen</button></div>
+    </form>
+</div>
 <div id="batchNoteModal" class="modal-overlay">
     <div class="modal-content">
         <h3>Batch-Notiz Festlegen</h3><div class="form-group"><label for="batchNoteInput">Notiz für alle Scans in diesem Batch (optional):</label><input type="text" id="batchNoteInput" placeholder="Notiz eingeben..." list="noteSuggestions"></div>

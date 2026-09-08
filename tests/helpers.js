@@ -39,6 +39,9 @@ function makeBackend(initial, lkwStatus) {
       state.version++; Object.keys(incoming).forEach(b => { state.store[b] = JSON.parse(JSON.stringify(incoming[b])); });
       resp = { status: 'success', version: state.version, merged: JSON.parse(JSON.stringify(incoming)) };
     }
+    else if (action === 'deleteShipment') { // wie das Backend: Löschvermerk → Sendung ist ab jetzt weg (loadChanges liefert sie nicht mehr)
+      const b = body.payload && body.payload.baseNumber; if (b) delete state.store[b]; state.version++; resp = { status: 'success', version: state.version };
+    }
     else if (action === 'loadLkwStatus') resp = { status: 'success', data: state.lkwStatus };
     else if (action === 'saveLkwStatus') { state.lkwStatus = (body.payload && body.payload.lkwStatus) || body.lkwStatus || {}; resp = { status: 'success' }; }
     else if (action === 'searchArchive') resp = { status: 'success', results: {}, order: [], total: 0, truncated: false };
