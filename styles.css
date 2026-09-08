@@ -2580,6 +2580,12 @@ body.modal-open { overflow: hidden; }
     .hu-add-existing { overflow: auto; padding-bottom: var(--sp-4); }
     .hu-add-new .hu-add-table th:nth-child(2), .hu-add-new .hu-add-table td:nth-child(2) { width: 34%; min-width: 220px; }   /* HU-Nummer bekommt den meisten Platz */
     .hu-add-new .hu-add-table th.hu-add-kg, .hu-add-new .hu-add-table td.hu-add-kg { width: 110px; }
+    /* VW-Auftrag: erste Spalte ist die VSE (kein Pos.), daneben die Sendungs-Nr. */
+    .hu-add-new .hu-add-table-vvl th:nth-child(1), .hu-add-new .hu-add-table-vvl td:nth-child(1) { width: 30%; min-width: 200px; padding-left: 6px; }
+    .hu-add-new .hu-add-table-vvl th:nth-child(2), .hu-add-new .hu-add-table-vvl td:nth-child(2) { width: auto; min-width: 0; }
+    .hu-add-table th.hu-add-sendnr-cell, .hu-add-table td.hu-add-sendnr-cell { width: 150px; }
+    .hu-add-table input.hu-add-sendnr { font-family: var(--font-mono, ui-monospace, monospace); color: var(--text-muted); }
+    .hu-add-table input.hu-add-sendnr:focus { color: var(--text); }
     .hu-add-existing .pack-table { table-layout: auto; }
     /* rechts zählt nur „was ist schon da“: Zeit- und Notiz-Spalte weglassen, damit alles ohne Querscrollen passt */
     .hu-add-existing .pack-table th:nth-last-child(-n+2), .hu-add-existing .pack-table td:nth-last-child(-n+2) { display: none; }

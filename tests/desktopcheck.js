@@ -413,6 +413,21 @@ function bigData() {
       await page.evaluate(() => document.querySelector('#detailView .pack-table th[data-psort="sendnr"]').click()); await wait(150);
       assert(/sorted-asc/.test((await thState('sendnr')).cls) && !/sorted/.test((await thState('hu')).cls) && await firstHu() === '881226843', 'Klick Sendungs-Nr.: nur eine Spalte sortiert, gleiche Sendungs-Nr. → wieder Ursprungsreihenfolge');
       assert(page.__errors.length === 0, `Packstück-Sortierung: keine JS-Fehler (${page.__errors.join('; ')})`);
+      // „+ Packstück“ bei VW: Spalten VSE · Sendungs-Nr. (ohne Pos.), Sendungs-Nr. vorbelegt, gespeicherte Position trägt sendnr
+      await page.evaluate(() => document.querySelector('#detailView .pack-add-btn').click()); await wait(300);
+      const va = await page.evaluate(() => ({ head: [...document.querySelectorAll('#huAddModal .hu-add-table thead th')].map(t => t.textContent.trim()).join('|'), ctx: document.getElementById('huAddContext').textContent,
+        sn: [...document.querySelectorAll('#huAddRows .hu-add-sendnr')].map(i => i.value).join(), pos: document.querySelectorAll('#huAddRows .hu-add-pos').length, ph: document.querySelector('#huAddRows .hu-add-hu').placeholder, focus: document.activeElement.className }));
+      assert(va.head === 'VSE|Sendungs-Nr.|Verpackung|Maße|Gewicht|' && va.pos === 0 && va.sn === '8386256,8386256,8386256' && /VSE/.test(va.ph) && va.focus === 'hu-add-hu' && va.ctx === 'Kundennr 959201 · VVL 100004158949 · bisher 9 Packstücke', `VW „+ Packstück“: VSE · Sendungs-Nr. statt Pos. · HU, Sendungs-Nr. vorbelegt (${JSON.stringify(va)})`);
+      await page.keyboard.type('881226999'); await page.keyboard.press('Enter');
+      await page.evaluate(() => { const rows = document.querySelectorAll('#huAddRows tr'); rows[1].querySelector('.hu-add-hu').value = '881227000'; rows[1].querySelector('.hu-add-sendnr').value = '8386300'; rows[1].querySelector('.hu-add-hu').dispatchEvent(new Event('input', { bubbles: true })); });
+      // leere Sendungs-Nr. wird abgelehnt
+      await page.evaluate(() => { document.querySelectorAll('#huAddRows tr')[0].querySelector('.hu-add-sendnr').value = ''; document.getElementById('saveHuAddButton').click(); }); await wait(200);
+      assert(await page.evaluate(() => /Sendungs-Nr\. zu VSE 881226999/.test(document.getElementById('huAddError').textContent) && document.getElementById('huAddModal').classList.contains('visible')), 'VW: fehlende Sendungs-Nr. wird gemeldet');
+      await page.evaluate(() => { document.querySelectorAll('#huAddRows tr')[0].querySelector('.hu-add-sendnr').value = '8386256'; document.getElementById('saveHuAddButton').click(); }); await wait(700);
+      const vs = await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('frachtSicherungMobile_V8_18_Refactored'))['959201']; const added = s.scannedItems.slice(9);
+        return { modal: document.getElementById('huAddModal').classList.contains('visible'), tot: s.totalPiecesExpected, added: added.map(i => i.rawInput + ':' + i.sendnr + ':' + i.status + ':' + i.position).join(' '), rows: document.querySelectorAll('#detailView .pack-table tbody tr').length,
+          shown: [...document.querySelectorAll('#detailView .pack-table tbody tr')].filter(r => /88122(6999|7000)/.test(r.textContent)).map(r => r.cells[1].textContent.trim() + '|' + r.cells[2].textContent.trim()).join(' ') }; });
+      assert(!vs.modal && vs.tot === 11 && vs.added === '881226999:8386256:Anstehend:null 881227000:8386300:Anstehend:null' && vs.rows === 11 && vs.shown === '881226999|8386256 881227000|8386300', `VW: 2 Positionen mit Sendungs-Nr. angelegt (ohne Pos.-Nummer), Tabelle zeigt sie (${JSON.stringify(vs)})`);
       // MAN-Auftrag ohne VVL: keine Sendungs-Nr.-Spalte, Liste wie bisher
       await page.evaluate(() => document.getElementById('backToMainViewBtn').click()); await wait(300);
       await page.evaluate(() => document.getElementById('pageBackBtn').click()); await wait(300);
