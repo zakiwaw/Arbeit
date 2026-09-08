@@ -395,11 +395,40 @@ function bigData() {
       await page.evaluate(() => document.querySelector('tr[data-basenumber="959201"] .hawb-cell').click()); await wait(500);
       const pk = await page.evaluate(() => ({ head: [...document.querySelectorAll('.pack-table thead th')].map(t => t.textContent.trim()).join('|'), row: [...document.querySelectorAll('.pack-table tbody tr')[0].cells].map(c => c.textContent.trim()).slice(1, 3).join('|'), inHu: !!document.querySelector('.pack-table td.pack-hu .pack-sendnr') }));
       assert(pk.head === '|VSE|Sendungs-Nr.|Verpackung|Maße|Gewicht|WE|Sicherung|Zeit|Notiz|' && pk.row === '881226843|8386256' && !pk.inHu, `VW-Packstücke: VSE und Sendungs-Nr. als eigene Spalten (${JSON.stringify(pk)})`);
+      // Packstücktabelle sortierbar: Klick auf den Kopf dreht die Reihenfolge, Dreieck wie in der Sendungsliste, Wahl überlebt den Neuaufbau
+      const firstHu = () => page.evaluate(() => document.querySelector('#detailView .pack-table tbody tr .hu-value').textContent.trim());
+      const thState = (key) => page.evaluate((k) => { const th = document.querySelector(`#detailView .pack-table th[data-psort="${k}"]`); const ps = getComputedStyle(th, '::after'); return { cls: th.className, aria: th.getAttribute('aria-sort'), cursor: getComputedStyle(th).cursor, tri: ps.borderTopWidth, op: ps.opacity }; }, key);
+      const ps0 = await thState('hu');
+      assert(ps0.cursor === 'pointer' && ps0.tri === '5px' && ps0.op === '0' && !ps0.aria, `Packstück-Kopf VSE: klickbar, Dreieck vorhanden (unsortiert unsichtbar) (${JSON.stringify(ps0)})`);
+      await page.evaluate(() => document.querySelector('#detailView .pack-table th[data-psort="hu"]').click()); await wait(150);
+      const ps1 = await thState('hu');
+      assert(/sorted-asc/.test(ps1.cls) && ps1.aria === 'ascending' && Number(ps1.op) > 0.9 && await firstHu() === '881226843', `Klick VSE: aufsteigend, Dreieck sichtbar (${JSON.stringify(ps1)})`);
+      await page.evaluate(() => document.querySelector('#detailView .pack-table th[data-psort="hu"]').click()); await wait(150);
+      assert(/sorted-desc/.test((await thState('hu')).cls) && await firstHu() === '881226851', `Zweiter Klick VSE: absteigend, höchste Nummer oben (${await firstHu()})`);
+      assert(await page.evaluate(() => document.querySelectorAll('#detailView .pack-table tbody tr').length === 9 && document.querySelectorAll('#detailView .pack-table .pack-select').length === 9), 'Sortieren: alle 9 Zeilen und Kästchen noch da');
+      // Neuaufbau der Details (Kästchen anhaken → Leiste, dann Details neu öffnen): Sortierung bleibt
+      await page.evaluate(() => document.getElementById('backToMainViewBtn').click()); await wait(200);
+      await page.evaluate(() => document.querySelector('tr[data-basenumber="959201"] .hawb-cell').click()); await wait(400);
+      assert(await firstHu() === '881226851' && /sorted-desc/.test((await thState('hu')).cls), `Sortierung bleibt nach Neuaufbau der Details erhalten (${await firstHu()})`);
+      await page.evaluate(() => document.querySelector('#detailView .pack-table th[data-psort="sendnr"]').click()); await wait(150);
+      assert(/sorted-asc/.test((await thState('sendnr')).cls) && !/sorted/.test((await thState('hu')).cls) && await firstHu() === '881226843', 'Klick Sendungs-Nr.: nur eine Spalte sortiert, gleiche Sendungs-Nr. → wieder Ursprungsreihenfolge');
+      assert(page.__errors.length === 0, `Packstück-Sortierung: keine JS-Fehler (${page.__errors.join('; ')})`);
       // MAN-Auftrag ohne VVL: keine Sendungs-Nr.-Spalte, Liste wie bisher
       await page.evaluate(() => document.getElementById('backToMainViewBtn').click()); await wait(300);
       await page.evaluate(() => document.getElementById('pageBackBtn').click()); await wait(300);
       await page.evaluate(() => document.querySelector('tr[data-basenumber="9007000001"] .hawb-cell').click()); await wait(400);
       assert(await page.evaluate(() => [...document.querySelectorAll('.pack-table thead th')].map(t => t.textContent.trim()).join('|')) === '|HU|Verpackung|Maße|Gewicht|WE|Sicherung|Zeit|Notiz|', 'MAN-Auftrag: Packstücktabelle unverändert (keine Sendungs-Nr.-Spalte)');
+      // MAN-Auftrag: Sortierung nach Gewicht (erster Klick: Schwerstes oben; Gewichte „19.5 KG“, „25 KG“, „20,8 KG“ werden als Zahl verglichen)
+      await page.evaluate(() => document.querySelector('#detailView .pack-table th[data-psort="kg"]').click()); await wait(150);
+      const kgOrder = await page.evaluate(() => [...document.querySelectorAll('#detailView .pack-table tbody tr .hu-value')].map(e => e.textContent.trim()).join());
+      assert(kgOrder === 'HU1002,HU1003,HU1001', `Klick Gewicht: schwerstes Packstück oben (${kgOrder})`);
+      await page.evaluate(() => document.querySelector('#detailView .pack-table th[data-psort="kg"]').click()); await wait(150);
+      assert(await page.evaluate(() => [...document.querySelectorAll('#detailView .pack-table tbody tr .hu-value')].map(e => e.textContent.trim()).join()) === 'HU1001,HU1003,HU1002', 'Zweiter Klick Gewicht: leichtestes oben');
+      // Einzelsendung: Stück-Tabelle ebenfalls mit sortierbaren Köpfen
+      await page.evaluate(() => document.getElementById('backToMainViewBtn').click()); await wait(200);
+      await page.evaluate(() => document.querySelector('tr[data-basenumber="123"] .hawb-cell').click()); await wait(400);
+      assert(await page.evaluate(() => document.querySelectorAll('#detailView .pack-table-plain th[data-psort]').length === 8 && document.querySelectorAll('#detailView .pack-table-plain tbody tr[data-ps-default]').length >= 1), 'Einzelsendung: Stück-Tabelle mit sortierbaren Spaltenköpfen');
+      await page.evaluate(() => document.getElementById('backToMainViewBtn').click()); await wait(200);
       assert(await page.evaluate(() => !document.querySelector('tr[data-basenumber="9007000001"] .hawb-cell').classList.contains('hawb-cell-vvl')), 'MAN-Zeile: HAWB-Zelle unverändert');
       assert(await page.evaluate(() => { const t = document.querySelector('#shipmentTableBody').closest('table'); const th = t.querySelector('th[data-sort="hawb"]'); return !t.classList.contains('vw-only') && getComputedStyle(th.querySelector('.th-hawb')).display !== 'none' && getComputedStyle(th.querySelector('.th-vvl')).display === 'none'; }), 'Startseite: Kopf weiterhin „HAWB.“');
       assert(page.__errors.length === 0, `VW-Spalten: keine JS-Fehler (${page.__errors.join('; ')})`);

@@ -389,6 +389,8 @@ const LKWSTATUSKEY = 'frachtLkwStatusV1';
     // --- Anwendungsstatus ---
     let lastScrollPosition = 0;
     let isBatchModeActive = false;
+    let packTableSort = null;   // Sortierung der Packstücktabelle in den Details: { key, dir } oder null = wie bisher (Position, dann HU/VSE)
+    const PACK_SORT_NUMERIC = ['pos', 'kg', 'we', 'time', 'notes'];
     let currentBatch = [];
     let batchStatus = '';
     let batchIsCombination = false;
@@ -1925,7 +1927,7 @@ function buildDetailPackTable(shipment, readOnly, base) {
     const openCount = slots.filter(i => i.status === 'Anstehend').length;
     const hasPos = slots.some(i => i.position);   // VVL-Positionen tragen keine Nummer → Spalte weglassen
 
-    const rows = slots.slice().sort((a, b) => ((a.position || 9999) - (b.position || 9999)) || String(a.rawInput).localeCompare(String(b.rawInput))).map(item => {
+    const rows = slots.slice().sort((a, b) => ((a.position || 9999) - (b.position || 9999)) || String(a.rawInput).localeCompare(String(b.rawInput))).map((item, idx) => {
         const hu = item.rawInput;
         const detail = items.find(i => i && String(i.rawInput).toUpperCase() === String(hu).toUpperCase() && (i.packaging || i.dimensions || i.grossWeight)) || item;
         const we = byHu(hu, i => i.status === 'Wareneingang').length > 0;
@@ -1944,7 +1946,12 @@ function buildDetailPackTable(shipment, readOnly, base) {
         // Auswahl-Kästchen an jeder Zeile: offene Packstücke können eine Kontrollmethode bekommen, gesicherte storniert werden
         // (data-state steuert, welche Knöpfe die Leiste zeigt; data-timestamp = der Sicherungs-Eintrag für den Storno)
         const selectCell = readOnly ? '' : `<td class="pack-select-cell"><input type="checkbox" class="pack-select" data-hu="${escapeHtml(hu)}" data-state="${open ? 'open' : 'secured'}"${open ? '' : ` data-timestamp="${escapeHtml(item.timestamp)}"`} title="${escapeHtml(hu)} auswählen" aria-label="${escapeHtml(hu)} auswählen"></td>`;
-        return `<tr class="${rowClass}">`
+        // Sortierwerte für den Klick auf einen Spaltenkopf (applyPackTableSort): leer = „–“, landet immer am Ende
+        const kg = parseWeightKg(detail.grossWeight);
+        const sortAttrs = ` data-ps-default="${idx}" data-ps-pos="${item.position || ''}" data-ps-hu="${escapeHtml(hu)}"${isVvl ? ` data-ps-sendnr="${escapeHtml(item.sendnr || '')}"` : ''}`
+            + ` data-ps-pack="${escapeHtml(detail.packaging || '')}" data-ps-dim="${escapeHtml(detail.dimensions || '')}" data-ps-kg="${kg === null ? '' : kg}" data-ps-we="${we ? 1 : 0}"`
+            + ` data-ps-status="${dunkel.length ? '0 Dunkelalarm' : (open ? '1 Offen' : '2 ' + escapeHtml(item.status))}" data-ps-time="${open ? '' : (Date.parse(item.timestamp) || '')}" data-ps-notes="${notes.length}"`;
+        return `<tr class="${rowClass}"${sortAttrs}>`
             + selectCell
             + (hasPos ? `<td class="pack-pos">${item.position ? escapeHtml(String(item.position)) + '.' : ''}</td>` : '')
             + `<td class="pack-hu"><span class="hu-value${dunkel.length ? ' has-dunkelalarm' : ''}" title="Klicken zum Kopieren">${escapeHtml(hu)}</span></td>`
@@ -1972,7 +1979,7 @@ function buildDetailPackTable(shipment, readOnly, base) {
     return `<div class="detail-pack">`
         + `<div class="detail-pack-head"><h4>Packstücke (${slots.length})</h4><span class="detail-pack-meta">${openCount ? `${openCount} offen` : 'alle gesichert'}</span>${readOnly ? '' : `<button type="button" class="pack-add-btn" data-basenumber="${escapeHtml(base || shipment.hawb || '')}" title="Weiteres Packstück zu diesem Auftrag aufnehmen">+ Packstück</button>`}</div>`
         + selectBar
-        + `<table class="pack-table"><thead><tr>${readOnly ? '' : `<th class="pack-select-cell"><input type="checkbox" class="pack-select-all" title="Alle Packstücke auswählen" aria-label="Alle Packstücke auswählen"></th>`}${hasPos ? '<th>Pos.</th>' : ''}<th>${isVvl ? 'VSE' : 'HU'}</th>${isVvl ? '<th>Sendungs-Nr.</th>' : ''}<th>Verpackung</th><th>Maße</th><th>Gewicht</th><th>WE</th><th>Sicherung</th><th>Zeit</th><th>Notiz</th>${readOnly ? '' : '<th class="pack-edit-head"></th>'}</tr></thead>`
+        + `<table class="pack-table"><thead><tr>${readOnly ? '' : `<th class="pack-select-cell"><input type="checkbox" class="pack-select-all" title="Alle Packstücke auswählen" aria-label="Alle Packstücke auswählen"></th>`}${hasPos ? '<th data-psort="pos">Pos.</th>' : ''}<th data-psort="hu">${isVvl ? 'VSE' : 'HU'}</th>${isVvl ? '<th data-psort="sendnr">Sendungs-Nr.</th>' : ''}<th data-psort="pack">Verpackung</th><th data-psort="dim">Maße</th><th data-psort="kg">Gewicht</th><th data-psort="we">WE</th><th data-psort="status">Sicherung</th><th data-psort="time">Zeit</th><th data-psort="notes">Notiz</th>${readOnly ? '' : '<th class="pack-edit-head"></th>'}</tr></thead>`
         + `<tbody>${rows}</tbody></table></div>`;
 }
 
@@ -1996,6 +2003,8 @@ function buildDetailScanTable(shipment, base, readOnly) {
     const openAlarm = alarms.length && !(expected > 0 && secured.length >= expected) && !secured.some(i => (Date.parse(i.timestamp) || 0) >= lastAlarm);
     const notesOf = it => (it && Array.isArray(it.notes) ? it.notes : []).map(n => `<span class="pack-note">${escapeHtml(n)}</span>`).join('');
     const hasDetail = it => !!(it && (it.packaging || it.dimensions || it.grossWeight));
+    const notesCount = it => (it && Array.isArray(it.notes) ? it.notes.length : 0);
+    const tsOf = it => (it && (Date.parse(it.timestamp) || '')) || '';
     const detailCells = d => `<td class="pack-text">${escapeHtml((d && d.packaging) || '–')}</td><td class="pack-text">${escapeHtml((d && d.dimensions) || '–')}</td><td class="pack-num">${escapeHtml((d && d.grossWeight) || '–')}</td>`;
     const baseAttr = escapeHtml(base || shipment.hawb || '');
     let rows = '';
@@ -2007,7 +2016,9 @@ function buildDetailScanTable(shipment, base, readOnly) {
         const detail = [sec, we].find(hasDetail) || null;
         const cls = open ? (openAlarm && n === secured.length ? 'pack-row-danger' : 'pack-row-open') : 'pack-row-done';
         const editCell = readOnly ? '' : `<td class="pack-edit-cell">${anchor ? `<button type="button" class="pack-edit-btn" data-basenumber="${baseAttr}" data-item-id="${escapeHtml(anchor.id || '')}" data-partner-id="${escapeHtml(sec && we ? we.id || '' : '')}" data-piece="${n + 1}" data-piece-total="${rowsCount}" title="Stück ${n + 1} bearbeiten (Verpackung, Maße, Gewicht)" aria-label="Stück bearbeiten"></button>` : ''}</td>`;
-        rows += `<tr class="${cls}">`
+        const kg = parseWeightKg(detail && detail.grossWeight);
+        rows += `<tr class="${cls}" data-ps-default="${n}" data-ps-pos="${n + 1}" data-ps-pack="${escapeHtml((detail && detail.packaging) || '')}" data-ps-dim="${escapeHtml((detail && detail.dimensions) || '')}" data-ps-kg="${kg === null ? '' : kg}" data-ps-we="${we ? 1 : 0}"`
+            + ` data-ps-status="${sec ? '2 ' + escapeHtml(sec.status) : (openAlarm && n === secured.length ? '0 Dunkelalarm' : '1 Offen')}" data-ps-time="${tsOf(sec) || tsOf(we)}" data-ps-notes="${notesCount(sec) + notesCount(we)}">`
             + `<td class="pack-pos">${n + 1}.</td>`
             + detailCells(detail)
             + `<td class="pack-we-cell">${we ? `<span class="pack-we ok" title="Wareneingang ${escapeHtml(fmtTime(we.timestamp))}">WE</span>` : '<span class="pack-we" title="Kein Wareneingang">–</span>'}</td>`
@@ -2017,14 +2028,15 @@ function buildDetailScanTable(shipment, base, readOnly) {
             + editCell
             + `</tr>`;
     }
-    const extra = (list, label, cls) => list.map(it => `<tr class="${cls}"><td class="pack-pos"></td>${detailCells(null)}<td class="pack-we-cell"></td><td><span class="pack-status ${cls === 'pack-row-danger' ? 'danger' : 'ok'}">${escapeHtml(label || it.status)}</span></td><td class="pack-time">${escapeHtml(fmtTime(it.timestamp))}</td><td class="pack-notes">${notesOf(it)}</td>${readOnly ? '' : '<td class="pack-edit-cell"></td>'}</tr>`).join('');
+    let extraIdx = rowsCount;
+    const extra = (list, label, cls) => list.map(it => `<tr class="${cls}" data-ps-default="${extraIdx++}" data-ps-pos="" data-ps-pack="" data-ps-dim="" data-ps-kg="" data-ps-we="" data-ps-status="${cls === 'pack-row-danger' ? '0 ' : '2 '}${escapeHtml(label || it.status)}" data-ps-time="${tsOf(it)}" data-ps-notes="${notesCount(it)}"><td class="pack-pos"></td>${detailCells(null)}<td class="pack-we-cell"></td><td><span class="pack-status ${cls === 'pack-row-danger' ? 'danger' : 'ok'}">${escapeHtml(label || it.status)}</span></td><td class="pack-time">${escapeHtml(fmtTime(it.timestamp))}</td><td class="pack-notes">${notesOf(it)}</td>${readOnly ? '' : '<td class="pack-edit-cell"></td>'}</tr>`).join('');
     rows += extra(alarms, openAlarm ? 'Dunkelalarm' : 'Dunkelalarm (erledigt)', openAlarm ? 'pack-row-danger' : 'pack-row-done');
     rows += extra(kombis.map(k => Object.assign({}, k, { status: k.status + ' (Kombi)' })), null, 'pack-row-done');
     rows += extra(others, null, 'pack-row-done');
     const openCount = Math.max(0, rowsCount - secured.length);
     return `<div class="detail-pack">`
         + `<div class="detail-pack-head"><h4>Stücke (${rowsCount}${expected === null ? ' erfasst' : ''})</h4><span class="detail-pack-meta">${openCount ? `${openCount} offen` : 'alle gesichert'}</span></div>`
-        + `<table class="pack-table pack-table-plain"><thead><tr><th>Nr.</th><th>Verpackung</th><th>Maße</th><th>Gewicht</th><th>WE</th><th>Sicherung</th><th>Zeit</th><th>Notiz</th>${readOnly ? '' : '<th class="pack-edit-head"></th>'}</tr></thead>`
+        + `<table class="pack-table pack-table-plain"><thead><tr><th data-psort="pos">Nr.</th><th data-psort="pack">Verpackung</th><th data-psort="dim">Maße</th><th data-psort="kg">Gewicht</th><th data-psort="we">WE</th><th data-psort="status">Sicherung</th><th data-psort="time">Zeit</th><th data-psort="notes">Notiz</th>${readOnly ? '' : '<th class="pack-edit-head"></th>'}</tr></thead>`
         + `<tbody>${rows}</tbody></table></div>`;
 }
 
@@ -2204,6 +2216,7 @@ function openHuAddModal(base) {
     // Rechts daneben: was der Auftrag schon hat – dieselbe Tabelle wie in den Sendungsdetails, nur lesend (kein Stift, kein „+“)
     const existing = document.getElementById('huAddExisting');
     if (existing) existing.innerHTML = (buildDetailPackTable(shipment, true, base) || '').replace('<h4>Packstücke (', '<h4>Bisherige Packstücke (') || '<div class="hu-add-empty">Noch keine Packstücke in diesem Auftrag.</div>';
+    if (existing) applyPackTableSort(existing.querySelector('.pack-table'));
     huAddUpdateCount();
     const err = document.getElementById('huAddError'); err.textContent = ''; err.classList.add('hidden');
     modal.classList.add('visible');
@@ -2640,6 +2653,7 @@ detailsHtml += `${numberPart}<span class="hu-value" style="cursor:pointer;" titl
     detailsHtml += `</ul>`;
 
     displayTarget.innerHTML = detailsHtml;
+    applyPackTableSort(displayTarget.querySelector('.pack-table'));   // gewählte Sortierung der Packstücktabelle beibehalten
     const headQr = displayTarget.querySelector('.detail-qr div[data-qr-text]');
     if (headQr) drawQrCode(headQr);
 
@@ -3057,6 +3071,43 @@ document.addEventListener('click', (event) => {
     else if (th.classList.contains('sorted-desc')) dir = 'asc';
     else dir = ['we', 'sich', 'kg', 'time'].includes(key) ? 'desc' : 'asc';
     sortShipmentTable(table, key, dir);
+});
+// Packstücktabelle in den Sendungsdetails (Desktop): Klick auf einen Spaltenkopf sortiert die Zeilen, dasselbe Dreieck wie
+// in der Sendungsliste. Reine Darstellung – die Zeilen werden nur umgehängt, Daten und Auswahl-Kästchen bleiben unberührt.
+// Die Wahl gilt für die Sitzung und wird nach jedem Neuaufbau der Details (Scan, Sync, Übernehmen) wieder angewendet.
+function applyPackTableSort(table) {
+    if (!table || !table.tBodies[0]) return;
+    const tbody = table.tBodies[0];
+    const rows = Array.from(tbody.rows);
+    const s = packTableSort;
+    table.querySelectorAll('th[data-psort]').forEach(th => { th.classList.remove('sorted-asc', 'sorted-desc'); th.removeAttribute('aria-sort'); });
+    const byDefault = (a, b) => Number(a.dataset.psDefault || 0) - Number(b.dataset.psDefault || 0);
+    if (s) {
+        const attr = 'ps' + s.key.charAt(0).toUpperCase() + s.key.slice(1);
+        const numeric = PACK_SORT_NUMERIC.includes(s.key);
+        rows.sort((a, b) => {
+            const x = a.dataset[attr] || '', y = b.dataset[attr] || '';
+            if (x === '' || y === '') return x === y ? byDefault(a, b) : (x === '' ? 1 : -1);   // leere Werte („–“) immer ans Ende
+            let c = numeric ? Number(x) - Number(y) : x.localeCompare(y, 'de', { numeric: true });
+            if (s.dir === 'desc') c = -c;
+            return c || byDefault(a, b);
+        });
+    } else rows.sort(byDefault);
+    rows.forEach(r => tbody.appendChild(r));
+    const th = s ? table.querySelector(`th[data-psort="${s.key}"]`) : null;
+    if (th) { th.classList.add(s.dir === 'desc' ? 'sorted-desc' : 'sorted-asc'); th.setAttribute('aria-sort', s.dir === 'desc' ? 'descending' : 'ascending'); }
+}
+document.addEventListener('click', (event) => {
+    const th = event.target.closest('.pack-table th[data-psort]');
+    if (!th) return;
+    const key = th.dataset.psort;
+    // Erster Klick: Gewicht/Zeit/Notizen absteigend (Schwerstes/Neuestes oben), sonst aufsteigend; jeder weitere Klick dreht um
+    let dir;
+    if (th.classList.contains('sorted-asc')) dir = 'desc';
+    else if (th.classList.contains('sorted-desc')) dir = 'asc';
+    else dir = ['kg', 'time', 'notes'].includes(key) ? 'desc' : 'asc';
+    packTableSort = { key, dir };
+    applyPackTableSort(th.closest('table'));
 });
 function renderLkwMenu() {
     const container = document.getElementById('lkw-menu-container');

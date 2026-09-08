@@ -2295,12 +2295,13 @@ body.modal-open { overflow: hidden; }
     }
     .shipment-table th:first-child { border-top-left-radius: var(--r-lg); }
     .shipment-table th:last-child { border-top-right-radius: var(--r-lg); }
-    .shipment-table th[data-sort] { cursor: pointer; }
-    .shipment-table th[data-sort]:hover { color: var(--text); }
-    .shipment-table th[data-sort]::after { content: ""; display: inline-block; width: 0; height: 0; margin-left: 5px; vertical-align: middle; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid var(--border-strong); opacity: 0; transition: opacity var(--dur) var(--ease); }
-    .shipment-table th[data-sort]:hover::after { opacity: .6; }
-    .shipment-table th.sorted-asc::after, .shipment-table th.sorted-desc::after { opacity: 1; border-top-color: var(--accent); }
-    .shipment-table th.sorted-asc::after { transform: rotate(180deg); }
+    /* sortierbare Spaltenköpfe: Sendungsliste (data-sort) und Packstücktabelle in den Details (data-psort) – gleiches Dreieck */
+    .shipment-table th[data-sort], .pack-table th[data-psort] { cursor: pointer; user-select: none; }
+    .shipment-table th[data-sort]:hover, .pack-table th[data-psort]:hover { color: var(--text); }
+    .shipment-table th[data-sort]::after, .pack-table th[data-psort]::after { content: ""; display: inline-block; width: 0; height: 0; margin-left: 5px; vertical-align: middle; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid var(--border-strong); opacity: 0; transition: opacity var(--dur) var(--ease); }
+    .shipment-table th[data-sort]:hover::after, .pack-table th[data-psort]:hover::after { opacity: .6; }
+    .shipment-table th.sorted-asc::after, .shipment-table th.sorted-desc::after, .pack-table th.sorted-asc::after, .pack-table th.sorted-desc::after { opacity: 1; border-top-color: var(--accent); }
+    .shipment-table th.sorted-asc::after, .pack-table th.sorted-asc::after { transform: rotate(180deg); }
     .shipment-table tbody tr {
         display: table-row;
         margin: 0;
