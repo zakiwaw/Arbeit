@@ -307,6 +307,28 @@
         <div class="modal-actions"><button type="submit" id="saveHuEditButton" class="main-action-button">Speichern</button><button type="button" id="cancelHuEditButton">Abbrechen</button></div>
     </form>
 </div>
+<div id="orderAddModal" class="modal-overlay">
+    <form id="order-add-form" action="#" class="modal-content order-add-content">
+        <h3>Auftrag hinzufügen</h3>
+        <div id="orderAddContext" class="hu-edit-context"></div>
+        <input type="hidden" id="orderAddTruckId">
+        <div class="form-group"><label for="orderAddNumber">Rechnungsnummer:</label><input type="text" id="orderAddNumber" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="z. B. 9008296230"></div>
+        <div class="order-add-grid">
+            <div class="form-group"><label for="orderAddForwarder">Spediteur:</label><input type="text" id="orderAddForwarder" autocomplete="off" placeholder="z. B. AIT Worldwide"></div>
+            <div class="form-group"><label for="orderAddCountry">Land:</label><input type="text" id="orderAddCountry" autocomplete="off" autocapitalize="characters" placeholder="z. B. CHINA"></div>
+        </div>
+        <div class="form-group"><label for="orderAddPlso">PLSO (optional):</label><input type="text" id="orderAddPlso" autocomplete="off" inputmode="numeric" placeholder="z. B. 31810132522"></div>
+        <div class="order-add-sep">Erstes Packstück (Pos. 1)</div>
+        <div class="form-group"><label for="orderAddHu">HU-Nummer:</label><input type="text" id="orderAddHu" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="eintippen oder scannen"></div>
+        <div class="order-add-grid order-add-grid-3">
+            <div class="form-group"><label for="orderAddPackaging">Verpackung:</label><input type="text" id="orderAddPackaging" autocomplete="off" placeholder="optional"></div>
+            <div class="form-group"><label for="orderAddDimensions">Maße:</label><input type="text" id="orderAddDimensions" autocomplete="off" placeholder="optional"></div>
+            <div class="form-group"><label for="orderAddWeight">Gewicht:</label><input type="text" id="orderAddWeight" autocomplete="off" inputmode="decimal" placeholder="optional"></div>
+        </div>
+        <div id="orderAddError" class="hu-edit-error hidden"></div>
+        <div class="modal-actions"><button type="submit" id="saveOrderAddButton" class="main-action-button">Auftrag anlegen</button><button type="button" id="cancelOrderAddButton">Abbrechen</button></div>
+    </form>
+</div>
 <div id="batchNoteModal" class="modal-overlay">
     <div class="modal-content">
         <h3>Batch-Notiz Festlegen</h3><div class="form-group"><label for="batchNoteInput">Notiz für alle Scans in diesem Batch (optional):</label><input type="text" id="batchNoteInput" placeholder="Notiz eingeben..." list="noteSuggestions"></div>

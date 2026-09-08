@@ -2182,6 +2182,93 @@ function closeHuEditModal() {
     document.body.classList.remove('modal-open');
     focusShipmentInput();
 }
+// ---- „+ Auftrag“ (LKW-Seite, Desktop): weiteren Auftrag/Rechnung zu einem MAN-LKW aufnehmen ------------------------
+// Legt den Auftrag genauso an wie der Multi-Import (isHuListOrder, truckId/originalManNumber des LKW, Spediteur/Land/PLSO)
+// mit dem ersten Packstück als Platz „Anstehend“ (Pos. 1). Weitere HUs kommen über „+ Packstück“ in der Detailansicht.
+function openOrderAddModal(truckId) {
+    const modal = document.getElementById('orderAddModal');
+    if (!modal) return;
+    const shipments = loadShipments();
+    const onTruck = Object.values(shipments).filter(s => s && s.truckId === truckId);
+    if (!onTruck.length) { displayError(`LKW ${escapeHtml(truckId)} nicht gefunden.`); return; }
+    const sample = onTruck.find(s => s.freightForwarder) || onTruck[0];
+    document.getElementById('orderAddTruckId').value = truckId;
+    ['orderAddNumber', 'orderAddPlso', 'orderAddHu', 'orderAddPackaging', 'orderAddDimensions', 'orderAddWeight'].forEach(id => { document.getElementById(id).value = ''; });
+    // Spediteur/Land wie die anderen Aufträge dieses LKW vorbelegen (meist gleiche Lieferung) – änderbar
+    document.getElementById('orderAddForwarder').value = sample.freightForwarder || '';
+    document.getElementById('orderAddCountry').value = sample.destinationCountry || '';
+    document.getElementById('orderAddContext').textContent = `${truckShortName(truckId)} · ${pluralize(onTruck.length, 'Auftrag', 'Aufträge')} bisher`;
+    const err = document.getElementById('orderAddError'); err.textContent = ''; err.classList.add('hidden');
+    modal.classList.add('visible');
+    document.body.classList.add('modal-open');
+    setTimeout(() => document.getElementById('orderAddNumber').focus(), 50);
+}
+function closeOrderAddModal() {
+    const modal = document.getElementById('orderAddModal');
+    if (modal) modal.classList.remove('visible');
+    document.body.classList.remove('modal-open');
+    focusShipmentInput();
+}
+function saveOrderAddFromModal() {
+    const truckId = document.getElementById('orderAddTruckId').value;
+    const number = document.getElementById('orderAddNumber').value.trim().toUpperCase().replace(/\s+/g, '');
+    const forwarder = document.getElementById('orderAddForwarder').value.trim();
+    const country = document.getElementById('orderAddCountry').value.trim().toUpperCase();
+    const plso = document.getElementById('orderAddPlso').value.trim();
+    const hu = document.getElementById('orderAddHu').value.trim().toUpperCase().replace(/\s+/g, '');
+    const packaging = document.getElementById('orderAddPackaging').value.trim();
+    const dimensions = document.getElementById('orderAddDimensions').value.trim();
+    const weightRaw = document.getElementById('orderAddWeight').value.trim();
+    const err = document.getElementById('orderAddError');
+    const fail = msg => { err.textContent = msg; err.classList.remove('hidden'); };
+
+    if (!number) return fail('Bitte die Rechnungsnummer eingeben.');
+    if (!/^[0-9A-Z-]+$/.test(number)) return fail('Rechnungsnummer darf nur Ziffern, Großbuchstaben und Bindestrich enthalten.');
+    if (!forwarder) return fail('Bitte den Spediteur eingeben.');
+    if (!country) return fail('Bitte das Land eingeben.');
+    if (!hu) return fail('Bitte die erste HU-Nummer eingeben (oder scannen).');
+    if (!/^[0-9A-Z-]+$/.test(hu)) return fail('HU-Nummer darf nur Ziffern, Großbuchstaben und Bindestrich enthalten.');
+    if (hu === number) return fail('HU-Nummer und Rechnungsnummer dürfen nicht gleich sein.');
+    let grossWeight = null;
+    if (weightRaw) {
+        if (parseWeightKg(weightRaw) === null) return fail('Gewicht nicht lesbar – z. B. „42 KG“ oder „0,700 KG“.');
+        grossWeight = /KG/i.test(weightRaw) ? weightRaw.toUpperCase() : `${weightRaw} KG`;
+    }
+
+    const shipments = loadShipments();
+    if (shipments[number]) return fail(`${number} gibt es bereits${shipments[number].truckId ? ` (${truckShortName(shipments[number].truckId)})` : ''}.`);
+    if (isArchivedBase(number)) return fail(`${number} liegt im Archiv – bitte zuerst über die Suche wiederherstellen.`);
+    for (const b in shipments) {
+        const other = shipments[b];
+        if (!other || !other.isHuListOrder) continue;
+        if (huItemsOf(other, hu).length) return fail(`HU ${hu} gibt es bereits im Auftrag ${b}.`);
+    }
+    if (shipments[hu] || isArchivedBase(hu)) return fail(`${hu} ist bereits als eigene Sendung erfasst.`);
+    const onTruck = Object.values(shipments).filter(s => s && s.truckId === truckId);
+    if (!onTruck.length) { closeOrderAddModal(); displayError(`LKW ${escapeHtml(truckId)} nicht mehr gefunden.`); return; }
+    const sample = onTruck.find(s => typeof s.originalManNumber === 'number') || onTruck[0];
+
+    const now = new Date().toISOString();
+    const newShipment = {
+        hawb: number, lastModified: now, totalPiecesExpected: 1,
+        scannedItems: [], mitarbeiter: MITARBEITER_NAME, isHuListOrder: true,
+        truckId: truckId,
+        freightForwarder: forwarder, destinationCountry: country
+    };
+    if (typeof sample.originalManNumber === 'number') newShipment.originalManNumber = sample.originalManNumber;
+    if (plso) newShipment.plsoNumber = plso;
+    newShipment.scannedItems.push({
+        rawInput: hu, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null,
+        position: 1, packaging: packaging || null, dimensions: dimensions || null, grossWeight: grossWeight
+    });
+    shipments[number] = newShipment;
+    saveShipments(shipments);
+    closeOrderAddModal();
+    renderTable();
+    if (currentPage && currentPage.id === 'lkw') renderCurrentPage(true);
+    displayError(`Auftrag ${escapeHtml(number)} mit HU ${escapeHtml(hu)} auf ${escapeHtml(truckShortName(truckId))} angelegt.`, 'green', 3000);
+    showDetailView(number); // direkt weiter: dort „+ Packstück“ für die übrigen HUs
+}
 function saveHuEditFromModal() {
     if (document.getElementById('huEditModal').classList.contains('add-mode')) return saveHuAddFromModal();
     if (document.getElementById('huEditModal').classList.contains('piece-mode')) return savePieceEditFromModal();
@@ -3484,6 +3571,7 @@ const PAGE_RENDERERS = {
                 <span class="${chipClass(t.counted + t.dunkel, t.expected)}">Sich. ${ratioText(t.counted, t.expected)}</span>
                 ${t.dunkel ? `<span class="over">${t.dunkel} Dunkelalarm</span>` : ''}
                 ${t.openOrders ? `<span class="mismatch">${t.openOrders} offen</span>` : '<span class="ok">alles erfasst</span>'}
+                ${t.active && isDesktopLayout() && String(t.truckId).startsWith('MAN') ? `<button type="button" class="page-summary-btn page-summary-add" data-order-add="${escapeHtml(t.truckId)}" title="Weiteren Auftrag (Rechnung) zu diesem LKW aufnehmen">+ Auftrag</button>` : ''}
                 ${t.active ? `<button type="button" class="page-summary-btn" data-lkw-deactivate="${escapeHtml(t.truckId)}">LKW deaktivieren</button>` : ''}
             </div>`;
             pageContentEl.innerHTML = html;
@@ -3709,6 +3797,8 @@ if (pageContentEl) pageContentEl.addEventListener('click', (event) => {
     if (truckBtn) { openPage({ id: 'lkw', truckId: truckBtn.dataset.truckid }); return; }
     const act = target.closest('[data-lkw-activate]');
     if (act) { setLkwActiveFromPage(act.dataset.lkwActivate, true); return; }
+    const addOrder = target.closest('[data-order-add]');
+    if (addOrder) { if (!isBatchModeActive) openOrderAddModal(addOrder.dataset.orderAdd); return; }
     const deact = target.closest('[data-lkw-deactivate]');
     if (deact) {
         if (confirm('LKW deaktivieren?\n\nSeine Sendungen werden in der Liste ausgeblendet; nach 7 Tagen wandern sie ins Archiv (bleiben suchbar).')) setLkwActiveFromPage(deact.dataset.lkwDeactivate, false);
@@ -6096,6 +6186,12 @@ if (huEditFormEl) {
     huEditFormEl.addEventListener('submit', (e) => { e.preventDefault(); saveHuEditFromModal(); });
     document.getElementById('cancelHuEditButton').addEventListener('click', closeHuEditModal);
     document.getElementById('huEditModal').addEventListener('click', (e) => { if (e.target.id === 'huEditModal') closeHuEditModal(); });
+    const orderAddFormEl = document.getElementById('order-add-form');
+    if (orderAddFormEl) {
+        orderAddFormEl.addEventListener('submit', (e) => { e.preventDefault(); saveOrderAddFromModal(); });
+        document.getElementById('cancelOrderAddButton').addEventListener('click', closeOrderAddModal);
+        document.getElementById('orderAddModal').addEventListener('click', (e) => { if (e.target.id === 'orderAddModal') closeOrderAddModal(); });
+    }
 }
 
 // Der separate 'click'-Listener für saveNoteEditButtonEl wird komplett entfernt.

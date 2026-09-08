@@ -246,6 +246,49 @@ function bigData() {
       await page.close();
     }
 
+    // ---- „+ Auftrag“ (LKW-Seite): weiteren Auftrag zum MAN-LKW anlegen – wie ein Import, mit erstem Packstück ----
+    {
+      const d = bigData(); const now = Date.now(); const iso = ago => new Date(now - ago * 60e3).toISOString();
+      d['9007000001'].freightForwarder = 'Spedition A'; d['9007000001'].destinationCountry = 'DE';
+      const be = makeBackend(d, {});
+      page = await openApp(browser, be, { query: '?seite=anlieferung&lkw=MAN%201', viewport: { width: 1600, height: 900, deviceScaleFactor: 1 } }); await wait(600);
+      const before = await page.evaluate(() => ({ rows: document.querySelectorAll('#pageContent tr[data-basenumber]').length, btn: document.querySelector('[data-order-add]') && document.querySelector('[data-order-add]').textContent.trim() }));
+      assert(before.btn === '+ Auftrag', `„+ Auftrag“ auf der LKW-Seite neben „LKW deaktivieren“ (${before.btn})`);
+      await page.evaluate(() => document.querySelector('[data-order-add]').click()); await wait(300);
+      const m = await page.evaluate(() => ({ vis: document.getElementById('orderAddModal').classList.contains('visible'), focus: document.activeElement.id, fw: document.getElementById('orderAddForwarder').value, land: document.getElementById('orderAddCountry').value }));
+      assert(m.vis && m.focus === 'orderAddNumber' && m.fw === 'Spedition A' && m.land === 'DE', `Modal offen, Spediteur/Land vom LKW vorbelegt, Fokus Rechnungsnummer (${JSON.stringify(m)})`);
+      const trySave = async () => { await page.evaluate(() => document.getElementById('saveOrderAddButton').click()); await wait(200); return page.$eval('#orderAddError', e => e.textContent); };
+      assert(/Rechnungsnummer eingeben/.test(await trySave()), 'Auftrag: leere Rechnungsnummer wird abgelehnt');
+      await page.evaluate(() => { document.getElementById('orderAddNumber').value = '9007000005'; document.getElementById('orderAddHu').value = 'NEU0001'; });
+      assert(/9007000005 gibt es bereits/.test(await trySave()), 'Auftrag: vorhandene Rechnungsnummer wird abgelehnt');
+      await page.evaluate(() => { document.getElementById('orderAddNumber').value = '9007000099'; document.getElementById('orderAddHu').value = 'HU5002'; });
+      assert(/HU HU5002 gibt es bereits im Auftrag 9007000005/.test(await trySave()), 'Auftrag: HU aus anderem Auftrag wird abgelehnt');
+      await page.evaluate(() => { document.getElementById('orderAddCountry').value = ''; document.getElementById('orderAddHu').value = 'NEU0001'; });
+      assert(/Land eingeben/.test(await trySave()), 'Auftrag: Land ist Pflicht');
+      await page.evaluate(() => { document.getElementById('orderAddCountry').value = 'china'; document.getElementById('orderAddPlso').value = '318101'; document.getElementById('orderAddWeight').value = '7,5'; document.getElementById('saveOrderAddButton').click(); }); await wait(700);
+      const after = await page.evaluate(() => {
+        const s = JSON.parse(localStorage.getItem('frachtSicherungMobile_V8_18_Refactored'))['9007000099'];
+        return { modal: document.getElementById('orderAddModal').classList.contains('visible'), detail: getComputedStyle(document.getElementById('detailView')).display, crumbs: document.querySelector('.detail-crumbs').textContent.replace(/\s+/g, ' ').trim(), s: s && { truck: s.truckId, man: s.originalManNumber, hu: s.isHuListOrder, fw: s.freightForwarder, land: s.destinationCountry, plso: s.plsoNumber, tot: s.totalPiecesExpected, items: s.scannedItems.map(i => i.rawInput + ':' + i.status + ':' + i.position + ':' + i.grossWeight).join() }, addBtn: !!document.querySelector('.pack-add-btn') };
+      });
+      assert(!after.modal && after.detail === 'block' && /MAN 1.*9007000099$/.test(after.crumbs) && after.addBtn, `Nach dem Anlegen: Detailansicht des neuen Auftrags mit „+ Packstück“ (${after.crumbs})`);
+      assert(after.s && after.s.truck === 'MAN 1' && after.s.man === 1 && after.s.hu === true && after.s.fw === 'Spedition A' && after.s.land === 'CHINA' && after.s.plso === '318101' && after.s.tot === 1 && after.s.items === 'NEU0001:Anstehend:1:7,5 KG', `Auftrag wie ein Import angelegt (LKW, MAN-Nr., Spediteur, Land, PLSO, 1 Platz „Anstehend“) (${JSON.stringify(after.s)})`);
+      assert(be.store['9007000099'] && be.store['9007000099'].truckId === 'MAN 1', 'Neuer Auftrag ist beim Server angekommen');
+      await page.evaluate(() => document.querySelector('.detail-crumb[data-crumb-page="lkw"]').click()); await wait(500);
+      const lkw = await page.evaluate(() => ({ rows: document.querySelectorAll('#pageContent tr[data-basenumber]').length, sum: document.querySelector('.page-summary').textContent.replace(/\s+/g, ' ').trim() }));
+      assert(lkw.rows === before.rows + 1 && /HUs/.test(lkw.sum), `LKW-Seite zeigt den neuen Auftrag (${before.rows} → ${lkw.rows})`);
+      // Scan der ersten HU landet im neuen Auftrag
+      await page.evaluate(() => document.getElementById('backToMainViewBtn') && getComputedStyle(document.getElementById('detailView')).display !== 'none' ? document.getElementById('backToMainViewBtn').click() : null); await wait(200);
+      await scan(page, 'NEU0001', 600);
+      const scanned = await page.evaluate(() => JSON.parse(localStorage.getItem('frachtSicherungMobile_V8_18_Refactored'))['9007000099'].scannedItems.map(i => i.rawInput + ':' + i.status).join());
+      assert(scanned === 'NEU0001:XRY,NEU0001:Wareneingang', `Scan der ersten HU sichert Platz 1 im neuen Auftrag (${scanned})`);
+      assert(page.__errors.length === 0, `Auftrag hinzufügen: keine JS-Fehler (${page.__errors.join('; ')})`);
+      await page.close();
+      // Handy: LKW-Seite ohne „+ Auftrag“
+      page = await openApp(browser, makeBackend(bigData(), {}), { query: '?seite=anlieferung&lkw=MAN%201' }); await wait(500);
+      assert(await page.evaluate(() => !document.querySelector('[data-order-add]') && !!document.querySelector('[data-lkw-deactivate]')), 'Handy: LKW-Seite unverändert (kein „+ Auftrag“)');
+      await page.close();
+    }
+
     // ---- Handy: unverändert ----
     page = await openApp(browser, makeBackend(bigData(), {}));
     const mob = await page.evaluate(() => {

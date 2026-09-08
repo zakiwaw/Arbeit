@@ -2491,6 +2491,14 @@ body.modal-open { overflow: hidden; }
     .pack-add-btn { margin-left: auto; padding: 4px 10px; font-size: var(--fs-xs); font-weight: 700; color: var(--accent-text); background: var(--accent-soft); border: none; border-radius: var(--r-md); cursor: pointer; transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease); }
     .pack-add-btn:hover { background: var(--accent); color: #fff; }
     body.batch-mode-active .pack-add-btn { display: none; }   /* wie Stift/„Bearbeiten“ im Batch-Modus */
+    .page-summary-add { margin-left: auto; color: var(--accent-text); border-color: transparent; background: var(--accent-soft); }
+    .page-summary-add:hover { color: #fff !important; background-color: var(--accent) !important; }
+    .page-summary-add + .page-summary-btn { margin-left: 0; }
+    body.batch-mode-active .page-summary-add { display: none; }
+    .order-add-content { max-width: 560px; }
+    .order-add-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 var(--sp-3); }
+    .order-add-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+    .order-add-sep { margin: var(--sp-1) 0 var(--sp-3); padding-top: var(--sp-3); border-top: 1px solid var(--border); font-size: var(--fs-xs); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); }
     .pack-table-plain td.pack-time { width: 160px; }
     .pack-table th.pack-edit-head, .pack-table td.pack-edit-cell { width: 36px; padding: 0 4px; text-align: center; }
     .pack-edit-btn { width: 30px; height: 30px; padding: 0; font-size: 0; color: var(--text-faint); background: none; border: none; border-radius: var(--r-sm); opacity: .55; transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease), opacity var(--dur) var(--ease); }
