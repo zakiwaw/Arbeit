@@ -2191,12 +2191,9 @@ function openOrderAddModal(truckId) {
     const shipments = loadShipments();
     const onTruck = Object.values(shipments).filter(s => s && s.truckId === truckId);
     if (!onTruck.length) { displayError(`LKW ${escapeHtml(truckId)} nicht gefunden.`); return; }
-    const sample = onTruck.find(s => s.freightForwarder) || onTruck[0];
     document.getElementById('orderAddTruckId').value = truckId;
-    ['orderAddNumber', 'orderAddPlso', 'orderAddHu', 'orderAddPackaging', 'orderAddDimensions', 'orderAddWeight'].forEach(id => { document.getElementById(id).value = ''; });
-    // Spediteur/Land wie die anderen Aufträge dieses LKW vorbelegen (meist gleiche Lieferung) – änderbar
-    document.getElementById('orderAddForwarder').value = sample.freightForwarder || '';
-    document.getElementById('orderAddCountry').value = sample.destinationCountry || '';
+    // Alle Felder leer – Spediteur/Land werden je Rechnung eingegeben (keine Vorbelegung vom LKW)
+    ['orderAddNumber', 'orderAddForwarder', 'orderAddCountry', 'orderAddPlso', 'orderAddHu', 'orderAddPackaging', 'orderAddDimensions', 'orderAddWeight'].forEach(id => { document.getElementById(id).value = ''; });
     document.getElementById('orderAddContext').textContent = `${truckShortName(truckId)} · ${pluralize(onTruck.length, 'Auftrag', 'Aufträge')} bisher`;
     const err = document.getElementById('orderAddError'); err.textContent = ''; err.classList.add('hidden');
     modal.classList.add('visible');

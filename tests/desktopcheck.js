@@ -256,16 +256,18 @@ function bigData() {
       assert(before.btn === '+ Auftrag', `„+ Auftrag“ auf der LKW-Seite neben „LKW deaktivieren“ (${before.btn})`);
       await page.evaluate(() => document.querySelector('[data-order-add]').click()); await wait(300);
       const m = await page.evaluate(() => ({ vis: document.getElementById('orderAddModal').classList.contains('visible'), focus: document.activeElement.id, fw: document.getElementById('orderAddForwarder').value, land: document.getElementById('orderAddCountry').value }));
-      assert(m.vis && m.focus === 'orderAddNumber' && m.fw === 'Spedition A' && m.land === 'DE', `Modal offen, Spediteur/Land vom LKW vorbelegt, Fokus Rechnungsnummer (${JSON.stringify(m)})`);
+      assert(m.vis && m.focus === 'orderAddNumber' && m.fw === '' && m.land === '', `Modal offen, Spediteur/Land LEER (keine Vorbelegung), Fokus Rechnungsnummer (${JSON.stringify(m)})`);
       const trySave = async () => { await page.evaluate(() => document.getElementById('saveOrderAddButton').click()); await wait(200); return page.$eval('#orderAddError', e => e.textContent); };
       assert(/Rechnungsnummer eingeben/.test(await trySave()), 'Auftrag: leere Rechnungsnummer wird abgelehnt');
       await page.evaluate(() => { document.getElementById('orderAddNumber').value = '9007000005'; document.getElementById('orderAddHu').value = 'NEU0001'; });
+      assert(/Spediteur eingeben/.test(await trySave()), 'Auftrag: Spediteur ist Pflicht');
+      await page.evaluate(() => { document.getElementById('orderAddForwarder').value = 'Spedition A'; });
+      assert(/Land eingeben/.test(await trySave()), 'Auftrag: Land ist Pflicht');
+      await page.evaluate(() => { document.getElementById('orderAddCountry').value = 'DE'; });
       assert(/9007000005 gibt es bereits/.test(await trySave()), 'Auftrag: vorhandene Rechnungsnummer wird abgelehnt');
       await page.evaluate(() => { document.getElementById('orderAddNumber').value = '9007000099'; document.getElementById('orderAddHu').value = 'HU5002'; });
       assert(/HU HU5002 gibt es bereits im Auftrag 9007000005/.test(await trySave()), 'Auftrag: HU aus anderem Auftrag wird abgelehnt');
-      await page.evaluate(() => { document.getElementById('orderAddCountry').value = ''; document.getElementById('orderAddHu').value = 'NEU0001'; });
-      assert(/Land eingeben/.test(await trySave()), 'Auftrag: Land ist Pflicht');
-      await page.evaluate(() => { document.getElementById('orderAddCountry').value = 'china'; document.getElementById('orderAddPlso').value = '318101'; document.getElementById('orderAddWeight').value = '7,5'; document.getElementById('saveOrderAddButton').click(); }); await wait(700);
+      await page.evaluate(() => { document.getElementById('orderAddHu').value = 'NEU0001'; document.getElementById('orderAddCountry').value = 'china'; document.getElementById('orderAddPlso').value = '318101'; document.getElementById('orderAddWeight').value = '7,5'; document.getElementById('saveOrderAddButton').click(); }); await wait(700);
       const after = await page.evaluate(() => {
         const s = JSON.parse(localStorage.getItem('frachtSicherungMobile_V8_18_Refactored'))['9007000099'];
         return { modal: document.getElementById('orderAddModal').classList.contains('visible'), detail: getComputedStyle(document.getElementById('detailView')).display, crumbs: document.querySelector('.detail-crumbs').textContent.replace(/\s+/g, ' ').trim(), s: s && { truck: s.truckId, man: s.originalManNumber, hu: s.isHuListOrder, fw: s.freightForwarder, land: s.destinationCountry, plso: s.plsoNumber, tot: s.totalPiecesExpected, items: s.scannedItems.map(i => i.rawInput + ':' + i.status + ':' + i.position + ':' + i.grossWeight).join() }, addBtn: !!document.querySelector('.pack-add-btn') };
