@@ -297,6 +297,37 @@ function bigData() {
       await page.close();
     }
 
+    // ---- Große Bildschirme: Seite nutzt die volle Breite, Schrift/Zeilen wachsen mit; 992–1399 px und Handy unverändert ----
+    {
+      const probe = async (w, h) => {
+        const p = await openApp(browser, makeBackend(bigData(), {}), { viewport: { width: w, height: h, deviceScaleFactor: 1 } }); await wait(400);
+        const r = await p.evaluate(() => ({
+          rem: parseFloat(getComputedStyle(document.documentElement).fontSize),
+          container: Math.round(document.querySelector('.container').getBoundingClientRect().width),
+          row: Math.round(document.querySelector('#shipmentTableBody tr[data-basenumber] td').getBoundingClientRect().height),
+          table: Math.round(document.querySelector('.shipment-table').getBoundingClientRect().width),
+          errors: 0 }));
+        r.errors = p.__errors.length; await p.close(); return r;
+      };
+      const mid = await probe(1280, 800), fhd = await probe(1920, 1080), qhd = await probe(2560, 1440);
+      assert(mid.rem === 16 && mid.container === 1280 && mid.row === 36, `Desktop 1280 px unverändert: rem 16, Container 1280, Zeile 36 (${JSON.stringify(mid)})`);
+      assert(fhd.rem === 20 && fhd.container === 1920 && fhd.table >= 1800 && fhd.row === 46, `1920 px: rem 20, Container über die volle Breite, Tabelle ≥ 1800, Zeile 46 (${JSON.stringify(fhd)})`);
+      assert(qhd.rem === 20 && qhd.container === 2560 && qhd.table >= 2400, `2560 px: volle Breite, Tabelle ≥ 2400 (${JSON.stringify(qhd)})`);
+      assert(mid.errors + fhd.errors + qhd.errors === 0, 'Große Bildschirme: keine JS-Fehler');
+      // Detailansicht + „+ Packstück“-Modal auf 1920 px: Karte und Modal breit, Timeline nicht mehr gedeckelt
+      page = await openApp(browser, makeBackend(bigData(), {}), { viewport: { width: 1920, height: 1080, deviceScaleFactor: 1 } }); await wait(500);
+      await page.evaluate(() => document.querySelector('tr[data-basenumber="9007000001"] .hawb-cell').click()); await wait(500);
+      await page.evaluate(() => document.querySelector('.pack-add-btn').click()); await wait(300);
+      const big = await page.evaluate(() => ({
+        card: Math.round(document.getElementById('currentShipmentDetails').getBoundingClientRect().width),
+        tl: Math.round(document.querySelector('#currentShipmentDetails > ul').getBoundingClientRect().width),
+        modal: Math.round(document.querySelector('#huAddModal .modal-content').getBoundingClientRect().width),
+        input: Math.round(document.querySelector('.hu-add-table input').getBoundingClientRect().height) }));
+      assert(big.card >= 1800 && big.tl >= 1700, `1920 px Details: Karte ${big.card} px, Timeline ${big.tl} px (voll breit)`);
+      assert(big.modal >= 1500 && big.input === 40, `1920 px „+ Packstück“: Modal ${big.modal} px breit, Eingabefelder 40 px hoch`);
+      await page.close();
+    }
+
     // ---- Handy: unverändert ----
     page = await openApp(browser, makeBackend(bigData(), {}));
     const mob = await page.evaluate(() => {
