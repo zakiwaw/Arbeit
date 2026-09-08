@@ -209,11 +209,27 @@ function bigData() {
       assert(await page.$eval('.detail-pack-head .pack-add-btn', b => b.textContent.trim()) === '+ Packstück', '„+ Packstück“ in der Kopfzeile der Packstücktabelle');
       await page.evaluate(() => document.querySelector('.pack-add-btn').click()); await wait(300);
       const m = await page.evaluate(() => ({ vis: document.getElementById('huAddModal').classList.contains('visible'), ctx: document.getElementById('huAddContext').textContent, rows: document.querySelectorAll('#huAddRows tr').length, pos: [...document.querySelectorAll('.hu-add-pos-no')].map(e => e.textContent).join(), focus: document.activeElement.className, width: Math.round(document.querySelector('#huAddModal .modal-content').getBoundingClientRect().width) }));
-      assert(m.vis && m.ctx === 'Rechnung 9008296222 · ab Position 10 · bisher 9 Packstücke' && m.rows === 3 && m.pos === '10.,11.,12.' && m.focus === 'hu-add-hu' && m.width >= 900, `Breites Modal mit 3 Leerzeilen ab Pos. 10, Fokus in der ersten HU-Zelle (${JSON.stringify(m)})`);
+      assert(m.vis && m.ctx === 'Rechnung 9008296222 · ab Position 10 · bisher 9 Packstücke' && m.rows === 3 && m.pos === '10.,11.,12.' && m.focus === 'hu-add-hu' && m.width === 1600, `Eigene Vollbild-Seite (1600 px breit) mit 3 Leerzeilen ab Pos. 10, Fokus in der ersten HU-Zelle (${JSON.stringify(m)})`);
+      const pg = await page.evaluate(() => {
+        const m = document.getElementById('huAddModal'); const cs = getComputedStyle(m);
+        const ex = document.getElementById('huAddExisting');
+        return { align: cs.alignItems, pad: cs.padding, blur: cs.backdropFilter, header: !!m.querySelector('.hu-add-header #huAddBackBtn'), h2: m.querySelector('.hu-add-header h2').textContent,
+          exRows: ex.querySelectorAll('tbody tr').length, exHead: ex.querySelector('h4').textContent, exPencil: !!ex.querySelector('.pack-edit-btn'), exAdd: !!ex.querySelector('.pack-add-btn'),
+          actionsBottom: Math.round(document.querySelector('.hu-add-actions').getBoundingClientRect().bottom), count: document.getElementById('huAddCount').textContent };
+      });
+      assert(pg.align === 'stretch' && pg.pad === '0px' && pg.blur === 'none' && pg.header && pg.h2 === 'Packstücke hinzufügen', `Seite statt mittigem Fenster: Kopfzeile mit Zurück-Pfeil, kein Overlay-Rand (${JSON.stringify(pg)})`);
+      assert(pg.exRows === 9 && pg.exHead === 'Bisherige Packstücke (9)' && !pg.exPencil && !pg.exAdd, `Rechts die 9 bisherigen Packstücke, nur lesend (${JSON.stringify(pg)})`);
+      assert(pg.actionsBottom === 900 && pg.count === 'noch nichts eingetragen', `Speichern-Leiste fest am unteren Rand, Zähler leer (${JSON.stringify(pg)})`);
+      // Zurück-Pfeil schließt ohne zu speichern; erneutes Öffnen startet frisch
+      await page.evaluate(() => { document.querySelector('#huAddRows .hu-add-hu').value = 'ADD0099'; document.getElementById('huAddBackBtn').click(); }); await wait(200);
+      assert(await page.evaluate(() => !document.getElementById('huAddModal').classList.contains('visible') && JSON.parse(localStorage.getItem('frachtSicherungMobile_V8_18_Refactored'))['9008296222'].totalPiecesExpected === 9), 'Zurück-Pfeil schließt die Seite ohne zu speichern');
+      await page.evaluate(() => document.querySelector('.pack-add-btn').click()); await wait(300);
+      assert(await page.evaluate(() => [...document.querySelectorAll('.hu-add-hu')].every(i => !i.value) && document.activeElement.classList.contains('hu-add-hu')), 'Erneut geöffnet: leere Zeilen, Fokus wieder in der ersten HU-Zelle');
       // Scanner-Simulation: HU + Enter, viermal
       for (const hu of ['ADD0091', 'ADD0092', 'ADD0093', 'ADD0094']) { await page.keyboard.type(hu); await page.keyboard.press('Enter'); await wait(60); }
       const typed = await page.evaluate(() => ({ rows: document.querySelectorAll('#huAddRows tr').length, hus: [...document.querySelectorAll('.hu-add-hu')].map(e => e.value).join('|'), focusRow: document.activeElement.closest('tr').rowIndex }));
       assert(typed.rows === 5 && typed.hus === 'ADD0091|ADD0092|ADD0093|ADD0094|' && typed.focusRow === 5, `Enter springt zur nächsten Zeile, neue Leerzeile wird angehängt (${JSON.stringify(typed)})`);
+      assert(await page.$eval('#huAddCount', e => e.textContent) === '4 eingetragen', 'Zähler „4 eingetragen“ in der Kopfzeile der Eingabetabelle');
       await page.keyboard.type('ADD0092'); await wait(120);
       const bad = await page.$$eval('.hu-add-row-bad .hu-add-hu', e => e.map(x => x.value + ':' + x.title).join('|'));
       assert(bad === 'ADD0092:Doppelt in dieser Liste', `Doppelte HU wird sofort rot markiert (${bad})`);
@@ -228,10 +244,10 @@ function bigData() {
       await page.evaluate(() => { document.querySelectorAll('#huAddRows tr')[2].querySelector('.hu-add-weight').value = ''; document.getElementById('saveHuAddButton').click(); }); await wait(700);
       const after = await page.evaluate(() => {
         const s = JSON.parse(localStorage.getItem('frachtSicherungMobile_V8_18_Refactored'))['9008296222'];
-        return { modal: document.getElementById('huAddModal').classList.contains('visible'), tot: s.totalPiecesExpected, added: s.scannedItems.slice(9).map(i => i.rawInput + '@' + i.position + ':' + i.status + ':' + (i.grossWeight || '') + ':' + (i.packaging || '')).join(' '), rows: document.querySelectorAll('.pack-table tbody tr').length, h4: document.querySelector('.detail-pack-head h4').textContent, kolli: [...document.querySelectorAll('.detail-fact')].map(f => f.textContent.replace(/\s+/g, ' ')).find(x => /Kolli/.test(x)) };
+        return { modal: document.getElementById('huAddModal').classList.contains('visible'), tot: s.totalPiecesExpected, added: s.scannedItems.slice(9).map(i => i.rawInput + '@' + i.position + ':' + i.status + ':' + (i.grossWeight || '') + ':' + (i.packaging || '')).join(' '), rows: document.querySelectorAll('#detailView .pack-table tbody tr').length, stale: document.getElementById('huAddExisting').innerHTML.length, h4: document.querySelector('#detailView .detail-pack-head h4').textContent, kolli: [...document.querySelectorAll('.detail-fact')].map(f => f.textContent.replace(/\s+/g, ' ')).find(x => /Kolli/.test(x)) };
       });
       assert(!after.modal && after.tot === 13 && after.added === 'ADD0091@10:Anstehend:: ADD0092@11:Anstehend:12,5 KG:Palette ADD0093@12:Anstehend:: ADD0094@13:Anstehend::', `4 Packstücke auf einmal: Pos. 10–13 als „Anstehend“, Kolli 13 (${JSON.stringify(after)})`);
-      assert(after.rows === 13 && after.h4 === 'Packstücke (13)' && /Kolli ?13/.test(after.kolli), `Tabelle/Kopf zeigen 13 Packstücke (${after.h4}, ${after.kolli})`);
+      assert(after.rows === 13 && after.stale === 0 && after.h4 === 'Packstücke (13)' && /Kolli ?13/.test(after.kolli), `Tabelle/Kopf zeigen 13 Packstücke, Seite aufgeräumt (${after.h4}, ${after.kolli}, stale ${after.stale})`);
       assert(be.store['9008296222'] && be.store['9008296222'].totalPiecesExpected === 13 && be.store['9008296222'].scannedItems.filter(i => /^ADD009/.test(i.rawInput)).length === 4, 'Neue Packstücke sind beim Server angekommen');
       // Scan einer neuen HU sichert ihren Platz ganz normal
       await page.evaluate(() => document.getElementById('backToMainViewBtn').click()); await wait(300);

@@ -1932,6 +1932,8 @@ body.modal-open { overflow: hidden; }
     border-radius: var(--r-md);
     transition: background-color var(--dur) var(--ease);
 }
+.modal-actions.hu-add-actions { flex-wrap: wrap; }
+.hu-add-footer-info { flex: 1 0 100%; }
 .modal-actions-center { justify-content: center; }
 .modal-actions-center button { flex: 0 1 60%; }
 
@@ -2507,7 +2509,37 @@ body.modal-open { overflow: hidden; }
     .pack-edit-btn:hover { background-color: var(--accent-soft); color: var(--accent-text) !important; opacity: 1; }
     body.batch-mode-active .pack-edit-btn { display: none; }   /* wie „Bearbeiten“ in der Liste */
     #huEditModal .modal-content { max-width: 460px; }
-    #huAddModal .modal-content { max-width: 960px; }
+    /* „Packstücke hinzufügen“ = eigene Vollbild-Seite (wie Sendungsdetails), kein mittiges Fenster: das Overlay selbst
+       ist die Seite, das Formular füllt sie, oben die gewohnte Kopfzeile mit Zurück-Pfeil, unten eine feste Leiste. */
+    #huAddModal { display: none; align-items: stretch; justify-content: stretch; padding: 0; overflow: hidden; background-color: var(--bg); -webkit-backdrop-filter: none; backdrop-filter: none; }
+    #huAddModal.visible { display: flex; animation: overlay-in .15s var(--ease); }
+    #huAddModal .modal-content { flex: 1 1 auto; width: 100%; max-width: none; max-height: none; min-height: 0; padding: 0; background: transparent; border-radius: 0; box-shadow: none; animation: none; }
+    .hu-add-header { flex-shrink: 0; margin: 0; padding: var(--sp-2) var(--sp-6); }
+    .hu-add-header h2 { flex: 0 0 auto; }
+    .hu-add-context { flex: 1; min-width: 0; margin-left: var(--sp-3); font-size: var(--fs-sm); color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hu-add-layout { flex: 1 1 auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--sp-5); min-height: 0; padding: var(--sp-4) var(--sp-6) 0; overflow: hidden; }
+    .hu-add-panel { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+    .hu-add-panel .detail-pack-head { flex-shrink: 0; }
+    .hu-add-new .hu-add-table-wrap { flex: 0 1 auto; min-height: 0; max-height: none; margin: 0; overflow: auto; background-color: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); }
+    .hu-add-existing { overflow: auto; padding-bottom: var(--sp-4); }
+    .hu-add-new .hu-add-table th:nth-child(2), .hu-add-new .hu-add-table td:nth-child(2) { width: 34%; min-width: 220px; }   /* HU-Nummer bekommt den meisten Platz */
+    .hu-add-new .hu-add-table th.hu-add-kg, .hu-add-new .hu-add-table td.hu-add-kg { width: 110px; }
+    .hu-add-existing .pack-table { table-layout: auto; }
+    /* rechts zählt nur „was ist schon da“: Zeit- und Notiz-Spalte weglassen, damit alles ohne Querscrollen passt */
+    .hu-add-existing .pack-table th:nth-last-child(-n+2), .hu-add-existing .pack-table td:nth-last-child(-n+2) { display: none; }
+    .hu-add-existing .detail-pack { margin: 0; }
+    .hu-add-existing .pack-table th { top: 0; }
+    .hu-add-existing .pack-table tbody tr:hover td { background-color: inherit; }
+    .hu-add-existing .pack-table tr.pack-row-open:hover td { background-color: color-mix(in srgb, var(--warning-soft) 55%, transparent); }
+    .hu-add-empty { padding: var(--sp-5); font-size: var(--fs-sm); color: var(--text-faint); background-color: var(--surface); border: 1px dashed var(--border-strong); border-radius: var(--r-md); }
+    #huAddModal .modal-actions.hu-add-actions { display: flex; flex-shrink: 0; flex-wrap: nowrap; align-items: center; gap: var(--sp-3); margin: 0; padding: var(--sp-3) var(--sp-6); background-color: var(--surface); border-top: 1px solid var(--border); box-shadow: 0 -4px 12px -8px rgba(0,0,0,.25); }
+    .hu-add-footer-info { flex: 1 1 auto; min-width: 0; }
+    .hu-add-footer-info .hu-add-hint { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hu-add-footer-info .hu-edit-error { margin: var(--sp-1) 0 0; }
+    #huAddModal .hu-add-actions button { flex: 0 0 auto; width: auto; min-width: 200px; }
+    #saveHuAddButton { color: #fff; background-color: var(--accent); }
+    #saveHuAddButton:hover { background-color: var(--accent-hover, var(--accent)); }
+    #cancelHuAddButton { color: var(--text); background-color: var(--surface); border: 1.5px solid var(--border-strong); }
     .hu-add-table-wrap { max-height: 52vh; overflow: auto; margin: 0 0 var(--sp-2); border: 1px solid var(--border); border-radius: var(--r-md); }
     .hu-add-table { width: 100%; border-collapse: separate; border-spacing: 0; }
     .hu-add-table th { position: sticky; top: 0; z-index: 1; padding: 6px 8px; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; text-align: left; color: var(--text-muted); background: var(--surface-2); border-bottom: 1px solid var(--border); }

@@ -2186,14 +2186,26 @@ function openHuAddModal(base) {
     tbody.innerHTML = '';
     for (let i = 0; i < HU_ADD_MIN_ROWS; i++) huAddAppendRow();
     document.getElementById('huAddContext').textContent = `${shipment.freightForwarder && shipment.destinationCountry ? 'Rechnung' : 'Auftrag'} ${base}` + (pos === null ? '' : ` · ab Position ${pos}`) + (expected !== null ? ` · bisher ${pluralize(expected, 'Packstück', 'Packstücke')}` : '');
+    // Rechts daneben: was der Auftrag schon hat – dieselbe Tabelle wie in den Sendungsdetails, nur lesend (kein Stift, kein „+“)
+    const existing = document.getElementById('huAddExisting');
+    if (existing) existing.innerHTML = (buildDetailPackTable(shipment, true, base) || '').replace('<h4>Packstücke (', '<h4>Bisherige Packstücke (') || '<div class="hu-add-empty">Noch keine Packstücke in diesem Auftrag.</div>';
+    huAddUpdateCount();
     const err = document.getElementById('huAddError'); err.textContent = ''; err.classList.add('hidden');
     modal.classList.add('visible');
+    modal.scrollTop = 0;
     document.body.classList.add('modal-open');
     setTimeout(() => { const f = tbody.querySelector('.hu-add-hu'); if (f) f.focus(); }, 50);
+}
+// Zähler in der Kopfzeile der Eingabetabelle („3 eingetragen“) – reine Anzeige
+function huAddUpdateCount() {
+    const el = document.getElementById('huAddCount'); if (!el) return;
+    const n = Array.from(document.getElementById('huAddRows').rows).filter(tr => tr.querySelector('.hu-add-hu').value.trim()).length;
+    el.textContent = n ? `${n} eingetragen` : 'noch nichts eingetragen';
 }
 function closeHuAddModal() {
     const modal = document.getElementById('huAddModal');
     if (modal) modal.classList.remove('visible');
+    const existing = document.getElementById('huAddExisting'); if (existing) existing.innerHTML = '';   // Lese-Kopie der Packstücke nicht im DOM stehen lassen
     document.body.classList.remove('modal-open');
     focusShipmentInput();
 }
@@ -6248,6 +6260,7 @@ if (huEditFormEl) {
     if (huAddFormEl) {
         huAddFormEl.addEventListener('submit', (e) => { e.preventDefault(); saveHuAddFromModal(); });
         document.getElementById('cancelHuAddButton').addEventListener('click', closeHuAddModal);
+        const huAddBackEl = document.getElementById('huAddBackBtn'); if (huAddBackEl) huAddBackEl.addEventListener('click', closeHuAddModal);
         document.getElementById('huAddModal').addEventListener('click', (e) => { if (e.target.id === 'huAddModal') closeHuAddModal(); });
         const rowsEl = document.getElementById('huAddRows');
         // Enter (auch vom Scanner) in einer HU-Zelle → nächste Zeile; in anderen Zellen → nächstes Feld der Zeile
@@ -6268,7 +6281,7 @@ if (huEditFormEl) {
             }
         });
         rowsEl.addEventListener('input', (e) => {
-            if (e.target.classList.contains('hu-add-hu')) { huAddEnsureTrailingEmptyRow(); huAddValidateRows(); }
+            if (e.target.classList.contains('hu-add-hu')) { huAddEnsureTrailingEmptyRow(); huAddValidateRows(); huAddUpdateCount(); }
             const err = document.getElementById('huAddError'); if (err && !err.classList.contains('hidden')) { err.textContent = ''; err.classList.add('hidden'); }
         });
         rowsEl.addEventListener('click', (e) => {
@@ -6276,7 +6289,7 @@ if (huEditFormEl) {
             const tr = btn.closest('tr');
             if (rowsEl.rows.length > HU_ADD_MIN_ROWS) tr.remove(); else tr.querySelectorAll('input').forEach(i => { i.value = ''; i.title = ''; });
             tr.classList.remove('hu-add-row-bad');
-            huAddRenumber(); huAddEnsureTrailingEmptyRow(); huAddValidateRows();
+            huAddRenumber(); huAddEnsureTrailingEmptyRow(); huAddValidateRows(); huAddUpdateCount();
             const first = rowsEl.querySelector('.hu-add-hu'); if (first) first.focus();
         });
     }
