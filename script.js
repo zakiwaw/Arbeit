@@ -4711,6 +4711,10 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
                 batchListEl.appendChild(li);
             });
             batchItemCountEl.textContent = currentBatch.length;
+            // Zähler im Speichern-Knopf (feste Leiste am Handy): „Batch Speichern (7)“; leer → Knopf gedämpft
+            const saveCount = document.getElementById('saveBatchCount');
+            if (saveCount) { saveCount.textContent = String(currentBatch.length); saveCount.classList.toggle('hidden', currentBatch.length === 0); }
+            if (saveBatchButtonEl) saveBatchButtonEl.classList.toggle('is-empty', currentBatch.length === 0);
             updateCurrentBatchNoteDisplay();
         }
 

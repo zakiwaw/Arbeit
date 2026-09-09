@@ -158,9 +158,11 @@
                     <span class="batch-slider"></span>
                 </label>
             </div>
-            <div class="batch-action-buttons">
-                <button id="saveBatchButton">Batch Speichern</button>
-                <button id="clearBatchButton">Batch Leeren</button>
+            <!-- Handy: im Batch-Modus als feste Leiste am unteren Rand (CSS .batch-action-buttons in body.batch-mode-active);
+                 Desktop: wie bisher am Ende der Batch-Karte. Gleiche Knöpfe, gleiche Funktionen. -->
+            <div class="batch-action-buttons" id="batchActionBar">
+                <button id="saveBatchButton"><span class="batch-btn-prefix">Batch </span>Speichern<span id="saveBatchCount" class="batch-save-count hidden">0</span></button>
+                <button id="clearBatchButton"><span class="batch-btn-prefix">Batch </span>Leeren</button>
             </div>
         </div>
         <!-- Startseite: vier Kacheln. Die Sendungsdetails werden in der Detailansicht

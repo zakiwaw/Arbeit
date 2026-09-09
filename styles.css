@@ -684,8 +684,30 @@ body.batch-mode-active .status-and-button-container > #mainActionButton { flex: 
 }
 #saveBatchButton { color: #fff; background-color: var(--success); }
 #saveBatchButton:hover { background-color: var(--success-hover); }
+#saveBatchButton.is-empty { opacity: .6; }
 #clearBatchButton { color: var(--text); background-color: var(--surface); border: 1.5px solid var(--border-strong); }
 #clearBatchButton:hover { background-color: var(--surface-3); }
+.batch-save-count { display: inline-block; min-width: 22px; margin-left: 6px; padding: 0 6px; font-size: var(--fs-xs); font-weight: 800; line-height: 20px; color: var(--success-text); background-color: #fff; border-radius: var(--r-full); font-variant-numeric: tabular-nums; }
+/* Handy (unter 992 px): im Batch-Modus hängen „Batch Speichern“ / „Batch Leeren“ als feste Leiste am unteren Bildschirmrand –
+   so bleibt Speichern nach vielen Scans erreichbar, ohne zur Batch-Karte hochzuscrollen. Die Karte selbst bleibt oben wie bisher.
+   Nur in der Hauptansicht (Detailansicht/Unterseiten liegen darüber, z-index 100) und nicht am Desktop. */
+@media (max-width: 991.98px) {
+    body.batch-mode-active .batch-action-buttons {
+        position: fixed;
+        left: 0; right: 0; bottom: 0;
+        z-index: 60;                                   /* über der Liste, unter Detail-/Unterseiten (100) und Dialogen */
+        margin: 0;
+        padding: var(--sp-2) var(--sp-3) calc(var(--sp-2) + env(safe-area-inset-bottom, 0px));
+        background-color: var(--surface);
+        border-top: 1px solid var(--border);
+        box-shadow: 0 -6px 16px -8px rgba(0, 0, 0, .35);
+    }
+    body.batch-mode-active .batch-action-buttons button { white-space: nowrap; }
+    body.batch-mode-active .batch-action-buttons .batch-btn-prefix { display: none; }   /* in der Leiste reicht „Speichern (2)“ / „Leeren“ */
+    body.batch-mode-active .batch-area.visible { padding-bottom: var(--sp-3); }
+    body.batch-mode-active #mainView { padding-bottom: calc(var(--control-h) + var(--sp-4) + env(safe-area-inset-bottom, 0px)); }   /* letzte Karte nicht hinter der Leiste */
+    body.batch-mode-active.modal-open .batch-action-buttons { display: none; }   /* Vollbild-Dialoge (z. B. Packstücke) überdecken alles */
+}
 
 
 /* ===================================================================

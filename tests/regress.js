@@ -20,14 +20,19 @@ const wait = (ms) => new Promise(r => setTimeout(r, ms));
     assert(store['55512345'] && store['55512345'].totalPiecesExpected === 2, 'Neue Sendung 55512345 mit 2 Stück angelegt');
     await setBatchMode(page, true);
     assert(await page.evaluate(() => document.body.classList.contains('batch-mode-active')), 'Batch-Modus aktiv');
+    // Handy: „Speichern“/„Leeren“ hängen im Batch-Modus als feste Leiste unten (dieselben Knöpfe, aus der Karte gelöst)
+    const bar0 = await page.evaluate(() => { const bar = document.getElementById('batchActionBar'); const r = bar.getBoundingClientRect(); return { pos: getComputedStyle(bar).position, atBottom: Math.abs(innerHeight - r.bottom) < 1, save: document.getElementById('saveBatchButton').textContent.trim(), clear: document.getElementById('clearBatchButton').textContent.trim(), prefixHidden: [...document.querySelectorAll('#batchActionBar .batch-btn-prefix')].every(e => getComputedStyle(e).display === 'none'), cnt: getComputedStyle(document.getElementById('saveBatchCount')).display, pad: parseInt(getComputedStyle(document.getElementById('mainView')).paddingBottom) }; });
+    assert(bar0.pos === 'fixed' && bar0.atBottom && bar0.save === 'Batch Speichern0' && bar0.clear === 'Batch Leeren' && bar0.prefixHidden && bar0.cnt === 'none' && bar0.pad > 40, `Batch-Leiste unten fest, Zähler bei leerem Batch versteckt, Liste bekommt unten Luft (${JSON.stringify(bar0)})`);
     await page.evaluate(() => { const f = document.getElementById('batchFeedbackToggle'); if (!f.checked) f.click(); }); // Feedback-Popup (Standard: aus) einschalten
     await scan(page, 'HU1002', 300);
     assert(await page.evaluate(() => !document.querySelector('#batchScanFeedbackModal .modal-content').classList.contains('unexpected')), 'Batch: Feedback-Popup zeigt bekannte HU grün');
     await scan(page, 'UNBEKANNT1', 300);
     assert((await page.$$eval('.remove-batch-item', e => e.length)) === 2, 'Batch: 2 Einträge erfasst');
+    assert(await page.evaluate(() => document.getElementById('saveBatchCount').textContent === '2' && getComputedStyle(document.getElementById('saveBatchCount')).display !== 'none' && !document.getElementById('saveBatchButton').classList.contains('is-empty')), 'Batch-Leiste: Zähler „2“ am Speichern-Knopf');
     assert(await page.evaluate(() => document.querySelector('#batchScanFeedbackModal .modal-content').classList.contains('unexpected')), 'Batch: Feedback-Popup markiert unbekannte HU als überzählig (rot)');
     await page.evaluate(() => { const f = document.getElementById('batchFeedbackToggle'); if (f.checked) f.click(); });
     await setBatchMode(page, false);
+    assert(await page.evaluate(() => getComputedStyle(document.getElementById('batchActionBar')).position === 'static' && getComputedStyle(document.getElementById('mainView')).paddingBottom === '0px'), 'Batch aus: Leiste weg, kein Extra-Abstand');
     await page.evaluate(() => document.querySelector('.home-tile[data-page="anlieferung"]').click()); await wait(400);
     assert((await page.$$eval('.page-row[data-truckid]', r => r.length)) >= 1, 'Anlieferung: LKW-Zeilen vorhanden');
     await page.evaluate(() => document.querySelector('.page-row[data-truckid]').click()); await wait(400);

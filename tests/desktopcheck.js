@@ -259,6 +259,7 @@ function bigData() {
       await page.evaluate(() => document.querySelector('tr[data-basenumber="9008296222"] .hawb-cell').click()); await wait(400);
       assert(await page.$eval('.pack-add-btn', b => getComputedStyle(b).display !== 'none'), 'Nach dem Scan: „+ Packstück“ wieder sichtbar');
       await setBatchMode(page, true); await wait(300);
+      assert(await page.evaluate(() => getComputedStyle(document.getElementById('batchActionBar')).position === 'static' && /^Batch Speichern/.test(document.getElementById('saveBatchButton').textContent.trim())), 'Desktop: Batch-Knöpfe bleiben in der Karte („Batch Speichern“)');
       assert(await page.evaluate(() => !document.querySelector('.pack-add-btn') || getComputedStyle(document.querySelector('.pack-add-btn')).display === 'none'), 'Batch-Modus: „+ Packstück“ nicht erreichbar');
       await setBatchMode(page, false); await wait(300);
       await page.evaluate(() => document.getElementById('backToMainViewBtn').click()); await wait(300);
