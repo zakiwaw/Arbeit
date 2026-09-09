@@ -2068,7 +2068,8 @@ function openHuEditModal(base, hu) {
     document.getElementById('huEditOriginalHu').value = hu;
     document.getElementById('huEditNumber').value = hu;
     document.getElementById('huEditPackaging').value = detail.packaging && detail.packaging !== 'N/A' ? detail.packaging : '';
-    document.getElementById('huEditDimensions').value = detail.dimensions && detail.dimensions !== 'N/A' ? detail.dimensions : '';
+    modal.dataset.unit = dimensionUnitOf(shipment); setDimensionUnit(modal, modal.dataset.unit);
+    fillDimensionFields(modal, 'hu-edit-dim', detail.dimensions && detail.dimensions !== 'N/A' ? detail.dimensions : '');
     document.getElementById('huEditWeight').value = detail.grossWeight && detail.grossWeight !== 'N/A' ? detail.grossWeight : '';
     document.getElementById('huEditContext').textContent = `${shipment.freightForwarder && shipment.destinationCountry ? 'Rechnung' : 'Auftrag'} ${base}` + (detail.position ? ` · Position ${detail.position}` : '') + (scans ? ` · ${pluralize(scans, 'Scan', 'Scans')} auf diesem Packstück` : ' · noch nicht gescannt');
     const err = document.getElementById('huEditError'); err.textContent = ''; err.classList.add('hidden');
@@ -2097,7 +2098,8 @@ function openPieceEditModal(base, itemId, partnerId, pieceNo, pieceTotal) {
     document.getElementById('huEditPartnerId').value = partner ? partnerId : '';
     document.getElementById('huEditNumber').value = String(item.rawInput || base);
     document.getElementById('huEditPackaging').value = detail.packaging && detail.packaging !== 'N/A' ? detail.packaging : '';
-    document.getElementById('huEditDimensions').value = detail.dimensions && detail.dimensions !== 'N/A' ? detail.dimensions : '';
+    modal.dataset.unit = dimensionUnitOf(shipment); setDimensionUnit(modal, modal.dataset.unit);
+    fillDimensionFields(modal, 'hu-edit-dim', detail.dimensions && detail.dimensions !== 'N/A' ? detail.dimensions : '');
     document.getElementById('huEditWeight').value = detail.grossWeight && detail.grossWeight !== 'N/A' ? detail.grossWeight : '';
     const when = new Date(item.timestamp);
     document.getElementById('huEditContext').textContent = `Sendung ${base} · Stück ${pieceNo} von ${pieceTotal} · ${item.status}${isNaN(when) ? '' : ' ' + when.toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`;
@@ -2111,10 +2113,13 @@ function savePieceEditFromModal() {
     const itemId = document.getElementById('huEditItemId').value;
     const partnerId = document.getElementById('huEditPartnerId').value;
     const packaging = document.getElementById('huEditPackaging').value.trim();
-    const dimensions = document.getElementById('huEditDimensions').value.trim();
+    const modalEl = document.getElementById('huEditModal');
+    const dim = readDimensionFields(modalEl, 'hu-edit-dim', modalEl.dataset.unit || 'CM');
     const weightRaw = document.getElementById('huEditWeight').value.trim();
     const err = document.getElementById('huEditError');
     const fail = msg => { err.textContent = msg; err.classList.remove('hidden'); };
+    if (dim.error) return fail(dim.error);
+    const dimensions = dim.value;
     let grossWeight = null;
     if (weightRaw) {
         if (parseWeightKg(weightRaw) === null) return fail('Gewicht nicht lesbar – z. B. „42 KG“ oder „0,700 KG“.');
@@ -2160,7 +2165,7 @@ function huAddRowHtml(pos) {
         + `<td><input type="text" class="hu-add-hu" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="${vvl ? 'VSE eintippen oder scannen' : 'eintippen oder scannen'}"></td>`
         + (vvl ? `<td class="hu-add-sendnr-cell"><input type="text" class="hu-add-sendnr" autocomplete="off" inputmode="numeric" spellcheck="false" placeholder="optional"></td>` : '')
         + `<td><input type="text" class="hu-add-pack" autocomplete="off" placeholder="optional"></td>`
-        + `<td><input type="text" class="hu-add-dim" autocomplete="off" placeholder="optional"></td>`
+        + `<td class="hu-add-dim-cell">${dimensionFieldsHtml('hu-add-dim', document.getElementById('huAddRows').dataset.unit || 'CM')}</td>`
         + `<td class="hu-add-kg"><input type="text" class="hu-add-weight" autocomplete="off" inputmode="decimal" placeholder="optional"></td>`
         + `<td class="hu-add-x"><button type="button" class="hu-add-remove" title="Zeile leeren" aria-label="Zeile leeren">×</button></td>`
         + `</tr>`;
@@ -2225,9 +2230,10 @@ function openHuAddModal(base) {
     const isVvl = !!shipment.parentOrderNumber || items.some(i => i && i.sendnr);
     tbody.dataset.vvl = isVvl ? '1' : '';
     tbody.dataset.startPos = pos === null ? '' : String(pos);
+    tbody.dataset.unit = dimensionUnitOf(shipment);   // Maße-Felder speichern im Importformat des Auftrags (CM bzw. MM)
     // Kopfzeile passend zum Auftrag: VW = VSE · Sendungs-Nr. (ohne Pos.), sonst Pos. · HU-Nummer
     const thead = tbody.parentElement.tHead;
-    if (thead) thead.innerHTML = `<tr>${isVvl ? '<th>VSE</th><th class="hu-add-sendnr-cell">Sendungs-Nr.</th>' : '<th class="hu-add-pos">Pos.</th><th>HU-Nummer</th>'}<th>Verpackung</th><th>Maße</th><th class="hu-add-kg">Gewicht</th><th class="hu-add-x"></th></tr>`;
+    if (thead) thead.innerHTML = `<tr>${isVvl ? '<th>VSE</th><th class="hu-add-sendnr-cell">Sendungs-Nr.</th>' : '<th class="hu-add-pos">Pos.</th><th>HU-Nummer</th>'}<th>Verpackung</th><th class="hu-add-dim-cell">Maße <span class="th-unit">(${tbody.dataset.unit})</span></th><th class="hu-add-kg">Gewicht</th><th class="hu-add-x"></th></tr>`;
     tbody.parentElement.classList.toggle('hu-add-table-vvl', isVvl);
     tbody.innerHTML = '';
     for (let i = 0; i < HU_ADD_MIN_ROWS; i++) huAddAppendRow();
@@ -2268,12 +2274,15 @@ function saveHuAddFromModal() {
         hu: tr.querySelector('.hu-add-hu').value.trim().toUpperCase().replace(/\s+/g, ''),
         sendnr: isVvl ? tr.querySelector('.hu-add-sendnr').value.trim().replace(/\s+/g, '') : '',
         packaging: tr.querySelector('.hu-add-pack').value.trim(),
-        dimensions: tr.querySelector('.hu-add-dim').value.trim(),
+        dim: readDimensionFields(tr, 'hu-add-dim', tbody.dataset.unit || 'CM'),
         weightRaw: tr.querySelector('.hu-add-weight').value.trim()
-    })).filter(r => r.hu || r.sendnr || r.packaging || r.dimensions || r.weightRaw);
+    })).filter(r => r.hu || r.sendnr || r.packaging || r.dim.value || r.dim.error || r.weightRaw);
     if (!rows.length) return fail(`Bitte mindestens eine ${label} eingeben (oder scannen).`);
     const noHu = rows.find(r => !r.hu);
     if (noHu) return fail(`Eine Zeile hat Angaben, aber keine ${label}.`);
+    const badDim = rows.find(r => r.dim.error);
+    if (badDim) return fail(`${badDim.dim.error} (${label} ${badDim.hu})`);
+    rows.forEach(r => { r.dimensions = r.dim.value; });
     if (isVvl) {   // Sendungs-Nr. ist optional – wenn angegeben, nur Ziffern/Buchstaben/Bindestrich
         const badSn = rows.find(r => r.sendnr && !/^[0-9A-Z-]+$/i.test(r.sendnr));
         if (badSn) return fail(`Sendungs-Nr. „${badSn.sendnr}“ nicht lesbar – nur Ziffern, Buchstaben und Bindestrich.`);
@@ -2385,7 +2394,9 @@ function openOrderAddModal(truckId) {
     if (!onTruck.length) { displayError(`LKW ${escapeHtml(truckId)} nicht gefunden.`); return; }
     document.getElementById('orderAddTruckId').value = truckId;
     // Alle Felder leer – Spediteur/Land werden je Rechnung eingegeben (keine Vorbelegung vom LKW)
-    ['orderAddNumber', 'orderAddForwarder', 'orderAddCountry', 'orderAddPlso', 'orderAddHu', 'orderAddPackaging', 'orderAddDimensions', 'orderAddWeight'].forEach(id => { document.getElementById(id).value = ''; });
+    ['orderAddNumber', 'orderAddForwarder', 'orderAddCountry', 'orderAddPlso', 'orderAddHu', 'orderAddPackaging', 'orderAddWeight'].forEach(id => { document.getElementById(id).value = ''; });
+    modal.querySelectorAll('.order-add-dim').forEach(el => { el.value = ''; });   // neuer MAN-Auftrag: Maße in CM (wie die Rechnung)
+    setDimensionUnit(modal, 'CM');
     document.getElementById('orderAddContext').textContent = `${truckShortName(truckId)} · ${pluralize(onTruck.length, 'Auftrag', 'Aufträge')} bisher`;
     const err = document.getElementById('orderAddError'); err.textContent = ''; err.classList.add('hidden');
     modal.classList.add('visible');
@@ -2406,13 +2417,15 @@ function saveOrderAddFromModal() {
     const plso = document.getElementById('orderAddPlso').value.trim();
     const hu = document.getElementById('orderAddHu').value.trim().toUpperCase().replace(/\s+/g, '');
     const packaging = document.getElementById('orderAddPackaging').value.trim();
-    const dimensions = document.getElementById('orderAddDimensions').value.trim();
+    const dim = readDimensionFields(document.getElementById('orderAddModal'), 'order-add-dim', 'CM');
     const weightRaw = document.getElementById('orderAddWeight').value.trim();
     const err = document.getElementById('orderAddError');
     const fail = msg => { err.textContent = msg; err.classList.remove('hidden'); };
 
     if (!number) return fail('Bitte die Rechnungsnummer eingeben.');
     if (!/^[0-9A-Z-]+$/.test(number)) return fail('Rechnungsnummer darf nur Ziffern, Großbuchstaben und Bindestrich enthalten.');
+    if (dim.error) return fail(dim.error);
+    const dimensions = dim.value;
     if (!forwarder) return fail('Bitte den Spediteur eingeben.');
     if (!country) return fail('Bitte das Land eingeben.');
     if (!hu) return fail('Bitte die erste HU-Nummer eingeben (oder scannen).');
@@ -2464,13 +2477,16 @@ function saveHuEditFromModal() {
     const oldHu = document.getElementById('huEditOriginalHu').value;
     const newHu = document.getElementById('huEditNumber').value.trim().toUpperCase().replace(/\s+/g, '');
     const packaging = document.getElementById('huEditPackaging').value.trim();
-    const dimensions = document.getElementById('huEditDimensions').value.trim();
+    const modalEl = document.getElementById('huEditModal');
+    const dim = readDimensionFields(modalEl, 'hu-edit-dim', modalEl.dataset.unit || 'CM');
     const weightRaw = document.getElementById('huEditWeight').value.trim();
     const err = document.getElementById('huEditError');
     const fail = msg => { err.textContent = msg; err.classList.remove('hidden'); };
 
     if (!newHu) return fail('Bitte eine HU-Nummer eingeben.');
     if (!/^[0-9A-Z-]+$/.test(newHu)) return fail('HU-Nummer darf nur Ziffern, Großbuchstaben und Bindestrich enthalten.');
+    if (dim.error) return fail(dim.error);
+    const dimensions = dim.value;
     let grossWeight = null;
     if (weightRaw) {
         if (parseWeightKg(weightRaw) === null) return fail('Gewicht nicht lesbar – z. B. „42 KG“ oder „0,700 KG“.');
@@ -3745,6 +3761,56 @@ function dateRangeText(b) {
 // ---- Gewicht (Info-Suche) ---------------------------------------------------------------------
 // Gewicht einer HU steht als Text am Eintrag (grossWeight: „19.5 KG“, „19,500 KG“, „1.250,5 KG“, „N/A“ …).
 // Liefert Kilogramm als Zahl oder null (kein/unlesbares Gewicht). Dient auch zum Lesen der Eingabefelder „von/bis“.
+// ---- Maße als drei Zahlenfelder (L × B × H) --------------------------------------------------------------------
+// Gespeichert wird weiterhin EIN Text im Importformat des Auftrags: MAN-Rechnungen „100x45x10 CM“, VW-Positionen
+// „1200x800x600 MM“. Die Einheit kommt aus den vorhandenen Maßen des Auftrags; ohne Vorbild gilt VW → MM, sonst CM.
+function dimensionUnitOf(shipment) {
+    const items = shipment && Array.isArray(shipment.scannedItems) ? shipment.scannedItems : [];
+    for (const it of items) {
+        const m = it && typeof it.dimensions === 'string' && it.dimensions.match(/\b(MM|CM|M)\b/i);
+        if (m) return m[1].toUpperCase();
+    }
+    const isVvl = !!(shipment && (shipment.parentOrderNumber || items.some(i => i && i.sendnr)));
+    return isVvl ? 'MM' : 'CM';
+}
+// „100x 45x10 CM“ / „49x33x 16 CM“ / „1200 x 800 x 600 MM“ / „15 15 50“ → { l, b, h, unit } (null, wenn nicht 3 Zahlen)
+function splitDimensions(raw) {
+    if (!raw || typeof raw !== 'string') return null;
+    const str = raw.trim().toUpperCase();
+    if (!str || str === 'N/A') return null;
+    const unitMatch = str.match(/\b(MM|CM|M)\b/);
+    const nums = (str.replace(/\b(MM|CM|M)\b/g, ' ').match(/\d+(?:[.,]\d+)?/g) || []);
+    if (nums.length !== 3) return null;
+    return { l: nums[0].replace('.', ','), b: nums[1].replace('.', ','), h: nums[2].replace('.', ','), unit: unitMatch ? unitMatch[1] : '' };
+}
+// Drei Felder → gespeicherter Text („100x45x10 CM“). Alle leer → null; nur teilweise gefüllt oder keine Zahl → Error-Text
+function joinDimensions(l, b, h, unit) {
+    const vals = [l, b, h].map(v => String(v === null || v === undefined ? '' : v).trim().replace(',', '.'));
+    if (vals.every(v => !v)) return { value: null };
+    if (vals.some(v => !v)) return { error: 'Maße unvollständig – bitte Länge, Breite und Höhe angeben (oder alle drei leer lassen).' };
+    if (vals.some(v => !/^\d+(?:\.\d+)?$/.test(v) || Number(v) <= 0)) return { error: 'Maße nicht lesbar – bitte nur Zahlen eintragen, z. B. 100 · 45 · 10.' };
+    const fmt = v => { const n = Number(v); return Number.isInteger(n) ? String(n) : String(n).replace('.', ','); };
+    return { value: `${fmt(vals[0])}x${fmt(vals[1])}x${fmt(vals[2])} ${unit || 'CM'}` };
+}
+// Drei nebeneinanderliegende Felder für ein Formular (Klassen *-l/*-b/*-h, gemeinsame Einheit als Text dahinter)
+function dimensionFieldsHtml(cls, unit, opts) {
+    const o = opts || {};
+    const inp = (part, label) => `<input type="text" class="${cls} ${cls}-${part} dim-field" inputmode="decimal" autocomplete="off" placeholder="${label}" aria-label="${label} in ${unit}"${o.ids ? ` id="${o.ids[part]}"` : ''}>`;
+    return `<span class="dim-fields"${o.attrs || ''}>${inp('l', 'L')}<span class="dim-x">×</span>${inp('b', 'B')}<span class="dim-x">×</span>${inp('h', 'H')}<span class="dim-unit">${unit}</span></span>`;
+}
+// Felder aus gespeichertem Text befüllen (Text ohne 3 Zahlen → Felder leer, Original steht als Titel dran)
+function fillDimensionFields(root, cls, raw) {
+    const parts = splitDimensions(raw);
+    ['l', 'b', 'h'].forEach(p => { const el = root.querySelector(`.${cls}-${p}`); if (el) { el.value = parts ? parts[p] : ''; el.title = parts || !raw ? '' : `Bisher: ${raw}`; } });
+}
+function readDimensionFields(root, cls, unit) {
+    const v = p => { const el = root.querySelector(`.${cls}-${p}`); return el ? el.value : ''; };
+    return joinDimensions(v('l'), v('b'), v('h'), unit);
+}
+function setDimensionUnit(root, unit) {
+    root.querySelectorAll('.dim-unit').forEach(el => { el.textContent = unit; });
+    root.querySelectorAll('.dim-field').forEach(el => { el.setAttribute('aria-label', `${el.placeholder} in ${unit}`); });
+}
 function parseWeightKg(raw) {
     if (raw === null || raw === undefined) return null;
     if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null;

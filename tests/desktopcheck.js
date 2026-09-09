@@ -181,9 +181,9 @@ function bigData() {
       assert(m.vis && m.title === 'Stück bearbeiten' && m.hu === 'none' && m.focus === 'huEditPackaging' && /Stück 1 von 3 · XRY/.test(m.ctx), `Modal „Stück bearbeiten“ ohne HU-Feld, Fokus auf Verpackung (${JSON.stringify(m)})`);
       await page.evaluate(() => { document.getElementById('huEditWeight').value = 'viel'; document.getElementById('saveHuEditButton').click(); }); await wait(200);
       assert(/Gewicht nicht lesbar/.test(await page.$eval('#huEditError', e => e.textContent)), 'Stück: unlesbares Gewicht wird abgelehnt');
-      await page.evaluate(() => { document.getElementById('huEditPackaging').value = 'Karton'; document.getElementById('huEditDimensions').value = '60 x 40 x 30 CM'; document.getElementById('huEditWeight').value = '12,5'; document.getElementById('saveHuEditButton').click(); }); await wait(600);
+      await page.evaluate(() => { document.getElementById('huEditPackaging').value = 'Karton'; document.getElementById('huEditDimL').value = '60'; document.getElementById('huEditDimB').value = '40'; document.getElementById('huEditDimH').value = '30'; document.getElementById('huEditWeight').value = '12,5'; document.getElementById('saveHuEditButton').click(); }); await wait(600);
       const after = await page.evaluate(() => ({ modal: document.getElementById('huEditModal').classList.contains('visible'), row: [...document.querySelector('.pack-table-plain tbody tr').cells].slice(0, 4).map(c => c.textContent.trim()).join('|'), kg: [...document.querySelectorAll('.detail-fact')].map(f => f.textContent.replace(/\s+/g, ' ')).find(x => /Gewicht/.test(x)), items: JSON.parse(localStorage.getItem('frachtSicherungMobile_V8_18_Refactored'))['123'].scannedItems.map(i => i.status + ':' + (i.grossWeight || '')).join(' ') }));
-      assert(!after.modal && after.row === '1.|Karton|60 x 40 x 30 CM|12,5 KG' && /12,5 kg/.test(after.kg), `Stück gespeichert: Zeile + Kopf-Gewicht (${after.row}; ${after.kg})`);
+      assert(!after.modal && after.row === '1.|Karton|60x40x30 CM|12,5 KG' && /12,5 kg/.test(after.kg), `Stück gespeichert: Zeile + Kopf-Gewicht (${after.row}; ${after.kg})`);
       assert(after.items === 'Wareneingang: Wareneingang: XRY:12,5 KG EDD:', `Gewicht hängt nur am Sicherungsscan des Stücks – Zählung unverändert (${after.items})`);
       assert(be.store['123'] && be.store['123'].scannedItems.some(i => i.grossWeight === '12,5 KG' && i.packaging === 'Karton'), 'Stück-Angaben sind beim Server angekommen');
       // Titel/HU-Feld nach Schließen wieder für MAN-Packstücke bereit
@@ -440,6 +440,79 @@ function bigData() {
       await page.close();
     }
 
+    // ---- Maße als drei Felder L × B × H: Einheit je Auftrag (MAN → CM, VW → MM), gespeichert im Importformat ----
+    {
+      const d = bigData(); const now = new Date().toISOString(); const vvl = '100004158949';
+      const mk = (hu, pos, st, dim) => ({ rawInput: hu, position: pos, status: st, timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null, packaging: 'Carton', dimensions: dim, grossWeight: '3,200 KG' });
+      d['9008295247'] = { hawb: '9008295247', lastModified: now, totalPiecesExpected: 2, mitarbeiter: 'T', isHuListOrder: true, truckId: 'MAN 1', originalManNumber: 1, freightForwarder: 'DHL', destinationCountry: 'CHINA',
+        scannedItems: [mk('0926040918D6', 1, 'XRY', '100x 45x10 CM'), mk('0926040918DF', 2, 'Anstehend', '49x33x 16 CM')] };
+      d['796206'] = { hawb: '796206', lastModified: now, totalPiecesExpected: 2, mitarbeiter: 'T', isHuListOrder: true, truckId: 'VVL-' + vvl, parentOrderNumber: vvl,
+        scannedItems: [{ rawInput: '881226843', sendnr: '8386256', status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null, grossWeight: '30 KG', dimensions: '1200x800x600 MM' },
+                       { rawInput: '881226844', sendnr: '8386256', status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null, grossWeight: '12 KG', dimensions: 'N/A' }] };
+      const be = makeBackend(d, {});
+      page = await openApp(browser, be, { viewport: { width: 1568, height: 826, deviceScaleFactor: 1 } }); await wait(500);
+      const store = base => page.evaluate(b => JSON.parse(localStorage.getItem('frachtSicherungMobile_V8_18_Refactored'))[b], base);
+      // MAN „+ Packstück“: drei Felder, Einheit CM im Kopf und hinter den Feldern; Enter läuft L → B → H → Gewicht
+      await page.evaluate(() => document.querySelector('tr[data-basenumber="9008295247"] .hawb-cell').click()); await wait(400);
+      await page.evaluate(() => document.querySelector('#detailView .pack-add-btn').click()); await wait(400);
+      const f0 = await page.evaluate(() => { const t = document.querySelector('#huAddModal .hu-add-table'); const r = t.tBodies[0].rows[0];
+        return { th: t.tHead.querySelector('.hu-add-dim-cell').textContent.replace(/\s+/g, ' ').trim(), fields: r.querySelectorAll('.dim-field').length, ph: [...r.querySelectorAll('.dim-field')].map(i => i.placeholder).join(''), unit: r.querySelector('.dim-unit').textContent, old: !!r.querySelector('input.hu-add-dim:not(.dim-field)'), fits: t.scrollWidth <= t.closest('.hu-add-table-wrap').clientWidth + 1 }; });
+      assert(f0.th === 'Maße (CM)' && f0.fields === 3 && f0.ph === 'LBH' && f0.unit === 'CM' && !f0.old && f0.fits, `MAN: Maße als L × B × H mit Einheit CM, Tabelle passt ohne Querscrollen (${JSON.stringify(f0)})`);
+      await page.keyboard.type('0926040918E1'); await page.keyboard.press('Enter'); await wait(80);
+      await page.evaluate(() => { const r = document.querySelectorAll('#huAddRows tr')[0]; r.querySelector('.hu-add-pack').value = 'Carton'; r.querySelector('.hu-add-dim-l').focus(); });
+      await page.keyboard.type('100'); await page.keyboard.press('Enter'); await page.keyboard.type('45'); await page.keyboard.press('Enter'); await page.keyboard.type('10'); await page.keyboard.press('Enter');
+      assert(await page.evaluate(() => document.activeElement.classList.contains('hu-add-weight')), 'Enter in den Maßfeldern: L → B → H → Gewicht');
+      await page.keyboard.type('3,2');
+      // unvollständige Maße in Zeile 2 → Meldung mit HU, nichts gespeichert
+      await page.evaluate(() => { const r = document.querySelectorAll('#huAddRows tr')[1]; r.querySelector('.hu-add-hu').value = '0926040918E2'; r.querySelector('.hu-add-hu').dispatchEvent(new Event('input', { bubbles: true })); r.querySelector('.hu-add-dim-l').value = '50'; document.getElementById('saveHuAddButton').click(); }); await wait(200);
+      const e1 = await page.evaluate(() => ({ err: document.getElementById('huAddError').textContent, open: document.getElementById('huAddModal').classList.contains('visible') }));
+      assert(/Maße unvollständig/.test(e1.err) && /0926040918E2/.test(e1.err) && e1.open, `Nur Länge ausgefüllt → „Maße unvollständig“ mit HU-Nummer, Seite bleibt offen (${e1.err})`);
+      await page.evaluate(() => { const r = document.querySelectorAll('#huAddRows tr')[1]; r.querySelector('.hu-add-dim-l').value = 'abc'; r.querySelector('.hu-add-dim-b').value = '1'; r.querySelector('.hu-add-dim-h').value = '2'; document.getElementById('saveHuAddButton').click(); }); await wait(200);
+      assert(/Maße nicht lesbar/.test(await page.$eval('#huAddError', e => e.textContent)), 'Buchstaben in einem Maßfeld → „Maße nicht lesbar“');
+      await page.evaluate(() => { const r = document.querySelectorAll('#huAddRows tr')[1]; r.querySelectorAll('.dim-field').forEach(i => { i.value = ''; }); document.getElementById('saveHuAddButton').click(); }); await wait(700);
+      const s1 = await store('9008295247');
+      const added = s1.scannedItems.slice(2).map(i => [i.rawInput, i.packaging, i.dimensions, i.grossWeight].join('|')).join(' ; ');
+      assert(added === '0926040918E1|Carton|100x45x10 CM|3,2 KG ; 0926040918E2|||', `Gespeichert im Rechnungsformat „100x45x10 CM“; Zeile ohne Maße → keine Maße (${added})`);
+      assert(await page.evaluate(() => [...document.querySelectorAll('#detailView .pack-table tbody tr')].some(r => /0926040918E1/.test(r.textContent) && /100x45x10 CM/.test(r.textContent))), 'Packstücktabelle zeigt „100x45x10 CM“');
+      assert(be.store['9008295247'].scannedItems.some(i => i.dimensions === '100x45x10 CM'), 'Maße sind beim Server angekommen');
+      // Stift: Felder werden aus „100x 45x10 CM“ (mit Leerzeichen) vorbelegt; Änderung speichert sauber
+      await page.evaluate(() => document.querySelector('#detailView .pack-edit-btn[data-hu="0926040918D6"]').click()); await wait(300);
+      const ed = await page.evaluate(() => ({ l: document.getElementById('huEditDimL').value, b: document.getElementById('huEditDimB').value, h: document.getElementById('huEditDimH').value, unit: document.querySelector('#huEditModal .dim-unit').textContent, label: document.querySelector('label[for="huEditDimL"]').textContent }));
+      assert(ed.l === '100' && ed.b === '45' && ed.h === '10' && ed.unit === 'CM' && /L × B × H/.test(ed.label), `„Packstück bearbeiten“: Felder aus „100x 45x10 CM“ vorbelegt, Einheit CM (${JSON.stringify(ed)})`);
+      await page.evaluate(() => { document.getElementById('huEditDimH').value = '12'; document.getElementById('saveHuEditButton').click(); }); await wait(600);
+      assert((await store('9008295247')).scannedItems.find(i => i.rawInput === '0926040918D6').dimensions === '100x45x12 CM', 'Bearbeiten speichert „100x45x12 CM“');
+      // Maße komplett leeren → null (keine Maße), kein Fehler
+      await page.evaluate(() => document.querySelector('#detailView .pack-edit-btn[data-hu="0926040918D6"]').click()); await wait(300);
+      await page.evaluate(() => { ['huEditDimL', 'huEditDimB', 'huEditDimH'].forEach(id => { document.getElementById(id).value = ''; }); document.getElementById('saveHuEditButton').click(); }); await wait(600);
+      assert((await store('9008295247')).scannedItems.find(i => i.rawInput === '0926040918D6').dimensions === null && !(await page.evaluate(() => document.getElementById('huEditModal').classList.contains('visible'))), 'Alle drei Felder leer → Maße entfernt, Fenster zu');
+      // VW-Auftrag: Einheit MM (aus dem Import), Speichern „1200x800x600 MM“; N/A → Felder leer; Dezimalzahl mit Komma
+      await page.evaluate(() => document.getElementById('backToMainViewBtn').click()); await wait(300);
+      await page.evaluate(() => document.querySelector('tr[data-basenumber="796206"] .hawb-cell').click()); await wait(400);
+      await page.evaluate(() => document.querySelector('#detailView .pack-add-btn').click()); await wait(400);
+      const v0 = await page.evaluate(() => { const t = document.querySelector('#huAddModal .hu-add-table'); return { th: t.tHead.querySelector('.hu-add-dim-cell').textContent.replace(/\s+/g, ' ').trim(), unit: t.querySelector('.dim-unit').textContent, fits: t.scrollWidth <= t.closest('.hu-add-table-wrap').clientWidth + 1, x: !!t.querySelector('.hu-add-remove') && t.querySelector('.hu-add-remove').getBoundingClientRect().right <= t.closest('.hu-add-table-wrap').getBoundingClientRect().right + 1 }; });
+      assert(v0.th === 'Maße (MM)' && v0.unit === 'MM' && v0.fits && v0.x, `VW: Einheit MM, Tabelle mit Sendungs-Nr.-Spalte passt vollständig (${JSON.stringify(v0)})`);
+      await page.keyboard.type('881226999'); await page.keyboard.press('Enter'); await wait(80);
+      await page.evaluate(() => { const r = document.querySelectorAll('#huAddRows tr')[0]; r.querySelector('.hu-add-dim-l').value = '1200'; r.querySelector('.hu-add-dim-b').value = '800'; r.querySelector('.hu-add-dim-h').value = '600'; document.getElementById('saveHuAddButton').click(); }); await wait(700);
+      assert((await store('796206')).scannedItems.find(i => i.rawInput === '881226999').dimensions === '1200x800x600 MM', 'VW: gespeichert als „1200x800x600 MM“ (wie der VVL-Import)');
+      await page.evaluate(() => document.querySelector('#detailView .pack-edit-btn[data-hu="881226844"]').click()); await wait(300);
+      const ve = await page.evaluate(() => ({ l: document.getElementById('huEditDimL').value, unit: document.querySelector('#huEditModal .dim-unit').textContent }));
+      assert(ve.l === '' && ve.unit === 'MM', `VW-Packstück mit „N/A“: Felder leer, Einheit MM (${JSON.stringify(ve)})`);
+      await page.evaluate(() => { document.getElementById('huEditDimL').value = '500'; document.getElementById('huEditDimB').value = '40'; document.getElementById('huEditDimH').value = '30,5'; document.getElementById('saveHuEditButton').click(); }); await wait(600);
+      assert((await store('796206')).scannedItems.find(i => i.rawInput === '881226844').dimensions === '500x40x30,5 MM', 'Dezimalzahl mit Komma bleibt erhalten („500x40x30,5 MM“)');
+      // „+ Auftrag“ (neuer MAN-Auftrag): Felder L × B × H, gespeichert in CM
+      await page.evaluate(() => document.getElementById('backToMainViewBtn').click()); await wait(300);
+      await page.evaluate(() => document.querySelector('.home-tile[data-page="anlieferung"]').click()); await wait(400);
+      await page.evaluate(() => document.querySelector('.page-row[data-truckid="MAN 1"]').click()); await wait(500);
+      await page.evaluate(() => document.querySelector('.page-summary-add').click()); await wait(400);
+      const oa = await page.evaluate(() => { const g = document.querySelector('#orderAddModal .order-add-grid-3'); const fields = [...g.querySelectorAll('.dim-field')]; const gr = g.getBoundingClientRect();
+        return { n: fields.length, unit: g.querySelector('.dim-unit').textContent, inside: fields.every(f => f.getBoundingClientRect().right <= gr.right + 1) && document.getElementById('orderAddWeight').getBoundingClientRect().right <= gr.right + 1, old: !!document.getElementById('orderAddDimensions') }; });
+      assert(oa.n === 3 && oa.unit === 'CM' && oa.inside && !oa.old, `„+ Auftrag“: drei Maßfelder in CM, alles innerhalb des Fensters (${JSON.stringify(oa)})`);
+      await page.evaluate(() => { document.getElementById('orderAddNumber').value = '9008299999'; document.getElementById('orderAddForwarder').value = 'DHL'; document.getElementById('orderAddCountry').value = 'CHINA'; document.getElementById('orderAddHu').value = 'NEU0001'; document.getElementById('orderAddDimL').value = '120'; document.getElementById('orderAddDimB').value = '80'; document.getElementById('orderAddDimH').value = '60'; document.getElementById('saveOrderAddButton').click(); }); await wait(800);
+      assert((await store('9008299999')).scannedItems[0].dimensions === '120x80x60 CM', '„+ Auftrag“: erstes Packstück mit „120x80x60 CM“');
+      assert(page.__errors.length === 0, `Maßfelder: keine JS-Fehler (${page.__errors.join('; ')})`);
+      await page.close();
+    }
+
     // ---- „+ Auftrag“ (LKW-Seite): weiteren Auftrag zum MAN-LKW anlegen – wie ein Import, mit erstem Packstück ----
     {
       const d = bigData(); const now = Date.now(); const iso = ago => new Date(now - ago * 60e3).toISOString();
@@ -535,7 +608,7 @@ function bigData() {
       await page.evaluate(() => document.querySelector('#detailView .pack-add-btn').click()); await wait(300);
       const va = await page.evaluate(() => ({ head: [...document.querySelectorAll('#huAddModal .hu-add-table thead th')].map(t => t.textContent.trim()).join('|'), ctx: document.getElementById('huAddContext').textContent,
         sn: [...document.querySelectorAll('#huAddRows .hu-add-sendnr')].map(i => i.value).join(), pos: document.querySelectorAll('#huAddRows .hu-add-pos').length, ph: document.querySelector('#huAddRows .hu-add-hu').placeholder, focus: document.activeElement.className }));
-      assert(va.head === 'VSE|Sendungs-Nr.|Verpackung|Maße|Gewicht|' && va.pos === 0 && va.sn === ',,' && /VSE/.test(va.ph) && va.focus === 'hu-add-hu' && va.ctx === 'Kundennr 959201 · VVL 100004158949 · bisher 9 Packstücke', `VW „+ Packstück“: VSE · Sendungs-Nr. statt Pos. · HU, Sendungs-Nr. leer (${JSON.stringify(va)})`);
+      assert(va.head === 'VSE|Sendungs-Nr.|Verpackung|Maße (MM)|Gewicht|' && va.pos === 0 && va.sn === ',,' && /VSE/.test(va.ph) && va.focus === 'hu-add-hu' && va.ctx === 'Kundennr 959201 · VVL 100004158949 · bisher 9 Packstücke', `VW „+ Packstück“: VSE · Sendungs-Nr. statt Pos. · HU, Sendungs-Nr. leer (${JSON.stringify(va)})`);
       assert(await page.evaluate(() => document.querySelector('#huAddRows .hu-add-sendnr').placeholder === 'optional'), 'VW: Sendungs-Nr. als „optional“ gekennzeichnet');
       await page.keyboard.type('881226999'); await page.keyboard.press('Enter');
       await page.evaluate(() => { const rows = document.querySelectorAll('#huAddRows tr'); rows[1].querySelector('.hu-add-hu').value = '881227000'; rows[1].querySelector('.hu-add-sendnr').value = '8386300'; rows[1].querySelector('.hu-add-hu').dispatchEvent(new Event('input', { bubbles: true })); });

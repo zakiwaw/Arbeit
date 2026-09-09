@@ -460,6 +460,14 @@ input:focus-visible + .batch-slider { box-shadow: var(--focus-ring); }
 .toggle-row label svg { width: 20px; height: 20px; color: var(--text-muted); flex-shrink: 0; }
 
 .form-group { margin-bottom: var(--sp-4); }
+/* Maße als drei Zahlenfelder L × B × H mit fester Einheit dahinter (Importformat des Auftrags: CM bei MAN, MM bei VW).
+   Gespeichert wird weiterhin ein Text wie „100x45x10 CM“ (joinDimensions in script.js). */
+.dim-fields { display: inline-flex; align-items: center; gap: 3px; max-width: 100%; }
+.dim-fields .dim-field { flex: 1 1 0; width: 58px; min-width: 44px; padding: 0 4px; text-align: center; }
+.dim-x { flex: 0 0 auto; font-size: var(--fs-xs); color: var(--text-faint); }
+.dim-unit { flex: 0 0 auto; margin-left: 3px; font-size: 10px; font-weight: 700; letter-spacing: .04em; color: var(--text-muted); }
+.form-group .dim-fields { display: flex; width: 100%; }
+.form-group .dim-fields .dim-field { width: auto; }
 
 .input-with-button { display: flex; align-items: center; gap: var(--sp-2); }
 .input-with-button input { flex: 1; min-width: 0; }
@@ -2581,7 +2589,9 @@ body.modal-open { overflow: hidden; }
     .lkw-rename-content { max-width: 440px; }
     .lkw-rename-hint { margin: calc(-1 * var(--sp-2)) 0 var(--sp-4); font-size: var(--fs-xs); line-height: 1.45; color: var(--text-muted); }
     .order-add-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 var(--sp-3); }
-    .order-add-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+    .order-add-grid-3 { grid-template-columns: minmax(0, 1fr) minmax(0, 1.9fr) minmax(0, .8fr); }   /* Maße (L × B × H) brauchen die breiteste Spalte */
+    .order-add-grid .form-group { min-width: 0; }
+    .order-add-grid .dim-fields .dim-field { min-width: 0; }
     .order-add-sep { margin: var(--sp-1) 0 var(--sp-3); padding-top: var(--sp-3); border-top: 1px solid var(--border); font-size: var(--fs-xs); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); }
     .pack-table-plain td.pack-time { width: 160px; }
     .pack-table th.pack-edit-head, .pack-table td.pack-edit-cell { width: 36px; padding: 0 4px; text-align: center; }
@@ -2607,9 +2617,14 @@ body.modal-open { overflow: hidden; }
     .hu-add-new .hu-add-table th:nth-child(2), .hu-add-new .hu-add-table td:nth-child(2) { width: 34%; min-width: 220px; }   /* HU-Nummer bekommt den meisten Platz */
     .hu-add-new .hu-add-table th.hu-add-kg, .hu-add-new .hu-add-table td.hu-add-kg { width: 110px; }
     /* VW-Auftrag: erste Spalte ist die VSE (kein Pos.), daneben die Sendungs-Nr. */
-    .hu-add-new .hu-add-table-vvl th:nth-child(1), .hu-add-new .hu-add-table-vvl td:nth-child(1) { width: 30%; min-width: 200px; padding-left: 6px; }
+    .hu-add-new .hu-add-table-vvl th:nth-child(1), .hu-add-new .hu-add-table-vvl td:nth-child(1) { width: 24%; min-width: 150px; padding-left: 6px; }
     .hu-add-new .hu-add-table-vvl th:nth-child(2), .hu-add-new .hu-add-table-vvl td:nth-child(2) { width: auto; min-width: 0; }
-    .hu-add-table th.hu-add-sendnr-cell, .hu-add-table td.hu-add-sendnr-cell { width: 150px; }
+    .hu-add-new .hu-add-table-vvl th.hu-add-sendnr-cell, .hu-add-new .hu-add-table-vvl td.hu-add-sendnr-cell { width: 110px; min-width: 0; }
+    /* eine Spalte mehr (Sendungs-Nr.) → Maße und Gewicht etwas schmaler, damit nichts abgeschnitten wird */
+    .hu-add-new .hu-add-table-vvl th.hu-add-dim-cell, .hu-add-new .hu-add-table-vvl td.hu-add-dim-cell { width: 200px; }
+    .hu-add-new .hu-add-table-vvl td.hu-add-dim-cell .dim-field { width: 46px; min-width: 34px; }
+    .hu-add-new .hu-add-table-vvl th.hu-add-kg, .hu-add-new .hu-add-table-vvl td.hu-add-kg { width: 84px; }
+    .hu-add-new .hu-add-table-vvl td.hu-add-kg input { min-width: 0; }
     .hu-add-existing .pack-table { table-layout: auto; }
     /* rechts zählt nur „was ist schon da“: Zeit- und Notiz-Spalte weglassen, damit alles ohne Querscrollen passt */
     .hu-add-existing .pack-table th:nth-last-child(-n+2), .hu-add-existing .pack-table td:nth-last-child(-n+2) { display: none; }
@@ -2638,6 +2653,15 @@ body.modal-open { overflow: hidden; }
     .hu-add-table input[type="text"]:hover { border-color: var(--border); }
     .hu-add-table input[type="text"]:focus { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px var(--accent-soft); }
     .hu-add-table input.hu-add-hu { font-weight: 600; }   /* gleiche Schrift wie die übrigen Eingabefelder der Zeile, nur fett */
+    /* Maße-Felder in der Zeilentabelle „Packstücke hinzufügen“ (Basisregeln .dim-fields stehen bei den Formularen) */
+    .th-unit { font-weight: 600; color: var(--text-faint); text-transform: none; letter-spacing: 0; }
+    .hu-add-table th.hu-add-dim-cell, .hu-add-table td.hu-add-dim-cell { width: 232px; }
+    .hu-add-new .hu-add-table th:nth-child(2), .hu-add-new .hu-add-table td:nth-child(2) { width: 30%; min-width: 190px; }   /* etwas Platz an die drei Maßfelder abgeben */
+    .hu-add-table td.hu-add-dim-cell .dim-fields { width: 100%; gap: 2px; }
+    .hu-add-table td.hu-add-dim-cell .dim-field { height: 32px; min-width: 40px; padding: 0 3px; font-size: var(--fs-sm); border-color: var(--border); background: transparent; box-shadow: none; }
+    .hu-add-table td.hu-add-dim-cell .dim-field:hover { border-color: var(--text-faint); }
+    .hu-add-table td.hu-add-dim-cell .dim-field:focus { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px var(--accent-soft); }
+    .hu-add-table td.hu-add-kg input { min-width: 84px; }
     .hu-add-row-bad td { background: var(--danger-soft); }
     .hu-add-row-bad input.hu-add-hu { color: var(--danger-text); }
     .hu-add-remove { width: 26px; height: 26px; padding: 0; font-size: 16px; line-height: 1; color: var(--text-faint); background: none; border: none; border-radius: var(--r-sm); cursor: pointer; }
