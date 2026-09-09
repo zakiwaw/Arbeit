@@ -284,6 +284,10 @@ const LKWSTATUSKEY = 'frachtLkwStatusV1';
     const EXCLUSIVE_SECURITY_STATUSES = ['XRY', 'ETD', 'EDD', 'PHS', 'VCK'];
     const NOTE_ALLOWED_STATUSES = [...EXCLUSIVE_SECURITY_STATUSES, 'Abgelehnt', 'Dunkelalarm'];
     const STATUSES_THAT_TRIGGER_WE = [...EXCLUSIVE_SECURITY_STATUSES, 'Dunkelalarm']; // Scan erzeugt automatisch den Wareneingang
+    // Kontrollmethoden, die zusätzlich als „Kombi-Sicherung“ verbucht werden können (zählt nicht als finale Sicherung, das
+    // Packstück bleibt offen). Im Scan-Feld/Batch gibt es das Häkchen weiterhin nur bei XRY (updateNoteAndComboVisibility);
+    // VCK-Kombi ist nur über die Auswahl-Leiste der Packstücktabelle (Desktop) erreichbar.
+    const KOMBI_CAPABLE_STATUSES = ['XRY', 'VCK'];
     
     // AKTUALISIERTE LISTE BASIEREND AUF Kundennummerliste VW.xlsx (Stand: 16.10.2025)
     const KUNDENNR_CARRIER_MAP = {
@@ -1926,6 +1930,7 @@ function buildDetailPackTable(shipment, readOnly, base) {
     const todayStr = new Date().toLocaleDateString('de-DE');
     const fmtTime = iso => { const d = new Date(iso); if (isNaN(d)) return ''; const ds = d.toLocaleDateString('de-DE'); return ds === todayStr ? d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : ds + ' ' + d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }); };
     const openCount = slots.filter(i => i.status === 'Anstehend').length;
+    const packCount = slots.filter(i => !i.isCombination).length;   // Kombi-Sicherungen sind Zusatzzeilen, keine eigenen Packstücke
     const hasPos = slots.some(i => i.position);   // VVL-Positionen tragen keine Nummer → Spalte weglassen
 
     const rows = slots.slice().sort((a, b) => ((a.position || 9999) - (b.position || 9999)) || String(a.rawInput).localeCompare(String(b.rawInput))).map((item, idx) => {
@@ -1973,12 +1978,13 @@ function buildDetailPackTable(shipment, readOnly, base) {
     const selectBar = readOnly ? '' : `<div class="pack-select-bar hidden" data-basenumber="${escapeHtml(base || shipment.hawb || '')}">`
         + `<span class="pack-select-count">0 ausgewählt</span>`
         + `<span class="pack-select-group pack-select-group-apply"><label class="pack-select-label">Kontrollmethode <select class="pack-select-status">${EXCLUSIVE_SECURITY_STATUSES.map(s => `<option value="${s}">${s}</option>`).join('')}<option value="Wareneingang">Wareneingang</option><option value="Dunkelalarm">Dunkelalarm</option></select></label>`
+        + `<label class="pack-select-label pack-select-combo-wrap" title="Kombi-Sicherung: zusätzliche Kontrolle, zählt nicht als finale Sicherung – das Packstück bleibt offen"><input type="checkbox" class="pack-select-combo"> Kombi</label>`
         + `<button type="button" class="pack-select-apply">Übernehmen</button></span>`
         + `<span class="pack-select-group pack-select-group-cancel"><button type="button" class="pack-select-cancel">Storno</button></span>`
         + `<button type="button" class="pack-select-clear">Auswahl aufheben</button>`
         + `</div>`;
     return `<div class="detail-pack">`
-        + `<div class="detail-pack-head"><h4>Packstücke (${slots.length})</h4><span class="detail-pack-meta">${openCount ? `${openCount} offen` : 'alle gesichert'}</span>${readOnly ? '' : `<button type="button" class="pack-add-btn" data-basenumber="${escapeHtml(base || shipment.hawb || '')}" title="Weiteres Packstück zu diesem Auftrag aufnehmen">+ Packstück</button>`}</div>`
+        + `<div class="detail-pack-head"><h4>Packstücke (${packCount})</h4><span class="detail-pack-meta">${openCount ? `${openCount} offen` : 'alle gesichert'}</span>${readOnly ? '' : `<button type="button" class="pack-add-btn" data-basenumber="${escapeHtml(base || shipment.hawb || '')}" title="Weiteres Packstück zu diesem Auftrag aufnehmen">+ Packstück</button>`}</div>`
         + selectBar
         + `<table class="pack-table"><thead><tr>${readOnly ? '' : `<th class="pack-select-cell"><input type="checkbox" class="pack-select-all" title="Alle Packstücke auswählen" aria-label="Alle Packstücke auswählen"></th>`}${hasPos ? '<th data-psort="pos">Pos.</th>' : ''}<th data-psort="hu">${isVvl ? 'VSE' : 'HU'}</th>${isVvl ? '<th data-psort="sendnr">Sendungs-Nr.</th>' : ''}<th data-psort="pack">Verpackung</th><th data-psort="dim">Maße</th><th data-psort="kg">Gewicht</th><th data-psort="we">WE</th><th data-psort="status">Sicherung</th><th data-psort="time">Zeit</th><th data-psort="notes">Notiz</th>${readOnly ? '' : '<th class="pack-edit-head"></th>'}</tr></thead>`
         + `<tbody>${rows}</tbody></table></div>`;
@@ -2313,8 +2319,17 @@ function updatePackSelectionBar() {
     bar.querySelector('.pack-select-count').textContent = `${n} ausgewählt` + (n && parts.length ? ` (${parts.join(' · ')})` : '');
     bar.querySelector('.pack-select-group-apply').classList.toggle('hidden', open === 0);     // Kontrollmethode nur für offene
     bar.querySelector('.pack-select-group-cancel').classList.toggle('hidden', secured === 0); // Storno nur für gesicherte
+    syncPackSelectCombo(bar);
     const all = currentDetailsDivEl.querySelector('.pack-select-all');
     if (all) { all.checked = boxes.length > 0 && n === boxes.length; all.indeterminate = n > 0 && n < boxes.length; }
+}
+// Häkchen „Kombi“ in der Leiste nur bei Kontrollmethoden mit Kombi-Sicherung (XRY, VCK) – sonst verborgen und abgewählt
+function syncPackSelectCombo(bar) {
+    const wrap = bar ? bar.querySelector('.pack-select-combo-wrap') : null;
+    if (!wrap) return;
+    const canCombo = KOMBI_CAPABLE_STATUSES.includes(bar.querySelector('.pack-select-status').value);
+    wrap.classList.toggle('hidden', !canCombo);
+    if (!canCombo) wrap.querySelector('.pack-select-combo').checked = false;
 }
 // Gewählte Kontrollmethode für alle angehakten Packstücke verbuchen – je HU exakt wie ein Scan über das Eingabefeld
 // (processAndSaveSingleScan: Anstehend → Status, automatischer Wareneingang, Limits, Sync). Keine eigene Buchungslogik.
@@ -2322,18 +2337,22 @@ function applyStatusToSelectedPacks(bar) {
     if (!bar) return;
     const base = bar.dataset.basenumber;
     const status = bar.querySelector('.pack-select-status').value;
+    const comboEl = bar.querySelector('.pack-select-combo');
+    // Kombi-Sicherung (nur XRY/VCK): gleiches Flag wie das Häkchen im Scan-Feld → Eintrag „<Status> (Kombi)“, Packstück bleibt offen
+    const isCombo = !!(comboEl && comboEl.checked && KOMBI_CAPABLE_STATUSES.includes(status));
+    const label = `${status}${isCombo ? ' (Kombi)' : ''}`;
     const hus = Array.from(currentDetailsDivEl.querySelectorAll('.pack-select:checked:not(:disabled)')).filter(cb => cb.dataset.state === 'open').map(cb => cb.dataset.hu);
     if (!hus.length) { displayError('Bitte zuerst offene Packstücke auswählen.'); return; }
-    if (!confirm(`${status} für ${pluralize(hus.length, 'Packstück', 'Packstücke')} eintragen?\n\n${hus.join(', ')}`)) return;
+    if (!confirm(`${label} für ${pluralize(hus.length, 'Packstück', 'Packstücke')} eintragen?${isCombo ? '\n\nKombi-Sicherung: zusätzliche Kontrolle – die Packstücke bleiben für die finale Sicherung offen.' : ''}\n\n${hus.join(', ')}`)) return;
     const done = [], failed = [];
     hus.forEach(hu => {
-        const r = processAndSaveSingleScan(hu, status, false);   // Kombi-Sicherung gibt es hier nicht
+        const r = processAndSaveSingleScan(hu, status, isCombo);
         if (r && r.success) done.push(hu); else failed.push(`${hu}: ${(r && r.message) || 'unbekannter Fehler'}`);
     });
     resetSingleScanNoteInputState();
     renderTable();
     displayCurrentShipmentDetails(base);
-    if (done.length) displayError(`${status} für ${pluralize(done.length, 'Packstück', 'Packstücke')} eingetragen.`, 'green', 2500);
+    if (done.length) displayError(`${label} für ${pluralize(done.length, 'Packstück', 'Packstücke')} eingetragen.`, 'green', 2500);
     if (failed.length) displayError(`Nicht übernommen – ${failed.join(' · ')}`.replace(/<[^>]+>/g, ''), 'orange');
 }
 // Storno für die Auswahl: je gesichertem Packstück wird der Sicherungs-Eintrag storniert – über dieselbe Funktion wie der
@@ -4254,7 +4273,7 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
         const parentShipment = shipments[parentHawb];
         const now = new Date();
         const noteText = noteInputEl.value.trim() || null;
-        const isNewScanKombi = (statusToUse === 'XRY' && isCombinationFromCheckbox);
+        const isNewScanKombi = (KOMBI_CAPABLE_STATUSES.includes(statusToUse) && isCombinationFromCheckbox);
         const isSecurityStatus = EXCLUSIVE_SECURITY_STATUSES.includes(statusToUse);
         const isFinalClearanceScan = isSecurityStatus && !isNewScanKombi;
 
@@ -5235,7 +5254,8 @@ function saveBatch() {
                 // *** HIER IST DIE KORREKTUR ***
                 // Wenn es sich um einen HU-Auftrag handelt UND der stornierte Status ein exklusiver Sicherheitsstatus war,
                 // erstellen wir einen neuen "Anstehend"-Platzhalter, um die HU wieder scannbar zu machen.
-                if (shipment.isHuListOrder && EXCLUSIVE_SECURITY_STATUSES.includes(itemToCancel.status)) {
+                // Kombi-Sicherungen zählen nicht und haben den Platz „Anstehend“ nie belegt → kein neuer Platzhalter
+                if (shipment.isHuListOrder && EXCLUSIVE_SECURITY_STATUSES.includes(itemToCancel.status) && !itemToCancel.isCombination) {
                     const newPlaceholderItem = {
                         rawInput: itemToCancel.rawInput, // Die gleiche HU-Nummer
                         status: 'Anstehend',
@@ -6093,6 +6113,11 @@ else if (target.closest('.hu-value')) {
 
 // --- ENDE DER ÄNDERUNG ---
     // --- ENDE DER ÄNDERUNG ---
+});
+// Auswahl-Leiste der Packstücktabelle: Kontrollmethode gewechselt → Häkchen „Kombi“ ein-/ausblenden
+document.addEventListener('change', (event) => {
+    const t = event.target;
+    if (t && t.classList && t.classList.contains('pack-select-status') && t.closest('#currentShipmentDetails')) syncPackSelectCombo(t.closest('.pack-select-bar'));
 });
     
     // ===============================================================

@@ -323,6 +323,71 @@ function bigData() {
       await page.close();
     }
 
+    // ---- Auswahl-Leiste: Häkchen „Kombi“ bei XRY/VCK – Kombi-Sicherung wie ein Kombi-Scan, Packstück bleibt offen ----
+    {
+      const d = bigData(); const now = Date.now(); const iso = ago => new Date(now - ago * 60e3).toISOString();
+      const mk = (hu, pos, st) => ({ rawInput: hu, position: pos, status: st, timestamp: iso(30), isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null, packaging: 'Carton', dimensions: '10x10x10 CM', grossWeight: '5 KG' });
+      d['9008295952'] = { hawb: '9008295952', lastModified: iso(1), totalPiecesExpected: 3, mitarbeiter: 'T', isHuListOrder: true, truckId: 'MAN 1', originalManNumber: 1, freightForwarder: 'DHL', destinationCountry: 'AUSTRALIEN',
+        scannedItems: [mk('KMB0001', 1, 'Anstehend'), mk('KMB0002', 2, 'Anstehend'), mk('KMB0003', 3, 'Anstehend')] };
+      const be = makeBackend(d, {});
+      page = await openApp(browser, be, { viewport: { width: 1600, height: 900, deviceScaleFactor: 1 } }); await wait(500);
+      const dialogs = []; page.off('dialog'); page.on('dialog', dlg => { dialogs.push(dlg.message()); dlg.accept(); });
+      const store = () => page.evaluate(() => JSON.parse(localStorage.getItem('frachtSicherungMobile_V8_18_Refactored'))['9008295952']);
+      const comboState = () => page.evaluate(() => { const w = document.querySelector('#detailView .pack-select-combo-wrap'); return { hidden: !w || w.classList.contains('hidden') || getComputedStyle(w).display === 'none', checked: !!(w && w.querySelector('.pack-select-combo').checked) }; });
+      // Hilfen: offenes Packstück per HU anhaken, Kontrollmethode setzen (löst „change“ aus wie ein Nutzer), Kombi-Häkchen, Übernehmen
+      const pick = hus => page.evaluate(hs => hs.forEach(h => document.querySelector(`#detailView .pack-select[data-hu="${h}"][data-state="open"]`).click()), hus);
+      const method = v => page.evaluate(v => { const s = document.querySelector('#detailView .pack-select-status'); s.value = v; s.dispatchEvent(new Event('change', { bubbles: true })); }, v);
+      const combo = () => page.evaluate(() => document.querySelector('#detailView .pack-select-combo').click());
+      const apply = () => page.evaluate(() => document.querySelector('#detailView .pack-select-apply').click());
+      const statuses = () => page.evaluate(() => [...document.querySelectorAll('#detailView .pack-table tbody tr')].map(r => r.querySelector('.pack-pos').textContent.trim() + r.querySelector('.pack-status').textContent.trim()).join('|'));
+      await page.evaluate(() => document.querySelector('tr[data-basenumber="9008295952"] .hawb-cell').click()); await wait(400);
+      await pick(['KMB0001', 'KMB0002']); await wait(150);
+      const k0 = await comboState();
+      assert(!k0.hidden && !k0.checked, `Kontrollmethode XRY (Standard) → Häkchen „Kombi“ sichtbar, nicht gesetzt (${JSON.stringify(k0)})`);
+      // ETD → Häkchen weg (und abgewählt), VCK → wieder da, PHS → weg
+      await combo(); await method('ETD'); await wait(100); const k1 = await comboState();
+      await method('VCK'); await wait(100); const k2 = await comboState();
+      await method('PHS'); await wait(100); const k3 = await comboState();
+      assert(k1.hidden && !k1.checked && !k2.hidden && !k2.checked && k3.hidden, `Häkchen nur bei XRY/VCK: ETD verbirgt und löscht es, VCK zeigt es, PHS verbirgt es (${JSON.stringify([k1, k2, k3])})`);
+      // XRY (Kombi) für Pos. 1+2: Rückfrage nennt „XRY (Kombi)“, Einträge isCombination, Plätze bleiben offen, WE automatisch
+      await method('XRY'); await combo(); await apply(); await wait(700);
+      const s1 = await store();
+      const kombiRows = s1.scannedItems.filter(i => i.isCombination && !i.isCancelled).map(i => i.rawInput + ':' + i.status).sort().join(',');
+      const openRows = s1.scannedItems.filter(i => !i.isCancelled && i.status === 'Anstehend').map(i => i.rawInput).sort().join(',');
+      const dlg1 = dialogs[dialogs.length - 1] || '';
+      assert(/^XRY \(Kombi\) für 2 Packstücke eintragen\?/.test(dlg1) && /bleiben für die finale Sicherung offen/.test(dlg1) && /KMB0001, KMB0002/.test(dlg1), `Rückfrage nennt „XRY (Kombi)“ und erklärt, dass die Packstücke offen bleiben (${dlg1.replace(/\n+/g, ' ')})`);
+      assert(kombiRows === 'KMB0001:XRY,KMB0002:XRY' && openRows === 'KMB0001,KMB0002,KMB0003' && s1.scannedItems.filter(i => i.status === 'Wareneingang').length === 2, `XRY (Kombi): 2 Kombi-Einträge, alle 3 Plätze weiter offen, Wareneingang automatisch (${kombiRows} | offen ${openRows})`);
+      const t1 = await page.evaluate(() => ({ rows: document.querySelectorAll('#detailView .pack-table tbody tr').length, head: document.querySelector('#detailView .detail-pack-head h4').textContent, meta: document.querySelector('#detailView .detail-pack-meta').textContent, fact: document.querySelector('#detailView .detail-fact')?.textContent.replace(/\s+/g, ' ') }));
+      assert(t1.rows === 5 && t1.head === 'Packstücke (3)' && t1.meta === '3 offen' && await statuses() === '1.Offen|1.XRY (Kombi)|2.Offen|2.XRY (Kombi)|3.Offen' && /Offen/.test(t1.fact), `Tabelle: Kombi-Zeile „XRY (Kombi)“ direkt unter ihrem Packstück, Plätze offen, Kopf „Packstücke (3)“ / „3 offen“ (${JSON.stringify(t1)} ${await statuses()})`);
+      assert(be.store['9008295952'].scannedItems.filter(i => i.isCombination).length === 2, 'Kombi-Einträge sind beim Server angekommen');
+      assert(!(await comboState()).checked, 'Nach „Übernehmen“ ist das Häkchen „Kombi“ wieder leer (keine versehentliche zweite Kombi)');
+      // VCK (Kombi) für Pos. 3
+      await pick(['KMB0003']); await method('VCK'); await combo(); await apply(); await wait(700);
+      const s3 = await store();
+      const vck = s3.scannedItems.find(i => i.rawInput === 'KMB0003' && i.isCombination);
+      assert(vck && vck.status === 'VCK' && /^VCK \(Kombi\) für 1 Packstück eintragen\?/.test(dialogs[dialogs.length - 1]) && s3.scannedItems.filter(i => !i.isCancelled && i.status === 'Anstehend').length === 3, `VCK (Kombi) über die Leiste verbucht, Platz bleibt offen (${(dialogs[dialogs.length - 1] || '').replace(/\n+/g, ' ')})`);
+      assert(await statuses() === '1.Offen|1.XRY (Kombi)|2.Offen|2.XRY (Kombi)|3.Offen|3.VCK (Kombi)', `Tabelle zeigt „VCK (Kombi)“ unter Pos. 3 (${await statuses()})`);
+      // Finale Sicherung danach weiterhin möglich – die Kombi verbraucht den Platz nicht
+      await pick(['KMB0001']); await method('XRY'); await apply(); await wait(700);
+      const s4 = await store();
+      const f = s4.scannedItems.filter(i => i.rawInput === 'KMB0001' && !i.isCancelled).map(i => i.status + (i.isCombination ? '*' : '')).sort().join(',');
+      assert(f === 'Wareneingang,XRY,XRY*' && /^XRY für 1 Packstück eintragen\?/.test(dialogs[dialogs.length - 1]), `Finale XRY nach der Kombi: Platz gesichert, Kombi bleibt daneben stehen (${f})`);
+      assert(await statuses() === '1.XRY|1.XRY (Kombi)|2.Offen|2.XRY (Kombi)|3.Offen|3.VCK (Kombi)' && await page.evaluate(() => document.querySelector('#detailView .detail-pack-meta').textContent) === '2 offen', `Tabelle: Pos. 1 XRY + Kombi, Kopf „2 offen“ (${await statuses()})`);
+      // Storno der Kombi-Zeile über die Leiste: Eintrag storniert, aber KEIN zusätzlicher offener Platz
+      await page.evaluate(() => { const row = [...document.querySelectorAll('#detailView .pack-table tbody tr')].find(r => r.querySelector('.pack-status').textContent.trim() === 'VCK (Kombi)'); row.querySelector('.pack-select').click(); document.querySelector('#detailView .pack-select-cancel').click(); }); await wait(800);
+      const s5 = await store();
+      assert(s5.scannedItems.filter(i => i.isCancelled).length === 1 && s5.scannedItems.filter(i => !i.isCancelled && i.status === 'Anstehend').length === 2 && s5.scannedItems.filter(i => !i.isCancelled && i.isCombination).length === 2, 'Storno einer Kombi-Zeile: Eintrag storniert, kein zusätzlicher offener Platz');
+      assert(await statuses() === '1.XRY|1.XRY (Kombi)|2.Offen|2.XRY (Kombi)|3.Offen' && await page.evaluate(() => document.querySelector('#detailView .detail-pack-head h4').textContent === 'Packstücke (3)'), `Tabelle nach Storno: Kombi-Zeile weg, Kopf weiter „Packstücke (3)“ (${await statuses()})`);
+      // Scan-Feld unverändert: Kombi-Häkchen dort weiterhin nur bei XRY
+      await page.evaluate(() => document.getElementById('backToMainViewBtn').click()); await wait(300);
+      const sf = await page.evaluate(() => { const sel = document.getElementById('securityStatusSelect'); const c = document.getElementById('comboCheckboxContainer'); const vis = () => getComputedStyle(c).display !== 'none';
+        sel.value = 'VCK'; sel.dispatchEvent(new Event('change', { bubbles: true })); const vck = vis(); sel.value = 'XRY'; sel.dispatchEvent(new Event('change', { bubbles: true })); const xry = vis(); return { vck, xry }; });
+      assert(!sf.vck && sf.xry, `Scan-Feld unverändert: Kombi-Häkchen nur bei XRY (${JSON.stringify(sf)})`);
+      assert(page.__errors.length === 0, `Kombi-Auswahl: keine JS-Fehler (${page.__errors.join('; ')})`);
+      page.off('dialog'); page.on('dialog', dd => dd.accept());
+      await page.close();
+    }
+
     // ---- „+ Auftrag“ (LKW-Seite): weiteren Auftrag zum MAN-LKW anlegen – wie ein Import, mit erstem Packstück ----
     {
       const d = bigData(); const now = Date.now(); const iso = ago => new Date(now - ago * 60e3).toISOString();

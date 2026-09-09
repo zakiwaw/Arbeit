@@ -2547,6 +2547,10 @@ body.modal-open { overflow: hidden; }
     .pack-select-count { font-weight: 700; color: var(--accent-text); white-space: nowrap; }
     .pack-select-label { display: inline-flex; align-items: center; gap: var(--sp-2); margin: 0; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
     .pack-select-bar select.pack-select-status { width: auto; height: 34px; min-width: 150px; padding: 0 36px 0 var(--sp-3); font-size: var(--fs-sm); font-weight: 700; background-position: right 10px center; }
+    /* Häkchen „Kombi“ (nur bei XRY/VCK sichtbar – syncPackSelectCombo) */
+    .pack-select-combo-wrap { gap: 6px; padding: 0 var(--sp-2); height: 34px; color: var(--text); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); border-radius: var(--r-md); background-color: var(--surface); cursor: pointer; }
+    .pack-select-combo-wrap:has(input:checked) { color: var(--accent-text); border-color: var(--accent); }
+    .pack-select-bar input.pack-select-combo { width: 16px; height: 16px; margin: 0; cursor: pointer; accent-color: var(--accent); }
     .pack-select-bar button { height: 34px; padding: 0 var(--sp-4); font-size: var(--fs-sm); font-weight: 700; border-radius: var(--r-md); }
     .pack-select-apply { color: #fff; background-color: var(--accent); }
     .pack-select-apply:hover { background-color: var(--accent-hover); }
