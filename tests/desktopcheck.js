@@ -513,6 +513,51 @@ function bigData() {
       await page.close();
     }
 
+    // ---- Packstücke löschen: Auswahl-Leiste + „Packstück löschen“ im Bearbeiten-Fenster (Kunde: HU kommt nicht) ----
+    {
+      const d = bigData(); const now = Date.now(); const iso = ago => new Date(now - ago * 60e3).toISOString();
+      const mk = (hu, pos, st, extra) => Object.assign({ rawInput: hu, position: pos, status: st, timestamp: iso(30 - pos), isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null, packaging: 'Carton', dimensions: '10x10x10 CM', grossWeight: '5 KG' }, extra || {});
+      d['9008295951'] = { hawb: '9008295951', lastModified: iso(1), totalPiecesExpected: 5, mitarbeiter: 'T', isHuListOrder: true, truckId: 'MAN 1', originalManNumber: 1, freightForwarder: 'DHL', destinationCountry: 'AUSTRALIEN',
+        scannedItems: [mk('DEL0001', 1, 'Anstehend'), mk('DEL0002', 2, 'XRY'), mk('DEL0002', 2, 'Wareneingang'), mk('DEL0003', 3, 'Anstehend'), mk('DEL0003', 3, 'VCK', { isCombination: true }), mk('DEL0004', 4, 'Anstehend', { notes: ['Notiz'] }), mk('DEL0005', 5, 'Anstehend')] };
+      const be = makeBackend(d, {});
+      page = await openApp(browser, be, { viewport: { width: 1600, height: 900, deviceScaleFactor: 1 } }); await wait(500);
+      await page.evaluate(() => document.querySelector('tr[data-basenumber="9008295951"] .hawb-cell').click()); await wait(400);
+      const kolli = () => page.evaluate(() => ([...document.querySelectorAll('#detailView .detail-fact')].map(f => f.textContent.replace(/\s+/g, '')).find(t => /^Kolli/i.test(t)) || '').replace(/^Kolli/i, ''));
+      assert(await kolli() === '5', `Kolli vor dem Löschen 5 (${await kolli()})`);
+      // gesichertes (mit WE) + offenes Packstück (mit Kombi-Zeile) wählen → „Löschen“ in der Leiste
+      await page.evaluate(() => { const b = [...document.querySelectorAll('#detailView .pack-select')]; b.find(x => x.dataset.hu === 'DEL0002').click(); b.find(x => x.dataset.hu === 'DEL0003' && x.dataset.state === 'open').click(); }); await wait(150);
+      const db0 = await page.evaluate(() => ({ count: document.querySelector('.pack-select-count').textContent, del: !document.querySelector('.pack-select-group-delete').classList.contains('hidden'), text: document.querySelector('.pack-select-delete').textContent.trim() }));
+      assert(db0.count === '2 ausgewählt (1 offen · 1 gesichert)' && db0.del && db0.text === 'Löschen', `Leiste zeigt „Löschen“ für offene wie gesicherte (${JSON.stringify(db0)})`);
+      // Rückfrage abgelehnt → nichts passiert
+      page.off('dialog'); const declineDel = dlg => { dlg.dismiss(); page.off('dialog', declineDel); page.on('dialog', dd => dd.accept()); }; page.on('dialog', declineDel);
+      await page.evaluate(() => document.querySelector('#detailView .pack-select-delete').click()); await wait(400);
+      assert(await page.evaluate(() => JSON.parse(localStorage.getItem('frachtSicherungMobile_V8_18_Refactored'))['9008295951'].scannedItems.length) === 7, 'Löschen abgelehnt → nichts entfernt');
+      await page.evaluate(() => document.querySelector('#detailView .pack-select-delete').click()); await wait(800);
+      const db1 = await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('frachtSicherungMobile_V8_18_Refactored'))['9008295951']; return { items: s.scannedItems.map(i => i.rawInput + ':' + i.status).join(' '), exp: s.totalPiecesExpected, rows: document.querySelectorAll('#detailView .pack-table tbody tr').length, meta: document.querySelector('#detailView .detail-pack-meta').textContent, head: document.querySelector('#detailView .detail-pack-head h4').textContent, bar: document.querySelector('#detailView .pack-select-bar').classList.contains('hidden'), detail: getComputedStyle(document.getElementById('detailView')).display !== 'none' }; });
+      assert(db1.items === 'DEL0001:Anstehend DEL0004:Anstehend DEL0005:Anstehend' && db1.exp === 3 && db1.rows === 3 && db1.meta === '3 offen' && db1.head === 'Packstücke (3)' && db1.bar && db1.detail, `Auswahl gelöscht: alle Einträge der HUs weg (auch WE + Kombi), Kolli 5 → 3, Details bleiben offen (${JSON.stringify(db1)})`);
+      assert(await kolli() === '3', `Kopfzeile Kolli 3 (${await kolli()})`);
+      assert(be.store['9008295951'].scannedItems.map(i => i.rawInput).join() === 'DEL0001,DEL0004,DEL0005' && be.store['9008295951'].totalPiecesExpected === 3, 'Löschung ist beim Server angekommen (Einträge + Kolli)');
+      // Stift → „Packstück löschen“ für eine einzelne HU
+      await page.evaluate(() => document.querySelector('#detailView .pack-edit-btn[data-hu="DEL0004"]').click()); await wait(300);
+      assert(await page.evaluate(() => { const b = document.getElementById('deleteHuEditButton'); return !!b && b.offsetParent !== null && b.textContent.trim() === 'Packstück löschen'; }), 'Bearbeiten-Fenster zeigt „Packstück löschen“');
+      await page.evaluate(() => document.getElementById('deleteHuEditButton').click()); await wait(800);
+      const db2 = await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('frachtSicherungMobile_V8_18_Refactored'))['9008295951']; return { items: s.scannedItems.map(i => i.rawInput).join(), exp: s.totalPiecesExpected, modal: document.getElementById('huEditModal').classList.contains('visible'), detail: getComputedStyle(document.getElementById('detailView')).display !== 'none' }; });
+      assert(db2.items === 'DEL0001,DEL0005' && db2.exp === 2 && !db2.modal && db2.detail, `Einzelnes Packstück über den Stift gelöscht, Kolli 2, Fenster zu, Details offen (${JSON.stringify(db2)})`);
+      // Letztes Packstück: gesperrt (dafür „Sendung löschen“)
+      await page.evaluate(() => document.querySelector('#detailView .pack-select-all').click()); await wait(150);
+      await page.evaluate(() => document.querySelector('#detailView .pack-select-delete').click()); await wait(500);
+      const db3 = await page.evaluate(() => ({ err: document.getElementById('errorDisplay').textContent, n: JSON.parse(localStorage.getItem('frachtSicherungMobile_V8_18_Refactored'))['9008295951'].scannedItems.length }));
+      assert(/letzte Packstück kann nicht gelöscht/.test(db3.err) && db3.n === 2, `Alle wählen + Löschen → gesperrt, nichts entfernt (${JSON.stringify(db3)})`);
+      // Einzelsendung („Stück bearbeiten“): kein Löschen-Knopf
+      await page.evaluate(() => document.getElementById('backToMainViewBtn').click()); await wait(300);
+      await page.evaluate(() => document.querySelector('tr[data-basenumber="123"] .hawb-cell').click()); await wait(400);
+      await page.evaluate(() => document.querySelector('#detailView .pack-edit-btn').click()); await wait(300);
+      assert(await page.evaluate(() => document.getElementById('huEditModal').classList.contains('piece-mode') && getComputedStyle(document.getElementById('deleteHuEditButton').parentElement).display === 'none'), 'Stück einer Einzelsendung: kein „Packstück löschen“');
+      await page.evaluate(() => document.getElementById('cancelHuEditButton').click()); await wait(200);
+      assert(page.__errors.length === 0, `Keine JS-Fehler beim Löschen (${page.__errors.join(' | ')})`);
+      await page.close();
+    }
+
     // ---- „+ Auftrag“ (LKW-Seite): weiteren Auftrag zum MAN-LKW anlegen – wie ein Import, mit erstem Packstück ----
     {
       const d = bigData(); const now = Date.now(); const iso = ago => new Date(now - ago * 60e3).toISOString();

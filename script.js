@@ -1981,6 +1981,7 @@ function buildDetailPackTable(shipment, readOnly, base) {
         + `<label class="pack-select-label pack-select-combo-wrap" title="Kombi-Sicherung: zusätzliche Kontrolle, zählt nicht als finale Sicherung – das Packstück bleibt offen"><input type="checkbox" class="pack-select-combo"> Kombi</label>`
         + `<button type="button" class="pack-select-apply">Übernehmen</button></span>`
         + `<span class="pack-select-group pack-select-group-cancel"><button type="button" class="pack-select-cancel">Storno</button></span>`
+        + `<span class="pack-select-group pack-select-group-delete"><button type="button" class="pack-select-delete" title="Gewählte Packstücke aus dem Auftrag entfernen (z. B. Kunde meldet: HU kommt nicht)">Löschen</button></span>`
         + `<button type="button" class="pack-select-clear">Auswahl aufheben</button>`
         + `</div>`;
     return `<div class="detail-pack">`
@@ -2376,6 +2377,57 @@ function cancelSelectedPacks(bar) {
     renderTable();
     displayCurrentShipmentDetails(base);
     displayError(`${pluralize(picks.length, 'Sicherung', 'Sicherungen')} storniert – ${picks.map(p => p.hu).join(', ')} wieder offen.`, 'green', 3000);
+}
+// ---- Packstücke löschen (Desktop-Tabelle): HU komplett aus dem Auftrag nehmen --------------------------------------
+// Anwendungsfall: der Kunde meldet, dass eine HU nicht (heute) kommt, sie steht aber in der Anlieferung. Anders als
+// beim Storno bleibt nichts zurück: alle Einträge der HU (Platz „Anstehend“, Wareneingang, Sicherung, Dunkelalarm, Stornos)
+// werden entfernt und die Kolli-Zahl sinkt um die gelöschten Packstücke. Kombi-Zeilen hängen an ihrer HU und gehen mit.
+// Sync: Der Server-Merge kennt entfernte Einträge (bekannter Eintrag fehlt → bleibt entfernt), ein Scan derselben HU auf
+// einem anderen Gerät zur gleichen Zeit bleibt als neuer Eintrag erhalten. Der letzte Platz eines Auftrags ist nicht
+// löschbar – dafür gibt es „Sendung löschen“.
+function deleteHusFromShipment(base, hus) {
+    const shipments = loadShipments();
+    const shipment = shipments[base];
+    if (!shipment || !Array.isArray(shipment.scannedItems)) return { deleted: [], error: `Sendung ${escapeHtml(base)} nicht gefunden.` };
+    const keys = Array.from(new Set(hus.map(h => String(h).toUpperCase())));
+    const found = keys.filter(k => shipment.scannedItems.some(i => i && String(i.rawInput).toUpperCase() === k));
+    if (!found.length) return { deleted: [], error: 'Packstück nicht gefunden – bitte Ansicht neu öffnen.' };
+    // Plätze = Zeilen der Packstücktabelle (Anstehend oder gesichert, ohne Kombi/Storno) – so viele Kolli fallen weg
+    const slotsAll = shipment.scannedItems.filter(i => i && !i.isCancelled && !i.isCombination && (i.status === 'Anstehend' || EXCLUSIVE_SECURITY_STATUSES.includes(i.status)));
+    const removingSlots = slotsAll.filter(i => found.includes(String(i.rawInput).toUpperCase())).length;
+    if (removingSlots >= slotsAll.length) return { deleted: [], error: 'Das letzte Packstück kann nicht gelöscht werden – dafür „Sendung löschen“ verwenden.' };
+    shipment.scannedItems = shipment.scannedItems.filter(i => !(i && found.includes(String(i.rawInput).toUpperCase())));
+    const expected = expectedPiecesOf(shipment);
+    if (expected !== null) shipment.totalPiecesExpected = Math.max(0, expected - removingSlots);
+    shipment.lastModified = new Date().toISOString();
+    saveShipments(shipments);
+    return { deleted: found, slots: removingSlots };
+}
+function deleteSelectedPacks(bar) {
+    if (!bar) return;
+    const base = bar.dataset.basenumber;
+    const hus = Array.from(new Set(Array.from(currentDetailsDivEl.querySelectorAll('.pack-select:checked:not(:disabled)')).map(cb => cb.dataset.hu)));
+    if (!hus.length) { displayError('Bitte zuerst Packstücke auswählen.'); return; }
+    if (!confirm(`${pluralize(hus.length, 'Packstück', 'Packstücke')} aus ${base} löschen?\n\n${hus.join(', ')}\n\nAlle Einträge dieser HU-Nummern (auch Wareneingang, Sicherung und Zeitleiste) werden entfernt, die Kolli-Zahl sinkt entsprechend. Das lässt sich nicht rückgängig machen.`)) return;
+    const r = deleteHusFromShipment(base, hus);
+    if (r.error) { displayError(r.error, 'orange'); return; }
+    renderTable();
+    displayCurrentShipmentDetails(base);
+    displayError(`${pluralize(r.deleted.length, 'Packstück', 'Packstücke')} gelöscht – ${r.deleted.join(', ')}.`, 'green', 3000);
+}
+// „Packstück löschen“ im Bearbeiten-Fenster (Stift): dieselbe Funktion für eine einzelne HU
+function deleteHuFromEditModal() {
+    const base = document.getElementById('huEditBaseNumber').value;
+    const hu = document.getElementById('huEditOriginalHu').value;
+    if (!base || !hu) return;
+    const err = document.getElementById('huEditError');
+    if (!confirm(`Packstück ${hu} aus ${base} löschen?\n\nAlle Einträge dieser HU (auch Wareneingang, Sicherung und Zeitleiste) werden entfernt, die Kolli-Zahl sinkt um 1. Das lässt sich nicht rückgängig machen.`)) return;
+    const r = deleteHusFromShipment(base, [hu]);
+    if (r.error) { err.textContent = r.error; err.classList.remove('hidden'); return; }
+    closeHuEditModal();
+    renderTable();
+    displayCurrentShipmentDetails(base);
+    displayError(`Packstück ${hu} gelöscht.`, 'green', 3000);
 }
 function closeHuEditModal() {
     const modal = document.getElementById('huEditModal');
@@ -6114,6 +6166,9 @@ document.addEventListener('click', (event) => {
     else if (target.closest('.pack-select-cancel')) {
         if (!isBatchModeActive) cancelSelectedPacks(target.closest('.pack-select-bar'));
     }
+    else if (target.closest('.pack-select-delete')) {
+        if (!isBatchModeActive) deleteSelectedPacks(target.closest('.pack-select-bar'));
+    }
     // Packstücktabelle: „+ Packstück“ → weitere HU aufnehmen
     else if (target.closest('.pack-add-btn')) {
         if (!isBatchModeActive) openHuAddModal(target.closest('.pack-add-btn').dataset.basenumber);
@@ -6600,6 +6655,7 @@ const huEditFormEl = document.getElementById('hu-edit-form');
 if (huEditFormEl) {
     huEditFormEl.addEventListener('submit', (e) => { e.preventDefault(); saveHuEditFromModal(); });
     document.getElementById('cancelHuEditButton').addEventListener('click', closeHuEditModal);
+    const huEditDeleteEl = document.getElementById('deleteHuEditButton'); if (huEditDeleteEl) huEditDeleteEl.addEventListener('click', deleteHuFromEditModal);
     document.getElementById('huEditModal').addEventListener('click', (e) => { if (e.target.id === 'huEditModal') closeHuEditModal(); });
     const huAddFormEl = document.getElementById('hu-add-form');
     if (huAddFormEl) {

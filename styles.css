@@ -2539,6 +2539,10 @@ body.modal-open { overflow: hidden; }
     .pack-status-note { display: inline-block; margin-left: 6px; font-size: 10px; font-weight: 600; color: var(--text-faint); white-space: nowrap; }
     .pack-table-plain td.pack-pos { width: 44px; }
     #huEditModal.piece-mode .hu-edit-number-group { display: none; }   /* Stück einer normalen Sendung: keine HU-Nummer */
+    #huEditModal.piece-mode .hu-edit-danger { display: none; }         /* Stück einer normalen Sendung: kein Löschen (Stückzahl über „Bearbeiten“) */
+    .hu-edit-danger { display: flex; justify-content: flex-end; margin-top: var(--sp-3); padding-top: var(--sp-3); border-top: 1px solid var(--border); }
+    .hu-edit-delete-btn { height: 34px; padding: 0 var(--sp-4); font-size: var(--fs-sm); font-weight: 700; color: var(--danger-text); background-color: var(--danger-soft); border: 1px solid color-mix(in srgb, var(--danger-text) 30%, transparent); border-radius: var(--r-md); }
+    .hu-edit-delete-btn:hover { color: #fff; background-color: var(--danger); }
     .pack-add-btn { margin-left: auto; padding: 4px 10px; font-size: var(--fs-xs); font-weight: 700; color: var(--accent-text); background: var(--accent-soft); border: none; border-radius: var(--r-md); cursor: pointer; transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease); }
     .pack-add-btn:hover { background: var(--accent); color: #fff; }
     body.batch-mode-active .pack-add-btn { display: none; }   /* wie Stift/„Bearbeiten“ im Batch-Modus */
@@ -2550,6 +2554,9 @@ body.modal-open { overflow: hidden; }
     .pack-select-group-cancel { padding-left: var(--sp-3); border-left: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); }
     .pack-select-cancel { color: var(--warning-text); background-color: var(--warning-soft); border: 1px solid color-mix(in srgb, var(--warning-text) 30%, transparent) !important; }
     .pack-select-cancel:hover { color: #fff; background-color: var(--warning-text); }
+    .pack-select-group-delete { padding-left: var(--sp-3); border-left: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); }
+    .pack-select-delete { color: var(--danger-text); background-color: var(--danger-soft); border: 1px solid color-mix(in srgb, var(--danger-text) 30%, transparent) !important; }
+    .pack-select-delete:hover { color: #fff; background-color: var(--danger); }
     .pack-table tbody tr:has(.pack-select:checked) td { background-color: var(--accent-soft); }
     .pack-select-bar { display: flex; align-items: center; gap: var(--sp-3); margin: 0 0 var(--sp-2); padding: var(--sp-2) var(--sp-3); font-size: var(--fs-sm); background-color: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); border-radius: var(--r-md); }
     .pack-select-count { font-weight: 700; color: var(--accent-text); white-space: nowrap; }
