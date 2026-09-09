@@ -3492,7 +3492,10 @@ function updateHomeLayout() {
     const pageOpen = !!currentPage;
     const detailOpen = detailViewEl && !detailViewEl.classList.contains('hidden');
     if (homeHubEl) homeHubEl.classList.toggle('hidden', !!filter);
-    if (pageViewEl) pageViewEl.classList.toggle('hidden', !pageOpen);
+    // Solange die Sendungsdetails offen sind, bleibt die Unterseite (LKW, Offen, Dunkelalarm, Info) dahinter verborgen –
+    // sonst schöbe sich die Seite nach jedem Neuzeichnen (Übernehmen/Storno/Bearbeiten/Sync) über die Details.
+    // hideDetailView() blendet sie beim Zurück wieder ein.
+    if (pageViewEl) pageViewEl.classList.toggle('hidden', !pageOpen || detailOpen);
     if (mainViewEl) mainViewEl.classList.toggle('hidden', pageOpen || detailOpen);
     if (listCaptionEl) listCaptionEl.textContent = filter ? `Treffer zu „${filter}“` : (isBatchModeActive ? 'Sendungen' : 'Zuletzt bearbeitet');
 }

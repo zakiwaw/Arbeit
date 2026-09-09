@@ -388,6 +388,58 @@ function bigData() {
       await page.close();
     }
 
+    // ---- Details von einer Unterseite geöffnet (LKW / Info & Suche): „Übernehmen“, Storno und Sync lassen die Details vorne ----
+    {
+      const d = bigData(); const now = Date.now(); const iso = ago => new Date(now - ago * 60e3).toISOString();
+      const mk = (hu, pos, st) => ({ rawInput: hu, position: pos, status: st, timestamp: iso(30), isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null, packaging: 'pallet', dimensions: '120x80x61 CM', grossWeight: '664 KG' });
+      d['9008296216'] = { hawb: '9008296216', lastModified: iso(1), totalPiecesExpected: 2, mitarbeiter: 'T', isHuListOrder: true, truckId: 'MAN 1', originalManNumber: 1, freightForwarder: 'AIT', destinationCountry: 'CHINA',
+        scannedItems: [mk('0926041005C7', 1, 'Anstehend'), mk('09260410086D', 2, 'Anstehend')] };
+      const be = makeBackend(d, {});
+      page = await openApp(browser, be, { viewport: { width: 1500, height: 820, deviceScaleFactor: 1 }, query: '?seite=anlieferung&lkw=MAN%201' }); await wait(600);
+      const views = () => page.evaluate(() => ({ detail: !document.getElementById('detailView').classList.contains('hidden'), page: !document.getElementById('pageView').classList.contains('hidden'), main: !document.getElementById('mainView').classList.contains('hidden'),
+        top: (document.elementFromPoint(700, 300) || document.body).closest('#detailView, #pageView, #mainView')?.id || '', url: location.search }));
+      const v0 = await views();
+      assert(v0.page && !v0.detail && v0.top === 'pageView', `LKW-Seite offen (${JSON.stringify(v0)})`);
+      await page.evaluate(() => document.querySelector('#pageView tr[data-basenumber="9008296216"] .hawb-cell').click()); await wait(500);
+      const v1 = await views();
+      assert(v1.detail && !v1.page && v1.top === 'detailView' && /sendung=9008296216/.test(v1.url), `Details von der LKW-Seite geöffnet (${JSON.stringify(v1)})`);
+      // Übernehmen → Buchung UND Details bleiben vorne (bisher schob sich die LKW-Seite darüber)
+      await page.evaluate(() => { document.querySelector('#detailView .pack-select[data-hu="0926041005C7"]').click(); document.querySelector('#detailView .pack-select-apply').click(); }); await wait(800);
+      const v2 = await views();
+      const booked = await page.evaluate(() => JSON.parse(localStorage.getItem('frachtSicherungMobile_V8_18_Refactored'))['9008296216'].scannedItems.filter(i => i.status === 'XRY').length);
+      assert(booked === 1 && v2.detail && !v2.page && !v2.main && v2.top === 'detailView', `„Übernehmen“ von der LKW-Seite aus: gebucht, Sendungsdetails bleiben vorne (${JSON.stringify(v2)})`);
+      assert(await page.evaluate(() => [...document.querySelectorAll('#detailView .pack-table tbody tr .pack-status')].map(e => e.textContent.trim()).join('|')) === 'XRY|Offen', 'Tabelle in den Details ist aktualisiert (XRY | Offen)');
+      // Storno über die Leiste → ebenfalls vorne bleiben
+      await page.evaluate(() => { document.querySelector('#detailView .pack-select[data-state="secured"]').click(); document.querySelector('#detailView .pack-select-cancel').click(); }); await wait(800);
+      const v3 = await views();
+      assert(v3.detail && !v3.page && v3.top === 'detailView', `Storno aus den Details: Details bleiben vorne (${JSON.stringify(v3)})`);
+      // Sync von einem anderen Gerät, während die Details offen sind → Details bleiben vorne
+      be.store['9007000001'].mitarbeiter = 'Anderes Gerät'; be.store['9007000001'].lastModified = new Date().toISOString(); be.version++;
+      await wait(4200);
+      const v4 = await views();
+      assert(v4.detail && !v4.page && v4.top === 'detailView', `Sync im Hintergrund: Details bleiben vorne (${JSON.stringify(v4)})`);
+      // Zurück-Pfeil → LKW-Seite kommt wieder, Details zu
+      await page.evaluate(() => document.getElementById('backToMainViewBtn').click()); await wait(500);
+      const v5 = await views();
+      assert(!v5.detail && v5.page && v5.top === 'pageView' && /seite=anlieferung/.test(v5.url) && !/sendung=/.test(v5.url), `Zurück-Pfeil: LKW-Seite wieder da, Details zu (${JSON.stringify(v5)})`);
+      assert(await page.evaluate(() => document.getElementById('pageTitle').textContent.includes('MAN 1')), 'Zurück landet auf derselben LKW-Seite');
+      // Dasselbe von „Info & Suche“ aus
+      await page.evaluate(() => document.getElementById('pageBackBtn').click()); await wait(400);
+      await page.evaluate(() => document.querySelector('.home-tile[data-page="info"]').click()); await wait(500);
+      await page.evaluate(() => { const i = document.getElementById('infoSearchInput'); i.value = '9008296216'; i.dispatchEvent(new Event('input', { bubbles: true })); }); await wait(500);
+      await page.evaluate(() => document.querySelector('#infoResults tr[data-basenumber="9008296216"] .hawb-cell').click()); await wait(500);
+      const i1 = await views();
+      assert(i1.detail && !i1.page && /seite=info&sendung=9008296216/.test(i1.url), `Details aus „Info & Suche“ geöffnet (${JSON.stringify(i1)})`);
+      await page.evaluate(() => { document.querySelector('#detailView .pack-select[data-hu="0926041005C7"]').click(); document.querySelector('#detailView .pack-select-apply').click(); }); await wait(800);
+      const i2 = await views();
+      assert(i2.detail && !i2.page && i2.top === 'detailView', `„Übernehmen“ aus „Info & Suche“: Details bleiben vorne (${JSON.stringify(i2)})`);
+      await page.evaluate(() => document.getElementById('backToMainViewBtn').click()); await wait(500);
+      const i3 = await views();
+      assert(!i3.detail && i3.page && /seite=info$/.test(i3.url) && await page.evaluate(() => document.getElementById('infoSearchInput').value === '9008296216'), `Zurück: „Info & Suche“ mit dem Suchtext wieder da (${JSON.stringify(i3)})`);
+      assert(page.__errors.length === 0, `Unterseite + Details: keine JS-Fehler (${page.__errors.join('; ')})`);
+      await page.close();
+    }
+
     // ---- „+ Auftrag“ (LKW-Seite): weiteren Auftrag zum MAN-LKW anlegen – wie ein Import, mit erstem Packstück ----
     {
       const d = bigData(); const now = Date.now(); const iso = ago => new Date(now - ago * 60e3).toISOString();
