@@ -564,6 +564,57 @@ function bigData() {
       await page.close();
     }
 
+    // ---- Sicherungsnachweis: PDF-Knopf öffnet ein PDF im neuen Tab (Detail-Kopfzeile, Liste, VVL-Sammelnachweis) ----
+    {
+      const d = bigData(); const now = Date.now(); const iso = ago => new Date(now - ago * 60e3).toISOString();
+      const mk = (hu, pos, st, extra) => Object.assign({ rawInput: hu, position: pos, status: st, timestamp: iso(60 - pos), isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null, packaging: 'Carton', dimensions: '10x10x10 CM', grossWeight: '5 KG' }, extra || {});
+      d['9008295951'] = { hawb: '9008295951', lastModified: iso(1), totalPiecesExpected: 3, mitarbeiter: 'T', isHuListOrder: true, truckId: 'MAN 1', originalManNumber: 1, freightForwarder: 'DHL', destinationCountry: 'AUSTRALIEN', plsoNumber: '318101',
+        scannedItems: [mk('PDF0001', 1, 'XRY'), mk('PDF0001', 1, 'Wareneingang'), mk('PDF0002', 2, 'Anstehend'), mk('PDF0002', 2, 'VCK', { isCombination: true }), mk('PDF0003', 3, 'Anstehend', { notes: ['Notiz A'] })] };
+      const vw = (vse, sn, st) => ({ rawInput: vse, sendnr: sn, status: st, timestamp: iso(30), isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null, packaging: 'GLT', dimensions: '1200x800x600 MM', grossWeight: '100 KG' });
+      d['796201'] = { hawb: '796201', lastModified: iso(2), totalPiecesExpected: 1, mitarbeiter: 'T', isHuListOrder: true, truckId: 'VVL-100004158949', parentOrderNumber: '100004158949', scannedItems: [vw('881288686', '7000001', 'ETD'), vw('881288686', '7000001', 'Wareneingang')] };
+      d['938203'] = { hawb: '938203', lastModified: iso(2), totalPiecesExpected: 2, mitarbeiter: 'T', isHuListOrder: true, truckId: 'VVL-100004158949', parentOrderNumber: '100004158949', scannedItems: [vw('881292001', '8000001', 'XRY'), vw('881292002', '8000002', 'Anstehend')] };
+      const be = makeBackend(d, {});
+      page = await openApp(browser, be, { viewport: { width: 1600, height: 900, deviceScaleFactor: 1 } }); await wait(500);
+      // window.open abfangen (Tab sofort im Klick, URL danach) und PDF-Text auslesen
+      const hook = () => page.evaluate(() => { window.__opened = []; window.__openCalls = 0; window.open = () => { window.__openCalls++; const t = { closed: false, location: {}, close() { this.closed = true; } }; Object.defineProperty(t.location, 'href', { set(v) { window.__opened.push(v); } }); return t; }; });
+      const pdfText = async () => { const u = (await page.evaluate(() => window.__opened))[0]; if (!u) return null; const b64 = await page.evaluate(async (u) => { const r = await fetch(u); const b = await r.blob(); return await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result.split(',')[1]); fr.readAsDataURL(b); }); }, u); const buf = Buffer.from(b64, 'base64'); const head = buf.slice(0, 5).toString(); // Textinhalt: unkomprimierte jsPDF-Streams enthalten die Strings als (…) Tj – hier reicht Größe/Typ + Seitenzahl
+        return { pdf: head === '%PDF-', bytes: buf.length, pages: (buf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) || []).length }; };
+      await hook();
+      await page.evaluate(() => document.querySelector('tr[data-basenumber="9008295951"] .hawb-cell').click()); await wait(400);
+      await page.evaluate(() => document.querySelector('#detailView .detail-actions .pdf-btn').click()); await wait(1200);
+      const p1 = await pdfText(); const calls1 = await page.evaluate(() => ({ calls: window.__openCalls, urls: window.__opened.length, detail: getComputedStyle(document.getElementById('detailView')).display !== 'none', err: document.getElementById('errorDisplay').textContent }));
+      assert(p1 && p1.pdf && p1.bytes > 20000 && p1.pages === 1 && calls1.calls === 1 && calls1.urls === 1 && calls1.detail && calls1.err === '', `Detail-Kopfzeile: PDF-Knopf öffnet neuen Tab mit 1-seitigem PDF, Details bleiben offen (${JSON.stringify(Object.assign({}, p1, calls1))})`);
+      // Kein Mail-Aufruf mehr an das Backend
+      assert(!be.actions.some(a => a === 'sendPdfEmail'), 'Kein „sendPdfEmail“ mehr an den Server');
+      // Liste: PDF-Knopf in der Zeile
+      await page.evaluate(() => document.getElementById('backToMainViewBtn').click()); await wait(300);
+      await hook();
+      await page.evaluate(() => document.querySelector('tr[data-basenumber="9008295951"] .pdf-btn').click()); await wait(1200);
+      const p2 = await pdfText();
+      assert(p2 && p2.pdf && p2.pages === 1, `Liste: PDF-Knopf in der Zeile öffnet den Nachweis (${JSON.stringify(p2)})`);
+      // VVL: ein Dokument für alle Aufträge der Vorverladeliste
+      await hook();
+      await page.evaluate(() => document.querySelector('tr[data-basenumber="796201"] .pdf-btn').click()); await wait(1200);
+      const p3 = await pdfText();
+      assert(p3 && p3.pdf && p3.bytes > p1.bytes * 0.8, `VW: Sammelnachweis für die VVL (${JSON.stringify(p3)})`);
+      // Inhalt prüfen: jsPDF komprimiert nicht standardmäßig → Texte stehen als Klartext im PDF
+      // PDF-Text liegt als WinAnsi (latin1) vor; Klammern sind mit Backslash maskiert → ohne Klammern prüfen
+      const pdfRaw = async () => Buffer.from(await page.evaluate(async () => { const r = await fetch(window.__opened[0]); const b = await r.arrayBuffer(); return Array.from(new Uint8Array(b)); }), 'binary').toString('latin1');
+      const raw = await pdfRaw();
+      const has = t => raw.includes(t);
+      assert(has('Vorverladeliste 100004158949') && has('Kundennr. 796201') && has('Kundennr. 938203') && has('881292002') && has('7000001'), 'VW-Nachweis enthält beide Kundennummern, VSE und Sendungs-Nr.');
+      assert(has('Gesamt: 2 Aufträge') && has('nicht gesichert'), 'VW-Nachweis: Gesamtübersicht + Hinweis auf offene Packstücke');
+      // MAN-Inhalt
+      await hook();
+      await page.evaluate(() => document.querySelector('tr[data-basenumber="9008295951"] .pdf-btn').click()); await wait(1200);
+      const raw2 = await pdfRaw();
+      const h2 = t => raw2.includes(t);
+      assert(h2('Rechnung 9008295951') && h2('PDF0001') && h2('PDF0003') && h2('Notiz A') && h2('VCK') && h2('Kombi') && h2('AUSTRALIEN') && h2('DHL') && h2('318101'), 'MAN-Nachweis: Rechnung, HUs, Notiz, Kombi, Spediteur/Land/PLSO enthalten');
+      assert(h2('2 Packstücke nicht gesichert') && h2('SPX by XRY') && h2('Kombi: VCK'), 'MAN-Nachweis: Offen-Hinweis, Sicherheitsstatus SPX by XRY, Kombi getrennt ausgewiesen');
+      assert(page.__errors.length === 0, `Keine JS-Fehler beim PDF (${page.__errors.join(' | ')})`);
+      await page.close();
+    }
+
     // ---- „+ Auftrag“ (LKW-Seite): weiteren Auftrag zum MAN-LKW anlegen – wie ein Import, mit erstem Packstück ----
     {
       const d = bigData(); const now = Date.now(); const iso = ago => new Date(now - ago * 60e3).toISOString();
