@@ -4093,6 +4093,11 @@ const PAGE_RENDERERS = {
                     </div>
                     <div class="input-wrapper info-search-wrapper">
                         <input type="search" id="infoSearchInput" placeholder="Sendungsnummer, VVL, HU/VSE, Notiz …" autocapitalize="characters" autocomplete="off" enterkeyhint="search" value="${escapeHtml(infoState.text)}">
+                        <button type="button" id="infoSearchClear" class="clear-input-btn info-search-clear${infoState.text ? ' visible' : ''}" title="Suchtext löschen" aria-label="Suchtext löschen">×</button>
+                    </div>
+                    <div class="info-reset-row hidden" id="infoResetRow">
+                        <span class="info-reset-summary" id="infoResetSummary"></span>
+                        <button type="button" id="infoResetAllBtn" class="info-reset-btn" title="Suchtext und alle Filter zurücksetzen">Alle Filter zurücksetzen</button>
                     </div>
                     <div class="info-filters">
                         <label>Status<select id="infoStatusSelect">${infoOptionsHtml([['all', 'Alle'], ['open', 'Offen'], ['done', 'Abgeschlossen'], ['dunkel', 'Mit Dunkelalarm'], ['unknown', 'Ohne Stückzahl']], infoState.status)}</select></label>
@@ -4127,7 +4132,15 @@ const PAGE_RENDERERS = {
             const setAndUpdate = () => { pageLimit = PAGE_LIST_STEP; scheduleInfoArchiveSearch(); PAGE_RENDERERS.info.update(); };
             form.addEventListener('submit', (e) => { e.preventDefault(); input.blur(); if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); });
             const debounced = () => { if (infoTimer) clearTimeout(infoTimer); infoTimer = setTimeout(setAndUpdate, 150); };
-            input.addEventListener('input', () => { infoState.text = input.value.trim().toUpperCase(); debounced(); });
+            const clearBtn = document.getElementById('infoSearchClear');
+            input.addEventListener('input', () => { infoState.text = input.value.trim().toUpperCase(); clearBtn.classList.toggle('visible', !!input.value); debounced(); });
+            // X im Suchfeld: nur den Suchtext leeren – die Filter darunter bleiben; Fokus zurück ins Feld (Desktop), am Handy ohne Tastatur
+            clearBtn.addEventListener('click', () => {
+                input.value = ''; infoState.text = ''; clearBtn.classList.remove('visible');
+                if (infoTimer) clearTimeout(infoTimer);
+                setAndUpdate();
+                if (!('ontouchstart' in window)) input.focus();
+            });
             document.getElementById('infoWeightMin').addEventListener('input', (e) => { infoState.weightMin = e.target.value.trim(); debounced(); });
             document.getElementById('infoWeightMax').addEventListener('input', (e) => { infoState.weightMax = e.target.value.trim(); debounced(); });
             // Nach der Auswahl den Fokus freigeben – sonst landen Scanner-Eingaben in der Auswahlliste
@@ -4151,10 +4164,14 @@ const PAGE_RENDERERS = {
                 el.addEventListener('input', apply); el.addEventListener('change', apply);
             });
             document.getElementById('infoArchiveToggle').addEventListener('change', (e) => { infoState.archive = e.target.checked; setAndUpdate(); });
-            document.getElementById('infoResetBtn').addEventListener('click', () => {
+            // „Zurücksetzen“: Suchtext UND alle Filter auf Anfang (Kopf der Desktop-Seitenleiste / Zeile unter dem Suchfeld am Handy)
+            const resetAll = () => {
                 Object.assign(infoState, { text: '', status: 'all', truck: 'all', period: 'all', dateFrom: '', dateTo: '', weightMin: '', weightMax: '' });
+                if (infoTimer) clearTimeout(infoTimer);
                 this.render(); // Formular mit leeren Werten neu aufbauen
-            });
+            };
+            document.getElementById('infoResetBtn').addEventListener('click', resetAll);
+            document.getElementById('infoResetAllBtn').addEventListener('click', resetAll);
             scheduleInfoArchiveSearch();
             this.update();
             // Am Desktop gleich ins Suchfeld; auf Touch-Geräten nicht (Tastatur würde aufklappen, Scanner-Eingaben landeten hier)
@@ -4169,6 +4186,12 @@ const PAGE_RENDERERS = {
             const anyFilter = infoState.status !== 'all' || infoState.truck !== 'all' || infoState.period !== 'all' || !!range;
             const resetBtn = document.getElementById('infoResetBtn');
             if (resetBtn) resetBtn.classList.toggle('hidden', !text && !anyFilter);
+            const resetRow = document.getElementById('infoResetRow');
+            if (resetRow) {
+                resetRow.classList.toggle('hidden', !text && !anyFilter);
+                const active = (text ? 1 : 0) + (infoState.status !== 'all' ? 1 : 0) + (infoState.truck !== 'all' ? 1 : 0) + (infoState.period !== 'all' ? 1 : 0) + (range ? 1 : 0);
+                document.getElementById('infoResetSummary').textContent = active ? `${active} Filter aktiv` : '';
+            }
             results.innerHTML = '';
             // Handy: erst nach Eingabe/Filter suchen (kurze Liste, wenig Scrollen). Desktop: sofort alle Sendungen als
             // Tabelle zeigen – die Seitenleiste filtert dann live.

@@ -78,6 +78,12 @@ function bigData() {
     assert(!(await page.$eval('#infoResetBtn', b => b.classList.contains('hidden'))), 'Info: „Zurücksetzen“ erscheint bei aktivem Filter');
     await page.evaluate(() => document.getElementById('infoResetBtn').click()); await wait(400);
     assert((await page.$$eval('#infoResults tr[data-basenumber]', r => r.length)) === 15 && (await page.$eval('#infoStatusSelect', s => s.value)) === 'all', 'Info: „Zurücksetzen“ leert Filter und zeigt wieder alle');
+    await page.evaluate(() => { const i = document.getElementById('infoSearchInput'); i.value = 'HU1001'; i.dispatchEvent(new Event('input', { bubbles: true })); }); await wait(400);
+    const ix = await page.evaluate(() => ({ x: getComputedStyle(document.getElementById('infoSearchClear')).display, row: getComputedStyle(document.getElementById('infoResetRow')).display, rows: document.querySelectorAll('#infoResults tr[data-basenumber]').length }));
+    assert(ix.x !== 'none' && ix.row === 'none' && ix.rows === 1, `Info Desktop: X im Suchfeld bei Text, Reset-Zeile bleibt aus (Kopf hat „Zurücksetzen“) (${JSON.stringify(ix)})`);
+    await page.evaluate(() => document.getElementById('infoSearchClear').click()); await wait(400);
+    const ix2 = await page.evaluate(() => ({ text: document.getElementById('infoSearchInput').value, x: getComputedStyle(document.getElementById('infoSearchClear')).display, focus: document.activeElement.id, rows: document.querySelectorAll('#infoResults tr[data-basenumber]').length }));
+    assert(ix2.text === '' && ix2.x === 'none' && ix2.focus === 'infoSearchInput' && ix2.rows === 15, `X leert den Suchtext, Fokus bleibt im Feld, wieder alle Zeilen (${JSON.stringify(ix2)})`);
     // ---- Detailansicht am Desktop: Kopfzeile (Pfad, Kennzahlen, Aktionen, QR) und Packstücktabelle ----
     await page.evaluate(() => document.querySelector('#infoResults tr[data-basenumber="9007000005"] .hawb-cell').click()); await wait(500);
     const det = await page.evaluate(() => ({

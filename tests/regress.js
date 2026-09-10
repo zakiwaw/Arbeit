@@ -42,6 +42,16 @@ const wait = (ms) => new Promise(r => setTimeout(r, ms));
     await page.evaluate(() => { const i = document.getElementById('infoWeightMin'); i.value = '19'; i.dispatchEvent(new Event('input', { bubbles: true })); const j = document.getElementById('infoWeightMax'); j.value = '21'; j.dispatchEvent(new Event('input', { bubbles: true })); }); await wait(600);
     const hits = await page.$$eval('.weight-hit[data-hu]', e => e.map(x => x.dataset.hu));
     assert(hits.includes('HU1001') && hits.includes('HU1003') && !hits.includes('HU1002'), `Info: Gewichtsfilter 19–21 kg → ${hits.join(', ')}`);
+    // X im Suchfeld leert nur den Text; „Alle Filter zurücksetzen“ (Zeile unter dem Suchfeld am Handy) leert alles
+    await page.evaluate(() => { const i = document.getElementById('infoSearchInput'); i.value = 'HU10'; i.dispatchEvent(new Event('input', { bubbles: true })); const s = document.getElementById('infoStatusSelect'); s.value = 'open'; s.dispatchEvent(new Event('change', { bubbles: true })); }); await wait(500);
+    const ir0 = await page.evaluate(() => ({ x: getComputedStyle(document.getElementById('infoSearchClear')).display, row: getComputedStyle(document.getElementById('infoResetRow')).display, sum: document.getElementById('infoResetSummary').textContent }));
+    assert(ir0.x !== 'none' && ir0.row === 'flex' && ir0.sum === '3 Filter aktiv', `Info Handy: X im Suchfeld + Zeile „3 Filter aktiv · Alle Filter zurücksetzen“ (${JSON.stringify(ir0)})`);
+    await page.evaluate(() => document.getElementById('infoSearchClear').click()); await wait(400);
+    const ir1 = await page.evaluate(() => ({ text: document.getElementById('infoSearchInput').value, x: getComputedStyle(document.getElementById('infoSearchClear')).display, status: document.getElementById('infoStatusSelect').value, wmin: document.getElementById('infoWeightMin').value, sum: document.getElementById('infoResetSummary').textContent }));
+    assert(ir1.text === '' && ir1.x === 'none' && ir1.status === 'open' && ir1.wmin === '19' && ir1.sum === '2 Filter aktiv', `X leert nur den Suchtext, Filter bleiben (${JSON.stringify(ir1)})`);
+    await page.evaluate(() => document.getElementById('infoResetAllBtn').click()); await wait(500);
+    const ir2 = await page.evaluate(() => ({ text: document.getElementById('infoSearchInput').value, status: document.getElementById('infoStatusSelect').value, wmin: document.getElementById('infoWeightMin').value, wmax: document.getElementById('infoWeightMax').value, row: getComputedStyle(document.getElementById('infoResetRow')).display, hits: document.querySelectorAll('.weight-hit[data-hu]').length }));
+    assert(ir2.text === '' && ir2.status === 'all' && ir2.wmin === '' && ir2.wmax === '' && ir2.row === 'none' && ir2.hits === 0, `„Alle Filter zurücksetzen“ leert Suchtext + Filter, Zeile verschwindet (${JSON.stringify(ir2)})`);
     await page.goBack(); await wait(400);
     await page.evaluate(() => document.getElementById('menu-toggle-btn').click()); await wait(300);
     assert(await page.$eval('#side-menu', e => e.classList.contains('open')), 'Seitenmenü öffnet');

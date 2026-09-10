@@ -1000,6 +1000,16 @@ body.batch-mode-active .home-hub { display: none; } /* im Batch-Modus zählt nur
     appearance: none;
 }
 .info-search-wrapper input[type="search"]:focus { border-color: var(--accent); box-shadow: var(--focus-ring); outline: none; }
+/* Eigenes X im Suchfeld (statt des kleinen Browser-Kreuzes): sichtbar, sobald Text drinsteht; leert nur den Suchtext */
+.info-search-wrapper input[type="search"] { padding-right: 46px; }
+.info-search-wrapper input[type="search"]::-webkit-search-cancel-button, .info-search-wrapper input[type="search"]::-webkit-search-decoration { -webkit-appearance: none; appearance: none; display: none; }
+.info-search-clear.visible { display: flex; align-items: center; justify-content: center; }
+/* „Alle Filter zurücksetzen“ unter dem Suchfeld – erscheint, sobald Suchtext oder ein Filter gesetzt ist */
+.info-reset-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); margin-top: var(--sp-2); }
+.info-reset-row.hidden { display: none; }
+.info-reset-summary { font-size: var(--fs-xs); font-weight: 600; color: var(--text-muted); }
+.info-reset-row .info-reset-btn { min-height: var(--touch-min); padding: 0 var(--sp-3); font-size: var(--fs-sm); color: var(--accent-text); background-color: var(--accent-soft); border-color: transparent; }
+.info-reset-row .info-reset-btn:active { background-color: var(--accent); color: #fff; }
 .info-filters {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2707,6 +2717,8 @@ body.modal-open { overflow: hidden; }
     .info-form-title { font-size: var(--fs-xs); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); }
     .info-search-wrapper input[type="search"] { height: 40px; font-size: var(--fs-sm); }
     .info-search-wrapper input[type="search"]::placeholder { font-size: var(--fs-xs); }
+    .info-search-wrapper .info-search-clear { width: 28px; height: 28px; font-size: 18px; }
+    .info-reset-row { display: none; }   /* Desktop: „Zurücksetzen“ steht im Kopf der Seitenleiste */
     .info-filters { grid-template-columns: 1fr; gap: var(--sp-3); margin-top: var(--sp-3); }
     .info-filters label, .info-filters .info-weight, .info-filters .info-dates { grid-column: auto; }
     .info-filters select { height: 36px; }
