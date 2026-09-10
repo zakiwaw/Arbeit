@@ -18,6 +18,7 @@ V2 ändert das:
 | `searchArchive` | Archivsuche (siehe Abschnitt Archiv). |
 | `deleteShipment` | Löschung als Markierung (Tombstone, Spalte E = TRUE), damit andere Geräte die Sendung nicht wiederbeleben. |
 | `loadAllData`, `saveAllData`, `clearAllData`, `sendPdfEmail`, `saveLkwStatus`, `loadLkwStatus` | Wie bisher – `saveAllData` läuft jetzt ebenfalls durch den Merge, ein altes Gerät kann also nichts mehr überschreiben. |
+| `authUsers`, `authLogin`, `authAccept`, `authInviteInfo`, `authCheck`, `authLogout`, `admin*` | Anmeldung (siehe Version 2.2). |
 
 Nicht im Skript enthalten: `shipmentComplete` (Abschluss-Benachrichtigung) und `sendSummaryEmail`. Die App wertet die
 Antwort „Unbekannte Aktion“ auf `shipmentComplete` **nicht** als Fehler – die Scans sind zu dem Zeitpunkt längst über
@@ -121,3 +122,35 @@ Bei deutlich mehr Geräten `SYNC_POLL_INTERVAL_MS` in `script.js` erhöhen.
 
 `purgeDeletedRows()` im Skript-Editor manuell ausführen, um Lösch-Markierungen physisch aus dem Sheet zu entfernen.
 Archivierte Zeilen (`ARCHIV`) bleiben davon unberührt – sie werden nie automatisch gelöscht.
+
+## Version 2.2 – Anmeldung mit PIN
+
+Die App ist öffentlich erreichbar (GitHub Pages) und das Skript ist für „Jeder“ freigegeben – bisher konnte also jeder, der die
+Adresse kennt, Daten lesen und ändern. Ab 2.2 verlangt `doPost` für **jede** Daten-Aktion ein gültiges Sitzungs-Token
+(Feld `auth` im Anfragekörper); ohne Token antwortet der Server mit `{ status: 'error', code: 'AUTH_REQUIRED' }` und die
+App zeigt die Anmeldeseite. Öffentlich bleiben nur die Anmelde-Aktionen selbst.
+
+| Aktion | Wer | Zweck |
+|---|---|---|
+| `authUsers` | alle | Namen der anmeldbaren Mitarbeiter (nur id + Name) für die Auswahl auf der Anmeldeseite. Legt beim allerersten Aufruf den Haupt-Administrator an und schickt ihm die Einladung. |
+| `authLogin` `{ userId, pin, deviceId }` | alle | Name + 6-stellige PIN → Sitzungs-Token (12 h). 5 Fehlversuche → 15 Minuten gesperrt. |
+| `authInviteInfo` `{ invite }` / `authAccept` `{ invite, pin }` | alle | Einladungslink prüfen bzw. einlösen: Mitarbeiter wählt seine PIN selbst und ist danach angemeldet. Link 48 h gültig, einmalig. |
+| `authCheck`, `authLogout` | angemeldet | Sitzung prüfen / beenden. |
+| `adminListUsers`, `adminInvite` `{ name, email }`, `adminSetActive` `{ userId, active }`, `adminResetPin` `{ userId }` | Administrator | Mitarbeiter verwalten: einladen (E-Mail mit Link), sperren/freigeben, PIN zurücksetzen (= neue Einladung; die alte PIN gilt, bis die neue gesetzt ist). |
+
+Ablage im Sheet `_users` (ausgeblendet, wird automatisch angelegt): Name, E-Mail, Rolle, **PIN nur als Hash** (HMAC-SHA256 mit
+Salt je Nutzer und einem geheimen Schlüssel in den Script-Eigenschaften – `AUTH_SECRET`, nicht löschen), Sperrzähler,
+offene Einladung, laufende Sitzungen. Sperren oder PIN-Reset beendet sofort alle Anmeldungen des Nutzers.
+
+Einrichtung:
+1. `Code.gs` ersetzen, **Bereitstellen → Bereitstellung verwalten → Neue Version**. Beim ersten Ausführen fragt Google
+   zusätzlich nach der Berechtigung „E-Mails senden“ (MailApp) – bestätigen.
+2. App öffnen: der Haupt-Administrator (`BOOTSTRAP_ADMIN` in `Code.gs`, `bisbiss-92@hotmail.de`) bekommt automatisch die
+   Einladungs-Mail. Kommt sie nicht an: im Skript-Editor `setupFirstAdmin` ausführen – das Protokoll zeigt den Link, er kann
+   auch direkt geöffnet werden.
+3. Über den Link die eigene PIN festlegen. Danach im Menü **Mitarbeiter** die anderen Mitarbeiter einladen (Name + E-Mail).
+   Schlägt der Mail-Versand fehl, zeigt die App den Einladungslink zum Weitergeben an.
+4. Alle Geräte melden sich einmal an; die Sitzung hält 12 Stunden, danach genügt die PIN.
+
+Notschalter: `AUTH_ENABLED = false` in `Code.gs` (+ neue Version) schaltet die Anmeldung komplett ab – die App arbeitet
+dann wieder wie in 2.1.

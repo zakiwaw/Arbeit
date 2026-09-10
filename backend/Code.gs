@@ -1,6 +1,6 @@
 // ===================================================
 // FRACHT TRACKER – Google Apps Script Backend
-// Version 2.1: mehrgeräte-sicher + Archiv.
+// Version 2.2: mehrgeräte-sicher + Archiv + Anmeldung (PIN).
 //   - Jedes Gerät schickt nur die Sendungen, die es geändert hat (+ den Stand, von dem es ausging).
 //   - Der Server führt zusammen (3-Wege-Merge) statt zu überschreiben; Schreibzugriffe laufen unter Sperre.
 //   - Geräte holen regelmäßig nur die Änderungen ab ("loadChanges" seit Version X).
@@ -18,6 +18,11 @@
 //   sobald ein Gerät eine archivierte Sendung wieder speichert (Wiederherstellen, Scan, Storno, Notiz), schreibt der
 //   normale Speicherpfad die Zeile OHNE Markierung zurück = wieder aktiv. Gelöscht wird nie automatisch.
 // Script-Cache:       Versionszähler + LKW-Status für den Schnellpfad von loadChanges (siehe CACHE_TTL_S)
+//
+// ANMELDUNG (2.2): Jede Aktion außer den Anmelde-Aktionen braucht ein gültiges Sitzungs-Token (Feld "auth" im
+//   Anfragekörper), sonst antwortet der Server mit { status: 'error', code: 'AUTH_REQUIRED' }. Mitarbeiter stehen im
+//   Sheet "users"; der Administrator lädt sie per E-Mail ein, jeder wählt seine PIN selbst (Abschnitt ANMELDUNG unten).
+//   Notschalter: AUTH_ENABLED = false → alles wieder ohne Anmeldung wie in 2.1.
 // ===================================================
 
 // EINSTELLUNGEN
@@ -59,18 +64,42 @@ const NON_COUNTING_STATUSES_ = ['Dunkelalarm', 'Anstehend', 'NichtSichern', 'Abg
 // ===================================================
 // HAUPTFUNKTION
 // ===================================================
+const KNOWN_ACTIONS_ = ['saveShipments', 'deleteShipment', 'loadChanges', 'searchArchive', 'loadAllData', 'saveAllData', 'sendPdfEmail',
+  'clearAllData', 'saveLkwStatus', 'loadLkwStatus', 'authUsers', 'authLogin', 'authAccept', 'authInviteInfo', 'authCheck', 'authLogout',
+  'adminListUsers', 'adminInvite', 'adminSetActive', 'adminResetPin'];
+
 function doPost(e) {
   try {
     const requestData = JSON.parse(e.postData.contents);
     const payload = requestData.payload;
+    const action = String(requestData.action || '');
     let result = {};
 
-    switch (requestData.action) {
+    // Unbekannte Aktion zuerst melden (ältere App-Versionen erkennen daran ein Skript ohne die jeweilige Funktion)
+    if (KNOWN_ACTIONS_.indexOf(action) === -1) throw new Error("Unbekannte Aktion empfangen: " + action);
+
+    // Anmeldung (V2.2): alles außer den öffentlichen Anmelde-Aktionen braucht ein gültiges Sitzungs-Token
+    const user = (AUTH_ENABLED && !PUBLIC_ACTIONS_[action]) ? verifySession_(requestData.auth) : null;
+    if (ADMIN_ACTIONS_[action] && (!user || user.role !== 'admin')) throw authError_('FORBIDDEN', 'Nur für Administratoren.');
+
+    switch (action) {
       // ---- Neu (V2) ----
       case "saveShipments":   result = saveShipmentsMerged(payload); break;
       case "deleteShipment":  result = deleteShipmentRow(payload); break;
       case "loadChanges":     result = loadChangesSince(payload); break;
       case "searchArchive":   result = searchArchive(payload); break;
+
+      // ---- Anmeldung (V2.2) ----
+      case "authUsers":       result = authUsers(); break;
+      case "authLogin":       result = authLogin(payload); break;
+      case "authAccept":      result = authAccept(payload); break;
+      case "authInviteInfo":  result = authInviteInfo(payload); break;
+      case "authCheck":       result = user ? { status: 'success', user: publicUser_(user) } : { status: 'success', user: null, authDisabled: true }; break;
+      case "authLogout":      result = authLogout(user); break;
+      case "adminListUsers":  result = { status: 'success', users: adminUserList_() }; break;
+      case "adminInvite":     result = adminInvite(payload, user); break;
+      case "adminSetActive":  result = adminSetActive(payload, user); break;
+      case "adminResetPin":   result = adminResetPin(payload, user); break;
 
       // ---- Bestehend (kompatibel) ----
       case "loadAllData":     result = loadAllDataFromSheet(); break;
@@ -79,17 +108,15 @@ function doPost(e) {
       case "clearAllData":    result = clearAllDataInSheet(); break;
       case "saveLkwStatus":   saveLkwStatusToSheet(payload); result = { status: 'success', message: 'LKW-Status gespeichert.' }; break;
       case "loadLkwStatus":   result = { status: 'success', data: loadLkwStatusFromSheet() }; break;
-
-      default:
-        throw new Error("Unbekannte Aktion empfangen: " + requestData.action);
     }
 
     return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     Logger.log("Fehler in doPost: " + err.stack);
-    return ContentService
-      .createTextOutput(JSON.stringify({ status: 'error', message: "Verarbeitung serverseitig fehlgeschlagen: " + err.message }))
-      .setMimeType(ContentService.MimeType.JSON);
+    // Fehler mit Code (Anmeldung, Eingabeprüfung) gehen im Klartext an die App; alles andere wie bisher
+    const out = { status: 'error', message: err.code ? err.message : "Verarbeitung serverseitig fehlgeschlagen: " + err.message };
+    if (err.code) out.code = err.code;
+    return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
   }
 }
 
@@ -779,4 +806,318 @@ function sendPdfEmail(payload) {
   const body = "Im Anhang finden Sie das angeforderte Sicherheitsprotokoll.";
   Logger.log("PDF-E-Mail-Anfrage für Betreff '" + subject + "' erhalten.");
   return { status: 'success', message: 'E-Mail-Anfrage wurde erfolgreich verarbeitet.' };
+}
+
+// ===================================================
+// ANMELDUNG (V2.2) – PIN-Login, Einladung per E-Mail, Sitzungs-Token
+//
+// Sheet "_users" (ausgeblendet, wird automatisch angelegt, alle Zellen als Text):
+//   id | name | email | role (admin/user) | pinHash | salt | active | createdAt | invite | inviteExpires | failed | lockedUntil | lastLogin | gen | sessions
+//
+// Ablauf: Der Administrator lädt einen Mitarbeiter ein (adminInvite) → E-Mail mit Link ?einladung=<Token> (INVITE_HOURS gültig,
+//   einmalig). Der Mitarbeiter wählt über den Link seine 6-stellige PIN (authAccept) – niemand sonst kennt sie. Danach meldet er
+//   sich mit Name + PIN an (authLogin) und erhält ein Sitzungs-Token (SESSION_HOURS gültig), das die App jeder Anfrage mitgibt.
+// Sicherheit: PINs liegen nur als HMAC-SHA256 (Salt je Nutzer + geheimer Schlüssel aus den Script-Eigenschaften) im Sheet –
+//   ohne den Schlüssel lässt sich die PIN auch aus dem Sheet nicht zurückrechnen. Nach PIN_MAX_ATTEMPTS Fehlversuchen ist der
+//   Zugang PIN_LOCK_MINUTES gesperrt. Sitzungs-Token sind signiert (HMAC) und in der Spalte "sessions" des Nutzers eingetragen:
+//   "Abmelden" streicht die Sitzung dort, PIN-Reset oder Deaktivierung leert die Liste → laufende Anmeldungen verfallen sofort.
+// Erster Administrator: BOOTSTRAP_ADMIN wird beim ersten Aufruf mit leerem "users"-Sheet automatisch angelegt und eingeladen
+//   (oder von Hand: setupFirstAdmin im Skript-Editor ausführen – schickt eine neue Einladung).
+// Berechtigungen: Beim ersten Veröffentlichen fragt Google zusätzlich nach "E-Mails senden" (MailApp).
+// ===================================================
+const AUTH_ENABLED = true;                                              // false = Notschalter: alles wieder ohne Anmeldung
+const APP_URL = 'https://zakiwaw.github.io/Arbeit/';                    // Adresse der App (für den Einladungslink)
+const BOOTSTRAP_ADMIN = { name: 'Zakaria Bisbiss', email: 'bisbiss-92@hotmail.de' };
+const USERS_SHEET_NAME = '_users';
+const SESSION_HOURS = 12;                                               // Gültigkeit einer Anmeldung (danach PIN erneut)
+const INVITE_HOURS = 48;                                                // Gültigkeit eines Einladungslinks
+const PIN_MAX_ATTEMPTS = 5;                                             // Fehlversuche bis zur Sperre …
+const PIN_LOCK_MINUTES = 15;                                            // … und deren Dauer
+const CACHE_KEY_USERS = 'fracht_users';
+const USERS_CACHE_TTL_S = 600;                                          // Nutzerliste im Script-Cache (wird bei jeder Änderung geleert)
+const PUBLIC_ACTIONS_ = { authUsers: 1, authLogin: 1, authAccept: 1, authInviteInfo: 1 };
+const ADMIN_ACTIONS_ = { adminListUsers: 1, adminInvite: 1, adminSetActive: 1, adminResetPin: 1 };
+const USER_COLS_ = ['id', 'name', 'email', 'role', 'pinHash', 'salt', 'active', 'createdAt', 'invite', 'inviteExpires', 'failed', 'lockedUntil', 'lastLogin', 'gen', 'sessions'];
+const MAX_SESSIONS_PER_USER = 10;
+
+function authError_(code, message) { const e = new Error(message); e.code = code; return e; }
+function randomToken_() { return (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, ''); }   // 64 Hex-Zeichen
+function hex_(bytes) { return bytes.map(function (b) { const v = (b + 256) % 256; return (v < 16 ? '0' : '') + v.toString(16); }).join(''); }
+function hmacHex_(data, key) { return hex_(Utilities.computeHmacSha256Signature(String(data), String(key))); }
+function publicUser_(u) { return { id: u.id, name: u.name, role: u.role }; }
+function findUser_(users, pred) { for (let i = 0; i < users.length; i++) if (pred(users[i])) return users[i]; return null; }
+
+// Geheimer Schlüssel (Pepper) für PIN-Hashes und Token-Signaturen – wird einmalig erzeugt und in den Script-Eigenschaften
+// abgelegt (nicht im Sheet). NICHT ändern/löschen: danach wären alle PINs und Anmeldungen ungültig.
+function secret_() {
+  const props = PropertiesService.getScriptProperties();
+  let s = props.getProperty('AUTH_SECRET');
+  if (s) return s;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(LOCK_TIMEOUT_MS);
+  try {
+    s = props.getProperty('AUTH_SECRET');
+    if (!s) { s = randomToken_() + randomToken_(); props.setProperty('AUTH_SECRET', s); }
+    return s;
+  } finally { lock.releaseLock(); }
+}
+function hashPin_(pin, salt, secret) { return hmacHex_(salt + ':' + pin, secret); }
+
+function usersSheet_() {
+  const ss = ss_();
+  let sh = ss.getSheetByName(USERS_SHEET_NAME);
+  if (!sh) {
+    sh = ss.insertSheet(USERS_SHEET_NAME);
+    sh.getRange(1, 1, sh.getMaxRows(), USER_COLS_.length).setNumberFormat('@');   // alles Text (Hashes/Tokens nie als Zahl deuten)
+    sh.getRange(1, 1, 1, USER_COLS_.length).setValues([USER_COLS_]);
+    sh.setFrozenRows(1);
+    try { sh.hideSheet(); } catch (e) { /* letztes sichtbares Blatt lässt sich nicht ausblenden */ }
+  }
+  return sh;
+}
+function loadUsers_(fresh) {
+  if (!fresh) {
+    const c = cache_().get(CACHE_KEY_USERS);
+    if (c) { const arr = parseJsonSafe_(c); if (Array.isArray(arr)) return arr; }
+  }
+  const sh = usersSheet_();
+  const last = sh.getLastRow();
+  const users = [];
+  if (last >= 2) {
+    sh.getRange(2, 1, last - 1, USER_COLS_.length).getValues().forEach(function (r) {
+      const u = {};
+      USER_COLS_.forEach(function (k, j) { u[k] = r[j]; });
+      if (!u.id) return;
+      ['id', 'name', 'email', 'role', 'pinHash', 'salt', 'invite', 'sessions'].forEach(function (k) { u[k] = (u[k] === null || u[k] === undefined) ? '' : String(u[k]); });
+      ['createdAt', 'inviteExpires', 'failed', 'lockedUntil', 'lastLogin', 'gen'].forEach(function (k) { u[k] = Number(u[k]) || 0; });
+      u.active = (u.active === true || String(u.active).toUpperCase() === 'TRUE');
+      if (u.email.toLowerCase() === BOOTSTRAP_ADMIN.email.toLowerCase()) u.role = 'admin';   // Haupt-Administrator bleibt immer Administrator
+      users.push(u);
+    });
+  }
+  try { cache_().put(CACHE_KEY_USERS, JSON.stringify(users), USERS_CACHE_TTL_S); } catch (e) { /* Cache optional */ }
+  return users;
+}
+function saveUser_(u) {
+  const sh = usersSheet_();
+  const last = sh.getLastRow();
+  let row = 0;
+  if (last >= 2) {
+    const ids = sh.getRange(2, 1, last - 1, 1).getValues();
+    for (let i = 0; i < ids.length; i++) if (String(ids[i][0]) === u.id) { row = i + 2; break; }
+  }
+  if (!row) row = Math.max(last, 1) + 1;
+  const values = USER_COLS_.map(function (k) { const v = u[k]; return (v === undefined || v === null) ? '' : (typeof v === 'boolean' ? (v ? 'TRUE' : 'FALSE') : String(v)); });
+  sh.getRange(row, 1, 1, USER_COLS_.length).setNumberFormat('@').setValues([values]);
+  SpreadsheetApp.flush();
+  try { cache_().remove(CACHE_KEY_USERS); } catch (e) { /* Cache optional */ }
+}
+function newUser_(name, email, role) {
+  return { id: 'u' + randomToken_().slice(0, 10), name: name, email: email, role: role, pinHash: '', salt: '', active: true,
+    createdAt: Date.now(), invite: '', inviteExpires: 0, failed: 0, lockedUntil: 0, lastLogin: 0, gen: 0, sessions: '' };
+}
+function issueInvite_(u) { u.invite = randomToken_(); u.inviteExpires = Date.now() + INVITE_HOURS * 3600000; }
+
+function inviteLink_(u) { return APP_URL + (APP_URL.indexOf('?') === -1 ? '?' : '&') + 'einladung=' + u.invite; }
+// E-Mail-Versand; schlägt er fehl (z. B. Google-Konto ohne Gmail, Tageskontingent), bekommt der Administrator den Link
+// trotzdem in der App angezeigt und kann ihn selbst weitergeben.
+function trySendInviteMail_(u, admin) {
+  try { sendInviteMail_(u, admin); return null; } catch (e) { Logger.log('Einladung an ' + u.email + ' fehlgeschlagen: ' + e.message); return e.message; }
+}
+function sendInviteMail_(u, admin) {
+  const link = inviteLink_(u);
+  const by = admin ? admin.name : BOOTSTRAP_ADMIN.name;
+  const reset = !!u.pinHash;
+  const subject = 'Fracht-Tracker: ' + (reset ? 'Neue PIN festlegen' : 'Einladung');
+  const intro = reset ? by + ' hat für dich das Zurücksetzen der PIN im Fracht-Tracker angestoßen.'
+                      : by + ' hat dich zum Fracht-Tracker eingeladen.';
+  const body = 'Hallo ' + u.name + ',\n\n' + intro + '\n\nÖffne diesen Link auf dem Gerät, mit dem du arbeitest, und wähle deine persönliche 6-stellige PIN:\n'
+    + link + '\n\nDer Link ist ' + INVITE_HOURS + ' Stunden gültig und kann nur einmal verwendet werden. Bitte gib deine PIN an niemanden weiter.\n\nFracht-Tracker';
+  const html = '<p>Hallo ' + escapeHtml_(u.name) + ',</p><p>' + escapeHtml_(intro) + '</p>'
+    + '<p>Öffne diesen Link auf dem Gerät, mit dem du arbeitest, und wähle deine persönliche 6-stellige PIN:</p>'
+    + '<p><a href="' + link + '" style="display:inline-block;padding:12px 20px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold">PIN festlegen</a></p>'
+    + '<p style="font-size:12px;color:#555">Falls der Knopf nicht funktioniert: ' + link + '</p>'
+    + '<p style="font-size:12px;color:#555">Der Link ist ' + INVITE_HOURS + ' Stunden gültig und kann nur einmal verwendet werden. Bitte gib deine PIN an niemanden weiter.</p>';
+  MailApp.sendEmail({ to: u.email, subject: subject, body: body, htmlBody: html, name: 'Fracht-Tracker' });
+}
+function escapeHtml_(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+// Sitzungs-Token: base64url({ u: Nutzer, g: gen, s: Sitzung, e: Ablauf }) + "." + HMAC. Die Sitzung steht zusätzlich in der
+// Nutzerzeile (Spalte sessions), damit "Abmelden" serverseitig wirkt. Der Aufrufer speichert den Nutzer danach (saveUser_).
+function sessionList_(u) { const a = parseJsonSafe_(u.sessions); return Array.isArray(a) ? a : []; }
+function makeSession_(u, deviceId) {
+  const now = Date.now(), exp = now + SESSION_HOURS * 3600000, sid = randomToken_().slice(0, 16);
+  const list = sessionList_(u).filter(function (x) { return x && x.e > now; });
+  list.push({ s: sid, e: exp, d: String(deviceId || '').slice(0, 40) });
+  u.sessions = JSON.stringify(list.slice(-MAX_SESSIONS_PER_USER));
+  const body = Utilities.base64EncodeWebSafe(JSON.stringify({ u: u.id, g: u.gen || 0, s: sid, e: exp }));
+  return { status: 'success', token: body + '.' + hmacHex_(body, secret_()), expires: exp, user: publicUser_(u) };
+}
+function verifySession_(token) {
+  const t = String(token || '');
+  const dot = t.indexOf('.');
+  if (!t || dot < 1) throw authError_('AUTH_REQUIRED', 'Anmeldung erforderlich.');
+  const body = t.slice(0, dot), sig = t.slice(dot + 1);
+  if (sig !== hmacHex_(body, secret_())) throw authError_('AUTH_REQUIRED', 'Anmeldung ungültig – bitte erneut anmelden.');
+  const data = parseJsonSafe_(Utilities.newBlob(Utilities.base64DecodeWebSafe(body)).getDataAsString());
+  if (!data || !data.u) throw authError_('AUTH_REQUIRED', 'Anmeldung ungültig – bitte erneut anmelden.');
+  if (!(Number(data.e) > Date.now())) throw authError_('AUTH_REQUIRED', 'Anmeldung abgelaufen – bitte erneut anmelden.');
+  const u = findUser_(loadUsers_(), function (x) { return x.id === data.u; });
+  if (!u || !u.active) throw authError_('AUTH_REQUIRED', 'Zugang deaktiviert – bitte an den Administrator wenden.');
+  if ((u.gen || 0) !== (Number(data.g) || 0)) throw authError_('AUTH_REQUIRED', 'Anmeldung abgelaufen – bitte erneut anmelden.');
+  if (!sessionList_(u).some(function (x) { return x && x.s === data.s; })) throw authError_('AUTH_REQUIRED', 'Abgemeldet – bitte erneut anmelden.');
+  u.sessionId = data.s;
+  return u;
+}
+// Abmelden: Sitzung aus der Nutzerzeile streichen (das Token ist danach auf allen Wegen ungültig)
+function authLogout(user) {
+  if (!user) return { status: 'success' };
+  return withLock_(function () {
+    const u = findUser_(loadUsers_(true), function (x) { return x.id === user.id; });
+    if (u) { u.sessions = JSON.stringify(sessionList_(u).filter(function (x) { return x && x.s !== user.sessionId; })); saveUser_(u); }
+    return { status: 'success' };
+  });
+}
+
+// Öffentlich: Namen der anmeldbaren Mitarbeiter (nur id + Name). Legt beim allerersten Aufruf den Administrator an.
+function authUsers() {
+  if (!AUTH_ENABLED) return { status: 'success', users: [], authDisabled: true };
+  let users = loadUsers_();
+  if (!users.length) users = bootstrapAdmin_();
+  const ready = users.filter(function (u) { return u.active && u.pinHash; }).map(function (u) { return { id: u.id, name: u.name }; });
+  return { status: 'success', users: ready, setupPending: ready.length === 0 };
+}
+function bootstrapAdmin_() {
+  return withLock_(function () {
+    const users = loadUsers_(true);
+    if (users.length) return users;
+    const u = newUser_(BOOTSTRAP_ADMIN.name, BOOTSTRAP_ADMIN.email.toLowerCase(), 'admin');
+    issueInvite_(u);
+    saveUser_(u);
+    trySendInviteMail_(u, null);
+    return loadUsers_(true);
+  });
+}
+// Von Hand im Skript-Editor ausführen: legt den Haupt-Administrator an bzw. schickt ihm eine neue Einladung (PIN neu setzen)
+function setupFirstAdmin() {
+  return withLock_(function () {
+    let u = findUser_(loadUsers_(true), function (x) { return x.email.toLowerCase() === BOOTSTRAP_ADMIN.email.toLowerCase(); });
+    if (!u) u = newUser_(BOOTSTRAP_ADMIN.name, BOOTSTRAP_ADMIN.email.toLowerCase(), 'admin');
+    u.role = 'admin'; u.active = true;
+    issueInvite_(u);
+    saveUser_(u);
+    const mailError = trySendInviteMail_(u, null);
+    const msg = (mailError ? 'E-Mail fehlgeschlagen (' + mailError + ') – Link von Hand öffnen: ' : 'Einladung gesendet an ' + u.email + ' – Link: ') + inviteLink_(u);
+    Logger.log(msg);
+    return msg;
+  });
+}
+
+// payload { userId, pin, deviceId } → { token, expires, user }
+function authLogin(payload) {
+  if (!AUTH_ENABLED) return { status: 'success', authDisabled: true };
+  const id = String((payload && payload.userId) || '');
+  const pin = String((payload && payload.pin) || '');
+  if (!/^\d{6}$/.test(pin)) throw authError_('LOGIN_FAILED', 'Die PIN besteht aus 6 Ziffern.');
+  const secret = secret_();
+  return withLock_(function () {
+    const u = findUser_(loadUsers_(true), function (x) { return x.id === id; });
+    if (!u || !u.active || !u.pinHash) throw authError_('LOGIN_FAILED', 'Anmeldung fehlgeschlagen.');
+    const now = Date.now();
+    if (u.lockedUntil > now) throw authError_('LOCKED', 'Zu viele Fehlversuche – gesperrt für ' + Math.ceil((u.lockedUntil - now) / 60000) + ' Min.');
+    if (hashPin_(pin, u.salt, secret) !== u.pinHash) {
+      u.failed = (u.failed || 0) + 1;
+      let code = 'LOGIN_FAILED', msg = 'PIN falsch – noch ' + (PIN_MAX_ATTEMPTS - u.failed) + ' Versuch(e).';
+      if (u.failed >= PIN_MAX_ATTEMPTS) { u.lockedUntil = now + PIN_LOCK_MINUTES * 60000; u.failed = 0; code = 'LOCKED'; msg = 'Zu viele Fehlversuche – Zugang für ' + PIN_LOCK_MINUTES + ' Minuten gesperrt.'; }
+      saveUser_(u);
+      throw authError_(code, msg);
+    }
+    u.failed = 0; u.lockedUntil = 0; u.lastLogin = now;
+    const session = makeSession_(u, payload.deviceId);
+    saveUser_(u);
+    return session;
+  });
+}
+
+// payload { invite } → { valid, name, isReset }
+function authInviteInfo(payload) {
+  const inv = String((payload && payload.invite) || '');
+  const u = inv ? findUser_(loadUsers_(true), function (x) { return x.invite && x.invite === inv; }) : null;
+  if (!u || !(u.inviteExpires > Date.now())) return { status: 'success', valid: false };
+  return { status: 'success', valid: true, name: u.name, isReset: !!u.pinHash };
+}
+// payload { invite, pin, deviceId } → PIN festlegen (erstmalig oder Reset) und direkt anmelden
+function authAccept(payload) {
+  const inv = String((payload && payload.invite) || '');
+  const pin = String((payload && payload.pin) || '');
+  if (!/^\d{6}$/.test(pin)) throw authError_('PIN_INVALID', 'Die PIN muss aus genau 6 Ziffern bestehen.');
+  if (/^(\d)\1{5}$/.test(pin) || '01234567890'.indexOf(pin) !== -1 || '09876543210'.indexOf(pin) !== -1) throw authError_('PIN_WEAK', 'Bitte keine zu einfache PIN (z. B. 111111 oder 123456).');
+  const secret = secret_();
+  return withLock_(function () {
+    const u = inv ? findUser_(loadUsers_(true), function (x) { return x.invite && x.invite === inv; }) : null;
+    if (!u || !(u.inviteExpires > Date.now())) throw authError_('INVITE_INVALID', 'Dieser Einladungslink ist ungültig oder abgelaufen. Bitte beim Administrator eine neue Einladung anfordern.');
+    u.salt = randomToken_().slice(0, 32);
+    u.pinHash = hashPin_(pin, u.salt, secret);
+    u.invite = ''; u.inviteExpires = 0; u.failed = 0; u.lockedUntil = 0; u.active = true;
+    u.gen = (u.gen || 0) + 1; u.sessions = '';   // ältere Anmeldungen dieses Nutzers verfallen (PIN-Reset, evtl. verlorenes Gerät)
+    u.lastLogin = Date.now();
+    const session = makeSession_(u, payload.deviceId);
+    saveUser_(u);
+    return session;
+  });
+}
+
+// ---- Administrator ----
+function adminUserList_(users) {
+  const now = Date.now();
+  return (users || loadUsers_(true)).map(function (u) {
+    const inviteOpen = !!(u.invite && u.inviteExpires > now);
+    return { id: u.id, name: u.name, email: u.email, role: u.role, active: u.active, hasPin: !!u.pinHash, lastLogin: u.lastLogin || 0,
+      inviteOpen: inviteOpen, inviteExpires: u.inviteExpires || 0, locked: u.lockedUntil > now };
+  });
+}
+// payload { name, email } → neuen Mitarbeiter anlegen (oder vorhandenen erneut einladen) und E-Mail schicken
+function adminInvite(payload, admin) {
+  const name = String((payload && payload.name) || '').trim();
+  const email = String((payload && payload.email) || '').trim().toLowerCase();
+  if (name.length < 2) throw authError_('INVALID', 'Bitte einen Namen angeben.');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw authError_('INVALID', 'Bitte eine gültige E-Mail-Adresse angeben.');
+  return withLock_(function () {
+    let u = findUser_(loadUsers_(true), function (x) { return x.email.toLowerCase() === email; });
+    if (!u) u = newUser_(name, email, 'user'); else u.name = name;
+    issueInvite_(u);
+    saveUser_(u);
+    return { status: 'success', users: adminUserList_(), invited: inviteResult_(u, trySendInviteMail_(u, admin)) };
+  });
+}
+// Rückmeldung an die App: Link nur, wenn die E-Mail NICHT raus ging (dann gibt der Administrator ihn persönlich weiter);
+// sonst kennt nur der Eingeladene den Link – und damit nur er seine PIN.
+function inviteResult_(u, mailError) {
+  return { id: u.id, name: u.name, email: u.email, mailSent: !mailError, mailError: mailError || '', link: mailError ? inviteLink_(u) : '' };
+}
+// payload { userId } → neue Einladung (PIN zurücksetzen); die alte PIN gilt, bis die neue festgelegt wurde
+function adminResetPin(payload, admin) {
+  const id = String((payload && payload.userId) || '');
+  return withLock_(function () {
+    const u = findUser_(loadUsers_(true), function (x) { return x.id === id; });
+    if (!u) throw authError_('INVALID', 'Mitarbeiter nicht gefunden.');
+    issueInvite_(u);
+    saveUser_(u);
+    return { status: 'success', users: adminUserList_(), invited: inviteResult_(u, trySendInviteMail_(u, admin)) };
+  });
+}
+// payload { userId, active } → Zugang sperren/freigeben (Sperren beendet sofort alle Anmeldungen des Nutzers)
+function adminSetActive(payload, admin) {
+  const id = String((payload && payload.userId) || '');
+  const active = !!(payload && payload.active);
+  if (id === admin.id && !active) throw authError_('INVALID', 'Du kannst dich nicht selbst deaktivieren.');
+  return withLock_(function () {
+    const u = findUser_(loadUsers_(true), function (x) { return x.id === id; });
+    if (!u) throw authError_('INVALID', 'Mitarbeiter nicht gefunden.');
+    if (!active && u.email.toLowerCase() === BOOTSTRAP_ADMIN.email.toLowerCase()) throw authError_('INVALID', 'Der Haupt-Administrator kann nicht deaktiviert werden.');
+    u.active = active;
+    if (!active) { u.gen = (u.gen || 0) + 1; u.sessions = ''; }   // sofort überall abgemeldet
+    saveUser_(u);
+    return { status: 'success', users: adminUserList_() };
+  });
 }

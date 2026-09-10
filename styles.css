@@ -306,7 +306,7 @@ label {
     color: var(--text-muted);
 }
 
-input[type="text"], input[type="number"], select, textarea {
+input[type="text"], input[type="number"], input[type="email"], input[type="password"], select, textarea {
     width: 100%;
     height: var(--control-h);
     padding: 0 var(--sp-3);
@@ -2256,6 +2256,75 @@ body.modal-open { overflow: hidden; }
     transition: opacity var(--dur) var(--ease), visibility var(--dur) var(--ease);
 }
 .loading-overlay.visible { visibility: visible; opacity: 1; }
+
+/* --- Anmeldung (PIN) / Einladung: liegt über allem – auch über dem Lade-Spinner --- */
+.auth-view {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: max(24px, 8vh) var(--sp-4) var(--sp-6);
+    overflow-y: auto;
+    background-color: var(--bg);
+}
+.auth-view.hidden { display: none; }
+body.auth-open { overflow: hidden; }
+.auth-card {
+    width: 100%;
+    max-width: 420px;
+    padding: var(--sp-6) var(--sp-5);
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-lg);
+}
+.auth-brand { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-5); }
+.auth-brand h1 { margin: 0; font-size: 1.25rem; font-weight: 800; letter-spacing: -.01em; color: var(--text); }
+.auth-logo {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 40px; height: 40px;
+    font-size: var(--fs-sm); font-weight: 800; letter-spacing: .04em; color: #fff;
+    background-color: var(--accent); border-radius: var(--r-md);
+}
+.auth-card h2 { margin: 0 0 var(--sp-2); font-size: 1.1rem; font-weight: 700; color: var(--text); }
+.auth-hint { margin: 0 0 var(--sp-4); font-size: var(--fs-sm); line-height: 1.45; color: var(--text-muted); }
+.auth-card .main-action-button { margin-top: var(--sp-2); }
+.auth-card input.auth-pin { font-size: 1.5rem; letter-spacing: .45em; text-align: center; font-variant-numeric: tabular-nums; }
+.auth-card input.auth-pin::placeholder { letter-spacing: .3em; color: var(--text-faint); }
+.auth-message { display: none; margin: 0 0 var(--sp-3); padding: var(--sp-3) var(--sp-4); font-size: var(--fs-sm); line-height: 1.45; border-radius: var(--r-md); }
+.auth-message.is-error { display: block; color: var(--danger-text); background-color: var(--danger-soft); }
+.auth-message.is-info { display: block; color: var(--accent-text); background-color: var(--accent-soft); }
+.auth-message.is-ok { display: block; color: var(--success-text); background-color: var(--success-soft); }
+
+/* Seitenmenü: angemeldeter Mitarbeiter */
+.side-menu-user { margin: calc(-1 * var(--sp-2)) 0 var(--sp-3); padding: 0 var(--sp-2); font-size: var(--fs-sm); font-weight: 600; color: var(--text); }
+.side-menu-user.hidden { display: none; }
+
+/* Seite „Mitarbeiter“ (Administrator) */
+.admin-invite { margin: var(--sp-3) 0 var(--sp-4); padding: var(--sp-4); background-color: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); }
+.admin-invite .form-group:last-of-type { margin-bottom: var(--sp-3); }
+.admin-notice.is-ok { color: var(--success-text); background-color: var(--success-soft); }
+.admin-notice.is-error { color: var(--danger-text); background-color: var(--danger-soft); }
+.admin-notice.is-warning { color: var(--warning-text); background-color: var(--warning-soft); }
+.admin-link { display: inline-block; max-width: 100%; word-break: break-all; font-size: var(--fs-xs); user-select: all; }
+.admin-row { flex-wrap: wrap; }
+.admin-main { flex: 1 1 220px; min-width: 0; }
+.admin-name { font-weight: 700; color: var(--text); }
+.admin-name .row-chip { margin-left: var(--sp-2); }
+.admin-meta { margin-top: 2px; font-size: var(--fs-xs); color: var(--text-muted); }
+.admin-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.admin-actions .page-link-btn { width: auto; min-height: 36px; }
+.admin-row .admin-name { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) 0; }
+.admin-row .admin-name .row-chip { margin-left: var(--sp-2); }
+.admin-actions .admin-danger { color: var(--danger-text); border-color: var(--danger); }
+.admin-actions .admin-danger:hover { background-color: var(--danger-soft); }
+.admin-self { font-size: var(--fs-xs); color: var(--text-faint); }
+.admin-inactive .admin-main { opacity: .6; }
+.row-chip.chip-ok { color: var(--success-text); background-color: var(--success-soft); }
+.row-chip.chip-warn { color: var(--warning-text); background-color: var(--warning-soft); }
+.row-chip.chip-danger { color: var(--danger-text); background-color: var(--danger-soft); }
 .spinner {
     width: 56px;
     height: 56px;
@@ -2695,6 +2764,7 @@ body.modal-open { overflow: hidden; }
     .page-content { max-width: 1240px; margin: 0 auto; }   /* so breit wie die Startseite: dichte Tabelle braucht Platz */
     .page-shipments .row-chip { display: none; }            /* LKW steht am Desktop in der eigenen Spalte */
     .page-summary, .page-banner, .page-details, .page-list { max-width: 900px; margin-left: auto; margin-right: auto; }
+    .admin-invite, #pageContent:has(.admin-invite) > .page-note, #pageContent:has(.admin-invite) > .page-section-title { max-width: 900px; margin-left: auto; margin-right: auto; }   /* Seite „Mitarbeiter“: eine Spalte wie die Liste */
     .shipment-table td.hawb-cell-vvl { width: 24%; min-width: 250px; }
     .shipment-table:has(td.hawb-cell-vvl) td.dt-status { width: 10%; }   /* VW-Zeilen: Status-Spalte etwas schmaler, damit QR-Spalte Platz behält */
     .page-list:has(td.hawb-cell-vvl), #pageContent:has(td.hawb-cell-vvl) .page-shipments { max-width: none; }   /* VW-LKW-Seite: Tabelle darf die volle Seitenbreite nutzen */

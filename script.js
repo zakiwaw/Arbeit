@@ -137,18 +137,14 @@ const suspicionDeclineBtnEl = document.getElementById('suspicionDeclineBtn');
 
     async function initializeApp() {
         showLoader(); // <<<< NEU: Lade-Spinner anzeigen
+        // Anmeldung zuerst: ohne gültige Sitzung liefert der Server keine Daten. Zeigt bei Bedarf die Anmeldeseite
+        // (oder die Einladungsseite bei ?einladung=…) und kehrt erst nach erfolgreicher Anmeldung zurück.
+        await ensureLoggedIn();
         const initialShipments = await loadDataFromServer();
 // LKW-Status vom Server laden und lokal cachen
     try {
-        const lkwRes = await fetch(WEB_APP_URL, {
-            method: 'POST', mode: 'cors', cache: 'no-cache',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action: 'loadLkwStatus' })
-        });
-        const lkwResult = await lkwRes.json();
-        if (lkwResult.status === 'success') {
-            localStorage.setItem(LKWSTATUSKEY, JSON.stringify(lkwResult.data));
-        }
+        const lkwResult = await postToServer('loadLkwStatus');
+        localStorage.setItem(LKWSTATUSKEY, JSON.stringify(lkwResult.data));
     } catch(e) {
         console.warn('LKW-Status vom Server konnte nicht geladen werden. Nutze lokalen Cache.', e);
     }
@@ -274,7 +270,10 @@ const suspicionDeclineBtnEl = document.getElementById('suspicionDeclineBtn');
     const LOCAL_STORAGE_KEY = 'frachtSicherungMobile_V8_18_Refactored';
 const LKWSTATUSKEY = 'frachtLkwStatusV1';
     const SUFFIX_LENGTH = 4;
-    const MITARBEITER_NAME = "Zakaria Bisbiss";
+    // Name des angemeldeten Mitarbeiters (Anmeldung mit PIN, s. Abschnitt ANMELDUNG) – landet in Scans, Archiv und PDF.
+    // Solange das Server-Skript noch keine Anmeldung kennt (AUTH_ENABLED = false / altes Skript), gilt der bisherige Standardname.
+    const MITARBEITER_NAME_DEFAULT = "Zakaria Bisbiss";
+    let MITARBEITER_NAME = MITARBEITER_NAME_DEFAULT;
     const RAC_NUMMER = "DE/RA/00889-07";
     // Firmenbezeichnung des reglementierten Beauftragten im Sicherungsnachweis (PDF) – zusammen mit RAC_NUMMER die Kennung nach DVO (EU) 2015/1998 Nr. 6.3.2.6 a)
     const REGB_NAME = "LFS Luftfrachtsicherheit-Service";
@@ -456,11 +455,7 @@ async function saveLkwStatus(status) {
     localStorage.setItem(LKWSTATUSKEY, JSON.stringify(status));
     lkwStatusSaveInFlight++;
     try {
-        await fetch(WEB_APP_URL, {
-            method: 'POST', mode: 'cors', cache: 'no-cache',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action: 'saveLkwStatus', payload: status })
-        });
+        await postToServer('saveLkwStatus', status);
     } catch(e) {
         console.warn('LKW-Status Server-Sync fehlgeschlagen:', e);
     } finally {
@@ -1031,17 +1026,293 @@ function ensureItemIds(shipment) {
 }
 
 function isUnknownActionError(err) { return /Unbekannte Aktion/i.test((err && err.message) || ''); }
+function isAuthError(err) { return !!(err && err.code === 'AUTH_REQUIRED'); }
 
-async function postToServer(action, payload) {
+// Einzige Stelle, die mit dem Server-Skript spricht: schickt das Sitzungs-Token mit (Feld "auth"); antwortet der Server
+// mit code AUTH_REQUIRED (kein/abgelaufenes Token, Zugang gesperrt), wird die Sitzung verworfen und die Anmeldeseite gezeigt.
+async function postToServer(action, payload, authOverride) {
     const response = await fetch(WEB_APP_URL, {
         method: 'POST', mode: 'cors', cache: 'no-cache',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action, payload })
+        body: JSON.stringify({ action, payload, auth: authOverride !== undefined ? authOverride : authToken() })
     });
     if (!response.ok) throw new Error(`Server-Fehler: ${response.status}`);
     const result = await response.json();
-    if (result.status !== 'success') throw new Error(result.message || 'Unbekannter Serverfehler');
+    if (result.status !== 'success') {
+        const err = new Error(result.message || 'Unbekannter Serverfehler');
+        if (result.code) err.code = result.code;
+        if (isAuthError(err)) onAuthRequired(err.message);
+        throw err;
+    }
     return result;
+}
+
+// ===================================================================
+// ANMELDUNG (PIN) – siehe backend/Code.gs, Abschnitt ANMELDUNG
+// Ablauf: Server-Skript verlangt für jede Daten-Aktion ein Sitzungs-Token. Ohne gültige Sitzung zeigt die App vor dem
+// Laden die Anmeldeseite (Name wählen + 6-stellige PIN). Einladungslink ?einladung=<Token> → Mitarbeiter legt seine PIN
+// selbst fest. Die PIN wird nie gespeichert – nur das Token (12 h) und Name/Rolle des Angemeldeten (localStorage).
+// Administrator: Seite „Mitarbeiter“ im Menü (einladen, sperren, PIN zurücksetzen).
+// ===================================================================
+const AUTH_SESSION_KEY = 'frachtTracker_session';
+const authViewEl = document.getElementById('authView');
+const authContentEl = document.getElementById('authContent');
+let authSession = (() => { try { return JSON.parse(localStorage.getItem(AUTH_SESSION_KEY) || 'null'); } catch (e) { return null; } })();
+let authResolve = null;          // wartender initializeApp (ensureLoggedIn) – wird nach erfolgreicher Anmeldung aufgelöst
+let authDisabled = false;        // Server-Skript ohne Anmeldung (AUTH_ENABLED = false oder altes Skript)
+let authBusy = false;
+
+function authToken() { return authSession && authSession.token ? authSession.token : ''; }
+function currentUser() { return authSession && authSession.user ? authSession.user : null; }
+function isAdmin() { const u = currentUser(); return !!(u && u.role === 'admin'); }
+function isAuthViewOpen() { return !!(authViewEl && !authViewEl.classList.contains('hidden')); }
+function setAuthSession(sess) {
+    authSession = sess || null;
+    if (authSession) localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(authSession)); else localStorage.removeItem(AUTH_SESSION_KEY);
+    MITARBEITER_NAME = (authSession && authSession.user && authSession.user.name) || MITARBEITER_NAME_DEFAULT;
+    updateAuthMenu();
+}
+// Menüeinträge: Name des Angemeldeten, „Mitarbeiter“ nur für Administratoren, „Abmelden“ nur mit Sitzung
+function updateAuthMenu() {
+    const u = currentUser();
+    const line = document.getElementById('authUserLine');
+    if (line) { line.textContent = u ? `Angemeldet: ${u.name}${u.role === 'admin' ? ' (Administrator)' : ''}` : ''; line.classList.toggle('hidden', !u); }
+    const mi = document.getElementById('manageUsersItem'); if (mi) mi.classList.toggle('hidden', !isAdmin());
+    const li = document.getElementById('logoutItem'); if (li) li.classList.toggle('hidden', !u);
+}
+// Wird aus postToServer gerufen, sobald der Server ein Token ablehnt: Sitzung verwerfen, Anmeldeseite zeigen.
+function onAuthRequired(message) {
+    if (authSession) setAuthSession(null);
+    if (!isAuthViewOpen()) showLoginPage(message || 'Bitte erneut anmelden.');
+}
+// Vor dem ersten Laden: Sitzung prüfen bzw. Anmeldung abwarten. Löst auf, sobald eine gültige Sitzung besteht
+// (oder das Server-Skript keine Anmeldung verlangt).
+function ensureLoggedIn() {
+    return new Promise(async resolve => {
+        authResolve = resolve;
+        const invite = new URLSearchParams(location.search).get('einladung');
+        if (invite) { showInvitePage(invite); return; }
+        if (authSession && authSession.token) {
+            try {
+                const r = await postToServer('authCheck');
+                if (r.authDisabled) { authDisabled = true; setAuthSession(null); }
+                else if (r.user) setAuthSession({ token: authSession.token, user: r.user, expires: authSession.expires });
+                finishAuth(); return;
+            } catch (e) {
+                if (isAuthError(e)) return;               // postToServer hat die Anmeldeseite bereits geöffnet
+                if (isUnknownActionError(e)) { authDisabled = true; setAuthSession(null); finishAuth(); return; }
+                finishAuth(); return;                      // Server nicht erreichbar → offline mit lokalem Stand weiterarbeiten, Token behalten
+            }
+        }
+        showLoginPage();
+    });
+}
+function finishAuth() {
+    hideAuthView();
+    updateAuthMenu();
+    const r = authResolve; authResolve = null;
+    if (r) { showLoader(); r(); }                          // App-Start geht weiter (loadDataFromServer …)
+    else { syncPollFailures = 0; pollNow(); }              // Anmeldung im laufenden Betrieb: sofort abgleichen (nachholen, was wartete)
+}
+function showAuthView(html) {
+    if (!authViewEl) return;
+    authContentEl.innerHTML = html;
+    authViewEl.classList.remove('hidden');
+    document.body.classList.add('auth-open');
+    hideLoader();
+}
+function hideAuthView() {
+    if (!authViewEl) return;
+    authViewEl.classList.add('hidden');
+    authContentEl.innerHTML = '';
+    document.body.classList.remove('auth-open');
+}
+function authMsg(text, kind) {
+    const el = document.getElementById('authMessage');
+    if (!el) return;
+    el.textContent = text || '';
+    el.className = 'auth-message' + (text ? ` is-${kind || 'error'}` : '');
+}
+function pinField(id, label, autofocus) {
+    return `<div class="form-group"><label for="${id}">${label}</label>`
+        + `<input type="password" id="${id}" class="auth-pin" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" placeholder="••••••" ${autofocus ? 'autofocus' : ''}></div>`;
+}
+function pinValue(id) { return (document.getElementById(id)?.value || '').replace(/\D/g, ''); }
+
+// ---- Anmeldeseite ----
+async function showLoginPage(message) {
+    if (isAuthViewOpen() && document.getElementById('authLoginForm')) { authMsg(message, 'error'); return; }
+    showAuthView('<h2 id="authTitle">Anmelden</h2><p class="auth-hint">Namen wählen und PIN eingeben.</p><div id="authMessage" class="auth-message"></div><p class="page-note" id="authLoading">Lade Mitarbeiter …</p>');
+    if (message) authMsg(message, 'error');
+    let users = [], setupPending = false;
+    try {
+        const r = await postToServer('authUsers');
+        if (r.authDisabled) { authDisabled = true; setAuthSession(null); finishAuth(); return; }
+        users = r.users || []; setupPending = !!r.setupPending;
+    } catch (e) {
+        if (isUnknownActionError(e)) { authDisabled = true; setAuthSession(null); finishAuth(); return; } // altes Skript ohne Anmeldung
+        renderLoginError(`Server nicht erreichbar (${escapeHtml(e.message)}).`); return;
+    }
+    if (!document.getElementById('authLoading')) return; // inzwischen anders weitergegangen
+    if (setupPending || !users.length) {
+        renderLoginError('Noch kein Mitarbeiter eingerichtet. Der Administrator hat eine Einladung per E-Mail erhalten – bitte den Link darin öffnen und die PIN festlegen.', true);
+        return;
+    }
+    const lastId = localStorage.getItem('frachtTracker_lastUserId') || '';
+    const opts = users.map(u => `<option value="${escapeHtml(u.id)}" ${u.id === lastId ? 'selected' : ''}>${escapeHtml(u.name)}</option>`).join('');
+    authContentEl.innerHTML = `<h2 id="authTitle">Anmelden</h2><p class="auth-hint">Namen wählen und PIN eingeben.</p>
+        <form id="authLoginForm" novalidate>
+            <div class="form-group"><label for="authUserSelect">Mitarbeiter</label><select id="authUserSelect">${opts}</select></div>
+            ${pinField('authPin', 'PIN (6 Ziffern)', true)}
+            <div id="authMessage" class="auth-message"></div>
+            <button type="submit" class="main-action-button" id="authLoginBtn">Anmelden</button>
+        </form>`;
+    if (message) authMsg(message, 'error');
+    const pinEl = document.getElementById('authPin');
+    pinEl.addEventListener('input', () => { pinEl.value = pinEl.value.replace(/\D/g, '').slice(0, 6); if (pinEl.value.length === 6) document.getElementById('authLoginForm').requestSubmit(); });
+    document.getElementById('authLoginForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (authBusy) return;
+        const userId = document.getElementById('authUserSelect').value, pin = pinValue('authPin');
+        if (pin.length !== 6) { authMsg('Bitte die 6-stellige PIN eingeben.'); pinEl.focus(); return; }
+        authBusy = true; document.getElementById('authLoginBtn').disabled = true; authMsg('');
+        try {
+            const r = await postToServer('authLogin', { userId, pin, deviceId: SYNC_DEVICE_ID });
+            if (r.authDisabled) { authDisabled = true; setAuthSession(null); finishAuth(); return; }
+            localStorage.setItem('frachtTracker_lastUserId', userId);
+            setAuthSession({ token: r.token, user: r.user, expires: r.expires });
+            finishAuth();
+        } catch (err) {
+            pinEl.value = '';
+            authMsg(err.message || 'Anmeldung fehlgeschlagen.');
+            pinEl.focus();
+        } finally { authBusy = false; const b = document.getElementById('authLoginBtn'); if (b) b.disabled = false; }
+    });
+    setTimeout(() => pinEl.focus(), 50);
+}
+function renderLoginError(text, info) {
+    authContentEl.innerHTML = `<h2 id="authTitle">Anmelden</h2><div id="authMessage" class="auth-message is-${info ? 'info' : 'error'}">${escapeHtml(text)}</div>`
+        + '<button type="button" class="main-action-button" id="authRetryBtn">Erneut versuchen</button>';
+    document.getElementById('authRetryBtn').addEventListener('click', () => showLoginPage());
+}
+
+// ---- Einladungsseite (?einladung=<Token>): PIN zweimal eingeben ----
+async function showInvitePage(invite) {
+    showAuthView('<h2 id="authTitle">Einladung</h2><p class="page-note">Einladung wird geprüft …</p>');
+    let info;
+    try { info = await postToServer('authInviteInfo', { invite }); }
+    catch (e) { renderInviteError(`Server nicht erreichbar (${escapeHtml(e.message)}).`); return; }
+    if (!info.valid) { renderInviteError('Dieser Einladungslink ist ungültig oder abgelaufen (48 Stunden, einmalig). Bitte beim Administrator eine neue Einladung anfordern.'); return; }
+    authContentEl.innerHTML = `<h2 id="authTitle">Willkommen, ${escapeHtml(info.name)}</h2>
+        <p class="auth-hint">${info.isReset ? 'Lege deine neue PIN fest.' : 'Lege deine persönliche PIN fest – damit meldest du dich ab jetzt an.'} 6 Ziffern, bitte keine einfachen Folgen wie 123456.</p>
+        <form id="authInviteForm" novalidate>
+            ${pinField('authPin1', 'Neue PIN', true)}
+            ${pinField('authPin2', 'PIN wiederholen', false)}
+            <div id="authMessage" class="auth-message"></div>
+            <button type="submit" class="main-action-button" id="authInviteBtn">PIN speichern und anmelden</button>
+        </form>`;
+    ['authPin1', 'authPin2'].forEach(id => { const el = document.getElementById(id); el.addEventListener('input', () => { el.value = el.value.replace(/\D/g, '').slice(0, 6); if (id === 'authPin1' && el.value.length === 6) document.getElementById('authPin2').focus(); }); });
+    document.getElementById('authInviteForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (authBusy) return;
+        const p1 = pinValue('authPin1'), p2 = pinValue('authPin2');
+        if (p1.length !== 6) { authMsg('Die PIN muss aus 6 Ziffern bestehen.'); document.getElementById('authPin1').focus(); return; }
+        if (p1 !== p2) { authMsg('Die beiden Eingaben stimmen nicht überein.'); document.getElementById('authPin2').value = ''; document.getElementById('authPin2').focus(); return; }
+        authBusy = true; document.getElementById('authInviteBtn').disabled = true; authMsg('');
+        try {
+            const r = await postToServer('authAccept', { invite, pin: p1, deviceId: SYNC_DEVICE_ID });
+            setAuthSession({ token: r.token, user: r.user, expires: r.expires });
+            localStorage.setItem('frachtTracker_lastUserId', r.user.id);
+            // Einladungs-Token aus der Adresse nehmen (Neuladen soll nicht wieder die Einladungsseite zeigen)
+            try { const u = new URL(location.href); u.searchParams.delete('einladung'); history.replaceState(history.state, '', u.pathname + u.search + u.hash); } catch (err) { /* ignorieren */ }
+            finishAuth();
+        } catch (err) {
+            authMsg(err.message || 'PIN konnte nicht gespeichert werden.');
+            if (err.code === 'INVITE_INVALID') setTimeout(() => renderInviteError(err.message), 10);
+        } finally { authBusy = false; const b = document.getElementById('authInviteBtn'); if (b) b.disabled = false; }
+    });
+    setTimeout(() => document.getElementById('authPin1').focus(), 50);
+}
+function renderInviteError(text) {
+    authContentEl.innerHTML = `<h2 id="authTitle">Einladung</h2><div id="authMessage" class="auth-message is-error">${escapeHtml(text)}</div>`
+        + '<button type="button" class="main-action-button" id="authToLoginBtn">Zur Anmeldung</button>';
+    document.getElementById('authToLoginBtn').addEventListener('click', () => {
+        try { const u = new URL(location.href); u.searchParams.delete('einladung'); history.replaceState(history.state, '', u.pathname + u.search + u.hash); } catch (e) { /* ignorieren */ }
+        showLoginPage();
+    });
+}
+
+// ---- Abmelden ----
+async function logout() {
+    if (!confirm('Abmelden?\n\nZum Weiterarbeiten ist danach die PIN nötig.')) return;
+    closeSideMenu();
+    const tok = authToken();
+    setAuthSession(null);
+    if (currentPage && currentPage.id === 'mitarbeiter') showHome();
+    showLoginPage();
+    if (tok) { try { await postToServer('authLogout', null, tok); } catch (e) { /* Sitzung ist lokal weg; serverseitig läuft sie spätestens nach 12 h ab */ } }
+}
+
+// ---- Administrator: Seite „Mitarbeiter“ ----
+const adminState = { users: null, busy: false, notice: null };
+function adminFmtTime(ms) { return ms ? new Date(ms).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '–'; }
+async function adminLoadUsers() {
+    try { const r = await postToServer('adminListUsers'); adminState.users = r.users || []; }
+    catch (e) { adminState.users = []; adminState.notice = { kind: 'error', text: `Mitarbeiterliste konnte nicht geladen werden: ${e.message}` }; }
+    if (currentPage && currentPage.id === 'mitarbeiter') renderCurrentPage(false);
+}
+function renderAdminPage() {
+    setPageHeader('Mitarbeiter', adminState.users ? String(adminState.users.length) : '');
+    const me = currentUser();
+    const n = adminState.notice;
+    let html = '<p class="page-note">Mitarbeiter einladen: Er bekommt eine E-Mail mit einem Link (48 Stunden gültig) und legt dort seine eigene 6-stellige PIN fest. '
+        + '„PIN zurücksetzen“ schickt eine neue Einladung; „Sperren“ beendet sofort alle Anmeldungen des Mitarbeiters.</p>';
+    if (n) html += `<div class="page-banner admin-notice is-${n.kind}"><span>${escapeHtml(n.text)}${n.link ? `<br><small>Link zum Weitergeben:</small> <code class="admin-link">${escapeHtml(n.link)}</code>` : ''}</span><button type="button" class="page-banner-btn" data-admin-dismiss="1">OK</button></div>`;
+    html += `<form id="adminInviteForm" class="admin-invite" novalidate>
+        <div class="form-group"><label for="adminName">Name</label><input type="text" id="adminName" autocomplete="off" placeholder="Vorname Nachname" maxlength="60"></div>
+        <div class="form-group"><label for="adminEmail">E-Mail</label><input type="email" id="adminEmail" autocomplete="off" placeholder="name@firma.de" maxlength="120"></div>
+        <button type="submit" class="main-action-button" id="adminInviteBtn" ${adminState.busy ? 'disabled' : ''}>Einladen</button>
+    </form>`;
+    if (!adminState.users) html += '<p class="page-note">Lade Mitarbeiter …</p>';
+    else if (!adminState.users.length) html += '<p class="page-empty">Noch keine Mitarbeiter.</p>';
+    else {
+        html += '<h3 class="page-section-title">Mitarbeiter</h3><ul class="page-list admin-list">' + adminState.users.map(u => {
+            const self = me && u.id === me.id;
+            const state = !u.active ? '<span class="row-chip chip-danger">gesperrt</span>' : (!u.hasPin ? '<span class="row-chip chip-warn">Einladung offen</span>' : (u.locked ? '<span class="row-chip chip-warn">PIN-Sperre</span>' : '<span class="row-chip chip-ok">aktiv</span>'));
+            const role = u.role === 'admin' ? '<span class="row-chip">Administrator</span>' : '';
+            const meta = `${escapeHtml(u.email)} · letzte Anmeldung ${adminFmtTime(u.lastLogin)}${u.inviteOpen ? ` · Einladung gültig bis ${adminFmtTime(u.inviteExpires)}` : ''}`;
+            const btns = self ? '<span class="admin-self">das bist du</span>'
+                : `<button type="button" class="page-link-btn" data-admin-reset="${escapeHtml(u.id)}" ${adminState.busy ? 'disabled' : ''}>${u.hasPin ? 'PIN zurücksetzen' : 'Erneut einladen'}</button>`
+                  + `<button type="button" class="page-link-btn ${u.active ? 'admin-danger' : ''}" data-admin-active="${escapeHtml(u.id)}" data-admin-to="${u.active ? '0' : '1'}" ${adminState.busy ? 'disabled' : ''}>${u.active ? 'Sperren' : 'Freigeben'}</button>`;
+            return `<li class="page-row admin-row ${u.active ? '' : 'admin-inactive'}"><div class="admin-main"><div class="admin-name">${escapeHtml(u.name)}${role}${state}</div><div class="admin-meta">${meta}</div></div><div class="admin-actions">${btns}</div></li>`;
+        }).join('') + '</ul>';
+    }
+    // Eingaben im Einladungsformular überleben ein Neuzeichnen (z. B. wenn die Liste nachträglich eintrifft)
+    const keepName = document.getElementById('adminName')?.value || '', keepEmail = document.getElementById('adminEmail')?.value || '';
+    pageContentEl.innerHTML = html;
+    if (adminState.notice && adminState.notice.kind === 'ok') { /* Formular nach Erfolg leer */ }
+    else { const a = document.getElementById('adminName'), b = document.getElementById('adminEmail'); if (a) a.value = keepName; if (b) b.value = keepEmail; }
+    if (!adminState.users) adminLoadUsers();
+    const form = document.getElementById('adminInviteForm');
+    if (form) form.addEventListener('submit', (e) => { e.preventDefault(); adminInvite(); });
+}
+async function adminRun(action, payload, okText) {
+    if (adminState.busy) return;
+    adminState.busy = true; adminState.notice = null; renderCurrentPage(false);
+    try {
+        const r = await postToServer(action, payload);
+        adminState.users = r.users || adminState.users;
+        const inv = r.invited;
+        if (inv && !inv.mailSent) adminState.notice = { kind: 'warning', text: `${okText} – die E-Mail an ${inv.email} konnte nicht gesendet werden (${inv.mailError || 'unbekannt'}). Bitte den Link persönlich weitergeben.`, link: inv.link };
+        else adminState.notice = { kind: 'ok', text: inv ? `${okText} – E-Mail an ${inv.email} gesendet.` : okText };
+    } catch (e) { adminState.notice = { kind: 'error', text: e.message }; }
+    finally { adminState.busy = false; if (currentPage && currentPage.id === 'mitarbeiter') renderCurrentPage(false); }
+}
+function adminInvite() {
+    const name = (document.getElementById('adminName')?.value || '').trim(), email = (document.getElementById('adminEmail')?.value || '').trim();
+    if (name.length < 2) { adminState.notice = { kind: 'error', text: 'Bitte einen Namen angeben.' }; renderCurrentPage(false); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { adminState.notice = { kind: 'error', text: 'Bitte eine gültige E-Mail-Adresse angeben.' }; renderCurrentPage(false); return; }
+    adminRun('adminInvite', { name, email }, `${name} eingeladen`);
 }
 
 function showSyncOk() {
@@ -1071,6 +1342,7 @@ async function saveShipments(shipments) {
 async function flushPendingChanges() {
     if (syncInFlight) { syncQueued = true; return; }
     if (!hasPending()) return;
+    if (isAuthViewOpen()) { syncQueued = true; return; } // wird nach der Anmeldung nachgeholt (ensureLoggedIn → pollNow)
 
     syncInFlight = true;
     setSyncIndicator('busy', 'Wird synchronisiert …');
@@ -1128,7 +1400,9 @@ async function flushPendingChanges() {
         if (!hasPending()) showSyncOk();
     } catch (error) {
         console.warn("Server-Synchronisierung fehlgeschlagen:", error.message);
-        if (isUnknownActionError(error) && !serverIsLegacy) {
+        if (isAuthError(error)) {
+            setSyncIndicator('error', 'Anmeldung erforderlich – Daten sind lokal gespeichert'); // Anmeldeseite ist bereits offen (postToServer)
+        } else if (isUnknownActionError(error) && !serverIsLegacy) {
             serverIsLegacy = true; displayError(SYNC_LEGACY_MESSAGE, 'orange'); syncQueued = true;
         } else {
             setSyncIndicator('error', 'Server nicht erreichbar – Daten sind lokal gespeichert');
@@ -1210,7 +1484,7 @@ function refreshViewsAfterRemoteChange() {
 
 // Änderungen anderer Geräte abholen
 async function pullRemoteChanges() {
-    if (syncInFlight || document.hidden) return;
+    if (syncInFlight || document.hidden || isAuthViewOpen()) return;
     // Während der Stückzahl-Abfrage für eine NEUE Sendung nicht abrufen: die Sendung wird gleich lokal neu angelegt
     // und soll dann per Vereinigung (nicht per Ausgangsstand) mit einer evtl. gleichzeitig angelegten Fremd-Sendung zusammenlaufen.
     if (document.querySelector('#newTotalSection.visible')) return;
@@ -1234,7 +1508,8 @@ async function pullRemoteChanges() {
         console.warn("Abruf der Änderungen fehlgeschlagen:", error.message);
         syncPollFailures++;
         syncPollDelay = Math.min(syncPollDelay * 2, SYNC_POLL_MAX_INTERVAL_MS); // Server nicht mit Anfragen fluten
-        if (isUnknownActionError(error) && !serverIsLegacy) { serverIsLegacy = true; displayError(SYNC_LEGACY_MESSAGE, 'orange'); }
+        if (isAuthError(error)) setSyncIndicator('error', 'Anmeldung erforderlich'); // Anmeldeseite ist bereits offen (postToServer)
+        else if (isUnknownActionError(error) && !serverIsLegacy) { serverIsLegacy = true; displayError(SYNC_LEGACY_MESSAGE, 'orange'); }
         else if (syncPollFailures >= 2) setSyncIndicator('error', 'Server nicht erreichbar'); // ein einzelner Aussetzer flackert nicht rot
     } finally {
         syncInFlight = false;
@@ -1302,6 +1577,7 @@ async function loadDataFromServer() {
         return data;
     } catch (error) {
         console.error("Fehler beim Laden vom Server:", error);
+        if (isAuthError(error)) { setSyncIndicator('error', 'Anmeldung erforderlich'); return localRaw; }
         displayError("Keine Serververbindung. Lade lokale Daten.", 'orange', 4000);
         setSyncIndicator('error', 'Server nicht erreichbar');
         return localRaw;
@@ -1661,6 +1937,7 @@ function fitTextToContainer(element, container, initialFontSize, minFontSize, pa
 }
 // --- ENDE DER ÄNDERUNG: Dynamisches Font-Sizing Hilfsfunktion ---
         function focusShipmentInput() {
+            if (isAuthViewOpen()) return; // Anmeldeseite hat den Fokus (PIN-Feld)
             const isModalVisible = (sel) => document.querySelector(sel)?.classList.contains('visible');
             // ANFORDERUNG 2: Das neue HU-Import-Modal zur Prüfung hinzufügen
             if (isModalVisible('#editModal') || isModalVisible('#batchNoteModal') || isModalVisible('#importHuModal') || isModalVisible('#huEditModal') ||
@@ -4073,6 +4350,10 @@ const PAGE_RENDERERS = {
             }
         }
     },
+    mitarbeiter: {
+        render() { if (!isAdmin()) { showHome(); return; } adminState.users = null; adminState.notice = null; renderAdminPage(); },
+        update() { if (!isAdmin()) { showHome(); return; } renderAdminPage(); }
+    },
     info: {
         truckOptions(trucks) {
             return [['all', 'Alle LKW']].concat(trucks.map(t => [t.truckId, `${truckLabel(t)}${t.active ? '' : ' (deaktiviert)'}`]), [['none', 'Ohne LKW']]);
@@ -4256,8 +4537,28 @@ if (homeHubEl) homeHubEl.addEventListener('click', (e) => {
     if (tile) openPage({ id: tile.dataset.page });
 });
 if (pageBackBtnEl) pageBackBtnEl.addEventListener('click', closePage);
+// Seite „Mitarbeiter“ (Administrator): Knöpfe je Zeile
+function handleAdminPageClick(event) {
+    const t = event.target;
+    if (t.closest('[data-admin-dismiss]')) { adminState.notice = null; renderCurrentPage(false); return; }
+    const reset = t.closest('[data-admin-reset]');
+    if (reset) {
+        const u = (adminState.users || []).find(x => x.id === reset.dataset.adminReset); if (!u) return;
+        if (confirm(`${u.hasPin ? 'PIN zurücksetzen' : 'Erneut einladen'}: ${u.name}?\n\n${u.name} bekommt eine neue Einladung per E-Mail und legt dort ${u.hasPin ? 'eine neue' : 'seine'} PIN fest.${u.hasPin ? ' Die bisherige PIN gilt, bis die neue gesetzt ist.' : ''}`))
+            adminRun('adminResetPin', { userId: u.id }, u.hasPin ? `PIN-Reset für ${u.name} angestoßen` : `${u.name} erneut eingeladen`);
+        return;
+    }
+    const act = t.closest('[data-admin-active]');
+    if (act) {
+        const u = (adminState.users || []).find(x => x.id === act.dataset.adminActive); if (!u) return;
+        const to = act.dataset.adminTo === '1';
+        if (to || confirm(`${u.name} sperren?\n\nAlle Anmeldungen werden sofort beendet; der Zugang kann später wieder freigegeben werden.`))
+            adminRun('adminSetActive', { userId: u.id, active: to }, to ? `${u.name} freigegeben` : `${u.name} gesperrt`);
+    }
+}
 if (pageContentEl) pageContentEl.addEventListener('click', (event) => {
     const target = event.target;
+    if (currentPage && currentPage.id === 'mitarbeiter') { handleAdminPageClick(event); return; }
     const truckBtn = target.closest('.page-row[data-truckid]');
     if (truckBtn) { openPage({ id: 'lkw', truckId: truckBtn.dataset.truckid }); return; }
     const rename = target.closest('[data-lkw-rename]');
@@ -5842,18 +6143,12 @@ function openSecurityReport(base, shipmentsPool, preopenedTab) {
             console.log(`Sende Abschluss-Benachrichtigung für ${baseNumber}...`);
             notifiedCompletions.add(baseNumber); // Als benachrichtigt markieren
             
-            const notificationData = { action: 'shipmentComplete', shipmentData: shipmentObject };
             try {
-                const response = await fetch(WEB_APP_URL, {
-                    method: 'POST', mode: 'cors', cache: 'no-cache',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify(notificationData)
-                });
-                if (!response.ok) throw new Error(`Server Fehler (Mail): ${response.status} ${response.statusText}`);
-                const result = await response.json();
                 // Kennt das Server-Skript die Aktion nicht (Skript ohne Abschluss-Handler), ist das KEIN Fehler:
                 // die Scans sind längst über saveShipments gespeichert – nur die Zusatz-Benachrichtigung entfällt.
-                const serverHasNoHandler = result.status !== 'success' && isUnknownActionError(result);
+                let result, serverHasNoHandler = false;
+                try { result = await postToServer('shipmentComplete', { shipmentData: shipmentObject }); }
+                catch (e) { if (!isUnknownActionError(e)) throw e; serverHasNoHandler = true; result = { status: 'error', message: e.message }; }
                 if (result.status === 'success' || serverHasNoHandler) {
                     if (serverHasNoHandler) console.info(`Server kennt 'shipmentComplete' nicht – Abschluss von ${baseNumber} nur lokal gemeldet.`);
                     else console.log(`Abschluss-Benachrichtigung für ${baseNumber} erfolgreich gesendet.`);
@@ -5883,20 +6178,10 @@ function openSecurityReport(base, shipmentsPool, preopenedTab) {
             }
             sheetStatusEl.textContent = 'Sende E-Mail-Zusammenfassung...'; sheetStatusEl.style.color = '#f0ad4e';
             sendSummaryEmailButtonEl.disabled = true; clearError();
-            const payload = { action: 'sendSummaryEmail', allShipmentsData: shipmentsData, mitarbeiter: MITARBEITER_NAME };
             try {
-                const response = await fetch(WEB_APP_URL, {
-                    method: 'POST', mode: 'cors', cache: 'no-cache',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload)
-                });
-                if (!response.ok) throw new Error(`Server Verbindung: ${response.status} ${response.statusText}`);
-                const result = await response.json();
-                if (result.status === 'success') {
-                    sheetStatusEl.textContent = `Erfolg: ${result.message || 'Zusammenfassung gesendet.'}`; sheetStatusEl.style.color = 'green';
-                    setTimeout(closeSideMenu, 1500);
-                } else {
-                    throw new Error(`Apps Script Fehler: ${result.message || 'Unbekannt'}`);
-                }
+                const result = await postToServer('sendSummaryEmail', { allShipmentsData: shipmentsData, mitarbeiter: MITARBEITER_NAME });
+                sheetStatusEl.textContent = `Erfolg: ${result.message || 'Zusammenfassung gesendet.'}`; sheetStatusEl.style.color = 'green';
+                setTimeout(closeSideMenu, 1500);
             } catch (error) {
                 console.error("Fehler beim Senden der E-Mail:", error);
                 sheetStatusEl.textContent = `Fehler: ${error.message}`; sheetStatusEl.style.color = 'red';
@@ -6683,14 +6968,7 @@ if (huEditFormEl) {
             sheetStatusEl.textContent = 'Lösche Daten auf dem Server...';
             sheetStatusEl.style.color = 'orange';
             try {
-                const response = await fetch(WEB_APP_URL, {
-                    method: 'POST', mode: 'cors', cache: 'no-cache',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({ action: "clearAllData" })
-                });
-                if (!response.ok) throw new Error(`Server-Fehler: ${response.status}`);
-                const result = await response.json();
-                if (result.status !== 'success') throw new Error(result.message);
+                await postToServer('clearAllData');
                 localStorage.removeItem(LOCAL_STORAGE_KEY);
                 clearSyncState();
                 location.reload(); 
@@ -6751,6 +7029,14 @@ if (huEditFormEl) {
         e.preventDefault();
         showOpenHusSummary();
     });
+    document.getElementById('manageUsersButton')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        closeSideMenu();
+        if (!isAdmin()) return;
+        if (detailViewEl && !detailViewEl.classList.contains('hidden')) hideDetailView();
+        openPage({ id: 'mitarbeiter' });
+    });
+    document.getElementById('logoutButton')?.addEventListener('click', (e) => { e.preventDefault(); logout(); });
     
     closeOpenHusModalButtonEl.addEventListener('click', () => {
         openHusModalEl.classList.remove('visible');
