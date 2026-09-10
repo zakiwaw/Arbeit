@@ -62,6 +62,7 @@ function makeBackend(initial, lkwStatus) {
       else { u.pin = p.pin; u.hasPin = true; delete state.invites[p.invite]; const t = 'tok-' + Math.random().toString(36).slice(2); state.tokens[t] = u.id; resp = { status: 'success', token: t, expires: Date.now() + 3600e3, user: pub(u) }; }
     }
     else if (action === 'authLogout') { delete state.tokens[body.auth]; resp = { status: 'success' }; }
+    else if (action === 'authRefresh') { const t = 'tok-' + Math.random().toString(36).slice(2); state.tokens[t] = me.id; state.refreshes = (state.refreshes || 0) + 1; resp = { status: 'success', token: t, expires: Date.now() + 7200e3, user: pub(me) }; }
     else if (action === 'adminListUsers' || action === 'adminInvite' || action === 'adminSetActive' || action === 'adminResetPin') {
       if (me.role !== 'admin') resp = { status: 'error', code: 'FORBIDDEN', message: 'Nur für Administratoren.' };
       else if (action === 'adminListUsers') resp = { status: 'success', users: list() };
@@ -95,7 +96,8 @@ function makeBackend(initial, lkwStatus) {
 async function openApp(browser, backend, opts = {}) {
   const page = await browser.newPage();
   const seed = opts.session ? JSON.stringify(opts.session) : (opts.loggedOut ? null : JSON.stringify({ token: TEST_TOKEN, user: TEST_USER, expires: Date.now() + 3600e3 }));
-  if (!opts.keepStorage) await page.evaluateOnNewDocument((seed) => { if (!window.__storageCleared) { window.__storageCleared = true; try { localStorage.clear(); sessionStorage.clear(); if (seed) localStorage.setItem('frachtTracker_session', seed); } catch (e) {} } }, seed);
+  const lastActivity = opts.idleMs ? Date.now() - opts.idleMs : Date.now();
+  if (!opts.keepStorage) await page.evaluateOnNewDocument((seed, lastActivity) => { if (!window.__storageCleared) { window.__storageCleared = true; try { localStorage.clear(); sessionStorage.clear(); if (seed) { localStorage.setItem('frachtTracker_session', seed); localStorage.setItem('frachtTracker_lastActivity', String(lastActivity)); } } catch (e) {} } }, seed, lastActivity);
   await page.setViewport(opts.viewport || { width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
   page.__errors = [];
   page.on('pageerror', e => page.__errors.push(String(e)));

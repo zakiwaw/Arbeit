@@ -173,7 +173,44 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     assert(page.__errors.length === 0, `Keine JS-Fehler (${page.__errors.join(' | ')})`);
     await page.close();
 
-    // 7) Sichtbarkeit: Anmeldeseite auf dem Handy (Screenshot für die Sichtprüfung)
+    // 7) Automatische Abmeldung nach 30 Minuten ohne Bedienung; Bedienung verlängert die Sitzung
+    be = makeBackend(sampleData(), {});
+    page = await openApp(browser, be, { idleMs: 31 * 60 * 1000 }); await wait(500);
+    assert(await authOpen(page) && /Automatisch abgemeldet/.test(await authText(page)), 'Start nach >30 Min Untätigkeit (Browser war zu): Anmeldeseite mit Hinweis');
+    assert(be.actions.includes('authLogout') && !be.actions.includes('loadChanges'), 'Alte Sitzung serverseitig beendet, keine Daten geladen');
+    await page.close();
+    be = makeBackend(sampleData(), {});
+    page = await openApp(browser, be, { idleMs: 20 * 60 * 1000 }); await wait(500);
+    assert(!(await authOpen(page)), 'Start nach 20 Min Untätigkeit: ohne PIN weiter');
+    assert((be.actions.filter(a => a === 'authRefresh').length) === 0, 'Beim Start ohne Bedienung keine Verlängerung');
+    // Bedienung → Sitzung verlängert (Start prüft nur, verlängert nicht) und Zeitpunkt beim Verlassen der Seite gesichert
+    await page.evaluate(() => document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))); await wait(600);
+    assert(be.actions.filter(a => a === 'authRefresh').length === 1, 'Erste Bedienung verlängert die Sitzung beim Server (authRefresh)');
+    const sessAfter = await page.evaluate(() => JSON.parse(localStorage.getItem('frachtTracker_session')));
+    assert(sessAfter.token !== TEST_TOKEN && be.tokens[sessAfter.token] === 'u-admin', 'Neues Token übernommen');
+    await page.evaluate(() => document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))); await wait(400);
+    assert(be.actions.filter(a => a === 'authRefresh').length === 1, 'Weitere Bedienung kurz danach: keine erneute Verlängerung (höchstens alle 10 Min)');
+    const dataAfter = be.requests.filter(r => r.action === 'loadChanges').pop();
+    await wait(3500);
+    const lastPoll = be.requests.filter(r => r.action === 'loadChanges').pop();
+    assert(lastPoll !== dataAfter && lastPoll.auth === sessAfter.token, 'Abruf läuft mit dem neuen Token weiter');
+    // Zeitpunkt der letzten Bedienung: gedrosselt gespeichert, beim Verlassen der Seite sofort
+    await page.evaluate(() => localStorage.setItem('frachtTracker_lastActivity', String(Date.now() - 5 * 60 * 1000)));
+    await page.evaluate(() => { document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })); window.dispatchEvent(new Event('pagehide')); }); await wait(200);
+    const stamp = await page.evaluate(() => Number(localStorage.getItem('frachtTracker_lastActivity')));
+    assert(Date.now() - stamp < 5000, 'Beim Verlassen der Seite wird die letzte Bedienung sofort gesichert');
+    // Untätigkeit im laufenden Betrieb: gespeicherten Zeitpunkt zurückdrehen → Prüfung beim Zurückkehren meldet ab
+    await page.evaluate(() => localStorage.setItem('frachtTracker_lastActivity', String(Date.now() - 31 * 60 * 1000)));
+    await page.evaluate(() => { document.dispatchEvent(new Event('visibilitychange')); });   // Rückkehr in den Vordergrund prüft sofort
+    await wait(600);
+    assert(await authOpen(page) && /Automatisch abgemeldet/.test(await authText(page)), 'Im Betrieb: 30 Min ohne Bedienung → Anmeldeseite mit Hinweis');
+    assert(!be.tokens[sessAfter.token], 'Sitzung serverseitig beendet');
+    await page.select('#authUserSelect', 'u-admin'); await typePin(page, '#authPin', '482913'); await wait(1200);
+    assert(!(await authOpen(page)), 'Erneute Anmeldung ohne Neuladen');
+    assert(page.__errors.length === 0, `Keine JS-Fehler (${page.__errors.join(' | ')})`);
+    await page.close();
+
+    // 8) Sichtbarkeit: Anmeldeseite auf dem Handy (Screenshot für die Sichtprüfung)
     be = makeBackend(sampleData(), {});
     page = await openApp(browser, be, { loggedOut: true }); await wait(400);
     try { await page.screenshot({ path: '.arena-shots/auth-login-phone.png' }); } catch (e) { /* .arena-shots fehlt → nur Sichtprüfung entfällt */ }

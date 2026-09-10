@@ -133,9 +133,9 @@ App zeigt die Anmeldeseite. Öffentlich bleiben nur die Anmelde-Aktionen selbst.
 | Aktion | Wer | Zweck |
 |---|---|---|
 | `authUsers` | alle | Namen der anmeldbaren Mitarbeiter (nur id + Name) für die Auswahl auf der Anmeldeseite. Legt beim allerersten Aufruf den Haupt-Administrator an und schickt ihm die Einladung. |
-| `authLogin` `{ userId, pin, deviceId }` | alle | Name + 6-stellige PIN → Sitzungs-Token (12 h). 5 Fehlversuche → 15 Minuten gesperrt. |
+| `authLogin` `{ userId, pin, deviceId }` | alle | Name + 6-stellige PIN → Sitzungs-Token. 5 Fehlversuche → 15 Minuten gesperrt. |
 | `authInviteInfo` `{ invite }` / `authAccept` `{ invite, pin }` | alle | Einladungslink prüfen bzw. einlösen: Mitarbeiter wählt seine PIN selbst und ist danach angemeldet. Link 48 h gültig, einmalig. |
-| `authCheck`, `authLogout` | angemeldet | Sitzung prüfen / beenden. |
+| `authCheck`, `authRefresh`, `authLogout` | angemeldet | Sitzung prüfen / verlängern / beenden. |
 | `adminListUsers`, `adminInvite` `{ name, email }`, `adminSetActive` `{ userId, active }`, `adminResetPin` `{ userId }` | Administrator | Mitarbeiter verwalten: einladen (E-Mail mit Link), sperren/freigeben, PIN zurücksetzen (= neue Einladung; die alte PIN gilt, bis die neue gesetzt ist). |
 
 Ablage im Sheet `_users` (ausgeblendet, wird automatisch angelegt): Name, E-Mail, Rolle, **PIN nur als Hash** (HMAC-SHA256 mit
@@ -150,7 +150,12 @@ Einrichtung:
    auch direkt geöffnet werden.
 3. Über den Link die eigene PIN festlegen. Danach im Menü **Mitarbeiter** die anderen Mitarbeiter einladen (Name + E-Mail).
    Schlägt der Mail-Versand fehl, zeigt die App den Einladungslink zum Weitergeben an.
-4. Alle Geräte melden sich einmal an; die Sitzung hält 12 Stunden, danach genügt die PIN.
+4. Alle Geräte melden sich einmal an.
+
+Sitzungsdauer (2.3): Solange die App bedient wird (Tippen, Scannen, Scrollen), bleibt man angemeldet – die App verlängert die
+Sitzung alle 10 Minuten beim Server (`authRefresh`). **30 Minuten ohne Bedienung** → automatische Abmeldung, danach ist die PIN
+nötig; das gilt auch, wenn der Browser zwischendurch geschlossen war (innerhalb von 30 Minuten geht es ohne PIN weiter).
+Ein nicht mehr verlängertes Token (Gerät aus) verfällt serverseitig nach `SESSION_HOURS` (2 h).
 
 Notschalter: `AUTH_ENABLED = false` in `Code.gs` (+ neue Version) schaltet die Anmeldung komplett ab – die App arbeitet
 dann wieder wie in 2.1.

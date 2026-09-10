@@ -18,7 +18,8 @@ python3 -m http.server 8000 --bind 0.0.0.0
 ```bash
 node tests/soundcheck.js      # Töne: wann Fehler-/Nachlieferungs-Ton, parallel, vollständig
 node tests/zoomcheck.js       # Browser-Zoom ist unterbunden, Scrollen/Tippen weiterhin möglich
-node tests/authcheck.js       # Anmeldung (PIN): Anmeldeseite, Einladungslink, Token je Anfrage, Seite „Mitarbeiter“, Abmelden
+node tests/authcheck.js       # Anmeldung (PIN): Anmeldeseite, Einladungslink, Token je Anfrage, Seite „Mitarbeiter“, Abmelden, 30-Min-Abmeldung
+node tests/backendcheck.js    # Server-Skript offline (ohne Chrome/Server): Anmelde-Logik in backend/Code.gs Schritt für Schritt
 node tests/regress.js         # Grundfunktionen: Scan, Batch, Startseite, Unterseiten, Info-Filter
 ```
 Jeder Test endet mit `ALL GOOD` (Exit-Code 0) oder `SOME FAILED` (Exit-Code 1) – Ketten wie `node tests/x.js && git push` brechen bei Fehlern ab.

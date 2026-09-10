@@ -1062,6 +1062,61 @@ let authResolve = null;          // wartender initializeApp (ensureLoggedIn) –
 let authDisabled = false;        // Server-Skript ohne Anmeldung (AUTH_ENABLED = false oder altes Skript)
 let authBusy = false;
 
+// ---- Automatische Abmeldung bei Untätigkeit ----
+// Jede Bedienung (Tippen, Scannen, Klicken, Scrollen) zählt als „noch da“. 30 Minuten ohne Bedienung → Abmeldung, danach ist
+// die PIN nötig. Solange gearbeitet wird, verlängert die App die Sitzung beim Server (authRefresh, alle 10 Minuten), damit sie
+// nie mitten in der Arbeit abläuft. Der Zeitpunkt der letzten Bedienung steht im localStorage: Browser zu und wieder auf →
+// innerhalb der 30 Minuten geht es ohne PIN weiter, danach wird die PIN verlangt.
+const AUTH_IDLE_LIMIT_MS = 30 * 60 * 1000;
+const AUTH_REFRESH_EVERY_MS = 10 * 60 * 1000;
+const AUTH_ACTIVITY_KEY = 'frachtTracker_lastActivity';
+let authLastActivity = Number(localStorage.getItem(AUTH_ACTIVITY_KEY)) || 0;
+let authLastActivityStored = authLastActivity;
+let authLastRefresh = 0;
+let authIdleTimer = null;
+let authRefreshBusy = false;
+
+function storeActivity(ts) { authLastActivityStored = ts; try { localStorage.setItem(AUTH_ACTIVITY_KEY, String(ts)); } catch (e) { /* voll/gesperrt */ } }
+function noteActivity() {
+    const now = Date.now();
+    authLastActivity = now;
+    if (now - authLastActivityStored > 15000) storeActivity(now);   // höchstens alle 15 s schreiben (Scroll/Tipp-Ereignisse kommen im Sekundentakt)
+    if (authToken() && !isAuthViewOpen() && now - authLastRefresh > AUTH_REFRESH_EVERY_MS) refreshSession();
+}
+// Maßgeblich ist der gespeicherte Zeitpunkt (max. 15 s hinter der letzten Bedienung; beim Verlassen der Seite sofort gesichert) –
+// so zählt auch die Bedienung in einem zweiten Tab desselben Geräts, und nach Schließen/Öffnen des Browsers stimmt die Rechnung.
+function idleFor() { const last = Number(localStorage.getItem(AUTH_ACTIVITY_KEY)) || authLastActivity; return last ? Date.now() - last : 0; }
+// Prüft alle 30 s (und beim Zurückkehren in den Vordergrund): zu lange nichts getan → abmelden
+function checkIdle() {
+    if (!authToken() || isAuthViewOpen()) return;
+    if (idleFor() >= AUTH_IDLE_LIMIT_MS) logout(true);
+}
+function startIdleWatch() {
+    ['pointerdown', 'keydown', 'touchstart', 'scroll', 'input'].forEach(ev => document.addEventListener(ev, noteActivity, { capture: true, passive: true }));
+    // Seite verlassen / in den Hintergrund: letzte Bedienung sofort sichern (die 15-s-Drossel soll hier nichts verschlucken)
+    const flush = () => { if (authLastActivity > authLastActivityStored) storeActivity(authLastActivity); };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) { flush(); return; }
+        checkIdle();                                                    // zurück im Vordergrund: zu lange weg → abmelden …
+        if (authToken() && !isAuthViewOpen()) noteActivity();          // … sonst zählt die Rückkehr als Bedienung
+    });
+    if (authIdleTimer) clearInterval(authIdleTimer);
+    authIdleTimer = setInterval(checkIdle, 30000);
+}
+// Sitzung beim Server verlängern (neues Token, gleiche Sitzung). Fehler sind unkritisch – beim nächsten Mal erneut.
+async function refreshSession() {
+    if (authRefreshBusy || !authToken()) return;
+    authRefreshBusy = true; authLastRefresh = Date.now();
+    try {
+        const r = await postToServer('authRefresh');
+        if (r && r.token) setAuthSession({ token: r.token, user: r.user || currentUser(), expires: r.expires });
+    } catch (e) {
+        if (isUnknownActionError(e)) authLastRefresh = Infinity;                                   // Skript ohne authRefresh (2.2): Token läuft dort 12 h
+        else if (!isAuthError(e)) authLastRefresh = Date.now() - AUTH_REFRESH_EVERY_MS + 60000;  // nicht erreichbar → in 1 Min erneut
+    } finally { authRefreshBusy = false; }
+}
+
 function authToken() { return authSession && authSession.token ? authSession.token : ''; }
 function currentUser() { return authSession && authSession.user ? authSession.user : null; }
 function isAdmin() { const u = currentUser(); return !!(u && u.role === 'admin'); }
@@ -1090,14 +1145,24 @@ function onAuthRequired(message) {
 function ensureLoggedIn() {
     return new Promise(async resolve => {
         authResolve = resolve;
+        startIdleWatch();
         const invite = new URLSearchParams(location.search).get('einladung');
         if (invite) { showInvitePage(invite); return; }
+        if (authSession && authSession.token && idleFor() >= AUTH_IDLE_LIMIT_MS) {
+            // Browser/Tab war länger als 30 Minuten zu (oder offen, aber unbenutzt) → wie automatische Abmeldung
+            const tok = authToken(); setAuthSession(null);
+            postToServer('authLogout', null, tok).catch(() => { /* Sitzung läuft serverseitig ohnehin aus */ });
+            showLoginPage('Automatisch abgemeldet – länger als 30 Minuten keine Bedienung.', 'info');
+            return;
+        }
         if (authSession && authSession.token) {
             try {
                 const r = await postToServer('authCheck');
                 if (r.authDisabled) { authDisabled = true; setAuthSession(null); }
                 else if (r.user) setAuthSession({ token: authSession.token, user: r.user, expires: authSession.expires });
-                finishAuth(); return;
+                finishAuth();
+                authLastRefresh = 0;                      // Prüfung verlängert nicht → die erste Bedienung holt die Verlängerung nach
+                return;
             } catch (e) {
                 if (isAuthError(e)) return;               // postToServer hat die Anmeldeseite bereits geöffnet
                 if (isUnknownActionError(e)) { authDisabled = true; setAuthSession(null); finishAuth(); return; }
@@ -1110,6 +1175,8 @@ function ensureLoggedIn() {
 function finishAuth() {
     hideAuthView();
     updateAuthMenu();
+    authLastActivity = Date.now(); storeActivity(authLastActivity);   // Anmeldung/Start zählt als Bedienung
+    authLastRefresh = Date.now();
     const r = authResolve; authResolve = null;
     if (r) { showLoader(); r(); }                          // App-Start geht weiter (loadDataFromServer …)
     else { syncPollFailures = 0; pollNow(); }              // Anmeldung im laufenden Betrieb: sofort abgleichen (nachholen, was wartete)
@@ -1140,10 +1207,10 @@ function pinField(id, label, autofocus) {
 function pinValue(id) { return (document.getElementById(id)?.value || '').replace(/\D/g, ''); }
 
 // ---- Anmeldeseite ----
-async function showLoginPage(message) {
-    if (isAuthViewOpen() && document.getElementById('authLoginForm')) { authMsg(message, 'error'); return; }
+async function showLoginPage(message, kind) {
+    if (isAuthViewOpen() && document.getElementById('authLoginForm')) { authMsg(message, kind || 'error'); return; }
     showAuthView('<h2 id="authTitle">Anmelden</h2><p class="auth-hint">Namen wählen und PIN eingeben.</p><div id="authMessage" class="auth-message"></div><p class="page-note" id="authLoading">Lade Mitarbeiter …</p>');
-    if (message) authMsg(message, 'error');
+    if (message) authMsg(message, kind || 'error');
     let users = [], setupPending = false;
     try {
         const r = await postToServer('authUsers');
@@ -1167,7 +1234,7 @@ async function showLoginPage(message) {
             <div id="authMessage" class="auth-message"></div>
             <button type="submit" class="main-action-button" id="authLoginBtn">Anmelden</button>
         </form>`;
-    if (message) authMsg(message, 'error');
+    if (message) authMsg(message, kind || 'error');
     const pinEl = document.getElementById('authPin');
     pinEl.addEventListener('input', () => { pinEl.value = pinEl.value.replace(/\D/g, '').slice(0, 6); if (pinEl.value.length === 6) document.getElementById('authLoginForm').requestSubmit(); });
     document.getElementById('authLoginForm').addEventListener('submit', async (e) => {
@@ -1243,13 +1310,13 @@ function renderInviteError(text) {
 }
 
 // ---- Abmelden ----
-async function logout() {
-    if (!confirm('Abmelden?\n\nZum Weiterarbeiten ist danach die PIN nötig.')) return;
+async function logout(automatic) {
+    if (!automatic && !confirm('Abmelden?\n\nZum Weiterarbeiten ist danach die PIN nötig.')) return;
     closeSideMenu();
     const tok = authToken();
     setAuthSession(null);
     if (currentPage && currentPage.id === 'mitarbeiter') showHome();
-    showLoginPage();
+    showLoginPage(automatic ? 'Automatisch abgemeldet – 30 Minuten keine Bedienung.' : '', 'info');
     if (tok) { try { await postToServer('authLogout', null, tok); } catch (e) { /* Sitzung ist lokal weg; serverseitig läuft sie spätestens nach 12 h ab */ } }
 }
 

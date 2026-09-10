@@ -1,6 +1,6 @@
 // ===================================================
 // FRACHT TRACKER – Google Apps Script Backend
-// Version 2.2: mehrgeräte-sicher + Archiv + Anmeldung (PIN).
+// Version 2.3: mehrgeräte-sicher + Archiv + Anmeldung (PIN; Sitzung verlängert sich bei Bedienung).
 //   - Jedes Gerät schickt nur die Sendungen, die es geändert hat (+ den Stand, von dem es ausging).
 //   - Der Server führt zusammen (3-Wege-Merge) statt zu überschreiben; Schreibzugriffe laufen unter Sperre.
 //   - Geräte holen regelmäßig nur die Änderungen ab ("loadChanges" seit Version X).
@@ -66,7 +66,7 @@ const NON_COUNTING_STATUSES_ = ['Dunkelalarm', 'Anstehend', 'NichtSichern', 'Abg
 // ===================================================
 const KNOWN_ACTIONS_ = ['saveShipments', 'deleteShipment', 'loadChanges', 'searchArchive', 'loadAllData', 'saveAllData', 'sendPdfEmail',
   'clearAllData', 'saveLkwStatus', 'loadLkwStatus', 'authUsers', 'authLogin', 'authAccept', 'authInviteInfo', 'authCheck', 'authLogout',
-  'adminListUsers', 'adminInvite', 'adminSetActive', 'adminResetPin'];
+  'authRefresh', 'adminListUsers', 'adminInvite', 'adminSetActive', 'adminResetPin'];
 
 function doPost(e) {
   try {
@@ -96,6 +96,7 @@ function doPost(e) {
       case "authInviteInfo":  result = authInviteInfo(payload); break;
       case "authCheck":       result = user ? { status: 'success', user: publicUser_(user) } : { status: 'success', user: null, authDisabled: true }; break;
       case "authLogout":      result = authLogout(user); break;
+      case "authRefresh":     result = user ? authRefresh(user) : { status: 'success', authDisabled: true }; break;
       case "adminListUsers":  result = { status: 'success', users: adminUserList_() }; break;
       case "adminInvite":     result = adminInvite(payload, user); break;
       case "adminSetActive":  result = adminSetActive(payload, user); break;
@@ -816,7 +817,10 @@ function sendPdfEmail(payload) {
 //
 // Ablauf: Der Administrator lädt einen Mitarbeiter ein (adminInvite) → E-Mail mit Link ?einladung=<Token> (INVITE_HOURS gültig,
 //   einmalig). Der Mitarbeiter wählt über den Link seine 6-stellige PIN (authAccept) – niemand sonst kennt sie. Danach meldet er
-//   sich mit Name + PIN an (authLogin) und erhält ein Sitzungs-Token (SESSION_HOURS gültig), das die App jeder Anfrage mitgibt.
+//   sich mit Name + PIN an (authLogin) und erhält ein Sitzungs-Token, das die App jeder Anfrage mitgibt.
+// Sitzungsdauer: Solange die App bedient wird, verlängert sie die Sitzung alle paar Minuten (authRefresh). Nach 30 Minuten ohne
+//   Bedienung meldet die App selbst ab (authLogout). Ein Token, das nicht mehr verlängert wird (Gerät aus, Browser geschlossen,
+//   App abgestürzt), verfällt spätestens SESSION_HOURS nach der letzten Verlängerung.
 // Sicherheit: PINs liegen nur als HMAC-SHA256 (Salt je Nutzer + geheimer Schlüssel aus den Script-Eigenschaften) im Sheet –
 //   ohne den Schlüssel lässt sich die PIN auch aus dem Sheet nicht zurückrechnen. Nach PIN_MAX_ATTEMPTS Fehlversuchen ist der
 //   Zugang PIN_LOCK_MINUTES gesperrt. Sitzungs-Token sind signiert (HMAC) und in der Spalte "sessions" des Nutzers eingetragen:
@@ -829,7 +833,7 @@ const AUTH_ENABLED = true;                                              // false
 const APP_URL = 'https://zakiwaw.github.io/Arbeit/';                    // Adresse der App (für den Einladungslink)
 const BOOTSTRAP_ADMIN = { name: 'Zakaria Bisbiss', email: 'bisbiss-92@hotmail.de' };
 const USERS_SHEET_NAME = '_users';
-const SESSION_HOURS = 12;                                               // Gültigkeit einer Anmeldung (danach PIN erneut)
+const SESSION_HOURS = 2;                                                // Gültigkeit ohne Verlängerung (App verlängert bei Bedienung alle 10 Min)
 const INVITE_HOURS = 48;                                                // Gültigkeit eines Einladungslinks
 const PIN_MAX_ATTEMPTS = 5;                                             // Fehlversuche bis zur Sperre …
 const PIN_LOCK_MINUTES = 15;                                            // … und deren Dauer
@@ -947,8 +951,10 @@ function escapeHtml_(s) { return String(s).replace(/[&<>"']/g, function (c) { re
 function sessionList_(u) { const a = parseJsonSafe_(u.sessions); return Array.isArray(a) ? a : []; }
 function makeSession_(u, deviceId) {
   const now = Date.now(), exp = now + SESSION_HOURS * 3600000, sid = randomToken_().slice(0, 16);
-  const list = sessionList_(u).filter(function (x) { return x && x.e > now; });
-  list.push({ s: sid, e: exp, d: String(deviceId || '').slice(0, 40) });
+  const dev = String(deviceId || '').slice(0, 40);
+  // abgelaufene Sitzungen und die bisherige Sitzung desselben Geräts raus (neue Anmeldung ersetzt sie)
+  const list = sessionList_(u).filter(function (x) { return x && x.e > now && !(dev && x.d === dev); });
+  list.push({ s: sid, e: exp, d: dev });
   u.sessions = JSON.stringify(list.slice(-MAX_SESSIONS_PER_USER));
   const body = Utilities.base64EncodeWebSafe(JSON.stringify({ u: u.id, g: u.gen || 0, s: sid, e: exp }));
   return { status: 'success', token: body + '.' + hmacHex_(body, secret_()), expires: exp, user: publicUser_(u) };
@@ -968,6 +974,22 @@ function verifySession_(token) {
   if (!sessionList_(u).some(function (x) { return x && x.s === data.s; })) throw authError_('AUTH_REQUIRED', 'Abgemeldet – bitte erneut anmelden.');
   u.sessionId = data.s;
   return u;
+}
+// Verlängern: gleiche Sitzung, neues Ablaufdatum → neues Token (das alte gilt bis zu seinem eigenen Ablauf weiter)
+function authRefresh(user) {
+  return withLock_(function () {
+    const u = findUser_(loadUsers_(true), function (x) { return x.id === user.id; });
+    if (!u || !u.active) throw authError_('AUTH_REQUIRED', 'Zugang deaktiviert – bitte an den Administrator wenden.');
+    const now = Date.now(), exp = now + SESSION_HOURS * 3600000;
+    const list = sessionList_(u).filter(function (x) { return x && x.e > now; });
+    const cur = list.filter(function (x) { return x.s === user.sessionId; })[0];
+    if (!cur) throw authError_('AUTH_REQUIRED', 'Abgemeldet – bitte erneut anmelden.');
+    cur.e = exp;
+    u.sessions = JSON.stringify(list);
+    saveUser_(u);
+    const body = Utilities.base64EncodeWebSafe(JSON.stringify({ u: u.id, g: u.gen || 0, s: cur.s, e: exp }));
+    return { status: 'success', token: body + '.' + hmacHex_(body, secret_()), expires: exp, user: publicUser_(u) };
+  });
 }
 // Abmelden: Sitzung aus der Nutzerzeile streichen (das Token ist danach auf allen Wegen ungültig)
 function authLogout(user) {
