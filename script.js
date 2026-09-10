@@ -276,12 +276,16 @@ const LKWSTATUSKEY = 'frachtLkwStatusV1';
     const SUFFIX_LENGTH = 4;
     const MITARBEITER_NAME = "Zakaria Bisbiss";
     const RAC_NUMMER = "DE/RA/00889-07";
+    // Firmenbezeichnung des reglementierten Beauftragten im Sicherungsnachweis (PDF) – zusammen mit RAC_NUMMER die Kennung nach DVO (EU) 2015/1998 Nr. 6.3.2.6 a)
+    const REGB_NAME = "LFS Luftfrachtsicherheit-Service";
     const NON_COUNTING_STATUSES = ['Dunkelalarm', 'Anstehend', 'NichtSichern', 'Abgelehnt', 'Wareneingang'];
     // Sicherheits-Kontrollmethoden (zählen als Sicherung, schließen sich je Packstück gegenseitig aus,
     // lösen automatisch den Wareneingang aus). Neue Methoden NUR hier und im <select id="securityStatusSelect"> ergänzen.
     // Kürzel wie in der Sicherheitserklärung: XRY = Röntgen, ETD = Sprengstoffspurendetektion, EDD = Sprengstoffspürhund,
     // PHS = Handdurchsuchung, VCK = Sichtkontrolle. PHS/VCK verhalten sich in der App exakt wie ETD/EDD.
     const EXCLUSIVE_SECURITY_STATUSES = ['XRY', 'ETD', 'EDD', 'PHS', 'VCK'];
+    // Klartext der Kontrollmethoden-Codes (DVO (EU) 2015/1998, Anhang Nr. 6.3.2.6 Buchst. e) – nur für den Sicherungsnachweis (PDF)
+    const KONTROLLMETHODE_TEXT = { XRY: 'Röntgenkontrolle', ETD: 'Sprengstoffspurendetektion', EDD: 'Sprengstoffspürhund', PHS: 'Durchsuchung von Hand', VCK: 'Sichtkontrolle' };
     const NOTE_ALLOWED_STATUSES = [...EXCLUSIVE_SECURITY_STATUSES, 'Abgelehnt', 'Dunkelalarm'];
     const STATUSES_THAT_TRIGGER_WE = [...EXCLUSIVE_SECURITY_STATUSES, 'Dunkelalarm']; // Scan erzeugt automatisch den Wareneingang
     // Kontrollmethoden, die zusätzlich als „Kombi-Sicherung“ verbucht werden können (zählt nicht als finale Sicherung, das
@@ -5525,31 +5529,37 @@ const FIRMENLOGO_BASE64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAcsAAAB
 // (Wareneingang / Sicherung / Dunkelalarm), Tabelle je Packstück (wie die Packstücktabelle am Desktop) und die
 // Zusammenfassung der Kontrollmethoden. Offene Packstücke stehen als „Offen“ drin – mit Hinweis im Kopf.
 // VVL-Aufträge (VW): ein Dokument für alle Aufträge der Vorverladeliste, je Auftrag ein Abschnitt.
+// ---- Sicherungsnachweis (PDF) ----------------------------------------------------------------------------------
+// Packstückzeilen für den Nachweis – gleiche Regeln wie die Desktop-Packstücktabelle: HU-Listen eine Zeile je Position
+// (Anstehend oder zählende Sicherung), Einzelsendung eine Zeile je erwartetem Stück (n-ter Sicherungsscan).
 function pdfPackRows(shipment) {
     const items = (Array.isArray(shipment.scannedItems) ? shipment.scannedItems : []).filter(i => i);
-    const byHu = (hu, pred) => items.filter(i => !i.isCancelled && String(i.rawInput).toUpperCase() === String(hu).toUpperCase() && pred(i));
-    const fmt = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+    const same = (a, b) => String(a).toUpperCase() === String(b).toUpperCase();
+    const val = v => (v && v !== 'N/A') ? String(v) : '';
+    const isSec = i => EXCLUSIVE_SECURITY_STATUSES.includes(i.status);
     if (shipment.isHuListOrder) {
-        const slots = items.filter(i => !i.isCancelled && !i.isCombination && (i.status === 'Anstehend' || EXCLUSIVE_SECURITY_STATUSES.includes(i.status)))
+        const byHu = (hu, pred) => items.filter(i => !i.isCancelled && same(i.rawInput, hu) && pred(i));
+        const slots = items.filter(i => !i.isCancelled && !i.isCombination && (i.status === 'Anstehend' || isSec(i)))
             .sort((a, b) => ((a.position || 9999) - (b.position || 9999)) || String(a.rawInput).localeCompare(String(b.rawInput)));
         return slots.map(item => {
             const hu = item.rawInput;
-            const detail = items.find(i => String(i.rawInput).toUpperCase() === String(hu).toUpperCase() && (i.packaging || i.dimensions || i.grossWeight)) || item;
-            const we = byHu(hu, i => i.status === 'Wareneingang');
-            const kombis = byHu(hu, i => i.isCombination && EXCLUSIVE_SECURITY_STATUSES.includes(i.status));
-            const dunkelOpen = byHu(hu, i => i.status === 'Dunkelalarm').filter(a => !byHu(hu, i => EXCLUSIVE_SECURITY_STATUSES.includes(i.status) && (Date.parse(i.timestamp) || 0) >= (Date.parse(a.timestamp) || 0)).length);
+            const detail = items.find(i => same(i.rawInput, hu) && (i.packaging || i.dimensions || i.grossWeight)) || item;
+            const secured = byHu(hu, isSec);
+            const kombi = byHu(hu, i => i.isCombination && isSec(i)).map(k => k.status);
+            const dunkelOpen = byHu(hu, i => i.status === 'Dunkelalarm').some(a => !secured.some(x => (Date.parse(x.timestamp) || 0) >= (Date.parse(a.timestamp) || 0)));
             const open = item.status === 'Anstehend';
-            let sich = open ? (dunkelOpen.length ? 'DUNKELALARM' : 'Offen') : item.status;
-            if (kombis.length) sich += ` + ${kombis.map(k => k.status).join('/')} (Kombi)`;
             const notes = byHu(hu, () => true).reduce((arr, i) => arr.concat(Array.isArray(i.notes) ? i.notes : []), []);
-            return { cells: [item.position ? `${item.position}.` : '', String(hu) + (item.sendnr ? `\n${item.sendnr}` : ''), (detail.packaging && detail.packaging !== 'N/A') ? detail.packaging : '', (detail.dimensions && detail.dimensions !== 'N/A') ? detail.dimensions : '', (detail.grossWeight && detail.grossWeight !== 'N/A') ? detail.grossWeight : '', we.length ? 'WE' : '–', sich, open ? '' : fmt(item.timestamp), notes.join('; ')], open, danger: !!dunkelOpen.length, hasSendnr: !!item.sendnr };
+            return { pos: item.position ? `${item.position}.` : '', nr: String(hu), sub: item.sendnr ? String(item.sendnr) : '',
+                packaging: val(detail.packaging), dimensions: val(detail.dimensions), weight: val(detail.grossWeight),
+                we: byHu(hu, i => i.status === 'Wareneingang').length > 0, state: open ? (dunkelOpen ? 'dunkel' : 'open') : 'secured',
+                method: open ? '' : item.status, kombi, time: open ? '' : item.timestamp, notes };
         });
     }
-    // Einzelsendung: eine Zeile je erwartetem Stück (n-ter Sicherungsscan), wie die Desktop-Tabelle
     const live = items.filter(i => !i.isCancelled && i.status !== 'Anstehend');
     const byTime = (a, b) => (Date.parse(a.timestamp) || 0) - (Date.parse(b.timestamp) || 0);
-    const secured = live.filter(i => EXCLUSIVE_SECURITY_STATUSES.includes(i.status) && !i.isCombination).sort(byTime);
+    const secured = live.filter(i => isSec(i) && !i.isCombination).sort(byTime);
     const receipts = live.filter(i => i.status === 'Wareneingang').sort(byTime);
+    const dunkelOpen = calculateOpenDunkelalarmCount(items, shipment);
     const expected = expectedPiecesOf(shipment);
     const n = Math.max(expected || 0, secured.length, receipts.length);
     const rows = [];
@@ -5557,10 +5567,16 @@ function pdfPackRows(shipment) {
         const sec = secured[k], we = receipts[k];
         const d = [sec, we].find(i => i && (i.packaging || i.dimensions || i.grossWeight)) || null;
         const notes = [sec, we].reduce((arr, i) => arr.concat(i && Array.isArray(i.notes) ? i.notes : []), []);
-        rows.push({ cells: [`${k + 1}.`, String(shipment.hawb), d && d.packaging || '', d && d.dimensions || '', d && d.grossWeight || '', we ? 'WE' : '–', sec ? sec.status : 'Offen', sec ? fmt(sec.timestamp) : '', notes.join('; ')], open: !sec, danger: false, hasSendnr: false });
+        rows.push({ pos: `${k + 1}.`, nr: String(shipment.hawb), sub: '', packaging: d ? val(d.packaging) : '', dimensions: d ? val(d.dimensions) : '', weight: d ? val(d.grossWeight) : '',
+            we: !!we, state: sec ? 'secured' : (k - secured.length < dunkelOpen ? 'dunkel' : 'open'), method: sec ? sec.status : '', kombi: [], time: sec ? sec.timestamp : '', notes });
     }
     return rows;
 }
+// Sicherungsnachweis als PDF im neuen Browser-Tab. Aufbau je Sendung: Erklärung zur Sicherheit der Sendung mit den
+// Angaben nach DVO (EU) 2015/1998, Anhang Nr. 6.3.2.6 (Kennung des RegB, Kennung der Sendung, Inhalt, Sicherheitsstatus,
+// Kontrollmethode als Grund der Erteilung, Name + Datum/Uhrzeit der Erteilung), danach die Packstückliste mit Methode
+// und Zeitpunkt je Packstück. Bei einer Vorverladeliste zuerst eine Übersicht, dann je Kundennummer eine eigene Seite.
+// Offene Packstücke werden ausgewiesen (Status „NICHT ERTEILT“) – der Nachweis wird trotzdem erzeugt.
 function openSecurityReport(base, shipmentsPool, preopenedTab) {
     const all = shipmentsPool || loadShipments();
     const clicked = all[base];
@@ -5572,110 +5588,187 @@ function openSecurityReport(base, shipmentsPool, preopenedTab) {
     const tab = preopenedTab || window.open('', '_blank');
     try {
         const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-        const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 12;
-        const title = parent ? `Sicherungsnachweis – Vorverladeliste ${parent}` : `Sicherungsnachweis – ${clicked.freightForwarder && clicked.destinationCountry ? 'Rechnung' : 'Sendung'} ${base}`;
-        const now = new Date().toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-        const dark = [30, 41, 59], mid = [71, 85, 105], light = [241, 245, 249], red = [185, 28, 28], amber = [180, 83, 9], green = [21, 128, 61];
-        const truckOf = s => s.truckId ? truckShortName(s.truckId) : '';
-        let y = M;
+        const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
+        const M = 15, TOP = 43, BOTTOM = 24, CW = W - 2 * M;   // Seitenränder; TOP/BOTTOM = Platz für Kopf- und Fußzeile
+        const fmtDT = d => { const x = new Date(d); return isNaN(x) ? '' : x.toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+        const now = fmtDT(new Date());
+        const isMan = s => !!(s.freightForwarder && s.destinationCountry);
+        const refOf = s => s.parentOrderNumber ? `Kundennr. ${s.hawb}` : (isMan(s) ? `Rechnung ${s.hawb}` : `Sendung ${s.hawb}`);
+        const docRef = parent ? `Vorverladeliste ${parent}` : refOf(clicked);
+        const dark = [30, 41, 59], mid = [71, 85, 105], line = [203, 213, 225], fillLabel = [248, 250, 252], fillHead = [241, 245, 249];
+        const red = [185, 28, 28], amber = [180, 83, 9], green = [21, 128, 61], fillOpen = [255, 251, 235], fillDunkel = [254, 226, 226];
+        const pcs = n => pluralize(n, 'Packstück', 'Packstücke');
+        const methodText = code => KONTROLLMETHODE_TEXT[code] ? `${code} – ${KONTROLLMETHODE_TEXT[code]}` : code;
+        let y = TOP;
         const header = () => {
-            y = M;
-            if (FIRMENLOGO_BASE64) { try { doc.addImage(FIRMENLOGO_BASE64, 'PNG', W - M - 42, y - 2, 42, 9.2); } catch (e) { /* Logo optional */ } }
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.setTextColor(...dark); doc.text(title, M, y + 5);
+            if (FIRMENLOGO_BASE64) { try { doc.addImage(FIRMENLOGO_BASE64, 'PNG', W - M - 46, M - 2, 46, 10); } catch (e) { /* Logo optional */ } }
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(17); doc.setTextColor(...dark); doc.text('Sicherungsnachweis', M, M + 5);
+            doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...mid);
+            doc.text('Erklärung zur Sicherheit der Sendung nach DVO (EU) 2015/1998, Anhang Nr. 6.3.2.6', M, M + 11.5);
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5); doc.setTextColor(...dark); doc.text(docRef, M, M + 18);
             doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...mid);
-            doc.text(`Erstellt: ${now}   ·   Mitarbeiter: ${MITARBEITER_NAME}   ·   RegB: ${RAC_NUMMER}`, M, y + 11);
-            doc.setDrawColor(203, 213, 225); doc.setLineWidth(0.3); doc.line(M, y + 14, W - M, y + 14);
-            y += 20;
+            doc.text(`${REGB_NAME} · Reglementierter Beauftragter ${RAC_NUMMER}`, W - M, M + 18, { align: 'right' });
+            doc.setDrawColor(...line); doc.setLineWidth(0.4); doc.line(M, M + 22, W - M, M + 22);
+            y = TOP;
         };
         const footer = () => {
             const pages = doc.getNumberOfPages();
             for (let p = 1; p <= pages; p++) {
-                doc.setPage(p); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...mid);
-                doc.text(`${title} · Seite ${p} von ${pages}`, M, H - 7);
-                doc.text('Erstellt mit Fracht-Tracker', W - M, H - 7, { align: 'right' });
+                doc.setPage(p);
+                doc.setDrawColor(...line); doc.setLineWidth(0.3); doc.line(M, H - 17, W - M, H - 17);
+                doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...mid);
+                doc.text(`${docRef} · Reglementierter Beauftragter ${RAC_NUMMER}`, M, H - 12.5);
+                doc.text(`Seite ${p} von ${pages}`, W - M, H - 12.5, { align: 'right' });
+                doc.text(`Elektronisch erstellt am ${now} Uhr von ${MITARBEITER_NAME} · Fracht-Tracker`, M, H - 8.5);
             }
         };
-        const ensure = need => { if (y + need > H - 14) { doc.addPage(); header(); } };
-        header();
-        // Gesamtübersicht bei VVL
-        if (parent) {
-            const tot = list.reduce((a, s) => { const p = shipmentProgress(s); a.exp += p.expected || 0; a.we += p.we; a.sec += p.counted; a.open += p.pending || 0; a.dunkel += p.dunkel; return a; }, { exp: 0, we: 0, sec: 0, open: 0, dunkel: 0 });
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(...dark);
-            doc.text(`Gesamt: ${list.length} Aufträge · ${tot.exp} Packstücke · Wareneingang ${tot.we}/${tot.exp} · Gesichert ${tot.sec}/${tot.exp}` + (tot.dunkel ? ` · Dunkelalarm ${tot.dunkel}` : ''), M, y);
-            y += 5;
-            if (tot.open > 0) { doc.setTextColor(...amber); doc.setFontSize(9); doc.text(`Hinweis: ${pluralize(tot.open, 'Packstück', 'Packstücke')} noch nicht gesichert.`, M, y); y += 5; }
-            y += 3;
-        }
-        list.forEach((s, idx) => {
-            const p = shipmentProgress(s);
-            const rows = pdfPackRows(s);
-            const isMan = !!(s.freightForwarder && s.destinationCountry);
-            ensure(40);
-            // Kopf je Sendung
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(parent ? 11 : 12.5); doc.setTextColor(...dark);
-            doc.text(parent ? `Kundennr. ${s.hawb}` : (isMan ? `Rechnung ${s.hawb}` : `Sendung ${s.hawb}`), M, y);
-            const state = p.dunkel > 0 ? ['DUNKELALARM', red] : (p.unknown ? ['ohne Stückzahl', mid] : (p.open ? [`OFFEN – ${pluralize(p.pending, 'Packstück', 'Packstücke')} nicht gesichert`, amber] : ['VOLLSTÄNDIG GESICHERT', green]));
-            doc.setFontSize(9.5); doc.setTextColor(...state[1]); doc.text(state[0], W - M, y, { align: 'right' });
-            y += 5.5;
-            doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...mid);
-            // Zwei Zeilen: Auftrag (LKW, VVL, PLSO, Spediteur, Land) und Mengen (Kolli, Gewicht, erfasst von)
-            const line1 = [];
-            if (s.truckId) line1.push(`LKW: ${truckOf(s)}`);
-            if (s.parentOrderNumber) line1.push(`VVL: ${s.parentOrderNumber}`);
-            if (s.plsoNumber && s.plsoNumber !== 'N/A') line1.push(`PLSO: ${s.plsoNumber}`);
-            if (s.freightForwarder) line1.push(`Spediteur: ${s.freightForwarder}`);
-            if (s.destinationCountry) line1.push(`Land: ${s.destinationCountry}`);
-            const kg = s.isHuListOrder ? detailUniqueKg(s) : shipmentTotalKg(s);
-            const line2 = [`Kolli: ${p.expected === null ? '–' : p.expected}`];
-            if (kg !== null) line2.push(`Gewicht: ${formatKg(kg)}`);
-            if (s.mitarbeiter) line2.push(`Erfasst von: ${s.mitarbeiter}`);
-            if (s.lastModified) { const lm = new Date(s.lastModified); if (!isNaN(lm)) line2.push(`Letzte Änderung: ${lm.toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`); }
-            [line1, line2].filter(l => l.length).forEach(l => { const wrapped = doc.splitTextToSize(l.join('   ·   '), W - 2 * M); doc.text(wrapped, M, y); y += 4.2 * wrapped.length; });
-            y += 1.5;
-            // Kennzahlen
+        const ensure = need => { if (y + need > H - BOTTOM) { doc.addPage(); header(); } };
+        // Gemeinsame Tabellen-Einstellungen: Kopfzeile auch auf Seiten, die die Tabelle selbst umbricht; Zeilen nicht teilen
+        const tableBase = { margin: { left: M, right: M, top: TOP, bottom: BOTTOM }, theme: 'grid', rowPageBreak: 'avoid', didDrawPage: data => { if (data.pageNumber > 1) header(); } };
+        const badge = (text, color, xRight, yTop) => {
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+            const w = doc.getTextWidth(text) + 8;
+            doc.setFillColor(...color); doc.roundedRect(xRight - w, yTop, w, 7, 1.5, 1.5, 'F');
+            doc.setTextColor(255, 255, 255); doc.text(text, xRight - w / 2, yTop + 4.8, { align: 'center' });
+        };
+        const sectionTitle = (text, st) => { ensure(40); doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(...dark); doc.text(text, M, y + 5); if (st) badge(st.badge, st.color, W - M, y); y += 12; };
+        // Sicherheitsstatus der Sendung (SPX nur, wenn alle Packstücke kontrolliert sind)
+        const stateOf = p => {
+            if (p.dunkel > 0) return { key: 'dunkel', color: red, badge: 'DUNKELALARM', status: `NICHT ERTEILT – Dunkelalarm offen (${pcs(p.dunkel)}): Kontrolle mit einer anderen geeigneten Methode erforderlich` };
+            if (p.open) return { key: 'open', color: amber, badge: 'NICHT ERTEILT', status: `NICHT ERTEILT – ${p.pending} von ${p.expected} Packstücken noch nicht kontrolliert` };
+            if (p.unknown) return p.counted > 0 ? { key: 'unknown', color: amber, badge: 'STÜCKZAHL FEHLT', status: `Stückzahl nicht hinterlegt – ${pcs(p.counted)} kontrolliert, Vollständigkeit der Sendung nicht bestätigt` } : { key: 'open', color: amber, badge: 'NICHT ERTEILT', status: 'NICHT ERTEILT – keine Kontrolle erfasst' };
+            return { key: 'ok', color: green, badge: 'SPX', status: 'SPX – sicher für Passagierflugzeuge, Nurfrachtflugzeuge und Nurpostflugzeuge' };
+        };
+        const methodSummary = s => {
+            const counts = {}, kombi = {};
+            (s.scannedItems || []).forEach(i => { if (!i || i.isCancelled || !EXCLUSIVE_SECURITY_STATUSES.includes(i.status)) return; const t = i.isCombination ? kombi : counts; t[i.status] = (t[i.status] || 0) + 1; });
+            const fmt = o => Object.keys(o).sort().map(k => `${methodText(k)} (${pcs(o[k])})`);
+            return { main: fmt(counts), kombi: fmt(kombi), codes: Object.keys(counts).sort() };
+        };
+        const lastSecured = s => (s.scannedItems || []).filter(i => i && !i.isCancelled && !i.isCombination && EXCLUSIVE_SECURITY_STATUSES.includes(i.status)).reduce((m, i) => Math.max(m, Date.parse(i.timestamp) || 0), 0);
+        const declarationRows = (s, p, st, ms, rows) => {
             const exp = p.expected === null ? '–' : p.expected;
-            doc.setFont('helvetica', 'bold'); doc.setTextColor(...dark);
-            doc.text(`Wareneingang ${p.we}/${exp}      Sicherung ${p.counted}/${exp}` + (p.dunkel ? `      Dunkelalarm ${p.dunkel}` : ''), M, y);
-            y += 5;
-            // Tabelle
-            const hasSendnr = rows.some(r => r.hasSendnr);
-            const hasPos = rows.some(r => r.cells[0]);   // VW-Positionen tragen keine Nummer → Spalte weglassen
-            const headCells = ['Pos.', hasSendnr ? 'VSE / Sendungs-Nr.' : (s.isHuListOrder ? 'HU-Nummer' : 'Nummer'), 'Verpackung', 'Maße', 'Gewicht', 'WE', 'Sicherung', 'Zeit', 'Notiz'];
-            const colStyles = [{ cellWidth: 9, halign: 'right' }, { cellWidth: 30, fontStyle: 'bold' }, { cellWidth: 30 }, { cellWidth: 26 }, { cellWidth: 16, halign: 'right' }, { cellWidth: 9, halign: 'center' }, { cellWidth: 24 }, { cellWidth: 24 }, { cellWidth: 'auto' }];
-            const keep = hasPos ? [0, 1, 2, 3, 4, 5, 6, 7, 8] : [1, 2, 3, 4, 5, 6, 7, 8];
-            const columnStyles = {}; keep.forEach((c, i) => { columnStyles[i] = colStyles[c]; });
-            const colWe = keep.indexOf(5), colSich = keep.indexOf(6);
-            if (rows.length) {
-                doc.autoTable({
-                    head: [keep.map(c => headCells[c])], body: rows.map(r => keep.map(c => r.cells[c])), startY: y, margin: { left: M, right: M, top: M + 22, bottom: 14 }, theme: 'grid',
-                    styles: { font: 'helvetica', fontSize: 7.5, cellPadding: 1.4, textColor: dark, lineColor: [203, 213, 225], lineWidth: 0.2, overflow: 'linebreak', valign: 'middle' },
-                    headStyles: { fillColor: light, textColor: dark, fontStyle: 'bold', fontSize: 7.5 },
+            const out = [['Reglementierter Beauftragter', `${REGB_NAME}\nKennung: ${RAC_NUMMER}`]];
+            const ident = [refOf(s)];
+            if (s.parentOrderNumber) ident.push(`Vorverladeliste ${s.parentOrderNumber}`);
+            if (s.plsoNumber && s.plsoNumber !== 'N/A') ident.push(`PLSO ${s.plsoNumber}`);
+            out.push(['Eindeutige Kennung der Sendung', ident.join(' · ')]);
+            const deliv = [];
+            if (s.freightForwarder) deliv.push(`Spediteur ${s.freightForwarder}`);
+            if (s.truckId) deliv.push(`LKW ${truckShortName(s.truckId)}`);
+            if (deliv.length) out.push(['Anlieferung durch', deliv.join(' · ')]);
+            if (s.destinationCountry) out.push(['Bestimmungsland', String(s.destinationCountry)]);
+            const kg = s.isHuListOrder ? detailUniqueKg(s) : shipmentTotalKg(s);
+            const packs = [...new Set(rows.map(r => r.packaging).filter(Boolean))];
+            const content = [p.expected === null ? 'Stückzahl nicht hinterlegt' : pcs(p.expected)];
+            if (kg !== null) content.push(`Gesamtgewicht ${formatKg(kg)}`);
+            if (packs.length) content.push(`Verpackung: ${packs.join(', ')}`);
+            out.push(['Inhalt der Sendung', content.join(' · ') + ' – Einzelaufstellung siehe Packstückliste']);
+            out.push(['Bearbeitungsstand', `Wareneingang ${p.we} von ${exp} · kontrolliert ${p.counted} von ${exp}` + (p.pending ? ` · offen ${p.pending}` : '') + (p.dunkel ? ` · Dunkelalarm ${p.dunkel}` : '')]);
+            out.push(['Sicherheitsstatus', st.status]);
+            out.push(['Kontrollmethode(n)\n(Grund der Erteilung)', ms.main.length ? ms.main.join('\n') + (ms.kombi.length ? `\nzusätzlich (Kombi): ${ms.kombi.join(', ')}` : '') : 'keine Kontrolle erfasst']);
+            const t = lastSecured(s), who = s.mitarbeiter || MITARBEITER_NAME;
+            out.push(['Sicherheitsstatus\nerteilt von / am', (st.key === 'ok' || st.key === 'unknown') ? `${who} · ${fmtDT(t)} Uhr (Zeitpunkt der letzten Kontrolle)` : (t ? `noch nicht erteilt (letzte Kontrolle ${fmtDT(t)} Uhr durch ${who})` : 'noch nicht erteilt')]);
+            return out;
+        };
+        const drawShipment = (s, idx) => {
+            const p = shipmentProgress(s), st = stateOf(p), rows = pdfPackRows(s), ms = methodSummary(s);
+            sectionTitle(parent ? `${refOf(s)} – Auftrag ${idx + 1} von ${list.length}` : refOf(s), st);
+            // Block 1: Erklärung zur Sicherheit der Sendung
+            const decl = declarationRows(s, p, st, ms, rows);
+            const statusRow = decl.findIndex(r => r[0] === 'Sicherheitsstatus');
+            doc.autoTable(Object.assign({}, tableBase, {
+                startY: y, head: [[{ content: 'Erklärung zur Sicherheit der Sendung (Consignment Security Declaration)', colSpan: 2 }]], body: decl,
+                styles: { font: 'helvetica', fontSize: 9.5, cellPadding: { top: 2.3, bottom: 2.3, left: 3, right: 3 }, textColor: dark, lineColor: line, lineWidth: 0.25, overflow: 'linebreak', valign: 'top' },
+                headStyles: { fillColor: fillHead, textColor: dark, fontStyle: 'bold', fontSize: 10 },
+                columnStyles: { 0: { cellWidth: 52, fontStyle: 'bold', textColor: mid, fillColor: fillLabel }, 1: { cellWidth: 'auto' } },
+                didParseCell: data => { if (data.section === 'body' && data.column.index === 1 && data.row.index === statusRow) { data.cell.styles.textColor = st.color; data.cell.styles.fontStyle = 'bold'; } }
+            }));
+            y = doc.lastAutoTable.finalY + 6;
+            // Erklärungstext (Aussteller, Grundlage, Hinweis auf offene Packstücke, maschinelle Erstellung)
+            const txt = ['Der oben genannte reglementierte Beauftragte erklärt, dass die in der Packstückliste mit einer Kontrollmethode ausgewiesenen Packstücke dieser Sendung kontrolliert wurden und der Sicherheitsstatus zum angegebenen Zeitpunkt durch die genannte Person erteilt wurde (Durchführungsverordnung (EU) 2015/1998, Anhang Nr. 6.3.2.6).'];
+            if (st.key === 'open' || st.key === 'dunkel') txt.push('Für Packstücke ohne Kontrolle ist kein Sicherheitsstatus erteilt; die Sendung darf insoweit nicht als gesicherte Luftfracht übergeben werden.');
+            txt.push('Dieses Dokument wurde maschinell erstellt und ist ohne Unterschrift gültig.');
+            doc.setFont('helvetica', 'normal'); doc.setFontSize(8.8); doc.setTextColor(...dark);
+            const para = doc.splitTextToSize(txt.join(' '), CW);
+            ensure(para.length * 3.9 + 6);
+            doc.setFont('helvetica', 'normal'); doc.setFontSize(8.8); doc.setTextColor(...dark);   // header() nach Umbruch setzt die Schrift um
+            doc.text(para, M, y + 2); y += para.length * 3.9 + 9;
+            // Block 2: Packstückliste
+            ensure(45);
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(...dark); doc.text('Packstückliste', M, y + 4); y += 8;
+            const hasPos = rows.some(r => r.pos), hasSub = rows.some(r => r.sub);
+            const cols = [];
+            if (hasPos) cols.push({ h: 'Pos.', w: 12, get: r => r.pos, st: { halign: 'right' } });
+            cols.push({ h: hasSub ? 'VSE\nSendungs-Nr.' : (s.isHuListOrder ? 'HU-Nummer' : 'Sendungsnummer'), w: 'auto', get: r => r.sub ? `${r.nr}\n${r.sub}` : r.nr, st: { fontStyle: 'bold' } });
+            if (rows.some(r => r.packaging)) cols.push({ h: 'Verpackung', w: 31, get: r => r.packaging });
+            if (rows.some(r => r.dimensions)) cols.push({ h: 'Maße', w: 29, get: r => r.dimensions });
+            if (rows.some(r => r.weight)) cols.push({ h: 'Gewicht', w: 16, get: r => r.weight, st: { halign: 'right' } });
+            cols.push({ h: 'WE', w: 10, get: r => r.we ? 'Ja' : '–', st: { halign: 'center' } });
+            cols.push({ h: 'Kontrolle', w: 25, get: r => (r.state === 'secured' ? r.method : (r.state === 'dunkel' ? 'Dunkelalarm' : 'Offen')) + (r.kombi.length ? `\n+ ${r.kombi.join('/')} (Kombi)` : ''), st: { fontStyle: 'bold' } });
+            cols.push({ h: 'Datum / Uhrzeit', w: 30, get: r => r.time ? fmtDT(r.time) : '' });
+            const colKontrolle = cols.findIndex(c => c.h === 'Kontrolle'), colWe = cols.findIndex(c => c.h === 'WE');
+            const body = [], meta = [];
+            rows.forEach(r => {
+                body.push(cols.map(c => c.get(r))); meta.push({ r, note: false });
+                if (r.notes.length) { body.push([{ content: `Bemerkung zu ${r.nr}: ${r.notes.join('; ')}`, colSpan: cols.length, styles: { fontStyle: 'italic', textColor: mid, halign: 'left' } }]); meta.push({ r, note: true }); }
+            });
+            const columnStyles = {}; cols.forEach((c, i) => { columnStyles[i] = Object.assign({ cellWidth: c.w }, c.st || {}); });
+            const legend = 'Kontrolle = angewandte Kontrollmethode (Code nach DVO (EU) 2015/1998, Anhang Nr. 6.3.2.6 Buchst. e): XRY = Röntgenkontrolle · ETD = Sprengstoffspurendetektion · EDD = Sprengstoffspürhund · PHS = Durchsuchung von Hand · VCK = Sichtkontrolle. Kombi = zusätzliche Kontrolle desselben Packstücks (keine eigenständige Sicherung). Offen = noch nicht kontrolliert. Dunkelalarm = Kontrolle nicht auswertbar, andere geeignete Methode erforderlich. WE = Wareneingang erfasst.';
+            if (body.length) {
+                doc.autoTable(Object.assign({}, tableBase, {
+                    startY: y, head: [cols.map(c => c.h)], body, foot: [[{ content: legend, colSpan: cols.length }]], showFoot: 'lastPage',
+                    margin: { left: M, right: M, top: TOP + 8, bottom: BOTTOM },
+                    didDrawPage: data => { if (data.pageNumber > 1) { header(); doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(...dark); doc.text(`${refOf(s)} – Packstückliste (Fortsetzung)`, M, TOP + 3); } },
+                    styles: { font: 'helvetica', fontSize: 8.5, cellPadding: { top: 2.2, bottom: 2.2, left: 2, right: 2 }, textColor: dark, lineColor: line, lineWidth: 0.25, overflow: 'linebreak', valign: 'middle' },
+                    headStyles: { fillColor: fillHead, textColor: dark, fontStyle: 'bold', valign: 'middle' },
+                    footStyles: { fillColor: [255, 255, 255], textColor: mid, fontStyle: 'normal', fontSize: 7.8, lineWidth: 0, halign: 'left', cellPadding: { top: 2.5, bottom: 0, left: 0, right: 0 } },
                     columnStyles,
                     didParseCell: data => {
                         if (data.section !== 'body') return;
-                        const r = rows[data.row.index];
-                        if (data.column.index === colSich) { data.cell.styles.fontStyle = 'bold'; data.cell.styles.textColor = r.danger ? red : (r.open ? amber : green); }
-                        if (data.column.index === colWe && data.cell.raw === 'WE') data.cell.styles.textColor = green;
-                        if (r.open) data.cell.styles.fillColor = r.danger ? [254, 226, 226] : [255, 251, 235];
-                    },
-                    didDrawPage: data => { if (data.pageNumber > 1) header(); }   // Kopf auch auf Seiten, die die Tabelle selbst umbricht
-                });
-                y = doc.lastAutoTable.finalY + 4;
+                        const m = meta[data.row.index]; if (!m) return;
+                        if (m.r.state !== 'secured') data.cell.styles.fillColor = m.r.state === 'dunkel' ? fillDunkel : fillOpen;
+                        if (m.note) return;
+                        if (data.column.index === colKontrolle) data.cell.styles.textColor = m.r.state === 'dunkel' ? red : (m.r.state === 'open' ? amber : green);
+                        if (data.column.index === colWe && m.r.we) data.cell.styles.textColor = green;
+                    }
+                }));
+                y = doc.lastAutoTable.finalY + 8;
             } else {
-                doc.setFont('helvetica', 'italic'); doc.setFontSize(8.5); doc.setTextColor(...mid); doc.text('Keine Packstücke erfasst.', M, y); y += 5;
+                doc.setFont('helvetica', 'italic'); doc.setFontSize(9); doc.setTextColor(...mid); doc.text('Keine Packstücke erfasst.', M, y + 2); y += 8;
             }
-            // Zusammenfassung der Kontrollmethoden (zählende Sicherungen, ohne Kombi/Storno)
-            const counts = {};
-            (s.scannedItems || []).forEach(i => { if (i && !i.isCancelled && !i.isCombination && EXCLUSIVE_SECURITY_STATUSES.includes(i.status)) counts[i.status] = (counts[i.status] || 0) + 1; });
-            const kombi = {};
-            (s.scannedItems || []).forEach(i => { if (i && !i.isCancelled && i.isCombination && EXCLUSIVE_SECURITY_STATUSES.includes(i.status)) kombi[i.status] = (kombi[i.status] || 0) + 1; });
-            const methods = Object.keys(counts).sort().map(k => `${k} (${counts[k]}×)`);
-            const kombiTxt = Object.keys(kombi).sort().map(k => `${k} (${kombi[k]}×)`);
-            ensure(10);
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(...dark);
-            doc.text(`Sicherheitsstatus: ${methods.length ? 'SPX by ' + methods.join(', ') : 'keine zählende Sicherungsmethode angewendet'}` + (kombiTxt.length ? `   ·   Kombi: ${kombiTxt.join(', ')}` : ''), M, y);
-            y += (idx < list.length - 1) ? 10 : 6;
-        });
+        };
+        header();
+        if (parent) {
+            // Übersicht der Vorverladeliste, danach je Auftrag (Einzelsendung) eine eigene Seite
+            const tot = list.reduce((a, s) => { const p = shipmentProgress(s); a.exp += p.expected || 0; a.we += p.we; a.sec += p.counted; a.open += p.pending || 0; a.dunkel += p.dunkel; return a; }, { exp: 0, we: 0, sec: 0, open: 0, dunkel: 0 });
+            const totState = tot.dunkel ? { badge: 'DUNKELALARM', color: red } : (tot.open ? { badge: 'NICHT ERTEILT', color: amber } : { badge: 'SPX', color: green });
+            sectionTitle(`Übersicht Vorverladeliste ${parent}`, totState);
+            doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(...mid);
+            doc.text(`LKW ${truckShortName(clicked.truckId)} · ${pluralize(list.length, 'Auftrag', 'Aufträge')} · ${pcs(tot.exp)} · Wareneingang ${tot.we} von ${tot.exp} · kontrolliert ${tot.sec} von ${tot.exp}` + (tot.open ? ` · offen ${tot.open}` : '') + (tot.dunkel ? ` · Dunkelalarm ${tot.dunkel}` : ''), M, y);
+            y += 6;
+            const ovBody = list.map(s => { const p = shipmentProgress(s), st = stateOf(p), ms = methodSummary(s); return [String(s.hawb), p.expected === null ? '–' : String(p.expected), String(p.we), String(p.counted), ms.codes.join(', ') || '–', st.badge + (p.pending ? `\n${p.pending} offen` : '')]; });
+            const ovColors = list.map(s => stateOf(shipmentProgress(s)).color);
+            doc.autoTable(Object.assign({}, tableBase, {
+                startY: y, head: [['Kundennr.', 'Packstücke', 'Wareneingang', 'Kontrolliert', 'Methode(n)', 'Sicherheitsstatus']], body: ovBody,
+                styles: { font: 'helvetica', fontSize: 9.5, cellPadding: { top: 2.6, bottom: 2.6, left: 3, right: 3 }, textColor: dark, lineColor: line, lineWidth: 0.25, overflow: 'linebreak', valign: 'middle' },
+                headStyles: { fillColor: fillHead, textColor: dark, fontStyle: 'bold', fontSize: 9 },
+                columnStyles: { 0: { cellWidth: 26, fontStyle: 'bold' }, 1: { cellWidth: 25, halign: 'right' }, 2: { cellWidth: 30, halign: 'right' }, 3: { cellWidth: 25, halign: 'right' }, 4: { cellWidth: 'auto' }, 5: { cellWidth: 40, fontStyle: 'bold' } },
+                didParseCell: data => { if (data.section === 'body' && data.column.index === 5) data.cell.styles.textColor = ovColors[data.row.index]; }
+            }));
+            y = doc.lastAutoTable.finalY + 8;
+            doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
+            if (tot.open || tot.dunkel) {
+                doc.setTextColor(...amber);
+                const hint = doc.splitTextToSize(`Hinweis: ${tot.open} von ${tot.exp} Packstücken noch nicht kontrolliert` + (tot.dunkel ? `, ${pluralize(tot.dunkel, 'offener Dunkelalarm', 'offene Dunkelalarme')}` : '') + ' – für die betroffenen Aufträge ist kein Sicherheitsstatus erteilt.', CW);
+                doc.text(hint, M, y); y += hint.length * 4.2 + 3;
+            }
+            doc.setTextColor(...mid);
+            doc.text('Für jeden Auftrag folgt auf den nächsten Seiten eine eigene Erklärung zur Sicherheit der Sendung mit Packstückliste.', M, y);
+            list.forEach((s, idx) => { doc.addPage(); header(); drawShipment(s, idx); });
+        } else {
+            drawShipment(clicked, 0);
+        }
         footer();
         const url = doc.output('bloburl');
         if (tab) { tab.location.href = url; }

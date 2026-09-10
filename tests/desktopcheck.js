@@ -583,7 +583,7 @@ function bigData() {
       await page.evaluate(() => document.querySelector('tr[data-basenumber="9008295951"] .hawb-cell').click()); await wait(400);
       await page.evaluate(() => document.querySelector('#detailView .detail-actions .pdf-btn').click()); await wait(1200);
       const p1 = await pdfText(); const calls1 = await page.evaluate(() => ({ calls: window.__openCalls, urls: window.__opened.length, detail: getComputedStyle(document.getElementById('detailView')).display !== 'none', err: document.getElementById('errorDisplay').textContent }));
-      assert(p1 && p1.pdf && p1.bytes > 20000 && p1.pages === 1 && calls1.calls === 1 && calls1.urls === 1 && calls1.detail && calls1.err === '', `Detail-Kopfzeile: PDF-Knopf öffnet neuen Tab mit 1-seitigem PDF, Details bleiben offen (${JSON.stringify(Object.assign({}, p1, calls1))})`);
+      assert(p1 && p1.pdf && p1.bytes > 20000 && p1.pages === 1 && calls1.calls === 1 && calls1.urls === 1 && calls1.detail && calls1.err === '', `Detail-Kopfzeile: PDF-Knopf öffnet neuen Tab mit 1-seitigem PDF (Erklärung + Packstückliste), Details bleiben offen (${JSON.stringify(Object.assign({}, p1, calls1))})`);
       // Kein Mail-Aufruf mehr an das Backend
       assert(!be.actions.some(a => a === 'sendPdfEmail'), 'Kein „sendPdfEmail“ mehr an den Server');
       // Liste: PDF-Knopf in der Zeile
@@ -596,21 +596,28 @@ function bigData() {
       await hook();
       await page.evaluate(() => document.querySelector('tr[data-basenumber="796201"] .pdf-btn').click()); await wait(1200);
       const p3 = await pdfText();
-      assert(p3 && p3.pdf && p3.bytes > p1.bytes * 0.8, `VW: Sammelnachweis für die VVL (${JSON.stringify(p3)})`);
+      assert(p3 && p3.pdf && p3.pages === 3 && p3.bytes > p1.bytes * 0.8, `VW: Sammelnachweis für die VVL = Übersicht + je Auftrag eine Seite (${JSON.stringify(p3)})`);
       // Inhalt prüfen: jsPDF komprimiert nicht standardmäßig → Texte stehen als Klartext im PDF
       // PDF-Text liegt als WinAnsi (latin1) vor; Klammern sind mit Backslash maskiert → ohne Klammern prüfen
       const pdfRaw = async () => Buffer.from(await page.evaluate(async () => { const r = await fetch(window.__opened[0]); const b = await r.arrayBuffer(); return Array.from(new Uint8Array(b)); }), 'binary').toString('latin1');
       const raw = await pdfRaw();
       const has = t => raw.includes(t);
       assert(has('Vorverladeliste 100004158949') && has('Kundennr. 796201') && has('Kundennr. 938203') && has('881292002') && has('7000001'), 'VW-Nachweis enthält beide Kundennummern, VSE und Sendungs-Nr.');
-      assert(has('Gesamt: 2 Aufträge') && has('nicht gesichert'), 'VW-Nachweis: Gesamtübersicht + Hinweis auf offene Packstücke');
+      assert(has('bersicht Vorverladeliste 100004158949') && has('2 Aufträge') && has('noch nicht kontrolliert') && has('Auftrag 2 von 2'), 'VW-Nachweis: Übersicht der VVL, Hinweis auf offene Packstücke, Aufträge nummeriert');
       // MAN-Inhalt
       await hook();
       await page.evaluate(() => document.querySelector('tr[data-basenumber="9008295951"] .pdf-btn').click()); await wait(1200);
       const raw2 = await pdfRaw();
       const h2 = t => raw2.includes(t);
       assert(h2('Rechnung 9008295951') && h2('PDF0001') && h2('PDF0003') && h2('Notiz A') && h2('VCK') && h2('Kombi') && h2('AUSTRALIEN') && h2('DHL') && h2('318101'), 'MAN-Nachweis: Rechnung, HUs, Notiz, Kombi, Spediteur/Land/PLSO enthalten');
-      assert(h2('2 Packstücke nicht gesichert') && h2('SPX by XRY') && h2('Kombi: VCK'), 'MAN-Nachweis: Offen-Hinweis, Sicherheitsstatus SPX by XRY, Kombi getrennt ausgewiesen');
+      assert(h2('NICHT ERTEILT') && h2('2 von 3 Packstücken noch nicht kontrolliert') && h2('Röntgenkontrolle') && h2('Sichtkontrolle'), 'MAN-Nachweis: Status NICHT ERTEILT bei offenen Packstücken, Kontrollmethoden im Klartext');
+      // Pflichtangaben der Sicherheitserklärung (DVO (EU) 2015/1998 Nr. 6.3.2.6): RegB-Kennung, Sendungskennung, Inhalt, Status, Methode, erteilt von/am
+      assert(h2('Reglementierter Beauftragter') && h2('DE/RA/00889-07') && h2('Eindeutige Kennung der') && h2('Inhalt der Sendung') && h2('Sicherheitsstatus') && h2('Grund der Erteilung') && h2('erteilt von / am') && h2('6.3.2.6') && h2('ohne Unterschrift'), 'MAN-Nachweis: Felder der Sicherheitserklärung nach 6.3.2.6 vorhanden, keine Unterschriftsfelder');
+      // Vollständig gesicherte Einzelsendung → SPX mit Name + Zeitpunkt der Erteilung
+      await hook();
+      await page.evaluate(() => document.querySelector('tr[data-basenumber="123"] .pdf-btn').click()); await wait(1200);
+      const raw3 = await pdfRaw();
+      assert(raw3.includes('SPX') && raw3.includes('sicher für Passagierflugzeuge') && raw3.includes('Zeitpunkt der letzten Kontrolle') && !raw3.includes('NICHT ERTEILT'), 'Einzelsendung 123 vollständig gesichert: Status SPX mit Zeitpunkt der Erteilung');
       assert(page.__errors.length === 0, `Keine JS-Fehler beim PDF (${page.__errors.join(' | ')})`);
       await page.close();
     }
