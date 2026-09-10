@@ -4188,8 +4188,9 @@ const PAGE_RENDERERS = {
             if (resetBtn) resetBtn.classList.toggle('hidden', !text && !anyFilter);
             const resetRow = document.getElementById('infoResetRow');
             if (resetRow) {
-                resetRow.classList.toggle('hidden', !text && !anyFilter);
-                const active = (text ? 1 : 0) + (infoState.status !== 'all' ? 1 : 0) + (infoState.truck !== 'all' ? 1 : 0) + (infoState.period !== 'all' ? 1 : 0) + (range ? 1 : 0);
+                // Nur bei gesetzten Filtern (Status/LKW/Zeitraum/Gewicht) – für reinen Suchtext genügt das X im Feld
+                resetRow.classList.toggle('hidden', !anyFilter);
+                const active = (infoState.status !== 'all' ? 1 : 0) + (infoState.truck !== 'all' ? 1 : 0) + (infoState.period !== 'all' ? 1 : 0) + (range ? 1 : 0);
                 document.getElementById('infoResetSummary').textContent = active ? `${active} Filter aktiv` : '';
             }
             results.innerHTML = '';
