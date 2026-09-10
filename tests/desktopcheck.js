@@ -609,15 +609,15 @@ function bigData() {
       await page.evaluate(() => document.querySelector('tr[data-basenumber="9008295951"] .pdf-btn').click()); await wait(1200);
       const raw2 = await pdfRaw();
       const h2 = t => raw2.includes(t);
-      assert(h2('Rechnung 9008295951') && h2('PDF0001') && h2('PDF0003') && h2('Notiz A') && h2('VCK') && h2('Kombi') && h2('AUSTRALIEN') && h2('DHL') && h2('318101'), 'MAN-Nachweis: Rechnung, HUs, Notiz, Kombi, Spediteur/Land/PLSO enthalten');
+      assert(h2('Rechnung 9008295951') && h2('PDF0001') && h2('PDF0003') && h2('Bemerkung zu PDF0003: Notiz A') && h2('VCK') && h2('Kombi'), 'MAN-Nachweis: Rechnung, HUs, Bemerkung als eigene Zeile, Kombi enthalten');
       assert(h2('NICHT ERTEILT') && h2('2 von 3 Packstücken noch nicht kontrolliert') && h2('Röntgenkontrolle') && h2('Sichtkontrolle'), 'MAN-Nachweis: Status NICHT ERTEILT bei offenen Packstücken, Kontrollmethoden im Klartext');
-      // Pflichtangaben der Sicherheitserklärung (DVO (EU) 2015/1998 Nr. 6.3.2.6): RegB-Kennung, Sendungskennung, Inhalt, Status, Methode, erteilt von/am
-      assert(h2('Reglementierter Beauftragter') && h2('DE/RA/00889-07') && h2('Eindeutige Kennung der') && h2('Inhalt der Sendung') && h2('Sicherheitsstatus') && h2('Grund der Erteilung') && h2('erteilt von / am') && h2('6.3.2.6') && h2('ohne Unterschrift'), 'MAN-Nachweis: Felder der Sicherheitserklärung nach 6.3.2.6 vorhanden, keine Unterschriftsfelder');
+      // Genau vier Kopfzeilen (Status, Methode, erteilt von/am, RegB) – kein Erklärungsblock, keine Legende, keine Unterschriftsfelder
+      assert(h2('Sicherheitsstatus') && h2('Kontrollmethode') && h2('Erteilt von / am') && h2('RegB-Nummer') && h2('DE/RA/00889-07') && h2('6.3.2.6') && h2('ohne Unterschrift') && !h2('Inhalt der Sendung') && !h2('Legende') && !h2('Unterschrift:'), 'MAN-Nachweis: vier Kopfzeilen + RegB-Nummer, kein Erklärungsblock/Legende/Unterschriftsfeld');
       // Vollständig gesicherte Einzelsendung → SPX mit Name + Zeitpunkt der Erteilung
       await hook();
       await page.evaluate(() => document.querySelector('tr[data-basenumber="123"] .pdf-btn').click()); await wait(1200);
       const raw3 = await pdfRaw();
-      assert(raw3.includes('SPX') && raw3.includes('sicher für Passagierflugzeuge') && raw3.includes('Zeitpunkt der letzten Kontrolle') && !raw3.includes('NICHT ERTEILT'), 'Einzelsendung 123 vollständig gesichert: Status SPX mit Zeitpunkt der Erteilung');
+      assert(raw3.includes('SPX') && raw3.includes('das Packstück wurde kontrolliert') && /Erteilt von \/ am/.test(raw3) && !raw3.includes('NICHT ERTEILT') && !raw3.includes('noch nicht erteilt'), 'Einzelsendung 123 vollständig gesichert: Status SPX, erteilt von/am gefüllt');
       assert(page.__errors.length === 0, `Keine JS-Fehler beim PDF (${page.__errors.join(' | ')})`);
       await page.close();
     }

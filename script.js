@@ -5572,11 +5572,11 @@ function pdfPackRows(shipment) {
     }
     return rows;
 }
-// Sicherungsnachweis als PDF im neuen Browser-Tab. Aufbau je Sendung: Erklärung zur Sicherheit der Sendung mit den
-// Angaben nach DVO (EU) 2015/1998, Anhang Nr. 6.3.2.6 (Kennung des RegB, Kennung der Sendung, Inhalt, Sicherheitsstatus,
-// Kontrollmethode als Grund der Erteilung, Name + Datum/Uhrzeit der Erteilung), danach die Packstückliste mit Methode
-// und Zeitpunkt je Packstück. Bei einer Vorverladeliste zuerst eine Übersicht, dann je Kundennummer eine eigene Seite.
-// Offene Packstücke werden ausgewiesen (Status „NICHT ERTEILT“) – der Nachweis wird trotzdem erzeugt.
+// Sicherungsnachweis als PDF im neuen Browser-Tab. Bewusst knapp: je Sendung Titel + Status-Badge, vier Zeilen
+// (Sicherheitsstatus, Kontrollmethode, erteilt von/am, RegB-Nummer) und die Packstückliste mit Methode und Zeitpunkt
+// je Packstück – damit sind die Angaben nach DVO (EU) 2015/1998, Anhang Nr. 6.3.2.6 abgedeckt (Kennung des RegB,
+// Kennung der Sendung, Inhalt, Status, Grund der Erteilung, Name + Zeitpunkt). Bei einer Vorverladeliste zuerst eine
+// Übersicht, dann je Kundennummer eine eigene Seite. Offene Packstücke → Status „NICHT ERTEILT“, Nachweis trotzdem.
 function openSecurityReport(base, shipmentsPool, preopenedTab) {
     const all = shipmentsPool || loadShipments();
     const clicked = all[base];
@@ -5589,7 +5589,7 @@ function openSecurityReport(base, shipmentsPool, preopenedTab) {
     try {
         const doc = new jsPDF({ unit: 'mm', format: 'a4' });
         const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
-        const M = 15, TOP = 43, BOTTOM = 24, CW = W - 2 * M;   // Seitenränder; TOP/BOTTOM = Platz für Kopf- und Fußzeile
+        const M = 15, TOP = 36, BOTTOM = 24, CW = W - 2 * M;   // Seitenränder; TOP/BOTTOM = Platz für Kopf- und Fußzeile
         const fmtDT = d => { const x = new Date(d); return isNaN(x) ? '' : x.toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
         const now = fmtDT(new Date());
         const isMan = s => !!(s.freightForwarder && s.destinationCountry);
@@ -5603,12 +5603,8 @@ function openSecurityReport(base, shipmentsPool, preopenedTab) {
         const header = () => {
             if (FIRMENLOGO_BASE64) { try { doc.addImage(FIRMENLOGO_BASE64, 'PNG', W - M - 46, M - 2, 46, 10); } catch (e) { /* Logo optional */ } }
             doc.setFont('helvetica', 'bold'); doc.setFontSize(17); doc.setTextColor(...dark); doc.text('Sicherungsnachweis', M, M + 5);
-            doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...mid);
-            doc.text('Erklärung zur Sicherheit der Sendung nach DVO (EU) 2015/1998, Anhang Nr. 6.3.2.6', M, M + 11.5);
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5); doc.setTextColor(...dark); doc.text(docRef, M, M + 18);
-            doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...mid);
-            doc.text(`${REGB_NAME} · Reglementierter Beauftragter ${RAC_NUMMER}`, W - M, M + 18, { align: 'right' });
-            doc.setDrawColor(...line); doc.setLineWidth(0.4); doc.line(M, M + 22, W - M, M + 22);
+            doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5); doc.setTextColor(...mid); doc.text(docRef, M, M + 12);
+            doc.setDrawColor(...line); doc.setLineWidth(0.4); doc.line(M, M + 16, W - M, M + 16);
             y = TOP;
         };
         const footer = () => {
@@ -5617,9 +5613,9 @@ function openSecurityReport(base, shipmentsPool, preopenedTab) {
                 doc.setPage(p);
                 doc.setDrawColor(...line); doc.setLineWidth(0.3); doc.line(M, H - 17, W - M, H - 17);
                 doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...mid);
-                doc.text(`${docRef} · Reglementierter Beauftragter ${RAC_NUMMER}`, M, H - 12.5);
+                doc.text(`${docRef} · ${REGB_NAME} · Reglementierter Beauftragter ${RAC_NUMMER}`, M, H - 12.5);
                 doc.text(`Seite ${p} von ${pages}`, W - M, H - 12.5, { align: 'right' });
-                doc.text(`Elektronisch erstellt am ${now} Uhr von ${MITARBEITER_NAME} · Fracht-Tracker`, M, H - 8.5);
+                doc.text(`Maschinell erstellt am ${now} Uhr von ${MITARBEITER_NAME} · ohne Unterschrift gültig · Angaben nach DVO (EU) 2015/1998, Anhang Nr. 6.3.2.6`, M, H - 8.5);
             }
         };
         const ensure = need => { if (y + need > H - BOTTOM) { doc.addPage(); header(); } };
@@ -5634,10 +5630,10 @@ function openSecurityReport(base, shipmentsPool, preopenedTab) {
         const sectionTitle = (text, st) => { ensure(40); doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(...dark); doc.text(text, M, y + 5); if (st) badge(st.badge, st.color, W - M, y); y += 12; };
         // Sicherheitsstatus der Sendung (SPX nur, wenn alle Packstücke kontrolliert sind)
         const stateOf = p => {
-            if (p.dunkel > 0) return { key: 'dunkel', color: red, badge: 'DUNKELALARM', status: `NICHT ERTEILT – Dunkelalarm offen (${pcs(p.dunkel)}): Kontrolle mit einer anderen geeigneten Methode erforderlich` };
-            if (p.open) return { key: 'open', color: amber, badge: 'NICHT ERTEILT', status: `NICHT ERTEILT – ${p.pending} von ${p.expected} Packstücken noch nicht kontrolliert` };
-            if (p.unknown) return p.counted > 0 ? { key: 'unknown', color: amber, badge: 'STÜCKZAHL FEHLT', status: `Stückzahl nicht hinterlegt – ${pcs(p.counted)} kontrolliert, Vollständigkeit der Sendung nicht bestätigt` } : { key: 'open', color: amber, badge: 'NICHT ERTEILT', status: 'NICHT ERTEILT – keine Kontrolle erfasst' };
-            return { key: 'ok', color: green, badge: 'SPX', status: 'SPX – sicher für Passagierflugzeuge, Nurfrachtflugzeuge und Nurpostflugzeuge' };
+            if (p.dunkel > 0) return { key: 'dunkel', color: red, badge: 'DUNKELALARM', status: `NICHT ERTEILT – Dunkelalarm offen (${pcs(p.dunkel)}), andere Kontrollmethode erforderlich` };
+            if (p.open) return { key: 'open', color: amber, badge: 'NICHT ERTEILT', status: p.counted ? `NICHT ERTEILT – ${p.pending} von ${p.expected} Packstücken noch nicht kontrolliert` : `NICHT ERTEILT – noch kein Packstück kontrolliert (${pcs(p.expected)})` };
+            if (p.unknown) return p.counted > 0 ? { key: 'unknown', color: amber, badge: 'STÜCKZAHL FEHLT', status: `Stückzahl nicht hinterlegt – ${pcs(p.counted)} kontrolliert` } : { key: 'open', color: amber, badge: 'NICHT ERTEILT', status: 'NICHT ERTEILT – keine Kontrolle erfasst' };
+            return { key: 'ok', color: green, badge: 'SPX', status: p.expected === 1 ? 'SPX – das Packstück wurde kontrolliert' : `SPX – alle ${p.expected} Packstücke kontrolliert` };
         };
         const methodSummary = s => {
             const counts = {}, kombi = {};
@@ -5646,57 +5642,30 @@ function openSecurityReport(base, shipmentsPool, preopenedTab) {
             return { main: fmt(counts), kombi: fmt(kombi), codes: Object.keys(counts).sort() };
         };
         const lastSecured = s => (s.scannedItems || []).filter(i => i && !i.isCancelled && !i.isCombination && EXCLUSIVE_SECURITY_STATUSES.includes(i.status)).reduce((m, i) => Math.max(m, Date.parse(i.timestamp) || 0), 0);
-        const declarationRows = (s, p, st, ms, rows) => {
-            const exp = p.expected === null ? '–' : p.expected;
-            const out = [['Reglementierter Beauftragter', `${REGB_NAME}\nKennung: ${RAC_NUMMER}`]];
-            const ident = [refOf(s)];
-            if (s.parentOrderNumber) ident.push(`Vorverladeliste ${s.parentOrderNumber}`);
-            if (s.plsoNumber && s.plsoNumber !== 'N/A') ident.push(`PLSO ${s.plsoNumber}`);
-            out.push(['Eindeutige Kennung der Sendung', ident.join(' · ')]);
-            const deliv = [];
-            if (s.freightForwarder) deliv.push(`Spediteur ${s.freightForwarder}`);
-            if (s.truckId) deliv.push(`LKW ${truckShortName(s.truckId)}`);
-            if (deliv.length) out.push(['Anlieferung durch', deliv.join(' · ')]);
-            if (s.destinationCountry) out.push(['Bestimmungsland', String(s.destinationCountry)]);
-            const kg = s.isHuListOrder ? detailUniqueKg(s) : shipmentTotalKg(s);
-            const packs = [...new Set(rows.map(r => r.packaging).filter(Boolean))];
-            const content = [p.expected === null ? 'Stückzahl nicht hinterlegt' : pcs(p.expected)];
-            if (kg !== null) content.push(`Gesamtgewicht ${formatKg(kg)}`);
-            if (packs.length) content.push(`Verpackung: ${packs.join(', ')}`);
-            out.push(['Inhalt der Sendung', content.join(' · ') + ' – Einzelaufstellung siehe Packstückliste']);
-            out.push(['Bearbeitungsstand', `Wareneingang ${p.we} von ${exp} · kontrolliert ${p.counted} von ${exp}` + (p.pending ? ` · offen ${p.pending}` : '') + (p.dunkel ? ` · Dunkelalarm ${p.dunkel}` : '')]);
-            out.push(['Sicherheitsstatus', st.status]);
-            out.push(['Kontrollmethode(n)\n(Grund der Erteilung)', ms.main.length ? ms.main.join('\n') + (ms.kombi.length ? `\nzusätzlich (Kombi): ${ms.kombi.join(', ')}` : '') : 'keine Kontrolle erfasst']);
+        const summaryLines = (s, st, ms) => {
             const t = lastSecured(s), who = s.mitarbeiter || MITARBEITER_NAME;
-            out.push(['Sicherheitsstatus\nerteilt von / am', (st.key === 'ok' || st.key === 'unknown') ? `${who} · ${fmtDT(t)} Uhr (Zeitpunkt der letzten Kontrolle)` : (t ? `noch nicht erteilt (letzte Kontrolle ${fmtDT(t)} Uhr durch ${who})` : 'noch nicht erteilt')]);
-            return out;
+            return [
+                ['Sicherheitsstatus', st.status, st.color],
+                ['Kontrollmethode', ms.main.length ? ms.main.join(' · ') + (ms.kombi.length ? `\nzusätzlich Kombi: ${ms.kombi.join(', ')}` : '') : 'keine Kontrolle erfasst'],
+                ['Erteilt von / am', (st.key === 'ok' || st.key === 'unknown') ? `${who} · ${fmtDT(t)} Uhr` : (t ? `noch nicht erteilt · letzte Kontrolle ${fmtDT(t)} Uhr, ${who}` : 'noch nicht erteilt')],
+                ['RegB-Nummer', `${RAC_NUMMER} · ${REGB_NAME}`]
+            ];
         };
         const drawShipment = (s, idx) => {
             const p = shipmentProgress(s), st = stateOf(p), rows = pdfPackRows(s), ms = methodSummary(s);
             sectionTitle(parent ? `${refOf(s)} – Auftrag ${idx + 1} von ${list.length}` : refOf(s), st);
-            // Block 1: Erklärung zur Sicherheit der Sendung
-            const decl = declarationRows(s, p, st, ms, rows);
-            const statusRow = decl.findIndex(r => r[0] === 'Sicherheitsstatus');
-            doc.autoTable(Object.assign({}, tableBase, {
-                startY: y, head: [[{ content: 'Erklärung zur Sicherheit der Sendung (Consignment Security Declaration)', colSpan: 2 }]], body: decl,
-                styles: { font: 'helvetica', fontSize: 9.5, cellPadding: { top: 2.3, bottom: 2.3, left: 3, right: 3 }, textColor: dark, lineColor: line, lineWidth: 0.25, overflow: 'linebreak', valign: 'top' },
-                headStyles: { fillColor: fillHead, textColor: dark, fontStyle: 'bold', fontSize: 10 },
-                columnStyles: { 0: { cellWidth: 52, fontStyle: 'bold', textColor: mid, fillColor: fillLabel }, 1: { cellWidth: 'auto' } },
-                didParseCell: data => { if (data.section === 'body' && data.column.index === 1 && data.row.index === statusRow) { data.cell.styles.textColor = st.color; data.cell.styles.fontStyle = 'bold'; } }
-            }));
-            y = doc.lastAutoTable.finalY + 6;
-            // Erklärungstext (Aussteller, Grundlage, Hinweis auf offene Packstücke, maschinelle Erstellung)
-            const txt = ['Der oben genannte reglementierte Beauftragte erklärt, dass die in der Packstückliste mit einer Kontrollmethode ausgewiesenen Packstücke dieser Sendung kontrolliert wurden und der Sicherheitsstatus zum angegebenen Zeitpunkt durch die genannte Person erteilt wurde (Durchführungsverordnung (EU) 2015/1998, Anhang Nr. 6.3.2.6).'];
-            if (st.key === 'open' || st.key === 'dunkel') txt.push('Für Packstücke ohne Kontrolle ist kein Sicherheitsstatus erteilt; die Sendung darf insoweit nicht als gesicherte Luftfracht übergeben werden.');
-            txt.push('Dieses Dokument wurde maschinell erstellt und ist ohne Unterschrift gültig.');
-            doc.setFont('helvetica', 'normal'); doc.setFontSize(8.8); doc.setTextColor(...dark);
-            const para = doc.splitTextToSize(txt.join(' '), CW);
-            ensure(para.length * 3.9 + 6);
-            doc.setFont('helvetica', 'normal'); doc.setFontSize(8.8); doc.setTextColor(...dark);   // header() nach Umbruch setzt die Schrift um
-            doc.text(para, M, y + 2); y += para.length * 3.9 + 9;
-            // Block 2: Packstückliste
+            // Vier Zeilen: Status, Methode, erteilt von/am, RegB
+            const LW = 42;
+            summaryLines(s, st, ms).forEach(([label, value, color]) => {
+                const lines = doc.splitTextToSize(value, CW - LW);
+                ensure(lines.length * 4.6 + 3);
+                doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(...mid); doc.text(label, M, y);
+                doc.setFont('helvetica', color ? 'bold' : 'normal'); doc.setTextColor(...(color || dark)); doc.text(lines, M + LW, y);
+                y += lines.length * 4.6 + 2.2;
+            });
+            y += 6;
+            // Packstückliste
             ensure(45);
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(...dark); doc.text('Packstückliste', M, y + 4); y += 8;
             const hasPos = rows.some(r => r.pos), hasSub = rows.some(r => r.sub);
             const cols = [];
             if (hasPos) cols.push({ h: 'Pos.', w: 12, get: r => r.pos, st: { halign: 'right' } });
@@ -5714,15 +5683,13 @@ function openSecurityReport(base, shipmentsPool, preopenedTab) {
                 if (r.notes.length) { body.push([{ content: `Bemerkung zu ${r.nr}: ${r.notes.join('; ')}`, colSpan: cols.length, styles: { fontStyle: 'italic', textColor: mid, halign: 'left' } }]); meta.push({ r, note: true }); }
             });
             const columnStyles = {}; cols.forEach((c, i) => { columnStyles[i] = Object.assign({ cellWidth: c.w }, c.st || {}); });
-            const legend = 'Kontrolle = angewandte Kontrollmethode (Code nach DVO (EU) 2015/1998, Anhang Nr. 6.3.2.6 Buchst. e): XRY = Röntgenkontrolle · ETD = Sprengstoffspurendetektion · EDD = Sprengstoffspürhund · PHS = Durchsuchung von Hand · VCK = Sichtkontrolle. Kombi = zusätzliche Kontrolle desselben Packstücks (keine eigenständige Sicherung). Offen = noch nicht kontrolliert. Dunkelalarm = Kontrolle nicht auswertbar, andere geeignete Methode erforderlich. WE = Wareneingang erfasst.';
             if (body.length) {
                 doc.autoTable(Object.assign({}, tableBase, {
-                    startY: y, head: [cols.map(c => c.h)], body, foot: [[{ content: legend, colSpan: cols.length }]], showFoot: 'lastPage',
+                    startY: y, head: [cols.map(c => c.h)], body,
                     margin: { left: M, right: M, top: TOP + 8, bottom: BOTTOM },
                     didDrawPage: data => { if (data.pageNumber > 1) { header(); doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(...dark); doc.text(`${refOf(s)} – Packstückliste (Fortsetzung)`, M, TOP + 3); } },
                     styles: { font: 'helvetica', fontSize: 8.5, cellPadding: { top: 2.2, bottom: 2.2, left: 2, right: 2 }, textColor: dark, lineColor: line, lineWidth: 0.25, overflow: 'linebreak', valign: 'middle' },
                     headStyles: { fillColor: fillHead, textColor: dark, fontStyle: 'bold', valign: 'middle' },
-                    footStyles: { fillColor: [255, 255, 255], textColor: mid, fontStyle: 'normal', fontSize: 7.8, lineWidth: 0, halign: 'left', cellPadding: { top: 2.5, bottom: 0, left: 0, right: 0 } },
                     columnStyles,
                     didParseCell: data => {
                         if (data.section !== 'body') return;
@@ -5763,8 +5730,6 @@ function openSecurityReport(base, shipmentsPool, preopenedTab) {
                 const hint = doc.splitTextToSize(`Hinweis: ${tot.open} von ${tot.exp} Packstücken noch nicht kontrolliert` + (tot.dunkel ? `, ${pluralize(tot.dunkel, 'offener Dunkelalarm', 'offene Dunkelalarme')}` : '') + ' – für die betroffenen Aufträge ist kein Sicherheitsstatus erteilt.', CW);
                 doc.text(hint, M, y); y += hint.length * 4.2 + 3;
             }
-            doc.setTextColor(...mid);
-            doc.text('Für jeden Auftrag folgt auf den nächsten Seiten eine eigene Erklärung zur Sicherheit der Sendung mit Packstückliste.', M, y);
             list.forEach((s, idx) => { doc.addPage(); header(); drawShipment(s, idx); });
         } else {
             drawShipment(clicked, 0);
