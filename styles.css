@@ -1,1357 +1,2876 @@
-
-    :root{--primary-color:#5cb85c;--primary-hover:#4cae4c;--secondary-color:#5bc0de;--secondary-hover:#31b0d5;--danger-color:#d9534f;--danger-hover:#c9302c;--warning-color:#f0ad4e;--warning-hover:#ec971f;--info-color:#5bc0de;--info-hover:#31b0d5;--light-bg:#f9f9f9;--border-color:#ddd;--text-color:#333;--cancelled-color:#999;}
-    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;margin:0;padding:0;background-color:#f4f4f4;color:var(--text-color);font-size:16px;-webkit-text-size-adjust:100%;-webkit-touch-callout:none;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;position:relative}
-    input[type="text"],input[type="number"]{-webkit-user-select:text;user-select:text}
-    .container{padding:10px;max-width:100%;box-sizing:border-box}
-    h1,h2{text-align:center;margin-top:15px;margin-bottom:15px} h1{font-size:1.6em} h2{font-size:1.3em}
-    .input-section{margin-bottom:10px;margin-top:10px;padding:15px;border:1px solid var(--border-color);border-radius:8px;background-color:var(--light-bg);display:flex;flex-direction:column;gap:15px}
-    .controls-row{display:flex;flex-wrap:wrap;gap:15px;align-items:center;padding-top:5px}
-    label{display:block;margin-bottom:5px;font-weight:bold}
-    input[type="text"],select,input[type="number"]{width:100%;padding:12px 10px;border:1px solid #ccc;border-radius:5px;box-sizing:border-box;font-size:1em;height:44px}
-    input:disabled{background-color:#eee;cursor:not-allowed}
-    .input-wrapper{position:relative}
-    .clear-input-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:#bbb;color:white;border:none;border-radius:50%;width:24px;height:24px;font-size:16px;line-height:22px;text-align:center;cursor:pointer;display:none;padding:0}
-    .clear-input-btn:hover{background:#999}
-    .input-wrapper input[type="text"]{padding-right:35px}
-    .combo-checkbox-group{display:none;align-items:center;padding:5px 0} .combo-checkbox-group input{width:20px;height:20px;margin-right:8px} .combo-checkbox-group label{margin-bottom:0;font-weight:normal;font-size:1em;cursor:pointer} #comboCheckboxContainer.visible{display:flex}
-    .note-toggle-btn{background-color:#f0f0f0;border:1px solid #ccc;border-radius:5px;padding:5px 8px;font-size:1.2em;line-height:1;cursor:pointer;transition:background-color .2s,border-color .2s,color .2s;margin-left:auto;flex-shrink:0;height:38px;width:45px;display:flex;align-items:center;justify-content:center}
-    .note-toggle-btn:hover{background-color:#e0e0e0}
-    .note-toggle-btn.note-active{background-color:var(--warning-color);border-color:var(--warning-hover);color:white}
-    .note-input-area{display:none;margin-top:10px;padding:10px;border:1px dashed var(--warning-color);border-radius:5px;background-color:#fffaf0}
-    .note-input-area label{font-weight:bold;margin-bottom:5px;display:block}
-    .note-input-area .input-wrapper{position:relative}
-    .note-input-area input[type="text"]{width:100%;padding-right:35px;height:44px;box-sizing:border-box}
-    .clear-note-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:#bbb;color:white;border:none;border-radius:50%;width:24px;height:24px;font-size:16px;line-height:22px;text-align:center;cursor:pointer;padding:0;display:block !important}
-    .clear-note-btn:hover{background:#999}
-    .main-action-button{background-color:var(--primary-color);color:white;padding:12px 15px;border:none;border-radius:5px;cursor:pointer;font-size:1.1em;height:48px;text-align:center;width:100%;transition:background-color .2s} .main-action-button:hover,.main-action-button:active{background-color:var(--primary-hover)}
-    .delete-btn{background-color:var(--danger-color) !important}
-    .delete-btn:hover,.delete-btn:active{background-color:var(--danger-hover) !important}
-    #newTotalSection{display:none;flex-direction:column;gap:10px;border-top:1px solid #ccc;margin-top:15px;padding-top:15px}
-    #newTotalSection.visible{display:flex}
-    #newTotalSection div{display:flex;gap:10px;margin-top:10px}
-    #newTotalSection button{flex-grow:1}
-    #confirmNewTotalBtn{background-color:var(--primary-color)}
-    #confirmNewTotalBtn:hover{background-color:var(--primary-hover)}
-    #skipNewTotalBtn{background-color:var(--secondary-color)}
-    #skipNewTotalBtn:hover{background-color:var(--secondary-hover)}
-    .batch-controls{display:flex;justify-content:flex-end;align-items:center;margin-bottom:5px;padding:8px 10px;background-color:#e9e9e9;border-radius:5px;gap:15px;position:relative;z-index:10}
-    #menu-toggle-btn{background-color:var(--secondary-color);color:white;border:none;border-radius:5px;padding:6px 10px;font-size:1.2em;line-height:1;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.1);order:-1;margin-right:auto}
-    #menu-toggle-btn:hover{background-color:var(--secondary-hover)}
-    .batch-controls label{margin:0}
-    .batch-toggle-switch{position:relative;display:inline-block;width:50px;height:28px;flex-shrink:0}
-    .batch-toggle-switch input{opacity:0;width:0;height:0}
-    .batch-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#ccc;transition:.4s;border-radius:28px}
-    .batch-slider:before{position:absolute;content:"";height:20px;width:20px;left:4px;bottom:4px;background-color:white;transition:.4s;border-radius:50%}
-    input:checked+.batch-slider{background-color:var(--primary-color)}
-    input:checked+.batch-slider:before{transform:translateX(22px)}
-    .batch-status-display{font-size:.9em;color:#555;text-align:right;margin-left:5px}
-    .batch-area{display:none;margin-top:15px;padding:10px;border:1px solid var(--info-color);border-radius:8px;background-color:#f0f8ff} .batch-area.visible{display:block} .batch-area h3{margin-top:0;text-align:center;color:var(--info-color);font-size:1.1em} #batchList{list-style-type:none;padding:0;margin:10px 0;max-height:150px;overflow-y:auto;border:1px solid #eee;background-color:#fff;border-radius:4px} #batchList li{display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border-bottom:1px solid #eee;font-family:monospace;font-size:.95em} #batchList li:last-child{border-bottom:none} .remove-batch-item{background-color:var(--danger-color);color:white;border:none;border-radius:3px;padding:2px 5px;font-size:.8em;cursor:pointer;margin-left:10px} .batch-action-buttons{display:flex;justify-content:space-around;margin-top:10px;gap:10px} .batch-action-buttons button{flex-grow:1;padding:10px;font-size:1em;border-radius:5px;border:none;cursor:pointer;transition:background-color .2s} #saveBatchButton{background-color:var(--primary-color);color:white} #saveBatchButton:hover{background-color:var(--primary-hover)} #clearBatchButton{background-color:var(--warning-color);color:white} #clearBatchButton:hover{background-color:var(--warning-hover)}
-    .error{color:var(--danger-color);font-weight:bold;margin-top:5px;min-height:1.2em;text-align:center;padding:5px}
-    #currentShipmentDetails{margin-top:15px;padding:10px;background-color:#eef;border:1px dashed #aac;border-radius:8px;font-size:.9em;line-height:1.5}
-    #currentShipmentDetails strong{color:#335;display:block;margin-bottom:8px}
-    #currentShipmentDetails ul{margin:5px 0;padding-left:5px;list-style-type:none}
-    #currentShipmentDetails li{margin-bottom:4px;padding-bottom:4px;font-family:monospace;white-space:pre-wrap;position:relative;padding-right:70px;border-bottom:1px dotted #ccc;line-height:1.3}
-    #currentShipmentDetails li .timestamp{color:#557;display:block;font-size:.9em}
-    #currentShipmentDetails li .status{font-weight:bold}
-    #currentShipmentDetails li .combo{font-style:italic;color:#66a;margin-left:5px}
-    #currentShipmentDetails li.cancelled-item{text-decoration:line-through;color:var(--cancelled-color)}
-    #currentShipmentDetails li.cancelled-item .timestamp,#currentShipmentDetails li.cancelled-item .status,#currentShipmentDetails li.cancelled-item .combo,#currentShipmentDetails li.cancelled-item .note-display,#currentShipmentDetails li.cancelled-item .editable-note,#currentShipmentDetails li.cancelled-item .add-note-link{color:var(--cancelled-color) !important;cursor:default;text-decoration:none}
-    #currentShipmentDetails li.cancelled-item .add-note-link{display:none}
-    #currentShipmentDetails li .cancelled-info{font-size:.85em;display:block;text-decoration:none !important;color:#777}
-    .cancel-button{position:absolute;right:5px;top:50%;transform:translateY(-50%);background-color:var(--warning-color);color:white;border:none;border-radius:4px;padding:3px 6px;font-size:.8em;cursor:pointer;transition:background-color .2s}
-    .cancel-button:hover,.cancel-button:active{background-color:var(--warning-hover)}
-
-    #currentShipmentDetails li .editable-note{cursor:pointer;text-decoration-style:dotted;color:#007bff;margin-left:5px;font-size:.9em;font-style:italic}
-    #currentShipmentDetails li .add-note-link{cursor:pointer;color:#007bff;font-size:.9em;text-decoration:none;padding-left:10px;font-style:italic}
-    #currentShipmentDetails li .editable-note:hover,#currentShipmentDetails li .add-note-link:hover{color:#0056b3;text-decoration:underline;text-decoration-style:solid}
-    /* Die Regel ::before wird nicht mehr benÃ¶tigt und kann gelÃ¶scht werden */
+/* ===================================================================
+   FRACHT TRACKER – Stylesheet
+   -------------------------------------------------------------------
+   Aufbau:
+     1. Design-Tokens (Farben, Abstände, Radien, Schrift, Schatten)
+     2. Basis / Reset
+     3. App-Bar & Layout
+     4. Formulare & Buttons
+     5. Scan-Bereich (Input-Section)
+     6. Batch-Bereich
+     7. Sendungs-Karten (Tabelle)
+     8. Detailansicht
+     9. Seitenmenü
+    10. Modals (Bottom-Sheet auf Mobil, zentriert am Desktop)
+    11. Offene-HU-Listen, HU-Details, Korrekturvorschlag
+    12. Feedback (Fehlerzeile, Toast-Optik, Lade-Spinner)
+    13. Animationen & Utilities
+    14. Desktop-Layout (≥ 992px)
+    15. Dark Mode (prefers-color-scheme)
+   -------------------------------------------------------------------
+   Alle Klassen/IDs, die script.js setzt oder abfragt, sind unverändert.
+   =================================================================== */
 
 
-    #currentShipmentDetails li .note-display{display:inline;padding-left:0;margin-top:0;font-style:italic;color:#448}
-    #currentShipmentDetails li .note-prefix{display:inline;font-size:.9em;color:#448;margin-top:3px;padding-left:10px;font-style:italic}
- 
+/* ===================================================================
+   1. DESIGN-TOKENS
+   =================================================================== */
+:root {
+    color-scheme: light dark;
 
-    #currentShipmentDetails .summary{margin-top:10px;border-top:1px solid #ccc;padding-top:8px;font-weight:bold} #currentShipmentDetails .summary span{display:block;margin-bottom:3px} /* --- DURCH DIESEN BLOCK ERSETZEN --- */
-.summary .ok, .summary-cell .ok {color:green} 
-.summary .mismatch, .summary-cell .mismatch {color:orange} 
-.summary .over, .summary-cell .over {color:red;font-weight:bold}
-    table{width:100%;border-collapse:collapse;margin-top:20px} thead{display:none} tr{display:block;margin-bottom:15px;border:1px solid var(--border-color);border-radius:8px;padding:12px;background-color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.1)} td{display:block;text-align:right;border:none;border-bottom:1px dotted #eee;padding:8px 0;position:relative;padding-left:40%;min-height:24px;font-size:.95em} td:last-child{border-bottom:none} td::before{content:attr(data-label);position:absolute;left:0;width:38%;padding-right:10px;white-space:nowrap;text-align:left;font-weight:bold;color:#555} td.summary-cell span,td.summary-cell strong{display:block} td.actions-cell{text-align:center;padding-left:0;padding-top:10px}
-    td.actions-cell button.edit-btn{background-color:#6c757d} td.actions-cell button.edit-btn:hover{background-color:#5a6268} body.batch-mode-active td.actions-cell button.edit-btn{display:none}
-    td.actions-cell button {
-        background-color: var(--secondary-color);
-        color: white;
-        border: none;
-        padding: 8px 10px;
-        border-radius: 5px;
-        cursor: pointer;
-        font-size: .9em;
-        /* margin: 3px; <-- Diese Zeile wird entfernt */
-        transition: background-color .2s;
-        min-width: 70px;
-    }
-     td.actions-cell button:hover,td.actions-cell button:active{background-color:var(--secondary-hover)}
-    
-   
-    .modal-content{background-color:#fefefe;margin:auto;padding:20px;border:1px solid #888;border-radius:8px;width:90%;max-width:450px;box-shadow:0 4px 8px rgba(0,0,0,.2);position:relative}
-    .modal-content h3{margin-top:0;text-align:center}
-    .modal-content .form-group{margin-bottom:15px}
-    .modal-content label{display:block;margin-bottom:5px;font-weight:bold}
-    .modal-content input[type="number"],.modal-content input[type="text"]{font-size:1em}
-    .modal-content input[readonly]{background-color:#eee;cursor:not-allowed}
-    .modal-actions{display:flex;justify-content:space-between;margin-top:20px;gap:10px}
-    .modal-actions button{padding:10px 15px;border-radius:5px;border:none;cursor:pointer;font-size:1em;flex-grow:1}
-    #saveEditButton{background-color:var(--primary-color);color:white}
-    #cancelEditButton{background-color:#aaa;color:white}
-    #confirmBatchNoteButton{background-color:var(--primary-color)}
-    #skipBatchNoteButton{background-color:var(--secondary-color)}
-    .side-menu{position:fixed;top:0;left:0;width:280px;max-width:80%;height:100vh;background-color:#fff;box-shadow:2px 0 5px rgba(0,0,0,.2);transform:translateX(-100%);transition:transform .3s ease-in-out;z-index:1010;padding:20px;box-sizing:border-box;display:flex;flex-direction:column;overflow-y:auto}
-    .side-menu.open{transform:translateX(0)}
-    .side-menu h3{margin-top:0;margin-bottom:25px;text-align:center;color:var(--text-color)}
-    .side-menu #sendToSheetButton{background-color:var(--info-color);width:100%;margin-top:15px}
-    .side-menu #sendToSheetButton:hover{background-color:var(--info-hover)}
-    .side-menu #sheetStatus{margin-top:10px;margin-bottom:15px;min-height:1.2em;font-weight:bold;text-align:center}
-    .side-menu #resetDataButton{margin-top:10px;width:100%}
-    .side-menu #sendSummaryEmailButton{margin-top:10px;width:100%;background-color:var(--warning-color)}
-    .side-menu #sendSummaryEmailButton:hover{background-color:var(--warning-hover)}
-    .menu-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background-color:rgba(0,0,0,.5);opacity:0;visibility:hidden;transition:opacity .3s ease-in-out,visibility .3s ease-in-out;z-index:1000}
-    .menu-overlay.visible{opacity:1;visibility:visible}
-    .status-and-button-container {
-    display: flex;
-    align-items: flex-end; /* Richtet Select und Button an ihrer Unterkante aus */
-    gap: 15px; /* Konsistenter Abstand, wie in .input-section */
-}
+    /* --- Neutrale Skala --- */
+    --n-0:   #ffffff;
+    --n-50:  #f8fafc;
+    --n-100: #f1f5f9;
+    --n-200: #e2e8f0;
+    --n-300: #cbd5e1;
+    --n-400: #94a3b8;
+    --n-500: #64748b;
+    --n-600: #475569;
+    --n-700: #334155;
+    --n-800: #1e293b;
+    --n-900: #0f172a;
 
-.status-select-wrapper {
-    flex-grow: 1; /* Erlaubt dem Select-Wrapper (mit Label), den verfÃ¼gbaren Platz einzunehmen */
-}
+    /* --- Akzent (Blau) --- */
+    --accent:        #2563eb;
+    --accent-hover:  #1d4ed8;
+    --accent-soft:   #dbeafe;
+    --accent-text:   #1e40af;
 
-/* Ãberschreibt die Breite fÃ¼r mainActionButton, wenn er im neuen Container ist */
-/* --- START DER ÃNDERUNG --- */
+    /* --- Semantische Farben --- */
+    --success:       #16a34a;
+    --success-hover: #15803d;
+    --success-soft:  #dcfce7;
+    --success-text:  #166534;
 
-/* Ãberschreibt die Breite und HÃ¶he fÃ¼r mainActionButton, wenn er im neuen Container ist */
-.status-and-button-container > #mainActionButton {
-    width: auto; /* BehÃ¤lt die automatische Breitenanpassung bei */
-    flex-shrink: 0; /* Verhindert, dass der Button schrumpft */
-    height: 44px; /* Angleichen an die HÃ¶he des Select-Feldes (war 48px) */
-    padding-top: 10px; /* Vertikales Padding anpassen (war 12px) */
-    padding-bottom: 10px; /* Vertikales Padding anpassen (war 12px) */
-    /* padding-left und padding-right (15px) bleiben unverÃ¤ndert von .main-action-button */
-    line-height: normal; /* Stellt sicher, dass line-height die Zentrierung nicht stÃ¶rt, falls es woanders gesetzt wurde */
-    /* Die SchriftgrÃ¶Ãe (font-size: 1.1em) wird von .main-action-button geerbt */
-}
-    /* --- START: NEUE STILE FÃR MEHRERE NOTIZEN --- */
-    #currentShipmentDetails .notes-container {
-        margin-top: 5px;
-        padding-left: 15px; /* EinrÃ¼ckung fÃ¼r den gesamten Notiz-Block */
-        display: flex;
-        flex-direction: column;
-        gap: 3px;
-    }
-    #currentShipmentDetails .note-item {
-        display: flex;
-        align-items: center;
-        gap: 8px; /* Abstand zwischen Notiztext und LÃ¶schen-Button */
-    }
-#currentShipmentDetails .note-item .note-prefix {
-    font-weight: bold;
-    color: #555;
-    margin-right: 4px; /* Kleiner Abstand zum Notiztext */
-}
-    #currentShipmentDetails .note-item .editable-note {
-        flex-grow: 1; /* Notiztext nimmt verfÃ¼gbaren Platz ein */
-    }
-    #currentShipmentDetails .note-item .delete-note-btn {
-        background-color: #e7e7e7;
-        color: #888;
-        border: 1px solid #ccc;
-        border-radius: 50%;
-        width: 20px;
-        height: 20px;
-        font-size: 12px;
-        line-height: 18px;
-        text-align: center;
-        cursor: pointer;
-        padding: 0;
-        flex-shrink: 0;
-        transition: all 0.2s;
-    }
-    #currentShipmentDetails .note-item .delete-note-btn:hover {
-        background-color: var(--danger-color);
-        color: white;
-        border-color: var(--danger-hover);
-    }
-    /* --- ENDE: NEUE STILE FÃR MEHRERE NOTIZEN --- */
-/* --- ENDE DER ÃNDERUNG --- */
-#newTotalSection.warning-existing {
-    background-color: #f2dede; /* Heller Rotton */
-    border-color: #ebccd1;
-    border-style: solid;
-    border-width: 1px;
-}
-#newTotalSection.warning-existing label {
-    color: #a94442; /* Dunkelroter Text */
-    font-weight: bold;
+    --warning:       #d97706;
+    --warning-hover: #b45309;
+    --warning-soft:  #fef3c7;
+    --warning-text:  #92400e;
+
+    --danger:        #dc2626;
+    --danger-hover:  #b91c1c;
+    --danger-soft:   #fee2e2;
+    --danger-text:   #991b1b;
+
+    --info:          #0891b2;
+    --info-hover:    #0e7490;
+    --info-soft:     #cffafe;
+    --info-text:     #155e75;
+
+    /* --- Oberflächen & Text --- */
+    --bg:             var(--n-100);
+    --surface:        var(--n-0);
+    --surface-2:      var(--n-50);
+    --surface-3:      var(--n-100);
+    --border:         var(--n-200);
+    --border-strong:  var(--n-300);
+    --text:           var(--n-800);
+    --text-muted:     var(--n-500);
+    --text-faint:     var(--n-400);
+    --overlay:        rgba(15, 23, 42, .55);
+
+    /* --- Abstände --- */
+    --sp-1: 4px;
+    --sp-2: 8px;
+    --sp-3: 12px;
+    --sp-4: 16px;
+    --sp-5: 20px;
+    --sp-6: 24px;
+    --sp-8: 32px;
+
+    /* --- Radien --- */
+    --r-sm: 6px;
+    --r-md: 10px;
+    --r-lg: 14px;
+    --r-xl: 20px;
+    --r-full: 999px;
+
+    /* --- Schatten --- */
+    --shadow-sm: 0 1px 2px rgba(15, 23, 42, .06);
+    --shadow-md: 0 2px 8px rgba(15, 23, 42, .08), 0 1px 2px rgba(15, 23, 42, .04);
+    --shadow-lg: 0 12px 32px rgba(15, 23, 42, .18);
+
+    /* --- Schrift --- */
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --fs-xs:  .75rem;   /* 12px */
+    --fs-sm:  .875rem;  /* 14px */
+    --fs-md:  1rem;     /* 16px */
+    --fs-lg:  1.125rem; /* 18px */
+    --fs-xl:  1.375rem; /* 22px */
+    --fs-2xl: 1.75rem;  /* 28px */
+
+    /* --- Steuerelemente --- */
+    --control-h: 46px;
+    --touch-min: 44px;
+    --focus-ring: 0 0 0 3px var(--accent-soft);
+
+    /* --- Bewegung --- */
+    --ease: cubic-bezier(.2, .8, .2, 1);
+    --dur: .18s;
+
+    /* --- Kompatibilität: alte Variablennamen bleiben gültig --- */
+    --primary-color:   var(--success);
+    --primary-hover:   var(--success-hover);
+    --secondary-color: var(--info);
+    --secondary-hover: var(--info-hover);
+    --danger-color:    var(--danger);
+    --danger-hover:    var(--danger-hover);
+    --warning-color:   var(--warning);
+    --warning-hover:   var(--warning-hover);
+    --info-color:      var(--info);
+    --info-hover:      var(--info-hover);
+    --light-bg:        var(--surface-2);
+    --border-color:    var(--border);
+    --text-color:      var(--text);
+    --cancelled-color: var(--text-faint);
 }
 
 
-    #pendingHuList.partial {
-        border-color: orange; /* Orange fÃ¼r "teilweise bearbeitet" */
-    }
-    #pendingHuList h4 {
-        margin-top: 0;
-        margin-bottom: 8px;
-        font-size: 1em;
-        color: #333;
-    }
-    #pendingHuList ul {
-        list-style-type: none;
-        padding: 0;
-        margin: 0;
-        max-height: 120px; /* Limitiert die HÃ¶he und macht die Liste scrollbar */
-        overflow-y: auto;
-        font-family: monospace;
-        font-size: 0.95em;
-    }
-    #pendingHuList li {
-        padding: 2px 4px;
-        border-bottom: 1px dotted #ccc;
-    }
-    #pendingHuList li:last-child {
-        border-bottom: none;
-    }
-    /* --- ENDE: NEUE STILE FÃR OFFENE HU-LISTE --- */
-/* IN DER DATEI DSV_LFS.html, INNERHALB DES <style>-TAGS */
+/* ===================================================================
+   2. BASIS / RESET
+   =================================================================== */
+*, *::before, *::after { box-sizing: border-box; }
 
-/* --- START: NEUE STILE FÃR OFFENE HU-ZUSAMMENFASSUNG --- */
-#openHusListContainer .hu-order-group {
-    margin-bottom: 15px;
-    border-left: 3px solid var(--info-color);
-    padding-left: 10px;
-}
-#openHusListContainer .hu-order-title {
-    font-size: 1.1em;
-    font-weight: bold;
-    color: var(--text-color);
-    border-bottom: 1px solid #eee;
-    padding-bottom: 5px;
-    margin-bottom: 8px;
-}
-#openHusListContainer .hu-list {
-    list-style-type: none;
-    padding-left: 5px;
-    font-family: monospace;
-}
-#openHusListContainer .hu-list li {
-    padding: 3px 0;
-}
-#openHusListContainer .no-open-hus-message {
-    text-align: center;
-    padding: 20px 0;
-    font-style: italic;
-    color: #555;
-}
-/* --- ENDE: NEUE STILE --- */
-/* IN DER DATEI DSV_LFS.html, INNERHALB DES <style>-TAGS */
+html { -webkit-text-size-adjust: 100%; }
 
-/* --- START: NEUES DESIGN FÃR SEITENMENÃ --- */
-.side-menu .side-menu-list {
-    list-style: none;
-    padding: 0;
-    margin: 0 0 15px 0; /* Abstand nach unten zur Statusmeldung */
-    display: flex;
-    flex-direction: column;
-    gap: 8px; /* Abstand zwischen den MenÃ¼punkten */
-}
+/* Kein Browser-Zoom (Pinch / Doppeltipp): Scrollen in beide Richtungen bleibt erlaubt, Zoomgesten nicht.
+   Bewusst auf ALLE Elemente, weil touch-action nicht vererbt wird und Scroll-Container (Modals, Seitenmenü,
+   Unterseiten) den Wert sonst für ihren Inhalt zurücksetzen würden. Ergänzt das Viewport-Meta (user-scalable=no),
+   das Safari auf iOS seit Version 10 ignoriert, und den Gesten-Schutz in script.js. */
+* { touch-action: pan-x pan-y; }
 
-.side-menu .menu-action-item {
-    display: flex;
-    align-items: center;
-    padding: 12px 15px;
-    border-radius: 8px;
-    text-decoration: none;
-    font-weight: 500; /* Etwas dickere Schrift */
-    color: #333;
-    background-color: transparent;
-    border: 1px solid transparent; /* Platzhalter fÃ¼r den Hover-Effekt */
-    transition: all 0.2s ease-in-out;
-    cursor: pointer;
-}
-
-.side-menu .menu-action-item:hover {
-    background-color: #f4f4f4;
-    border-color: #e0e0e0;
-}
-
-/* Stil fÃ¼r die Icons */
-.side-menu .menu-action-item svg {
-    width: 22px;
-    height: 22px;
-    margin-right: 15px;
-    flex-shrink: 0; /* Verhindert, dass das Icon schrumpft */
-    fill: currentColor; /* Icon nimmt die Textfarbe an */
-}
-
-/* Spezielle Hover-Effekte fÃ¼r bestimmte Aktionen */
-
-/* PrimÃ¤re Aktion: Senden */
-.side-menu .menu-action-item.action-primary:hover {
-    background-color: #eef8ff;
-    color: var(--secondary-hover);
-    border-color: var(--secondary-color);
-}
-
-/* Wichtige Aktion: Zusammenfassung, Import */
-.side-menu .menu-action-item.action-warning:hover {
-    background-color: #fffaf0;
-    color: var(--warning-hover);
-    border-color: var(--warning-color);
-}
-
-/* Destruktive Aktion: ZurÃ¼cksetzen */
-.side-menu .menu-action-item.action-reset {
-    /* Kein spezieller Grundzustand, nur der Hover ist anders */
-}
-.side-menu .menu-action-item.action-reset:hover {
-    background-color: #fdeeee; /* Heller Rotton (Tippfehler korrigiert) */
-    color: var(--danger-color);
-    border-color: var(--danger-hover);
-}
-
-/* Die alten Button-Stile im MenÃ¼ werden nicht mehr gebraucht */
-.side-menu .main-action-button {
-    display: none; /* Versteckt die alten Buttons, falls sie noch da sind */
-}
-
-/* Besserer Stil fÃ¼r die Statusmeldung */
-.side-menu #sheetStatus {
-    margin-top: 10px;
-    padding: 10px;
-    border-radius: 5px;
-    background-color: #f8f9fa;
-    min-height: 1.2em;
-    font-weight: bold;
-    text-align: center;
-    border: 1px solid #eee;
-}
-/* --- ENDE: NEUES DESIGN FÃR SEITENMENÃ --- */
-/* --- START: NEUE STILE FÃR MODAL-TABS --- */
-.modal-tabs {
-    display: flex;
-    margin-bottom: 15px;
-    border-bottom: 2px solid #eee;
-    
-    /* NEU: Horizontales Scrollen aktivieren, wenn der Inhalt Ã¼berlÃ¤uft */
-    overflow-x: auto;
-    /* NEU: Verhindert, dass die Buttons in die nÃ¤chste Zeile umbrechen */
-    flex-wrap: nowrap;
-
-    /* Optional: Verbessert das Scroll-GefÃ¼hl auf iOS */
-    -webkit-overflow-scrolling: touch;
-
-    /* Optional: Gestaltet die Scrollleiste unauffÃ¤lliger */
-    scrollbar-width: thin;
-    scrollbar-color: #ccc transparent;
-}
-.modal-tab-btn {
-    /* ÃNDERUNG: 'flex: 1;' wird entfernt, damit die Buttons nicht mehr gezwungen werden, den Platz auszufÃ¼llen */
-    
-    padding: 10px 15px; /* Etwas mehr seitliches Padding fÃ¼r besseres Aussehen */
-    font-size: 0.95em;
-    font-weight: 500;
-    text-align: center;
-    border: none;
-    background-color: transparent;
-    color: #555;
-    cursor: pointer;
-    border-bottom: 3px solid transparent;
-    transition: all 0.2s ease-in-out;
-
-    /* NEU: Verhindert, dass die Buttons schrumpfen */
-    flex-shrink: 0;
-    /* NEU: Stellt sicher, dass der Text im Button nicht umbricht */
-    white-space: nowrap;
-}
-.modal-tabs::-webkit-scrollbar {
-    height: 4px; /* HÃ¶he der Scrollleiste */
-}
-.modal-tabs::-webkit-scrollbar-thumb {
-    background-color: #ccc; /* Farbe des Scroll-Balkens */
-    border-radius: 4px;
-}
-modal-tabs::-webkit-scrollbar-track
-.modal-tab-btn:hover {
-    background-color: #f9f9f9;
-    color: var(--primary-color);
-}
-.modal-tab-btn.active {
-    color: var(--primary-color);
-    font-weight: bold;
-    border-bottom-color: var(--primary-color);
-}
-/* --- ENDE: NEUE STILE FÃR MODAL-TABS --- */
-/* --- START: NEUE STILE FÃR VOLLBILD-MODAL --- */
-
-/* Diese Klasse wird per JavaScript zum <body> hinzugefÃ¼gt, wenn ein Modal offen ist */
-body.modal-open {
-    overflow: hidden; /* Verhindert das Scrollen des Hintergrunds */
-}
-
-/* Passt das Aussehen des Modal-Inhalts an, um den Bildschirm auszufÃ¼llen */
-.modal-content {
-    width: 100%;
-    height: 100%;
-    max-width: 100%; /* Ãberschreibt die alte Breitenbegrenzung */
+body {
     margin: 0;
-    border: none;
-    border-radius: 0; /* Entfernt abgerundete Ecken fÃ¼r den Vollbild-Look */
-    box-shadow: none;
-    
-    /* Flexbox-Layout, um Header, Inhalt und Footer besser zu steuern */
-    display: flex;
-    flex-direction: column;
-    padding: 15px; /* Etwas Padding fÃ¼r den Inhalt */
-    box-sizing: border-box;
-}
-
-/* Sorgt dafÃ¼r, dass der scrollbare Bereich im Modal den verfÃ¼gbaren Platz einnimmt */
-#openHusListContainer, 
-#missingReceiptHusListContainer,
-#editModal .form-group,
-#importHuModal .form-group:nth-of-type(2) /* Zielt auf den Container der Textarea */ {
-    flex-grow: 1; /* Dieser Bereich dehnt sich aus */
-    overflow-y: auto; /* Nur dieser Bereich wird scrollbar, nicht das ganze Modal */
-    min-height: 0; /* Wichtiger Fix fÃ¼r Flexbox-Scrolling */
-}
-
-/* Stellt sicher, dass die Textarea im Import-Modal den ganzen Platz ausfÃ¼llt */
-#huListTextarea {
-    flex-grow: 1;
-    height: 100%;
-}
-
-/* Die Aktions-Buttons am Ende sollen nicht mitwachsen */
-.modal-actions {
-    flex-shrink: 0;
-    margin-top: 15px;
-}
-/* --- ENDE: NEUE STILE FÃR VOLLBILD-MODAL --- */
-/* --- NEU: Styling fÃ¼r perfekt ausgerichtete Listen im Modal --- */
-#openHusListContainer .hu-list li,
-#missingReceiptHusListContainer .hu-list li,
-#dunkelalarmHusListContainer .hu-list li {
-    display: flex;
-    align-items: flex-start; /* Stellt sicher, dass die Zeilen oben beginnen */
-    padding: 3px 0; /* Etwas mehr vertikaler Abstand */
-}
-
-/* --- Styling fÃ¼r perfekt ausgerichtete Listen --- */
-/* Gilt fÃ¼r Modal UND Detailansicht */
-#openHusListContainer .hu-list li,
-#missingReceiptHusListContainer .hu-list li,
-#dunkelalarmHusListContainer .hu-list li,
-#pendingHuList .hu-list li {
-    display: flex;
-    align-items: flex-start;
-    padding: 3px 0;
-}
-
-/* Basis-Styling fÃ¼r die Positionsnummer */
-#openHusListContainer .hu-list .position-number,
-#missingReceiptHusListContainer .hu-list .position-number,
-#dunkelalarmHusListContainer .hu-list .position-number,
-#pendingHuList .hu-list .position-number {
-    min-width: 2.5em;
-    text-align: right;
-    padding-right: 0.75em; /* Standard-Abstand */
-    flex-shrink: 0;
-    color: #888;
-}
-
-/* --- HIER IST DIE SPEZIFISCHE ÃBERSCHREIBUNG --- */
-/* Diese Regel erhÃ¶ht den Abstand NUR fÃ¼r die pendingHuList in der Detailansicht */
-#pendingHuList .hu-list .position-number {
-    padding-right: 1.5em; /* GrÃ¶Ãerer Abstand */
-}
-.batch-sound-toggle-container {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    gap: 10px;
-    margin-top: 15px; /* Etwas Abstand nach oben */
-    font-size: 0.9em;
-}
-.batch-sound-toggle-container label {
-    margin-bottom: 0;
-    font-weight: normal;
-    cursor: pointer;
-}
-/* --- NEU: Layout fÃ¼r zweizeilige Scan-EintrÃ¤ge --- */
-#currentShipmentDetails li {
-    display: flex;
-    flex-wrap: wrap; /* Erlaubt den Zeilenumbruch */
-    align-items: center;
+    padding: 0;
+    font-family: var(--font-sans);
+    font-size: var(--fs-md);
+    line-height: 1.45;
+    color: var(--text);
+    background-color: var(--bg);
     position: relative;
-    padding-right: 70px; /* Platz fÃ¼r den Storno-Button */
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
 }
 
-#currentShipmentDetails .scan-main-info {
-    flex-grow: 1; /* Nimmt den verfÃ¼gbaren Platz in der ersten Zeile ein */
-    white-space: nowrap; /* Verhindert Zeilenumbruch innerhalb dieser Zeile */
-    overflow: hidden;
-    text-overflow: ellipsis; /* ... falls es doch zu lang wird */
+input, textarea { -webkit-user-select: text; user-select: text; }
+
+h1, h2, h3, h4 { margin: 0 0 var(--sp-3); line-height: 1.25; font-weight: 650; }
+h1 { font-size: var(--fs-2xl); }
+h2 { font-size: var(--fs-xl); }
+h3 { font-size: var(--fs-lg); }
+h4 { font-size: var(--fs-md); }
+
+a { color: var(--accent); }
+
+svg { display: block; }
+
+button {
+    font-family: inherit;
+    font-size: inherit;
+    color: inherit;
+    -webkit-tap-highlight-color: transparent;
 }
 
-#currentShipmentDetails .scan-actions-and-notes {
-    flex-basis: 100%; /* Erzwingt, dass dieser Block immer eine neue Zeile beginnt */
-    padding-left: 1.5em; /* Kleine EinrÃ¼ckung fÃ¼r die Notizen */
-    padding-top: 4px; /* Etwas Abstand nach oben */
-}
-/* INNERHALB des <style> Tags */
+:focus { outline: none; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-.hu-value.has-dunkelalarm {
-    color: red;
-    font-weight: bold;
-}
-.sendnr-display {
-    color: #666;
-    font-size: 0.9em;
-    font-style: italic;
-    margin-left: 8px;
-}
+.container { padding: var(--sp-3); max-width: 100%; }
 
-/* --- NEU: Styling fÃ¼r die tabellarische Pending-Liste --- */
-.pending-list-header {
-    display: flex;
-    justify-content: space-between;
-    font-weight: bold;
-    color: #333;
-    font-size: 0.9em;
-    padding: 4px 8px;
-    border-bottom: 2px solid #ccc;
-    margin-bottom: 4px;
-}
-.pending-list-header span:first-child {
-    flex-basis: 55%;
-    text-align: left;
-}
-.pending-list-header span:last-child {
-    flex-basis: 45%;
-    text-align: left;
-}
-
-#pendingHuList .hu-list li {
-    display: flex;
-    align-items: center; /* Vertikal zentrieren */
-}
-
-.pending-item-details {
-    display: flex;
-    justify-content: space-between;
-    width: 100%;
-}
-
-.pending-item-details .pending-vse {
-    flex-basis: 55%;
-    text-align: left;
-    font-weight: bold;
-}
-
-.pending-item-details .pending-sendnr {
-    flex-basis: 45%;
-    text-align: left;
-    color: #555;
-    font-style: italic;
-    font-size: 0.95em;
-}
-/* --- NEU: Styling fÃ¼r VVL-Anzeige im "Offene HUs"-Modal --- */
-
-/* Titel-Formatierung fÃ¼r VVL */
-.hu-order-group .hu-order-title small {
-    font-weight: normal;
-    font-size: 0.9em;
-    color: #555;
-}
-
-/* Kopfzeile fÃ¼r die VVL-Tabelle */
-.hu-list-header {
-    display: flex;
-    font-weight: bold;
-    font-size: 0.9em;
-    padding: 5px 0 5px 5px;
-    border-bottom: 2px solid #ddd;
-    margin-bottom: 5px;
-    color: #333;
-}
-.hu-list-header span:first-child {
-    flex: 2; /* VSE-Spalte bekommt mehr Platz */
-}
-.hu-list-header span:last-child {
-    flex: 1; /* Sendnr-Spalte bekommt weniger Platz */
-}
-
-/* Styling fÃ¼r die Zeilen in der VVL-Tabelle */
-.hu-list.vvl-list li {
-    padding: 4px 0 4px 5px;
-    border-bottom: 1px dotted #eee;
-}
-.hu-list.vvl-list li:last-child {
-    border-bottom: none;
-}
-
-.vvl-item-row {
-    display: flex;
-    width: 100%;
-}
-.vvl-item-row .vvl-vse {
-    flex: 2; /* VSE-Spalte */
-    font-family: monospace;
-    font-weight: bold;
-}
-.vvl-item-row .vvl-sendnr {
-    flex: 1; /* Sendnr-Spalte */
-    font-family: monospace;
-    color: #666;
-    font-size: 0.95em;
-}
-/* --- NEU & OPTIMIERT: Einheitliches Tabellen-Layout fÃ¼r offene Positionen --- */
-
-/* Gemeinsamer Stil fÃ¼r die Kopfzeile in der Detailansicht und im Modal */
-.pending-list-header,
-.hu-list-header {
-    display: flex;
-    font-weight: bold;
-    color: #333;
-    font-size: 0.9em;
-    padding: 4px 8px;
-    border-bottom: 2px solid #ccc;
-    margin-bottom: 4px;
-}
-.pending-list-header span:first-child,
-.hu-list-header span:first-child {
-    flex-basis: 55%;
-    text-align: left;
-}
-.pending-list-header span:last-child,
-.hu-list-header span:last-child {
-    flex-basis: 45%;
-    text-align: left;
-}
-
-/* Gemeinsamer Stil fÃ¼r ListeneintrÃ¤ge */
-#pendingHuList .hu-list li,
-.hu-order-group .hu-list.vvl-list li {
-    padding: 4px 8px;
-    border-bottom: 1px dotted #eee;
-}
-.hu-order-group .hu-list.vvl-list li:last-child {
-    border-bottom: none;
-}
+.hidden { display: none !important; }
+#mainView.hidden { display: none; }
 
 
-/* Gemeinsamer Stil fÃ¼r die zweispaltige Zeile */
-.pending-item-details,
-.vvl-item-row {
-    display: flex;
-    justify-content: space-between;
-    width: 100%;
-}
-
-/* Gemeinsamer Stil fÃ¼r die VSE-Spalte */
-.pending-item-details .pending-vse,
-.vvl-item-row .vvl-vse {
-    flex-basis: 55%;
-    text-align: left;
-    font-family: monospace;
-    font-weight: bold;
-}
-
-/* Gemeinsamer Stil fÃ¼r die Sendnr-Spalte */
-.pending-item-details .pending-sendnr,
-.vvl-item-row .vvl-sendnr {
-    flex-basis: 45%;
-    text-align: left;
-    font-family: monospace;
-    color: #555;
-    font-style: italic;
-    font-size: 0.95em;
-}
-/* --- START DER ÃNDERUNG: Batch Scan Feedback Modal --- */
-
-/* --- START DER ÃNDERUNG: Batch Scan Feedback Modal Stile --- */
-/* --- START DER ÃNDERUNG: Batch Scan Feedback Modal Stile --- */
-#batchScanFeedbackModal .modal-content {
-    background-color: black;
-    padding: 20px;
-    box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
-}
-
-#batchScanFeedbackModal .modal-content.unexpected {
-    box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
-}
-
-#batchScanFeedbackModal h3 {
-    color: black;
-    margin-bottom: 20px;
-}
-/* --- START DER ÃNDERUNG: Close-Button Icon Stil --- */
-.close-modal-icon-btn {
-    position: absolute; /* Absolut positioniert innerhalb des .modal-content */
-    top: 15px; /* Abstand vom oberen Rand */
-    right: 15px; /* Abstand vom rechten Rand */
-    background: none; /* Kein Hintergrund */
-    border: none; /* Kein Rahmen */
-    color: #bbb; /* Standardfarbe des Icons */
-    cursor: pointer;
-    font-size: 1.8em; /* GrÃ¶Ãe des Icons */
-    padding: 0;
-    width: 30px; /* Breite fÃ¼r Click-Bereich */
-    height: 30px; /* HÃ¶he fÃ¼r Click-Bereich */
-    display: flex; /* Flexbox fÃ¼r Zentrierung des SVG */
-    justify-content: center;
-    align-items: center;
-    transition: color 0.2s, transform 0.2s; /* Ãbergang fÃ¼r Hover-Effekt */
-    z-index: 10; /* Sicherstellen, dass es Ã¼ber anderen Inhalten liegt */
-}
-
-.close-modal-icon-btn:hover {
-    color: white; /* WeiÃer auf Schwarz bei Hover */
-    transform: scale(1.1); /* Leicht vergrÃ¶Ãern bei Hover */
-}
-
-.close-modal-icon-btn svg {
-    fill: currentColor; /* SVG-Farbe folgt der Textfarbe des Buttons */
-    width: 24px; /* GrÃ¶Ãe des SVG-Icons */
-    height: 24px;
-}
-/* --- ENDE DER ÃNDERUNG: Close-Button Icon Stil --- */
-
-/* Optional: Titel des Modals leicht anpassen, damit er nicht mit dem X-Icon kollidiert */
-#batchScanFeedbackModal h3 {
-    padding-right: 40px; /* Platz fÃ¼r das X-Icon schaffen */
-    text-align: center;
-}
-/* --- START DER ÃNDERUNG: Batch Scan Feedback Modal Stile (Font Sizing Vorbereitung) --- */
-#batchScanFeedbackModal .modal-content {
-    background-color: black;
-    padding: 20px;
-    box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
-}
-
-#batchScanFeedbackModal .modal-content.unexpected {
-    box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
-}
-
-
-
-/* --- START DER ÃNDERUNG: feedbackScanNumber responsive SchriftgrÃ¶Ãe --- */
-#feedbackScanNumber {
-    /* Vorherige Eigenschaften beibehalten: */
-    font-weight: bold;
-    text-align: center;
-    word-break: break-all; /* Wichtig, damit lange Nummern umbrechen, falls nÃ¶tig */
-    color: lime;
-    background-color: black;
-    padding: 10px 0px;
-    border-radius: 10px;
-    margin-bottom: 10px;
-    min-width: 80%;
-
-    /* NEU: Responsive SchriftgrÃ¶Ãe */
-    /* clamp(minimale GrÃ¶Ãe, responsive GrÃ¶Ãe (vw), maximale GrÃ¶Ãe) */
-    /* Hier: min. 1.8em, skaliert mit 8vw (8% der Viewport-Breite), max. 3.5em */
-    font-size: clamp(2.5em, 8vw, 3.5em);
-    
-    /* NEU: Flexbox verwenden, um den Text zu zentrieren und bei Bedarf zu schrumpfen */
-    display: flex; /* Macht das Element zu einem Flex-Container */
-    justify-content: center; /* Zentriert horizontal */
-    align-items: center; /* Zentriert vertikal */
-    line-height: 1.2; /* Etwas kleinerer Zeilenabstand */
-}
-
-/* Anpassung fÃ¼r unerwartete Scans, falls noch nicht erfolgt */
-#feedbackScanNumber.unexpected {
-    color: red;
-}
-/* --- ENDE DER ÃNDERUNG: feedbackScanNumber responsive SchriftgrÃ¶Ãe --- */
-
-/* --- START DER ÃNDERUNG: feedbackCarrier linksbÃ¼ndig --- */
-#feedbackCarrier {
-    font-size: 1.0em;
-    color: #ccc;
-    text-align: left; /* GEÃNDERT */
-    word-break: break-all;
-    font-style: italic;
-    margin-top: 5px;
-    width: 100%; /* Sicherstellen, dass es die volle Breite einnimmt, um linksbÃ¼ndig zu wirken */
-    padding-left: 20px; /* Optional: Leichte EinrÃ¼ckung von links, passend zum Padding des Modals */
-    padding-right: 20px; /* Optional: Auch rechts ein Padding fÃ¼r Symmetrie, wenn breiter */
-    box-sizing: border-box; /* Sicherstellen, dass Padding in der Breite enthalten ist */
-}
-/* --- ENDE DER ÃNDERUNG: feedbackCarrier linksbÃ¼ndig --- */
-/* --- ENDE DER ÃNDERUNG: Batch Scan Feedback Modal --- */
-/* --- NEU: Styling fÃ¼r Positionen mit Dunkelalarm in der "Offene HUs"-Ansicht --- */
-.hu-value.has-dunkelalarm,
-.pending-vse.has-dunkelalarm {
-    color: var(--danger-color);
-    font-weight: bold;
-}
-/* --- NEU: Styling fÃ¼r die VVL-Anzeige in der Haupttabelle --- */
-.vvl-table-entry {
-    font-size: 0.9em;
-    line-height: 1.4;
-}
-.vvl-table-entry .vvl-prefix,
-.vvl-table-entry .kundennr-prefix {
-    font-weight: normal;
-    color: #666;
-}
-/* --- NEU: Styling fÃ¼r die Trennlinie in der "Ãbersicht"-Spalte --- */
-.summary-cell {
-    padding-top: 12px; /* Etwas mehr Platz oben */
-    padding-bottom: 12px; /* Etwas mehr Platz unten */
-}
-.summary-divider {
-    width: 100%; /* Volle Breite der Zelle */
-    height: 1px; /* Dicke der Linie */
-    background-color: #e0e0e0; /* Farbe der Linie */
-    margin: 8px 0; /* Vertikaler Abstand oben und unten */
-}
-
-/* --- NEU: Styling fÃ¼r Tab-Notification-Badges (Vorschlag 1) --- */
-.modal-tab-btn {
-    position: relative; /* Wichtig fÃ¼r die Positionierung des Badges */
-    padding-right: 25px; /* Etwas mehr Platz fÃ¼r den Badge */
-}
-
-.tab-badge {
-    position: absolute;
-    top: 50%;
-    right: 8px;
-    transform: translateY(-50%);
-    background-color: var(--danger-color);
-    color: white;
-    font-size: 0.75em; /* Kleinere Schrift */
-    font-weight: bold;
-    padding: 2px 6px;
-    border-radius: 10px; /* Macht es zu einer Pille */
-    min-width: 10px; /* Sorgt dafÃ¼r, dass auch eine '1' gut aussieht */
-    text-align: center;
-    line-height: 1.2;
-    transition: transform 0.2s ease-in-out;
-}
-
-/* Versteckt den Badge, wenn er leer ist */
-.tab-badge.hidden {
-    transform: translateY(-50%) scale(0); /* SchÃ¶ner Ausblend-Effekt */
-    opacity: 0;
-}
-/* ===== NEUE STILE FÃR DEN LADE-SPINNER ===== */
-
-/* Das Overlay, das den gesamten Bildschirm abdeckt */
-.loading-overlay {
-    position: fixed; /* Bleibt an Ort und Stelle, auch beim Scrollen */
+/* ===================================================================
+   3. APP-BAR
+   =================================================================== */
+.app-bar {
+    position: sticky;
     top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(255, 255, 255, 0.7); /* Leicht durchsichtiger weiÃer Hintergrund */
-    display: flex; /* Zentriert den Spinner */
-    justify-content: center;
+    z-index: 50;
+    display: flex;
     align-items: center;
-    z-index: 9999; /* Stellt sicher, dass es Ã¼ber allem anderen liegt */
-    
-    /* StandardmÃ¤Ãig unsichtbar */
-    visibility: hidden;
-    opacity: 0;
-    transition: opacity 0.3s, visibility 0.3s;
+    gap: var(--sp-3);
+    min-height: 56px;
+    padding: var(--sp-2) var(--sp-3);
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
 }
 
-/* Sichtbarer Zustand fÃ¼r das Overlay */
-.loading-overlay.visible {
-    visibility: visible;
-    opacity: 1;
-}
-
-/* Der eigentliche Spinner (das sich drehende Rad) */
-.spinner {
-    width: 60px;
-    height: 60px;
-    border: 8px solid #f3f3f3; /* Der hellgraue Kreis */
-    border-top: 8px solid #3498db; /* Die blaue Farbe, die sich dreht */
-    border-radius: 50%;
-    animation: spin 1s linear infinite; /* Die Dreh-Animation */
-}
-
-/* Die Keyframe-Animation fÃ¼r die Drehung */
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-/* ===== ENDE DER NEUEN SPINNER-STILE ===== */
-/* ===== ENDE DER NEUEN SPINNER-STILE ===== */
-
-/* --- START: NEUE STILE FÃR HU-DETAIL-MODAL --- */
-/* NEU: Diese Regel Ã¼berschreibt die Zentrierung NUR fÃ¼r das HU-Detail-Modal */
-#huDetailsModal {
-    align-items: flex-start; /* Richtet das Modal oben aus statt in der Mitte */
-    padding-top: 20px;       /* FÃ¼gt einen kleinen Abstand zum oberen Bildschirmrand hinzu */
-}
-
-#huDetailsModal .modal-content {
-    max-width: 400px; /* Eine passende Breite fÃ¼r das kleine Info-Modal */
-    width: 90%;
-    height: auto; /* HÃ¶he passt sich dem Inhalt an */
-    max-height: 80vh;
-    border-radius: 8px; /* Ecken wieder abrunden */
-}
-
-#huDetailsContent dl {
-    margin: 10px 0;
+#menu-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--touch-min);
+    height: var(--touch-min);
     padding: 0;
-}
-
-#huDetailsContent dt {
-    font-weight: bold;
-    color: #555;
-    margin-top: 12px;
-    font-size: 0.9em;
-}
-
-#huDetailsContent dd {
-    margin-left: 0;
-    padding: 4px 8px;
-    background-color: #f4f4f4;
-    border-radius: 4px;
-    border: 1px solid #eee;
-    font-family: monospace;
-    font-size: 1.05em;
-    word-break: break-all;
-}
-/* --- ENDE: NEUE STILE FÃR HU-DETAIL-MODAL --- */
-/* ===== START DER ÃNDERUNG: Stile fÃ¼r die neue Detailansicht ===== */
-
-/* Versteckt die Hauptansicht, wenn die Detailansicht aktiv ist */
-#mainView.hidden {
-    display: none;
-}
-
-/* Container fÃ¼r die Detailansicht */
-.detail-view-container {
-    display: none; /* StandardmÃ¤Ãig versteckt */
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: #f4f4f4; /* Gleicher Hintergrund wie body */
-    z-index: 100; /* Liegt Ã¼ber dem normalen Inhalt, aber unter Modals */
-    flex-direction: column;
-}
-
-.detail-view-container.visible {
-    display: flex; /* Sichtbar machen */
-}
-
-
-
-.detail-view-header h2 {
-    margin: 0;
-    font-size: 1.2em;
-    text-align: center;
-    flex-grow: 1; /* Nimmt den restlichen Platz ein */
-}
-
-/* ZurÃ¼ck-Button */
-.detail-view-header .back-button {
-    background: none;
     border: none;
+    border-radius: var(--r-md);
+    background: transparent;
+    color: var(--text);
     cursor: pointer;
-    padding: 5px;
-    margin-right: 10px;
+    transition: background-color var(--dur) var(--ease);
+}
+#menu-toggle-btn svg { width: 26px; height: 26px; }
+#menu-toggle-btn:hover, #menu-toggle-btn:active { background-color: var(--surface-3); }
+
+.app-title {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--fs-md);
+    font-weight: 700;
+    letter-spacing: -.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.detail-view-header .back-button svg {
+/* Sync-Punkt: grau = unbekannt, grün = synchron, gelb pulsierend = sendet, rot = offline */
+.sync-indicator {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     width: 28px;
     height: 28px;
-    fill: var(--text-color);
+    margin-left: calc(-1 * var(--sp-1));
+    flex-shrink: 0;
+}
+.sync-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background-color: var(--text-faint);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--text-faint) 20%, transparent);
+    transition: background-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.sync-indicator.is-ok    .sync-dot { background-color: var(--success); box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 25%, transparent); }
+.sync-indicator.is-busy  .sync-dot { background-color: var(--warning); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warning) 25%, transparent); animation: blink 1s ease-in-out infinite; }
+.sync-indicator.is-error .sync-dot { background-color: var(--danger);  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 30%, transparent); }
+
+.app-bar-batch {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    flex-shrink: 0;
+}
+@media (max-width: 420px) {
+    .app-bar-batch > label:first-child { display: none; }
+}
+.app-bar-batch > label:first-child {
+    margin: 0;
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--text-muted);
+}
+#batchStatusDisplay {
+    max-width: 96px;
+    padding: 2px 8px;
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    background-color: var(--surface-3);
+    border-radius: var(--r-full);
+}
+#batchStatusDisplay:empty { display: none; }
+body.batch-mode-active #batchStatusDisplay { color: var(--success-text); background-color: var(--success-soft); }
+
+/* Batch-Modus: dezenter Farbstreifen oben, damit man den Modus immer sieht */
+body.batch-mode-active .app-bar { box-shadow: inset 0 3px 0 var(--success), var(--shadow-sm); }
+
+
+/* ===================================================================
+   4. FORMULARE & BUTTONS
+   =================================================================== */
+label {
+    display: block;
+    margin-bottom: var(--sp-1);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--text-muted);
 }
 
-/* Scrollbarer Inhaltsbereich */
-.detail-view-content {
-    flex-grow: 1; /* FÃ¼llt den restlichen Platz aus */
-    overflow-y: auto; /* Macht den Inhalt scrollbar */
-    padding: 10px;
-}
-
-/* Wir "stehlen" das Styling von #currentShipmentDetails fÃ¼r unsere neue Ansicht */
-.detail-view-content #currentShipmentDetails {
-    margin-top: 0; /* Kein extra Abstand oben */
-}
-/* ===== ENDE DER ÃNDERUNG ===== */
-/* FÃ¼gen Sie dies am Ende Ihrer styles.css Datei hinzu */
-
-/* =============================================================== */
-/* NEU: Stile fÃ¼r die Master-Detail-Ansicht                        */
-/* =============================================================== */
-
-/* =============================================================== */
-/* KORREKTE STILE FÃR ANSICHTEN & MODALS                           */
-/* =============================================================== */
-
-/* Versteckt ein Element zuverlÃ¤ssig */
-.hidden {
-    display: none !important;
-}
-
-/* Container fÃ¼r die Detailansicht */
-#detailView {
-    position: fixed;
-    top: 0;
-    left: 0;
+input[type="text"], input[type="number"], input[type="email"], input[type="password"], select, textarea {
     width: 100%;
-    height: 100%;
-    background-color: #f4f4f4;
-    z-index: 100; /* Liegt UNTER den Modals */
-    overflow-y: auto;
-    padding: 10px;
-    box-sizing: border-box;
+    height: var(--control-h);
+    padding: 0 var(--sp-3);
+    font: inherit;
+    font-size: var(--fs-md);
+    color: var(--text);
+    background-color: var(--surface);
+    border: 1.5px solid var(--border-strong);
+    border-radius: var(--r-md);
+    transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+    -webkit-appearance: none;
+    appearance: none;
+}
+textarea {
+    height: auto;
+    padding: var(--sp-3);
+    line-height: 1.45;
+    resize: vertical;
+}
+input::placeholder, textarea::placeholder { color: var(--text-faint); }
+input:focus, select:focus, textarea:focus {
+    border-color: var(--accent);
+    box-shadow: var(--focus-ring);
+    outline: none;
+}
+input:disabled, input[readonly] {
+    background-color: var(--surface-3);
+    color: var(--text-muted);
+    cursor: not-allowed;
 }
 
-/* Das Overlay fÃ¼r ALLE Modals */
-.modal-overlay {
-    display: none;
-    position: fixed;
-    z-index: 9000; /* Extrem hoher Wert, um Ã¼ber allem zu liegen */
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    overflow: auto;
-    background-color: rgba(0,0,0,.5);
+select {
+    padding-right: 40px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2364748b' d='M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 20px;
+}
+
+input[type="checkbox"] { accent-color: var(--accent); }
+
+/* --- Generische Buttons (Fallback für unklassifizierte Buttons) --- */
+button {
+    cursor: pointer;
+    border: none;
+    border-radius: var(--r-md);
+}
+button:disabled { opacity: .55; cursor: not-allowed; }
+
+/* --- Primärer Button --- */
+.main-action-button {
+    display: inline-flex;
+    align-items: center;
     justify-content: center;
-    align-items: center;
+    gap: var(--sp-2);
+    width: 100%;
+    height: var(--control-h);
+    padding: 0 var(--sp-4);
+    font-size: var(--fs-md);
+    font-weight: 650;
+    color: #fff;
+    background-color: var(--accent);
+    border: none;
+    border-radius: var(--r-md);
+    box-shadow: var(--shadow-sm);
+    transition: background-color var(--dur) var(--ease), transform var(--dur) var(--ease);
 }
-.modal-overlay.visible {
+.main-action-button:hover { background-color: var(--accent-hover); }
+.main-action-button:active { transform: translateY(1px); }
+
+.delete-btn { background-color: var(--danger) !important; color: #fff !important; }
+.delete-btn:hover, .delete-btn:active { background-color: var(--danger-hover) !important; }
+
+/* --- Eingabe mit Lösch-Button --- */
+.input-wrapper { position: relative; }
+.input-wrapper input[type="text"] { padding-right: 46px; }
+
+.clear-input-btn {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: none;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    font-size: 22px;
+    line-height: 1;
+    color: var(--text-muted);
+    background: var(--surface-3);
+    border: none;
+    border-radius: var(--r-full);
+    transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.clear-input-btn:hover { background: var(--border-strong); color: var(--text); }
+.clear-note-btn { display: block !important; }
+
+/* --- Toggle-Switch --- */
+.batch-toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 48px;
+    height: 28px;
+    flex-shrink: 0;
+    margin: 0;
+}
+.batch-toggle-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+.batch-slider {
+    position: absolute;
+    inset: 0;
+    cursor: pointer;
+    background-color: var(--n-300);
+    border-radius: var(--r-full);
+    transition: background-color var(--dur) var(--ease);
+}
+.batch-slider::before {
+    content: "";
+    position: absolute;
+    left: 3px;
+    bottom: 3px;
+    width: 22px;
+    height: 22px;
+    background-color: #fff;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
+    transition: transform var(--dur) var(--ease);
+}
+input:checked + .batch-slider { background-color: var(--success); }
+input:checked + .batch-slider::before { transform: translateX(20px); }
+input:focus-visible + .batch-slider { box-shadow: var(--focus-ring); }
+
+/* --- Zeile: Label links, Schalter rechts --- */
+.toggle-row {
     display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--sp-3);
+    min-height: var(--touch-min);
+    padding: var(--sp-1) 0;
+}
+.toggle-row label:first-child {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0;
+    font-size: var(--fs-sm);
+    font-weight: 500;
+    color: var(--text);
+    cursor: pointer;
+}
+.toggle-row label svg { width: 20px; height: 20px; color: var(--text-muted); flex-shrink: 0; }
+
+.form-group { margin-bottom: var(--sp-4); }
+/* Maße als drei Zahlenfelder L × B × H mit fester Einheit dahinter (Importformat des Auftrags: CM bei MAN, MM bei VW).
+   Gespeichert wird weiterhin ein Text wie „100x45x10 CM“ (joinDimensions in script.js). */
+.dim-fields { display: inline-flex; align-items: center; gap: 3px; max-width: 100%; }
+.dim-fields .dim-field { flex: 1 1 0; width: 58px; min-width: 44px; padding: 0 4px; text-align: center; }
+.dim-x { flex: 0 0 auto; font-size: var(--fs-xs); color: var(--text-faint); }
+.dim-unit { flex: 0 0 auto; margin-left: 3px; font-size: 10px; font-weight: 700; letter-spacing: .04em; color: var(--text-muted); }
+.form-group .dim-fields { display: flex; width: 100%; }
+.form-group .dim-fields .dim-field { width: auto; }
+
+.input-with-button { display: flex; align-items: center; gap: var(--sp-2); }
+.input-with-button input { flex: 1; min-width: 0; }
+.input-with-button .main-action-button {
+    width: var(--control-h);
+    flex-shrink: 0;
+    padding: 0;
+    font-size: 1.6em;
+    line-height: 1;
 }
 
-.detail-view-header {
+
+/* ===================================================================
+   5. SCAN-BEREICH
+   =================================================================== */
+.input-section {
     display: flex;
-    align-items: center;
-    margin-bottom: 0px;
-    position: sticky; /* HÃ¤lt den Header beim Scrollen oben */
-    top: 0;
-    background-color: #f4f4f4;
-    padding-top: 10px;
-    padding-bottom: 5px;
-    z-index: 101;
+    flex-direction: column;
+    gap: var(--sp-4);
+    margin: var(--sp-3) 0 var(--sp-2);
+    padding: var(--sp-4);
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-md);
 }
 
-#backToMainViewBtn {
+/* Das Scan-Feld ist der Held der Seite */
+.scan-input-wrapper .input-icon {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-faint);
+    pointer-events: none;
+    transition: color var(--dur) var(--ease);
+}
+.scan-input-wrapper .input-icon svg { width: 22px; height: 22px; }
+.scan-input-wrapper input[type="text"] {
+    height: 56px;
+    padding-left: 48px;
+    font-family: var(--font-mono);
+    font-size: var(--fs-lg);
+    font-weight: 600;
+    letter-spacing: .02em;
+    border-width: 2px;
+}
+.scan-input-wrapper input[type="text"]:focus {
+    border-color: var(--success);
+    box-shadow: 0 0 0 4px var(--success-soft);
+}
+.scan-input-wrapper input[type="text"]:focus ~ .input-icon,
+.scan-input-wrapper:focus-within .input-icon { color: var(--success); }
+.scan-input-wrapper .clear-input-btn { right: 10px; }
+
+.status-and-button-container {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--sp-3);
+}
+.status-select-wrapper { flex: 1; min-width: 0; }
+.status-and-button-container > #mainActionButton {
+    width: auto;
+    flex: 0 1 auto;
+    min-width: 0;
+    height: var(--control-h);
+    padding: 0 var(--sp-4);
+    white-space: nowrap;
+}
+body.batch-mode-active .status-and-button-container { flex-wrap: wrap; }
+body.batch-mode-active .status-and-button-container > #mainActionButton { flex: 1 1 100%; }
+
+.controls-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-3);
+}
+.controls-row:empty { display: none; }
+
+.combo-checkbox-group { display: none; align-items: center; gap: var(--sp-2); }
+.combo-checkbox-group input { width: 22px; height: 22px; margin: 0; }
+.combo-checkbox-group label { margin: 0; font-size: var(--fs-md); font-weight: 500; color: var(--text); cursor: pointer; }
+#comboCheckboxContainer.visible { display: flex; }
+
+.note-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--touch-min);
+    height: var(--touch-min);
+    margin-left: auto;
+    padding: 0;
+    flex-shrink: 0;
+    color: var(--text-muted);
+    background-color: var(--surface);
+    border: 1.5px solid var(--border-strong);
+    border-radius: var(--r-md);
+    transition: background-color var(--dur) var(--ease), border-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.note-toggle-btn svg { width: 22px; height: 22px; }
+.note-toggle-btn:hover { background-color: var(--surface-3); color: var(--text); }
+.note-toggle-btn.note-active {
+    color: #fff;
+    background-color: var(--warning);
+    border-color: var(--warning);
+}
+
+.note-input-area {
+    display: none;
+    padding: var(--sp-3);
+    background-color: var(--warning-soft);
+    border: 1px solid var(--warning);
+    border-radius: var(--r-md);
+}
+.note-input-area label { color: var(--warning-text); }
+.note-input-area input[type="text"] { padding-right: 46px; }
+
+#newTotalSection {
+    display: none;
+    flex-direction: column;
+    gap: var(--sp-3);
+    padding: var(--sp-4);
+    background-color: var(--accent-soft);
+    border: 1px solid var(--accent);
+    border-radius: var(--r-md);
+}
+#newTotalSection.visible { display: flex; }
+#newTotalSection label { color: var(--accent-text); }
+#newTotalSection div { display: flex; gap: var(--sp-2); }
+#newTotalSection button { flex: 1; }
+#skipNewTotalBtn {
+    color: var(--text) !important;
+    background-color: var(--surface) !important;
+    border: 1.5px solid var(--border-strong) !important;
+    box-shadow: none;
+}
+#skipNewTotalBtn:hover { background-color: var(--surface-3) !important; }
+#newTotalSection.warning-existing {
+    background-color: var(--danger-soft);
+    border-color: var(--danger);
+}
+#newTotalSection.warning-existing label { color: var(--danger-text); }
+
+
+/* ===================================================================
+   6. BATCH-BEREICH
+   =================================================================== */
+.batch-area {
+    display: none;
+    margin-top: var(--sp-3);
+    padding: var(--sp-4);
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--success);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-md);
+}
+.batch-area.visible { display: block; }
+.batch-area h3 {
+    margin-bottom: var(--sp-2);
+    font-size: var(--fs-md);
+    color: var(--text);
+}
+#currentBatchNoteDisplay {
+    margin-bottom: var(--sp-2);
+    font-size: var(--fs-sm);
+    font-style: italic;
+    color: var(--warning-text);
+}
+#batchList {
+    list-style: none;
+    margin: var(--sp-2) 0;
+    padding: 0;
+    max-height: 180px;
+    overflow-y: auto;
+    background-color: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+}
+#batchList li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3);
+    font-family: var(--font-mono);
+    font-size: var(--fs-sm);
+    border-bottom: 1px solid var(--border);
+}
+#batchList li:last-child { border-bottom: none; }
+.remove-batch-item {
+    flex-shrink: 0;
+    min-width: 32px;
+    height: 32px;
+    padding: 0 var(--sp-2);
+    font-size: var(--fs-sm);
+    font-weight: 700;
+    color: var(--danger-text);
+    background-color: var(--danger-soft);
+    border-radius: var(--r-sm);
+    transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.remove-batch-item:hover { color: #fff; background-color: var(--danger); }
+#batchSummary {
+    padding: var(--sp-2) 0;
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+}
+#batchItemCount { color: var(--text); font-size: var(--fs-md); }
+.batch-note-toggle-container { margin-top: var(--sp-2); }
+.batch-action-buttons { display: flex; gap: var(--sp-2); margin-top: var(--sp-3); }
+.batch-action-buttons button {
+    flex: 1;
+    height: var(--control-h);
+    font-size: var(--fs-md);
+    font-weight: 650;
+    border-radius: var(--r-md);
+    transition: background-color var(--dur) var(--ease);
+}
+#saveBatchButton { color: #fff; background-color: var(--success); }
+#saveBatchButton:hover { background-color: var(--success-hover); }
+#saveBatchButton.is-empty { opacity: .6; }
+#clearBatchButton { color: var(--text); background-color: var(--surface); border: 1.5px solid var(--border-strong); }
+#clearBatchButton:hover { background-color: var(--surface-3); }
+.batch-save-count { display: inline-block; min-width: 22px; margin-left: 6px; padding: 0 6px; font-size: var(--fs-xs); font-weight: 800; line-height: 20px; color: var(--success-text); background-color: #fff; border-radius: var(--r-full); font-variant-numeric: tabular-nums; }
+/* Handy (unter 992 px): im Batch-Modus hängen „Batch Speichern“ / „Batch Leeren“ als feste Leiste am unteren Bildschirmrand –
+   so bleibt Speichern nach vielen Scans erreichbar, ohne zur Batch-Karte hochzuscrollen. Die Karte selbst bleibt oben wie bisher.
+   Nur in der Hauptansicht (Detailansicht/Unterseiten liegen darüber, z-index 100) und nicht am Desktop. */
+@media (max-width: 991.98px) {
+    body.batch-mode-active .batch-action-buttons {
+        position: fixed;
+        left: 0; right: 0; bottom: 0;
+        z-index: 60;                                   /* über der Liste, unter Detail-/Unterseiten (100) und Dialogen */
+        margin: 0;
+        padding: var(--sp-2) var(--sp-3) calc(var(--sp-2) + env(safe-area-inset-bottom, 0px));
+        background-color: var(--surface);
+        border-top: 1px solid var(--border);
+        box-shadow: 0 -6px 16px -8px rgba(0, 0, 0, .35);
+    }
+    body.batch-mode-active .batch-action-buttons button { white-space: nowrap; }
+    body.batch-mode-active .batch-action-buttons .batch-btn-prefix { display: none; }   /* in der Leiste reicht „Speichern (2)“ / „Leeren“ */
+    body.batch-mode-active .batch-area.visible { padding-bottom: var(--sp-3); }
+    body.batch-mode-active #mainView { padding-bottom: calc(var(--control-h) + var(--sp-4) + env(safe-area-inset-bottom, 0px)); }   /* letzte Karte nicht hinter der Leiste */
+    body.batch-mode-active.modal-open .batch-action-buttons { display: none; }   /* Vollbild-Dialoge (z. B. Packstücke) überdecken alles */
+}
+
+
+/* ===================================================================
+   7. SENDUNGS-KARTEN (Tabelle → Karten auf Mobil)
+   =================================================================== */
+/* ---- Startseite: Suche + Kacheln (unter der Scan-Box) ---- */
+.home-hub { margin-top: var(--sp-4); }
+.home-search {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    width: 100%;
+    min-height: var(--control-h);
+    padding: 0 var(--sp-4);
+    font-size: var(--fs-sm);
+    text-align: left;
+    color: var(--text-muted);
+    background-color: var(--surface);
+    border: 1.5px dashed var(--border-strong);
+    border-radius: var(--r-lg);
+    transition: border-color var(--dur) var(--ease), background-color var(--dur) var(--ease);
+}
+.home-search:hover, .home-search:active { border-color: var(--accent); background-color: var(--surface-2); }
+.home-search svg { width: 20px; height: 20px; flex-shrink: 0; color: var(--text-faint); }
+.home-search span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.home-tiles {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-3);
+    margin-top: var(--sp-3);
+}
+.home-tile {
+    --tile: var(--accent);
+    --tile-soft: var(--accent-soft);
+    --tile-text: var(--accent-text);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--sp-2);
+    min-height: 118px;
+    padding: var(--sp-4);
+    text-align: left;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-xl);
+    box-shadow: var(--shadow-sm);
+    transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.home-tile:hover { border-color: var(--tile); box-shadow: var(--shadow-md); }
+.home-tile:active { transform: scale(.98); }
+.tile-dunkelalarm { --tile: var(--danger); --tile-soft: var(--danger-soft); --tile-text: var(--danger-text); }
+.tile-offen       { --tile: var(--warning); --tile-soft: var(--warning-soft); --tile-text: var(--warning-text); }
+.tile-info        { --tile: var(--info); --tile-soft: var(--info-soft); --tile-text: var(--info-text); }
+.tile-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    color: var(--tile-text);
+    background-color: var(--tile-soft);
+    border-radius: var(--r-md);
+}
+.tile-icon svg { width: 24px; height: 24px; }
+.tile-label { font-size: var(--fs-md); font-weight: 700; letter-spacing: -.01em; color: var(--text); }
+.tile-meta { font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.3; min-height: 1.3em; }
+.tile-count {
+    position: absolute;
+    top: var(--sp-3);
+    right: var(--sp-3);
+    min-width: 26px;
+    height: 26px;
+    padding: 0 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--fs-xs);
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: #fff;
+    background-color: var(--tile);
+    border-radius: var(--r-full);
+    box-shadow: 0 0 0 3px var(--surface);
+}
+.list-caption {
+    margin: var(--sp-5) 0 0;
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+body.batch-mode-active .home-hub { display: none; } /* im Batch-Modus zählt nur Scannen + Liste */
+
+/* ---- Unterseiten (Anlieferung, LKW, Dunkelalarm, Offene Sendungen, Info): Vollbild wie die Detailansicht ---- */
+#pageView {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    padding: 0 var(--sp-3) var(--sp-6);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    background-color: var(--bg);
+}
+.page-view-header h2 { text-align: left; padding-right: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.view-back-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: var(--touch-min);
+    height: var(--touch-min);
+    padding: 0;
+    color: var(--text);
     background: none;
     border: none;
-    cursor: pointer;
-    padding: 5px;
-    margin-right: 10px;
+    border-radius: var(--r-md);
+    transition: background-color var(--dur) var(--ease);
 }
-
-#backToMainViewBtn svg {
-    width: 32px;
-    height: 32px;
-    fill: #333;
-    transition: transform 0.2s;
+.view-back-btn:hover, .view-back-btn:active { background-color: var(--surface-3); }
+.view-back-btn svg { width: 28px; height: 28px; }
+.page-badge {
+    flex-shrink: 0;
+    padding: 3px 10px;
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent-text);
+    background-color: var(--accent-soft);
+    border-radius: var(--r-full);
 }
-#backToMainViewBtn:hover svg {
-    transform: scale(1.1);
+.page-content { min-height: 120px; }
+.page-empty, .page-note { margin: 0 0 var(--sp-3); font-size: var(--fs-sm); color: var(--text-muted); line-height: 1.45; }
+.page-empty { padding: var(--sp-5) var(--sp-4); text-align: center; border: 1px dashed var(--border-strong); border-radius: var(--r-lg); }
+.page-section-title {
+    margin: var(--sp-4) 0 var(--sp-2);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
 }
-
-.detail-view-header h2 {
-    margin: 0;
-    font-size: 1.4em;
-}
-
-/* Passt die Detailanzeige in der Detailansicht an */
-#detailViewContent #currentShipmentDetails {
-    margin-top: 0;
-    border-style: solid; /* Macht den Rahmen durchgezogen statt gestrichelt */
-}
-/* ===== NEU: Styling fÃ¼r klickbaren Titel zum Kopieren ===== */
-#currentShipmentDetails #shipmentDetailTitle:hover {
-    color: var(--primary-color); /* Hebt den Text farblich hervor */
-    text-decoration: underline;  /* Unterstreicht den Text beim Ãberfahren mit der Maus */
-    text-decoration-style: dotted;
-}
-/* ===== NEU: Styling fÃ¼r "Kopiert!"-Meldung bei HU-Nummern ===== */
-
-/* Positioniert das Pseudo-Element relativ zur HU-Nummer */
-#currentShipmentDetails .hu-value {
-    position: relative; 
-    transition: color 0.2s;
-}
-#currentShipmentDetails .hu-value:hover {
-    color: var(--primary-color);
-}
-
-/* Das Pseudo-Element, das als "Kopiert!"-Meldung dient */
-#currentShipmentDetails .hu-value.copied::after {
-    content: 'Kopiert!';
-    position: absolute;
-    top: 50%;
-    left: 105%; /* Positioniert es rechts neben der Nummer */
-    transform: translateY(-50%);
-    background-color: var(--primary-color);
-    color: white;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 0.8em;
-    font-weight: bold;
-    white-space: nowrap;
-    opacity: 0;
-    
-    /* Hier wird die Animation zugewiesen */
-    animation: fade-in-out 1.5s ease-in-out;
-}
-
-/* Die Keyframe-Animation fÃ¼r das Ein- und Ausblenden */
-@keyframes fade-in-out {
-    0% {
-        opacity: 0;
-        transform: translateY(-50%) scale(0.8);
-    }
-    20% {
-        opacity: 1;
-        transform: translateY(-50%) scale(1);
-    }
-    80% {
-        opacity: 1;
-        transform: translateY(-50%) scale(1);
-    }
-    100% {
-        opacity: 0;
-        transform: translateY(-50%) scale(0.8);
-    }
-}
-
-.suspicion-details {
-    text-align: center;
-    font-size: 1.1em;
-    line-height: 1.6;
-}
-.suspicion-details p {
-    margin: 5px 0;
-}
-.suspicion-details code {
-    font-family: monospace;
-    font-size: 1.2em;
-    padding: 3px 6px;
-    background-color: #eee;
-    border-radius: 4px;
-    border: 1px solid #ddd;
-}
-.suspicion-details hr {
-    border: none;
-    border-top: 1px dashed #ccc;
-    margin: 15px 0;
-}
-.suspicion-question {
-    font-weight: bold;
-    color: var(--secondary-hover);
-}
-
-/* =============================================================== */
-/* HIER DEN NEUEN CODE EINFÃGEN                                     */
-/* =============================================================== */
-/* ===== NEU: Stile fÃ¼r QR-Code in der Tabelle ===== */
-
-/* Die neue Spalte standardmÃ¤Ãig (auf MobilgerÃ¤ten) komplett ausblenden */
-th.qr-code-header,
-td.qr-code-cell {
-    display: none;
-}
-
-/* Der Container fÃ¼r den QR-Code, um ihn zu zentrieren */
-.qr-code-cell div {
+.page-list { list-style: none; margin: 0; padding: 0; }
+.page-list li + li { margin-top: var(--sp-2); }
+.page-list-muted .page-row { opacity: .7; }
+.page-row {
     display: flex;
-    justify-content: center;
     align-items: center;
-    padding: 5px 0;
+    gap: var(--sp-3);
+    width: 100%;
+    min-height: 64px;
+    padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-4);
+    text-align: left;
+    color: var(--text);
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.page-row:hover { border-color: var(--border-strong); box-shadow: var(--shadow-md); }
+.page-row:active { background-color: var(--surface-2); }
+.page-row-icon { flex-shrink: 0; font-size: 24px; line-height: 1; }
+.emoji { font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Twemoji Mozilla", sans-serif; font-style: normal; }
+.page-row-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.page-row-title { font-family: var(--font-mono); font-size: var(--fs-md); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.page-row-sub { font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.35; }
+.page-progress { display: block; height: 4px; margin-top: 2px; background-color: var(--surface-3); border-radius: var(--r-full); overflow: hidden; }
+.page-progress span { display: block; height: 100%; background-color: var(--success); border-radius: var(--r-full); transition: width .3s var(--ease); }
+.page-row-end { display: flex; align-items: center; gap: var(--sp-2); flex-shrink: 0; }
+.page-chip {
+    padding: 3px 8px;
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    white-space: nowrap;
+    color: var(--text-muted);
+    background-color: var(--surface-3);
+    border-radius: var(--r-full);
+}
+.page-chip.warn { color: var(--warning-text); background-color: var(--warning-soft); }
+.page-chip.ok   { color: var(--success-text); background-color: var(--success-soft); }
+.page-chevron { width: 9px; height: 9px; border-right: 2px solid var(--text-faint); border-bottom: 2px solid var(--text-faint); transform: rotate(-45deg); margin-right: 4px; }
+.text-danger { color: var(--danger-text); font-weight: 700; }
+
+.page-banner {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-3);
+    padding: var(--sp-3) var(--sp-4);
+    font-size: var(--fs-sm);
+    color: var(--warning-text);
+    background-color: var(--warning-soft);
+    border-radius: var(--r-lg);
+}
+.page-banner > span { flex: 1; }
+.page-banner-btn, .page-summary-btn, .page-link-btn {
+    min-height: 36px;
+    padding: 0 var(--sp-3);
+    font-size: var(--fs-sm);
+    font-weight: 700;
+    color: var(--accent-text);
+    background-color: var(--surface);
+    border: 1.5px solid var(--accent);
+    border-radius: var(--r-md);
+}
+.page-banner-btn:hover, .page-summary-btn:hover, .page-link-btn:hover { background-color: var(--accent-soft); }
+.page-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-2);
+    font-size: var(--fs-sm);
+    font-weight: 700;
+}
+.page-summary > span {
+    padding: 4px 10px;
+    color: var(--text-muted);
+    background-color: var(--surface-3);
+    border-radius: var(--r-full);
+    font-variant-numeric: tabular-nums;
+}
+.page-summary > span.ok       { color: var(--success-text); background-color: var(--success-soft); }
+.page-summary > span.mismatch { color: var(--warning-text); background-color: var(--warning-soft); }
+.page-summary > span.over     { color: var(--danger-text);  background-color: var(--danger-soft); }
+.page-summary-btn { margin-left: auto; color: var(--text-muted); border-color: var(--border-strong); }
+.page-summary-btn:hover { color: var(--text); background-color: var(--surface-3); }
+.page-actions { margin: var(--sp-4) 0; text-align: center; }
+.page-link-btn { width: 100%; min-height: var(--control-h); }
+.page-more-btn { margin-top: var(--sp-2); }
+.page-details { margin-top: var(--sp-4); }
+.page-details > summary { padding: var(--sp-3) 0; font-size: var(--fs-sm); font-weight: 700; color: var(--text-muted); cursor: pointer; }
+.page-order .hu-order-title { cursor: pointer; }
+.page-order .hu-order-title:hover { color: var(--accent); }
+.page-shipments { margin-top: 0; }
+.row-chip {
+    margin-left: var(--sp-2);
+    padding: 2px 7px;
+    font-family: var(--font-sans);
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    letter-spacing: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 45%;
+    color: var(--text-muted);
+    background-color: var(--surface-3);
+    border-radius: var(--r-full);
 }
 
-/* Media Query fÃ¼r "Desktop"-Ansichten (Bildschirme breiter als 992px) */
-@media (min-width: 992px) {
-    /* Ãndert das Layout der Tabelle zurÃ¼ck zu einer klassischen Tabellenansicht */
-    thead {
-        display: table-header-group;
-    }
-    tbody tr {
-        display: table-row;
-        margin-bottom: 0;
-        border: none;
-        box-shadow: none;
-        border-bottom: 1px solid #ddd;
-    }
-    tbody tr:last-child {
-        border-bottom: none;
-    }
-    td {
-        display: table-cell;
-        text-align: left;
-        border-bottom: none;
-        padding: 8px;
-        position: static;
-        padding-left: 8px; /* Padding zurÃ¼cksetzen */
-        vertical-align: middle;
-    }
-    /* Das "data-label" aus der mobilen Ansicht auf dem Desktop ausblenden */
-    td::before {
-        display: none;
-    }
-
-    /* Die QR-Code Spalte auf dem Desktop sichtbar machen und formatieren */
-    th.qr-code-header,
-    td.qr-code-cell {
-        display: table-cell;
-        width: 80px; /* Eine feste Breite fÃ¼r die Spalte */
-        vertical-align: middle;
-        text-align: center;
-        padding: 5px;
-    }
-    
-    .actions-cell {
-        width: 220px;
-        /* text-align: right; <-- Alte Eigenschaft wird ersetzt durch: */
-        display: flex; /* Macht die Zelle zu einem Flexbox-Container */
-        justify-content: flex-end; /* Richtet die Buttons rechts aus */
-        align-items: center; /* Zentriert die Buttons vertikal in der Zelle */
-        gap: 6px; /* FÃ¼gt einen sauberen Abstand von 6px zwischen den Buttons hinzu */
-    }
-
-/* Macht die HU-Nummer im Detail-Modal klickbar und fÃ¼gt visuelles Feedback hinzu */
-#huDetailsContent #huDetailsNumber {
+/* Info-Seite: Suche + Filter */
+.info-form { margin-bottom: var(--sp-3); }
+.info-form-head { display: none; }   /* nur in der Desktop-Seitenleiste sichtbar */
+.info-reset-btn {
+    min-height: 28px;
+    padding: 0 var(--sp-2);
+    font: inherit;
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    color: var(--accent);
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 999px;
     cursor: pointer;
-    position: relative; /* Wichtig fÃ¼r die "Kopiert!"-Meldung */
-    transition: background-color 0.2s;
+}
+.info-reset-btn:hover { background-color: var(--accent-soft); border-color: transparent; }
+.info-search-wrapper input[type="search"] {
+    width: 100%;
+    height: var(--control-h);
+    padding: 0 var(--sp-3);
+    font: inherit;
+    font-size: var(--fs-md);
+    color: var(--text);
+    background-color: var(--surface);
+    border: 1.5px solid var(--border-strong);
+    border-radius: var(--r-md);
+    -webkit-appearance: none;
+    appearance: none;
+}
+.info-search-wrapper input[type="search"]:focus { border-color: var(--accent); box-shadow: var(--focus-ring); outline: none; }
+/* Eigenes X im Suchfeld (statt des kleinen Browser-Kreuzes): sichtbar, sobald Text drinsteht; leert nur den Suchtext */
+.info-search-wrapper input[type="search"] { padding-right: 46px; }
+.info-search-wrapper input[type="search"]::-webkit-search-cancel-button, .info-search-wrapper input[type="search"]::-webkit-search-decoration { -webkit-appearance: none; appearance: none; display: none; }
+.info-search-clear.visible { display: flex; align-items: center; justify-content: center; }
+/* „Alle Filter zurücksetzen“ unter dem Suchfeld – erscheint, sobald Suchtext oder ein Filter gesetzt ist */
+.info-reset-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); margin-top: var(--sp-2); }
+.info-reset-row.hidden { display: none; }
+.info-reset-summary { font-size: var(--fs-xs); font-weight: 600; color: var(--text-muted); }
+.info-reset-row .info-reset-btn { min-height: var(--touch-min); padding: 0 var(--sp-3); font-size: var(--fs-sm); color: var(--accent-text); background-color: var(--accent-soft); border-color: transparent; }
+.info-reset-row .info-reset-btn:active { background-color: var(--accent); color: #fff; }
+.info-filters {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-2) var(--sp-3);
+    margin-top: var(--sp-2);
+}
+.info-filters label { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-xs); font-weight: 600; color: var(--text-muted); }
+.info-filters select { height: 40px; font-size: var(--fs-sm); }
+.info-filters .info-archive {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--sp-2);
+    min-height: var(--touch-min);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--text);
+}
+.info-filters .info-archive input { width: 20px; height: 20px; margin: 0; }
+/* Gewichtsbereich „von – bis“ (kg) und Datum „von – bis“: je zwei kleine Felder in einer Zelle des Filterrasters */
+.info-filters .info-weight, .info-filters .info-dates { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.info-weight-inputs input[type="date"] {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 40px;
+    padding: 0 var(--sp-2);
+    font: inherit;
+    font-size: var(--fs-sm);
+    color: var(--text);
+    background-color: var(--surface);
+    border: 1.5px solid var(--border-strong);
+    border-radius: var(--r-md);
+    -webkit-appearance: none;
+    appearance: none;
+}
+.info-weight-inputs input[type="date"]:focus { border-color: var(--accent); box-shadow: var(--focus-ring); outline: none; }
+/* iOS zeigt Datumsfelder sonst zentriert/ohne Höhe */
+.info-weight-inputs input[type="date"]::-webkit-date-and-time-value { text-align: left; min-height: 1.2em; }
+.info-weight-label { font-size: var(--fs-xs); font-weight: 600; color: var(--text-muted); }
+.info-weight-inputs { display: flex; align-items: center; gap: var(--sp-1); min-width: 0; }
+.info-weight-inputs input[type="text"] {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 40px;
+    padding: 0 var(--sp-2);
+    font-size: var(--fs-sm);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+}
+.info-weight-sep { flex-shrink: 0; color: var(--text-faint); }
+/* Treffer-HUs des Gewichtsfilters an der Sendungskarte (in der Übersichtszelle, tippbar → HU-Details) */
+.weight-hits { display: flex; flex-wrap: wrap; gap: var(--sp-1); flex-basis: 100%; margin-top: 2px; }
+.weight-hit {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 28px;
+    padding: 2px 9px;
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--accent-text);
+    background-color: var(--accent-soft);
+    border: 1px solid transparent;
+    border-radius: var(--r-full);
+    white-space: nowrap;
+    cursor: pointer;
+}
+.weight-hit:hover, .weight-hit:active { border-color: var(--accent); }
+.weight-hit-hu { font-weight: 600; opacity: .85; }
+.weight-hit-more { color: var(--text-muted); background-color: var(--surface-3); cursor: default; }
+
+.shipment-table { width: 100%; border-collapse: collapse; margin-top: var(--sp-3); }
+.shipment-table thead { display: none; }
+
+/* Unter der Liste: „Weitere anzeigen“ (nur die neuesten Karten werden gezeichnet) und Leer-Hinweis bei Suche */
+.list-footer { margin: var(--sp-2) 0 var(--sp-4); }
+.list-more-btn {
+    width: 100%;
+    min-height: var(--control-h);
+    padding: 0 var(--sp-4);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--text-muted);
+    background-color: var(--surface);
+    border: 1.5px dashed var(--border-strong);
+    border-radius: var(--r-lg);
+    transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.list-more-btn:hover, .list-more-btn:active { color: var(--text); background-color: var(--surface-3); }
+.list-empty-hint {
+    margin: var(--sp-3) 0 0;
+    padding: var(--sp-3);
+    text-align: center;
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
 }
 
-#huDetailsContent #huDetailsNumber:hover {
-    background-color: #e9e9e9; /* Leichter Hover-Effekt */
+/* ---- Archiv: Hinweis-Knopf unter der Liste, Trefferblock, Kennzeichen, „Wiederherstellen“ ---- */
+.archive-hint-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-2);
+    width: 100%;
+    min-height: var(--control-h);
+    margin-top: var(--sp-2);
+    padding: 0 var(--sp-4);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--accent-text);
+    background-color: var(--accent-soft);
+    border: 1px solid transparent;
+    border-radius: var(--r-lg);
+    transition: background-color var(--dur) var(--ease), opacity var(--dur) var(--ease);
+}
+.archive-hint-btn::before {
+    content: "";
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    background-color: currentColor;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M20.54 5.23 19.15 3.55A1.5 1.5 0 0 0 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6.5c0-.48-.17-.93-.46-1.27zM6.24 5h11.52l.81.97H5.44L6.24 5zM5 19V8h14v11H5zm8.45-9h-2.9v3H8l4 4 4-4h-2.55v-3z'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M20.54 5.23 19.15 3.55A1.5 1.5 0 0 0 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6.5c0-.48-.17-.93-.46-1.27zM6.24 5h11.52l.81.97H5.44L6.24 5zM5 19V8h14v11H5zm8.45-9h-2.9v3H8l4 4 4-4h-2.55v-3z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.archive-hint-btn:hover, .archive-hint-btn:active { background-color: var(--accent); color: #fff; }
+.archive-hint-btn:disabled { opacity: .6; }
+.archive-results { margin: var(--sp-2) 0 var(--sp-4); }
+.archive-results-header {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-2);
+    padding: 0 var(--sp-1);
+}
+.archive-results-header h3 {
+    flex: 1;
+    margin: 0;
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+.archive-close-btn {
+    width: var(--touch-min);
+    height: var(--touch-min);
+    padding: 0;
+    font-size: 22px;
+    line-height: 1;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    border-radius: var(--r-md);
+}
+.archive-close-btn:hover, .archive-close-btn:active { color: var(--text); background-color: var(--surface-3); }
+.archive-results-note { margin: 0 0 var(--sp-2); padding: 0 var(--sp-1); font-size: var(--fs-xs); color: var(--text-muted); }
+.archive-badge {
+    display: inline-block;
+    margin-left: var(--sp-2);
+    padding: 2px 7px;
+    font-family: var(--font-sans);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    background-color: var(--surface-3);
+    border-radius: var(--r-full);
+    vertical-align: middle;
+}
+.shipment-table tr.archived { background-color: var(--surface-2); border-style: dashed; } /* Karte (mobil) – am Desktop s. unten */
+.shipment-table tr.archived td.hawb-cell { color: var(--text-muted); }
+.shipment-table tr.archived .vvl-table-entry { display: inline-block; }
+/* Wiederherstellen-Knopf: als Icon in der Aktionsleiste, als Textknopf im Archiv-Banner der Detailansicht */
+td.actions-cell button.restore-btn {
+    --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6a7 7 0 1 1 2.05 4.95l-1.42 1.42A9 9 0 1 0 13 3zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z'/%3E%3C/svg%3E");
+    color: var(--success-text);
+}
+td.actions-cell button.restore-btn:hover, td.actions-cell button.restore-btn:active { background-color: var(--success-soft); }
+.archive-banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-3);
+    padding: var(--sp-2) var(--sp-3);
+    font-family: var(--font-sans);
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+    background-color: var(--surface-2);
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--r-md);
+}
+.archive-banner .archive-badge { margin-left: 0; }
+.archive-banner > span:not(.archive-badge) { flex: 1 1 140px; }
+.archive-banner .restore-btn {
+    min-height: 36px;
+    padding: 0 var(--sp-3);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: #fff;
+    background-color: var(--success);
+    border: none;
+    border-radius: var(--r-md);
+}
+.archive-banner .restore-btn:hover, .archive-banner .restore-btn:active { background-color: var(--success-hover); }
+/* Karte: HAWB und Status-Pills über die volle Breite, darunter Zeit (links) und Aktions-Icons (rechts).
+   Die Pill-Zeile hängt bewusst NICHT von der Breite der Icon-Leiste ab: Safari (iOS) berechnet die Zeilenhöhe
+   nicht neu, wenn sich nur die Nachbarspalte ändert (z. B. Stift-Icon im Batch-Modus ausgeblendet) – die
+   umgebrochene Pille lag dann über der Uhrzeit. */
+.shipment-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+        "hawb    hawb"
+        "summary summary"
+        "time    actions";
+    column-gap: var(--sp-2);
+    margin-bottom: var(--sp-2);
+    padding: var(--sp-3) var(--sp-3) var(--sp-1) var(--sp-4);
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow var(--dur) var(--ease);
+}
+.shipment-table tr:active { box-shadow: var(--shadow-md); }
+.shipment-table td {
+    display: block;
+    position: relative;
+    padding: 0;
+    min-height: 0;
+    font-size: var(--fs-sm);
+    text-align: left;
+    border: none;
+}
+.shipment-table td::before { display: none; } /* keine Labels mehr – Inhalte erklären sich selbst */
+
+/* HAWB – groß, Monospace, ganze Zeile tippbar (öffnet Details) */
+.shipment-table td.hawb-cell {
+    grid-area: hawb;
+    display: flex;
+    align-items: center;
+    min-height: var(--touch-min);
+    margin: calc(-1 * var(--sp-2)) 0 0;
+    padding: 0 28px 0 0;
+    font-family: var(--font-mono);
+    font-size: var(--fs-lg);
+    font-weight: 700;
+    letter-spacing: .01em;
+    color: var(--text);
+    cursor: pointer;
+}
+.shipment-table td.hawb-cell::after {
+    content: "";
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    width: 9px;
+    height: 9px;
+    margin-top: -6px;
+    border-right: 2px solid var(--text-faint);
+    border-bottom: 2px solid var(--text-faint);
+    transform: rotate(-45deg);
+}
+.th-vvl { display: none; }   /* Kopf „VVL | Kundennr“ nur in reinen VW-Tabellen am Desktop (Klasse vw-only, setzt script.js) */
+.vvl-table-entry { font-size: var(--fs-md); line-height: 1.35; }
+.vvl-table-entry .vvl-col { display: block; }
+.vvl-table-entry .vvl-prefix, .vvl-table-entry .kundennr-prefix { margin-right: 5px; }
+.vvl-table-entry .vvl-prefix::after, .vvl-table-entry .kundennr-prefix::after { content: ":"; }
+.vvl-table-entry .vvl-prefix, .vvl-table-entry .kundennr-prefix {
+    font-family: var(--font-sans);
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
 }
 
-/* Stil fÃ¼r die "Kopiert!"-Meldung (verwendet die existierende Animation) */
+/* Übersicht: Status-Pills, linksbündig unter der Nummer */
+.summary-cell { grid-area: summary; display: flex !important; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: var(--sp-1) var(--sp-2); padding: 0; }
+.summary-cell strong {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+    color: var(--text-muted);
+    background-color: var(--surface-3);
+    border: 1px solid var(--border);
+    border-radius: var(--r-full);
+    white-space: nowrap;
+}
+.summary-cell strong::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--text-faint);
+    flex-shrink: 0;
+}
+.summary-cell strong.ok       { color: var(--success-text); background-color: var(--success-soft); border-color: transparent; }
+.summary-cell strong.ok::before { background-color: var(--success); }
+.summary-cell strong.mismatch { color: var(--warning-text); background-color: var(--warning-soft); border-color: transparent; }
+.summary-cell strong.mismatch::before { background-color: var(--warning); }
+.summary-cell strong.over     { color: var(--danger-text); background-color: var(--danger-soft); border-color: transparent; }
+.summary-cell strong.over::before { background-color: var(--danger); }
+.summary-divider { display: none; }
+
+/* Letzte Änderung: klein, grau, mit Uhr-Icon – einzeilig, damit sich die Zeilenhöhe nie ändert */
+.shipment-table td.time-cell {
+    grid-area: time;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    font-size: var(--fs-xs);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-faint);
+}
+.shipment-table td.time-cell::before {
+    content: "";
+    display: block;
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+    background-color: currentColor;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm.5-13H11v6l5.2 3.1.8-1.3-4.5-2.7V7z'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm.5-13H11v6l5.2 3.1.8-1.3-4.5-2.7V7z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+/* Aktionen: Icon-Leiste rechts (Text bleibt für Screenreader im DOM, wird visuell durch Icon ersetzt) */
+.shipment-table td.actions-cell {
+    grid-area: actions;
+    display: flex;
+    align-items: center;
+    align-self: center;
+    gap: 2px;
+    padding: 0;
+    text-align: right;
+}
+td.actions-cell button {
+    position: relative;
+    width: var(--touch-min);
+    height: var(--touch-min);
+    min-width: 0;
+    padding: 0;
+    font-size: 0;                 /* Text ausblenden … */
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    border-radius: var(--r-md);
+    transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+td.actions-cell button::before {  /* … und Icon zeigen */
+    content: "";
+    display: block;
+    width: 24px;
+    height: 24px;
+    margin: 0 auto;
+    background-color: currentColor;
+    -webkit-mask: var(--icon) center / contain no-repeat;
+    mask: var(--icon) center / contain no-repeat;
+}
+td.actions-cell button:hover, td.actions-cell button:active { background-color: var(--surface-3); color: var(--text); }
+td.actions-cell button.edit-btn { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z'/%3E%3C/svg%3E"); }
+td.actions-cell button.pdf-btn  { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 12h8v2H8v-2zm0 4h8v2H8v-2z'/%3E%3C/svg%3E"); color: var(--accent-text); }
+td.actions-cell button.pdf-btn:hover { background-color: var(--accent-soft); }
+td.actions-cell button.main-delete-btn,
+td.actions-cell button.delete-btn {
+    --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12zM8 9h8v10H8V9zm7.5-5-1-1h-5l-1 1H5v2h14V4h-3.5z'/%3E%3C/svg%3E");
+    color: var(--danger-text) !important;
+    background-color: transparent !important;
+    border-color: transparent !important;
+}
+td.actions-cell button.delete-btn:hover { background-color: var(--danger-soft) !important; }
+body.batch-mode-active td.actions-cell button.edit-btn { display: none; }
+
+th.qr-code-header, td.qr-code-cell { display: none; }
+.shipment-table th.dt-cell, .shipment-table td.dt-cell { display: none; } /* Desktop-Spalten (Status, LKW, WE, Sich., Gewicht, Notizen) – nur ab 992 px */
+.qr-code-cell div { display: flex; justify-content: center; align-items: center; padding: var(--sp-1) 0; }
+
+
+/* ===================================================================
+   8. DETAILANSICHT
+   =================================================================== */
+#detailView {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    padding: 0 var(--sp-3) var(--sp-6);
+    overflow-y: auto;
+    background-color: var(--bg);
+}
+.detail-view-header {
+    position: sticky;
+    top: 0;
+    z-index: 101;
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-height: 56px;
+    margin: 0 calc(-1 * var(--sp-3)) var(--sp-3);
+    padding: var(--sp-2) var(--sp-3);
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+}
+.detail-view-header h2 { flex: 1; margin: 0; font-size: var(--fs-lg); text-align: center; padding-right: var(--touch-min); }
+#backToMainViewBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--touch-min);
+    height: var(--touch-min);
+    padding: 0;
+    background: none;
+    border: none;
+    border-radius: var(--r-md);
+    color: var(--text);
+    transition: background-color var(--dur) var(--ease);
+}
+#backToMainViewBtn:hover { background-color: var(--surface-3); }
+#backToMainViewBtn svg { width: 28px; height: 28px; fill: currentColor; }
+
+#currentShipmentDetails {
+    padding: var(--sp-4);
+    font-size: var(--fs-sm);
+    line-height: 1.5;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--border-strong); /* Farbe wird per JS gesetzt (rot/orange/grün) */
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-md);
+}
+/* Titel = HAWB. Tippen kopiert. -------------------------------------- */
+#currentShipmentDetails > strong {
+    display: block;
+    margin: 0 0 var(--sp-2);
+    font-family: var(--font-mono);
+    font-size: var(--fs-xl);
+    font-weight: 700;
+    letter-spacing: .01em;
+    color: var(--text);
+    overflow-wrap: anywhere;
+}
+#currentShipmentDetails #shipmentDetailTitle {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: var(--touch-min);
+    padding: 0 88px 0 0;
+    cursor: pointer;
+}
+#shipmentDetailTitle::after {
+    content: "Kopieren";
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 6px 10px;
+    font-family: var(--font-sans);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: .02em;
+    color: var(--accent);
+    background-color: var(--accent-soft);
+    border-radius: var(--r-full);
+}
+#currentShipmentDetails #shipmentDetailTitle:active { color: var(--accent); }
+#currentShipmentDetails #shipmentDetailTitle.copied::after { content: "Kopiert!"; color: #fff; background-color: var(--success); }
+
+/* Zusammenfassung – direkt unter dem Titel, zwei große Zahlen ---------- */
+#currentShipmentDetails .summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-3);
+}
+#currentShipmentDetails .summary > span {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: var(--sp-2) var(--sp-3);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    background-color: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+}
+.summary .ok, .summary .mismatch, .summary .over {
+    font-family: var(--font-mono);
+    font-size: var(--fs-2xl);
+    font-weight: 800;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0;
+    text-transform: none;
+}
+.summary .ok small, .summary .mismatch small, .summary .over small { font-size: var(--fs-md); font-weight: 600; opacity: .7; }
+.summary .ok       { color: var(--success-text); }
+.summary .mismatch { color: var(--warning-text); }
+.summary .over     { color: var(--danger-text); }
+/* Kachel färbt sich mit: fertig grün, überzählig rot */
+#currentShipmentDetails .summary > span:has(.ok)   { background-color: var(--success-soft); border-color: color-mix(in srgb, var(--success) 35%, transparent); }
+#currentShipmentDetails .summary > span:has(.over) { background-color: var(--danger-soft);  border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
+
+/* Scan-Liste = Zeitleiste, kompakt ------------------------------------- */
+#currentShipmentDetails ul { list-style: none; margin: 0; padding: 0; }
+#currentShipmentDetails > ul { position: relative; padding-left: 14px; }
+#currentShipmentDetails > ul::before { /* durchgehende Linie */
+    content: "";
+    position: absolute;
+    left: 4px;
+    top: 10px;
+    bottom: 10px;
+    width: 2px;
+    background-color: var(--border);
+}
+#currentShipmentDetails > ul > li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    position: relative;
+    margin: 0 0 var(--sp-1);
+    padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3);
+    font-family: var(--font-sans);
+    font-size: var(--fs-md);
+    line-height: 1.35;
+    white-space: normal;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+}
+#currentShipmentDetails > ul > li:last-child { margin-bottom: 0; }
+#currentShipmentDetails > ul > li::before { /* Punkt auf der Linie */
+    content: "";
+    position: absolute;
+    left: -14px;
+    top: 18px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: var(--accent);
+    border: 2px solid var(--surface);
+    box-sizing: border-box;
+}
+#currentShipmentDetails > ul > li.cancelled-item::before { background-color: var(--text-faint); }
+
+#currentShipmentDetails .scan-main-info {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px var(--sp-2);
+    padding-right: 72px; /* Platz für Storno */
+    white-space: normal;
+    overflow: visible;
+    overflow-wrap: anywhere;
+}
+#currentShipmentDetails li .timestamp {
+    flex: 0 0 100%;
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+}
+/* HU-Nummer: eigene Tippfläche (kopieren) */
+#currentShipmentDetails .scan-main-info .hu-value {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    padding: 0 var(--sp-2);
+    font-family: var(--font-mono);
+    font-size: var(--fs-md);
+    font-weight: 700;
+    color: var(--text);
+    background-color: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+}
+#currentShipmentDetails .scan-main-info .hu-value:active { background-color: var(--accent-soft); border-color: var(--accent); }
+#currentShipmentDetails .scan-main-info .position-number { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-faint); }
+#currentShipmentDetails li .status {
+    display: inline-block;
+    padding: 3px 8px;
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: .01em;
+    color: var(--accent-text);
+    background-color: var(--accent-soft);
+    border-radius: var(--r-full);
+}
+#currentShipmentDetails li .combo { font-size: var(--fs-xs); font-style: italic; color: var(--info-text); }
+#currentShipmentDetails li .cancelled-info { flex: 0 0 100%; font-size: var(--fs-xs); color: var(--text-faint); text-decoration: none !important; }
+#currentShipmentDetails li.cancelled-item { color: var(--cancelled-color); background-color: var(--surface-2); text-decoration: none; }
+#currentShipmentDetails li.cancelled-item .hu-value,
+#currentShipmentDetails li.cancelled-item .status { text-decoration: line-through; opacity: .65; }
+#currentShipmentDetails li.cancelled-item .status { color: var(--text-muted); background-color: var(--surface-3); }
+#currentShipmentDetails li.cancelled-item .timestamp,
+#currentShipmentDetails li.cancelled-item .combo,
+#currentShipmentDetails li.cancelled-item .note-display,
+#currentShipmentDetails li.cancelled-item .editable-note,
+#currentShipmentDetails li.cancelled-item .add-note-link { color: var(--cancelled-color) !important; cursor: default; text-decoration: none; }
+#currentShipmentDetails li.cancelled-item .add-note-link { display: none; }
+
+/* Storno: dezenter Text-Button rechts, 44 px Tippfläche */
+.cancel-button {
+    position: absolute;
+    right: var(--sp-1);
+    top: var(--sp-2);
+    min-height: var(--touch-min);
+    min-width: var(--touch-min);
+    padding: 0 var(--sp-2);
+    font-family: var(--font-sans);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+    color: var(--warning-text);
+    background: none;
+    border: none;
+    border-radius: var(--r-md);
+    transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.cancel-button:hover, .cancel-button:active { color: var(--warning-text); background-color: var(--warning-soft); }
+
+.hu-value.has-dunkelalarm, .pending-vse.has-dunkelalarm { color: var(--danger); font-weight: 700; }
+#currentShipmentDetails .scan-main-info .hu-value.has-dunkelalarm { color: var(--danger-text); background-color: var(--danger-soft); border-color: var(--danger); }
+.sendnr-display { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-muted); }
+
+/* Notizen & Aktionen unter dem Scan -------------------------------- */
+#currentShipmentDetails .scan-actions-and-notes {
+    flex-basis: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--sp-1);
+    padding: 0;
+}
+#currentShipmentDetails .scan-actions-and-notes:has(.notes-container) { padding-top: var(--sp-1); }
+#currentShipmentDetails .notes-container { flex: 1 1 100%; display: flex; flex-direction: column; gap: var(--sp-1); }
+#currentShipmentDetails .note-item {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-height: 40px;
+    padding: 0 0 0 var(--sp-3);
+    font-family: var(--font-sans);
+    background-color: var(--warning-soft);
+    border-left: 3px solid var(--warning);
+    border-radius: var(--r-sm);
+}
+#currentShipmentDetails .note-item .note-prefix { display: none; } /* Farbstreifen ersetzt das Wort "Notiz:" */
+#currentShipmentDetails .note-item .note-readonly { flex: 1; font-family: var(--font-sans); font-size: var(--fs-sm); color: var(--text); overflow-wrap: anywhere; } /* Archiv: nur lesen */
+#currentShipmentDetails li .editable-note {
+    flex: 1;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    min-height: 40px;
+    padding: var(--sp-1) 0;
+    font-family: var(--font-sans);
+    font-size: var(--fs-sm);
+    font-style: normal;
+    color: var(--text);
+    cursor: pointer;
+    text-decoration: none;
+    overflow-wrap: anywhere;
+}
+#currentShipmentDetails .note-item .delete-note-btn {
+    position: relative;
+    flex-shrink: 0;
+    align-self: stretch;
+    width: var(--touch-min);
+    min-height: 40px;
+    padding: 0;
+    font-size: 0;           /* Emoji-Glyphe ausblenden – nicht jede Geräteschrift hat sie */
+    line-height: 1;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    border-radius: 0 var(--r-sm) var(--r-sm) 0;
+    transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+#currentShipmentDetails .note-item .delete-note-btn::before { content: "×"; font-size: 22px; line-height: 1; }
+#currentShipmentDetails .note-item .delete-note-btn:hover,
+#currentShipmentDetails .note-item .delete-note-btn:active { color: #fff; background-color: var(--danger); }
+
+/* "Notiz hinzufügen": klein sichtbar, aber 44 px hohe Tippfläche */
+#currentShipmentDetails li .add-note-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: var(--touch-min);
+    margin: calc(-1 * var(--sp-2)) 0; /* Tippfläche ragt in die Karten-Polsterung, ohne Höhe zu kosten */
+    padding: 0 var(--sp-2);
+    font-family: var(--font-sans);
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    color: var(--text-muted);
+    text-decoration: none;
+    border-radius: var(--r-md);
+    cursor: pointer;
+    transition: color var(--dur) var(--ease), background-color var(--dur) var(--ease);
+}
+#currentShipmentDetails li .add-note-link::before { content: "+"; font-size: var(--fs-sm); font-weight: 700; line-height: 1; }
+#currentShipmentDetails li .add-note-link { font-weight: 500; }
+#currentShipmentDetails li .add-note-link:hover,
+#currentShipmentDetails li .add-note-link:active { color: var(--accent); background-color: var(--accent-soft); text-decoration: none; }
+#currentShipmentDetails li .editable-note:hover { color: var(--accent-hover); }
+/* Wenn Notizen da sind, sitzt der Link unter der letzten Notiz und darf nicht nach oben ragen */
+#currentShipmentDetails .scan-actions-and-notes:has(.notes-container) .add-note-link { margin-top: 0; }
+
+/* Offene Positionen (HU-Liste in den Details) */
+#pendingHuList {
+    margin: var(--sp-2) 0 var(--sp-3);
+    padding: var(--sp-3);
+    background-color: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+}
+#pendingHuList.partial { border-color: var(--warning); background-color: var(--warning-soft); }
+#pendingHuList h4 { margin: 0 0 var(--sp-2); font-size: var(--fs-sm); font-weight: 700; color: var(--text); }
+#pendingHuList ul { margin: 0; padding: 0; max-height: 240px; overflow-y: auto; font-family: var(--font-mono); font-size: var(--fs-sm); }
+#pendingHuList li { min-height: 40px; padding: var(--sp-1) var(--sp-2); border-bottom: 1px solid var(--border); }
+#pendingHuList li:last-child { border-bottom: none; }
+#pendingHuList .hu-list li { display: flex; align-items: center; min-height: 40px; padding: var(--sp-1) var(--sp-2); }
+.position-number { min-width: 2.5em; padding-right: 1em; flex-shrink: 0; text-align: right; color: var(--text-faint); }
+
+.pending-list-header, .hu-list-header {
+    display: flex;
+    margin-bottom: var(--sp-1);
+    padding: var(--sp-1) var(--sp-2);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border-bottom: 2px solid var(--border-strong);
+}
+.pending-list-header span:first-child, .hu-list-header span:first-child { flex-basis: 55%; text-align: left; }
+.pending-list-header span:last-child,  .hu-list-header span:last-child  { flex-basis: 45%; text-align: left; }
+.pending-item-details, .vvl-item-row { display: flex; justify-content: space-between; width: 100%; }
+.pending-item-details .pending-vse, .vvl-item-row .vvl-vse { flex-basis: 55%; text-align: left; font-family: var(--font-mono); font-weight: 700; }
+.pending-item-details .pending-sendnr, .vvl-item-row .vvl-sendnr { flex-basis: 45%; text-align: left; font-family: var(--font-mono); font-size: var(--fs-xs); font-style: italic; color: var(--text-muted); }
+
+#currentShipmentDetails .hu-value.copied::after,
 #huDetailsContent #huDetailsNumber.copied::after {
     content: 'Kopiert!';
     position: absolute;
     top: 50%;
-    right: 10px;
+    left: 105%;
     transform: translateY(-50%);
-    background-color: var(--primary-color);
-    color: white;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 0.8em;
-    font-weight: bold;
+    padding: 2px 8px;
+    font-family: var(--font-sans);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    color: #fff;
     white-space: nowrap;
+    background-color: var(--success);
+    border-radius: var(--r-sm);
     opacity: 0;
     animation: fade-in-out 1.5s ease-in-out;
 }
+#huDetailsContent #huDetailsNumber.copied::after { left: auto; right: 10px; }
+#currentShipmentDetails .scan-main-info .hu-value.copied::after { left: 0; top: auto; bottom: 100%; transform: none; margin-bottom: 4px; }
 
-/* --- ENDE DER ÃNDERUNG --- */
-/* ===== NEU: STIL FÃR BLINKENDE ZEICHEN BEI HU-VERDACHTSFÃLLEN ===== */
 
-/* Die Keyframe-Animation, die das Blinken erzeugt */
-@keyframes blink {
-    0%, 100% {
-        opacity: 1;
-    }
-    50% {
-        opacity: 0.2; /* Ein sanfteres Blinken statt komplett unsichtbar */
-    }
+/* ===================================================================
+   9. SEITENMENÜ
+   =================================================================== */
+.side-menu {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1010;
+    display: flex;
+    flex-direction: column;
+    width: 300px;
+    max-width: 85%;
+    height: 100vh;
+    height: 100dvh;
+    padding: var(--sp-5) var(--sp-4);
+    overflow-y: auto;
+    background-color: var(--surface);
+    box-shadow: var(--shadow-lg);
+    transform: translateX(-100%);
+    transition: transform .28s var(--ease);
 }
+.side-menu.open { transform: translateX(0); }
+.side-menu h3 {
+    margin: 0 0 var(--sp-4);
+    padding: 0 var(--sp-2);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+.side-menu .side-menu-list { list-style: none; margin: 0 0 var(--sp-4); padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.side-menu .menu-action-item {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    min-height: 48px;
+    padding: var(--sp-2) var(--sp-3);
+    font-size: var(--fs-md);
+    font-weight: 500;
+    color: var(--text);
+    text-decoration: none;
+    background-color: transparent;
+    border-radius: var(--r-md);
+    cursor: pointer;
+    transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.side-menu .menu-action-item:hover, .side-menu .menu-action-item:active { background-color: var(--surface-3); }
+.side-menu .menu-action-item svg { width: 22px; height: 22px; flex-shrink: 0; fill: currentColor; color: var(--text-muted); }
+.side-menu .menu-action-item:hover svg { color: inherit; }
+.side-menu .menu-action-item.action-primary:hover { color: var(--accent-text); background-color: var(--accent-soft); }
+.side-menu .menu-action-item.action-warning:hover { color: var(--warning-text); background-color: var(--warning-soft); }
+.side-menu .menu-action-item.action-reset { color: var(--danger-text); margin-top: var(--sp-2); }
+.side-menu .menu-action-item.action-reset svg { color: var(--danger); }
+.side-menu .menu-action-item.action-reset:hover { background-color: var(--danger-soft); }
+.side-menu .main-action-button { display: none; }
 
-/* Die Klasse, die auf das abweichende Zeichen angewendet wird */
-.blinking-char {
-    font-weight: bold;
-    color: var(--danger-color); /* Rot, um den Fehler hervorzuheben */
-    background-color: #fff0f0;  /* Ein sehr leichter roter Hintergrund */
-    border-radius: 3px;
-    padding: 0 2px;
-    
-    /* Zuweisung der Animation */
-    animation-name: blink;
-    animation-duration: 1.5s; /* Dauer eines Blink-Zyklus */
-    animation-iteration-count: infinite; /* Endloses Blinken */
-}
-/* ===== LKW-MenÃ¼ ===== */
-#lkw-section {
-    margin-top: 15px;
-    border-top: 1px solid #e0e0e0;
-    padding-top: 10px;
-    padding-bottom: 10px;
-}
+#lkw-section { margin-top: var(--sp-2); padding-top: var(--sp-3); border-top: 1px solid var(--border); }
 .lkw-section-title {
     display: flex;
     align-items: center;
-    gap: 8px;
-    flex-wrap: nowrap;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-2);
+    padding: 0 var(--sp-2);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
 }
-.lkw-total-count {
-    font-size: 0.8em;
-    color: #555;
-    font-weight: 600;
-    white-space: nowrap;
-}
-.lkw-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-#lkw-menu-container {
-    list-style: none;
-    padding: 0;         /* Zieht alles ganz nach links */
-    margin: 0;
-}
-
+.lkw-total-count { font-size: var(--fs-xs); font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+.lkw-list, #lkw-menu-container { list-style: none; margin: 0; padding: 0; }
 .lkw-menu-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 15px; /* Etwas mehr Luft nach oben/unten und links/rechts */
-    font-size: 0.88em;
-    border-bottom: 1px solid #f5f5f5;
+    gap: var(--sp-3);
+    min-height: 44px;
+    padding: var(--sp-2) var(--sp-3);
+    font-size: var(--fs-sm);
+    border-bottom: 1px solid var(--border);
     flex-wrap: nowrap;
-    gap: 15px;          /* Vergrößert den Abstand zwischen Text und Switch */
 }
+.lkw-menu-item:last-child { border-bottom: none; }
+.lkw-menu-item small { color: var(--text-faint); }
+.lkw-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lkw-label small { font-size: var(--fs-xs); color: var(--text-faint); }
 
-.lkw-label {
-    flex: 1;
+.side-menu #sheetStatus {
+    margin-top: auto;
+    padding: var(--sp-3);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    text-align: center;
+    background-color: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+}
+.side-menu #sheetStatus:empty { display: none; }
+
+.menu-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background-color: var(--overlay);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity .28s var(--ease), visibility .28s var(--ease);
+}
+.menu-overlay.visible { opacity: 1; visibility: visible; }
+
+
+/* ===================================================================
+   10. MODALS – Bottom-Sheet auf Mobil
+   =================================================================== */
+body.modal-open { overflow: hidden; }
+
+.modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9000;
+    justify-content: center;
+    align-items: flex-end;
+    padding: 0;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    min-width: 0;       /* WICHTIG für iOS, damit der Text nicht den Switch wegschiebt */
+    background-color: var(--overlay);
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
 }
+.modal-overlay.visible { display: flex; animation: overlay-in .2s var(--ease); }
 
-.lkw-label small { color: #bbb; font-size: 0.85em; }
-/* Animation für den Lauftext */
-@keyframes scrollText {
-  0%, 15% { transform: translateX(0); }
-  85%, 100% { transform: translateX(calc(-1 * var(--scroll-distance, 0px))); }
-}
-
-.scrolling-text-container {
-    overflow: hidden;
-    white-space: nowrap;
-    min-width: 0;
-    flex-grow: 1;
+.modal-content {
+    display: flex;
+    flex-direction: column;
     position: relative;
-    padding-right: 15px;
+    width: 100%;
+    max-width: 100%;
+    max-height: 92vh;
+    max-height: 92dvh;
+    margin: 0;
+    padding: var(--sp-5) var(--sp-4) calc(var(--sp-4) + env(safe-area-inset-bottom, 0px));
+    background-color: var(--surface);
+    border: none;
+    border-radius: var(--r-xl) var(--r-xl) 0 0;
+    box-shadow: var(--shadow-lg);
+    animation: sheet-up .28s var(--ease);
+}
+/* Griff oben am Sheet */
+.modal-content::before {
+    content: "";
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    width: 40px;
+    height: 4px;
+    margin-left: -20px;
+    background-color: var(--border-strong);
+    border-radius: var(--r-full);
+}
+.modal-content h3 { margin: var(--sp-1) 0 var(--sp-4); font-size: var(--fs-lg); text-align: center; }
+.modal-content .form-group { margin-bottom: var(--sp-4); }
+.modal-content label { margin-bottom: var(--sp-1); }
+.modal-content input[type="number"], .modal-content input[type="text"] { font-size: var(--fs-md); }
+#huListTextarea, #noteEditTextarea { font-family: var(--font-mono); font-size: var(--fs-sm); }
+
+.modal-actions {
+    display: flex;
+    flex-shrink: 0;
+    gap: var(--sp-2);
+    margin-top: var(--sp-3);
+}
+.modal-actions:empty { display: none; }
+.modal-actions button {
+    flex: 1;
+    height: var(--control-h);
+    padding: 0 var(--sp-3);
+    font-size: var(--fs-md);
+    font-weight: 650;
+    border: none;
+    border-radius: var(--r-md);
+    transition: background-color var(--dur) var(--ease);
+}
+.modal-actions.hu-add-actions { flex-wrap: wrap; }
+.hu-add-footer-info { flex: 1 0 100%; }
+.modal-actions-center { justify-content: center; }
+.modal-actions-center button { flex: 0 1 60%; }
+
+/* Primär / Sekundär in Modal-Aktionen (IDs kommen aus dem Markup) */
+#saveEditButton, #saveHuListButton, #confirmBatchNoteButton, #saveNoteEditButton, #suspicionConfirmBtn, #closeOpenHusModalButton {
+    color: #fff;
+    background-color: var(--accent);
+}
+#saveEditButton:hover, #saveHuListButton:hover, #confirmBatchNoteButton:hover, #saveNoteEditButton:hover, #suspicionConfirmBtn:hover, #closeOpenHusModalButton:hover { background-color: var(--accent-hover); }
+
+#cancelEditButton, #cancelHuImportButton, #skipBatchNoteButton, #cancelNoteEditButton {
+    color: var(--text) !important;
+    background-color: var(--surface) !important;
+    border: 1.5px solid var(--border-strong) !important;
+    box-shadow: none;
+}
+#cancelEditButton:hover, #cancelHuImportButton:hover, #skipBatchNoteButton:hover, #cancelNoteEditButton:hover { background-color: var(--surface-3) !important; }
+
+#suspicionDeclineBtn { color: var(--danger-text); background-color: var(--danger-soft); box-shadow: none; }
+#suspicionDeclineBtn:hover { color: #fff; background-color: var(--danger); }
+
+.close-modal-icon-btn {
+    position: absolute;
+    top: var(--sp-3);
+    right: var(--sp-3);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    color: var(--text-muted);
+    background: var(--surface-3);
+    border: none;
+    border-radius: var(--r-full);
+    transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.close-modal-icon-btn:hover { color: var(--text); background: var(--border-strong); }
+.close-modal-icon-btn svg { width: 22px; height: 22px; fill: currentColor; }
+
+/* Import-Modal: Textarea füllt den verfügbaren Platz */
+#importHuModal .form-group:nth-of-type(2) { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+#huListTextarea { flex: 1; min-height: 160px; resize: none; }
+
+/* Notiz-Bearbeitung */
+#noteEditContext { margin-bottom: var(--sp-3); font-size: var(--fs-sm); color: var(--text-muted); text-align: center; }
+#noteEditContext:empty { display: none; }
+
+
+/* ===================================================================
+   11. OFFENE HUs, HU-DETAILS, KORREKTURVORSCHLAG
+   =================================================================== */
+.modal-tabs {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: var(--sp-1);
+    margin: 0 calc(-1 * var(--sp-4)) var(--sp-3);
+    padding: 0 var(--sp-4);
+    overflow-x: auto;
+    border-bottom: 1px solid var(--border);
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+.modal-tabs::-webkit-scrollbar { display: none; }
+.modal-tabs-wrap { position: relative; }
+.modal-tab-btn {
+    position: relative;
+    flex: 1 0 auto;
+    padding: var(--sp-3) var(--sp-2);
+    padding-right: 26px;
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    color: var(--text-muted);
+    white-space: nowrap;
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    border-radius: 0;
+    transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.modal-tab-btn:hover { color: var(--text); }
+.modal-tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-badge {
+    position: absolute;
+    top: 50%;
+    right: 6px;
+    min-width: 20px;
+    padding: 2px 6px;
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    line-height: 1.2;
+    text-align: center;
+    color: #fff;
+    background-color: var(--danger);
+    border-radius: var(--r-full);
+    transform: translateY(-50%);
+    transition: transform var(--dur) var(--ease), opacity var(--dur) var(--ease);
+}
+.tab-badge.hidden { display: inline-block !important; transform: translateY(-50%) scale(0); opacity: 0; }
+
+.hu-tab-panel { flex: 1; min-height: 0; max-height: 60vh; overflow-y: auto; padding-right: var(--sp-1); }
+#openHusModal .modal-content { min-height: 70vh; min-height: 70dvh; }
+
+.hu-order-group {
+    margin-bottom: var(--sp-3);
+    padding: var(--sp-3);
+    background-color: var(--surface-2);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
+    border-radius: var(--r-md);
+}
+.hu-order-title {
+    margin-bottom: var(--sp-2);
+    padding-bottom: var(--sp-2);
+    font-family: var(--font-mono);
+    font-size: var(--fs-md);
+    font-weight: 700;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+}
+.hu-order-group .hu-order-title small { font-family: var(--font-sans); font-size: var(--fs-xs); font-weight: 500; color: var(--text-muted); }
+.hu-list { list-style: none; margin: 0; padding: 0; font-family: var(--font-mono); font-size: var(--fs-sm); }
+.hu-list li { display: flex; align-items: flex-start; padding: var(--sp-1) var(--sp-2); border-bottom: 1px solid var(--border); }
+.hu-list li:last-child { border-bottom: none; }
+.hu-list .hu-value { cursor: pointer; }
+.hu-list .hu-value:hover { color: var(--accent); }
+.no-open-hus-message {
+    padding: var(--sp-8) var(--sp-4);
+    font-size: var(--fs-sm);
+    font-style: italic;
+    text-align: center;
+    color: var(--text-muted);
 }
 
-.scrolling-text {
+/* HU-Details */
+#huDetailsModal { align-items: flex-end; }
+#huDetailsContent dl { margin: var(--sp-2) 0 0; padding: 0; }
+#huDetailsContent dt {
+    margin-top: var(--sp-3);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+#huDetailsContent dd {
+    margin: var(--sp-1) 0 0;
+    padding: var(--sp-2) var(--sp-3);
+    font-family: var(--font-mono);
+    font-size: var(--fs-md);
+    word-break: break-all;
+    background-color: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+}
+#huDetailsContent #huDetailsNumber { position: relative; cursor: pointer; transition: background-color var(--dur) var(--ease); }
+#huDetailsContent #huDetailsNumber:hover { background-color: var(--surface-3); }
+
+/* Korrekturvorschlag */
+.suspicion-details { font-size: var(--fs-md); line-height: 1.6; text-align: center; }
+.suspicion-details p { margin: var(--sp-1) 0; }
+.suspicion-details code {
     display: inline-block;
-    /* Animation läuft nur, wenn wir per JavaScript eine Klasse setzen */
+    padding: 4px 10px;
+    font-family: var(--font-mono);
+    font-size: var(--fs-lg);
+    font-weight: 700;
+    background-color: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+}
+.suspicion-details hr { margin: var(--sp-3) 0; border: none; border-top: 1px dashed var(--border-strong); }
+.suspicion-question { font-weight: 700; color: var(--accent-text); }
+.blinking-char {
+    padding: 0 2px;
+    font-weight: 800;
+    color: var(--danger);
+    background-color: var(--danger-soft);
+    border-radius: 3px;
+    animation: blink 1.5s infinite;
 }
 
-.scrolling-text.needs-scroll {
-    animation: scrollText 4s linear infinite alternate;
+/* Scan-Feedback im Batch-Modus: großflächig, aus der Distanz lesbar */
+#batchScanFeedbackModal { align-items: center; }
+#batchScanFeedbackModal .modal-content {
+    width: 92%;
+    max-width: 520px;
+    padding: var(--sp-6) var(--sp-4);
+    text-align: center;
+    background-color: var(--n-900);
+    border-radius: var(--r-xl);
+    box-shadow: 0 0 0 4px var(--success), var(--shadow-lg);
+    animation: pop-in .2s var(--ease);
+}
+#batchScanFeedbackModal .modal-content::before { display: none; }
+#batchScanFeedbackModal .modal-content.unexpected { box-shadow: 0 0 0 4px var(--danger), var(--shadow-lg); }
+#batchScanFeedbackModal h3 {
+    margin: 0 0 var(--sp-3);
+    padding-right: 44px;
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--n-400);
+}
+#batchScanFeedbackModal .close-modal-icon-btn { color: var(--n-400); background: rgba(255, 255, 255, .08); }
+#batchScanFeedbackModal .close-modal-icon-btn:hover { color: #fff; background: rgba(255, 255, 255, .16); }
+#feedbackScanNumber {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-width: 80%;
+    margin-bottom: var(--sp-3);
+    padding: var(--sp-3) 0;
+    font-family: var(--font-mono);
+    font-size: clamp(2.5em, 8vw, 3.5em);
+    font-weight: 800;
+    line-height: 1.2;
+    word-break: break-all;
+    color: #4ade80; /* Standard: grün – JS setzt lime/red per style, beide bleiben gut lesbar */
+    background-color: transparent;
+    border-radius: var(--r-md);
+}
+#feedbackScanNumber.unexpected { color: #f87171; }
+#feedbackCarrier {
+    width: 100%;
+    margin-top: var(--sp-1);
+    padding: 0 var(--sp-2);
+    font-size: var(--fs-md);
+    font-style: italic;
+    text-align: left;
+    word-break: break-all;
+    color: var(--n-300);
 }
 
+
+/* ===================================================================
+   12. FEEDBACK: Fehlerzeile, Lade-Spinner
+   =================================================================== */
+.error {
+    min-height: 0;
+    margin: var(--sp-2) 0 0;
+    padding: 0;
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    text-align: center;
+    color: var(--danger);
+    transition: padding var(--dur) var(--ease);
+}
+/* Sobald Text drin ist, wird die Zeile zu einer Meldungs-Box.
+   Die Textfarbe setzt das JS (red/green/orange/blue) – der Hintergrund folgt ihr über currentColor. */
+.error[style*="color: red"]    { color: var(--danger-text) !important; }
+.error[style*="color: orange"] { color: var(--warning-text) !important; }
+.error[style*="color: blue"]   { color: var(--info-text) !important; }
+.error[style*="color: green"]  { color: var(--success-text) !important; }
+.error:not(:empty) {
+    padding: var(--sp-3) var(--sp-4);
+    text-align: left;
+    border-radius: var(--r-md);
+    background-color: color-mix(in srgb, currentColor 10%, transparent);
+    border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+    border-left: 4px solid currentColor;
+}
+
+.loading-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: color-mix(in srgb, var(--bg) 70%, transparent);
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity var(--dur) var(--ease), visibility var(--dur) var(--ease);
+}
+.loading-overlay.visible { visibility: visible; opacity: 1; }
+
+/* --- Anmeldung (PIN) / Einladung: liegt über allem – auch über dem Lade-Spinner --- */
+.auth-view {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: max(24px, 8vh) var(--sp-4) var(--sp-6);
+    overflow-y: auto;
+    background-color: var(--bg);
+}
+.auth-view.hidden { display: none; }
+body.auth-open { overflow: hidden; }
+.auth-card {
+    width: 100%;
+    max-width: 420px;
+    padding: var(--sp-6) var(--sp-5);
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-lg);
+}
+.auth-brand { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-5); }
+.auth-brand h1 { margin: 0; font-size: 1.25rem; font-weight: 800; letter-spacing: -.01em; color: var(--text); }
+.auth-logo {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 40px; height: 40px;
+    font-size: var(--fs-sm); font-weight: 800; letter-spacing: .04em; color: #fff;
+    background-color: var(--accent); border-radius: var(--r-md);
+}
+.auth-card h2 { margin: 0 0 var(--sp-2); font-size: 1.1rem; font-weight: 700; color: var(--text); }
+.auth-hint { margin: 0 0 var(--sp-4); font-size: var(--fs-sm); line-height: 1.45; color: var(--text-muted); }
+.auth-card .main-action-button { margin-top: var(--sp-2); }
+.auth-card input.auth-pin { font-size: 1.5rem; letter-spacing: .45em; text-align: center; font-variant-numeric: tabular-nums; }
+.auth-card input.auth-pin::placeholder { letter-spacing: .3em; color: var(--text-faint); }
+.auth-message { display: none; margin: 0 0 var(--sp-3); padding: var(--sp-3) var(--sp-4); font-size: var(--fs-sm); line-height: 1.45; border-radius: var(--r-md); }
+.auth-message.is-error { display: block; color: var(--danger-text); background-color: var(--danger-soft); }
+.auth-message.is-info { display: block; color: var(--accent-text); background-color: var(--accent-soft); }
+.auth-message.is-ok { display: block; color: var(--success-text); background-color: var(--success-soft); }
+
+/* Seitenmenü: angemeldeter Mitarbeiter */
+.side-menu-user { margin: calc(-1 * var(--sp-2)) 0 var(--sp-3); padding: 0 var(--sp-2); font-size: var(--fs-sm); font-weight: 600; color: var(--text); }
+.side-menu-user.hidden { display: none; }
+
+/* Seite „Mitarbeiter“ (Administrator) */
+.admin-invite { margin: var(--sp-3) 0 var(--sp-4); padding: var(--sp-4); background-color: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); }
+.admin-invite .form-group:last-of-type { margin-bottom: var(--sp-3); }
+.admin-notice.is-ok { color: var(--success-text); background-color: var(--success-soft); }
+.admin-notice.is-error { color: var(--danger-text); background-color: var(--danger-soft); }
+.admin-notice.is-warning { color: var(--warning-text); background-color: var(--warning-soft); }
+.admin-link { display: inline-block; max-width: 100%; word-break: break-all; font-size: var(--fs-xs); user-select: all; }
+.admin-row { flex-wrap: wrap; }
+.admin-main { flex: 1 1 220px; min-width: 0; }
+.admin-name { font-weight: 700; color: var(--text); }
+.admin-name .row-chip { margin-left: var(--sp-2); }
+.admin-meta { margin-top: 2px; font-size: var(--fs-xs); color: var(--text-muted); }
+.admin-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.admin-actions .page-link-btn { width: auto; min-height: 36px; }
+.admin-row .admin-name { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) 0; }
+.admin-row .admin-name .row-chip { margin-left: var(--sp-2); }
+.admin-actions .admin-danger { color: var(--danger-text); border-color: var(--danger); }
+.admin-actions .admin-danger:hover { background-color: var(--danger-soft); }
+.admin-self { font-size: var(--fs-xs); color: var(--text-faint); }
+.admin-inactive .admin-main { opacity: .6; }
+.row-chip.chip-ok { color: var(--success-text); background-color: var(--success-soft); }
+.row-chip.chip-warn { color: var(--warning-text); background-color: var(--warning-soft); }
+.row-chip.chip-danger { color: var(--danger-text); background-color: var(--danger-soft); }
+.spinner {
+    width: 56px;
+    height: 56px;
+    border: 6px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+}
+
+
+/* ===================================================================
+   13. ANIMATIONEN & UTILITIES
+   =================================================================== */
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+@keyframes fade-in-out {
+    0%   { opacity: 0; transform: translateY(-50%) scale(.8); }
+    20%  { opacity: 1; transform: translateY(-50%) scale(1); }
+    80%  { opacity: 1; transform: translateY(-50%) scale(1); }
+    100% { opacity: 0; transform: translateY(-50%) scale(.8); }
+}
+@keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sheet-up { from { transform: translateY(24px); opacity: .6; } to { transform: translateY(0); opacity: 1; } }
+@keyframes pop-in { from { transform: scale(.97); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes scrollText {
+    0%, 15%   { transform: translateX(0); }
+    85%, 100% { transform: translateX(calc(-1 * var(--scroll-distance, 0px))); }
+}
+.scrolling-text-container { position: relative; flex: 1; min-width: 0; padding-right: var(--sp-3); overflow: hidden; white-space: nowrap; }
+.scrolling-text { display: inline-block; }
+.scrolling-text.needs-scroll { animation: scrollText 4s linear infinite alternate; }
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+    }
+    .blinking-char { animation: none; }
+}
+
+
+/* ===================================================================
+   14. DESKTOP-LAYOUT (≥ 992px)
+   =================================================================== */
+@media (min-width: 992px) {
+    .container { max-width: 1280px; margin: 0 auto; padding: var(--sp-5); }
+    .app-bar { padding: var(--sp-2) var(--sp-6); }
+
+    /* Tabelle wieder als Tabelle – dicht wie ein Arbeitsplatz-System: 1 Sendung = 1 Zeile (~36 px),
+       Status-Ampel, LKW, Zähler, Gewicht, Notizen als eigene Spalten; QR-Code als Icon mit Vorschau bei Hover */
+    .shipment-table {
+        width: 100%;
+        table-layout: auto;
+        background-color: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--r-lg);
+        box-shadow: var(--shadow-sm);
+        overflow: visible;                       /* QR-Vorschau darf über den Rand hinausragen */
+        font-size: var(--fs-sm);
+    }
+    .shipment-table thead { display: table-header-group; }
+    .shipment-table th { position: sticky; top: 60px; z-index: 2; }
+    .shipment-table thead tr { display: table-row; margin: 0; padding: 0; border: none; border-radius: 0; box-shadow: none; }
+    .shipment-table th {
+        padding: 6px 10px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+        text-align: left;
+        white-space: nowrap;
+        color: var(--text-muted);
+        background-color: var(--surface-2);
+        border-bottom: 1px solid var(--border);
+        user-select: none;
+    }
+    .shipment-table th:first-child { border-top-left-radius: var(--r-lg); }
+    .shipment-table th:last-child { border-top-right-radius: var(--r-lg); }
+    /* sortierbare Spaltenköpfe: Sendungsliste (data-sort) und Packstücktabelle in den Details (data-psort) – gleiches Dreieck */
+    .shipment-table th[data-sort], .pack-table th[data-psort] { cursor: pointer; user-select: none; }
+    .shipment-table th[data-sort]:hover, .pack-table th[data-psort]:hover { color: var(--text); }
+    .shipment-table th[data-sort]::after, .pack-table th[data-psort]::after { content: ""; display: inline-block; width: 0; height: 0; margin-left: 5px; vertical-align: middle; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid var(--border-strong); opacity: 0; transition: opacity var(--dur) var(--ease); }
+    .shipment-table th[data-sort]:hover::after, .pack-table th[data-psort]:hover::after { opacity: .6; }
+    .shipment-table th.sorted-asc::after, .shipment-table th.sorted-desc::after, .pack-table th.sorted-asc::after, .pack-table th.sorted-desc::after { opacity: 1; border-top-color: var(--accent); }
+    .shipment-table th.sorted-asc::after, .pack-table th.sorted-asc::after { transform: rotate(180deg); }
+    .shipment-table tbody tr {
+        display: table-row;
+        margin: 0;
+        padding: 0;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        transition: background-color var(--dur) var(--ease);
+    }
+    .shipment-table tbody tr:nth-child(even) { background-color: color-mix(in srgb, var(--surface-2) 45%, var(--surface)); }
+    .shipment-table tbody tr:hover { background-color: var(--accent-soft); }
+    .shipment-table tbody tr + tr td { border-top: 1px solid var(--border); }
+    .shipment-table td {
+        display: table-cell;
+        position: static;
+        height: 36px;
+        padding: 3px 10px;
+        text-align: left;
+        vertical-align: middle;
+        white-space: nowrap;
+        border: none;
+        font-size: var(--fs-sm);
+    }
+    .shipment-table td.hawb-cell, .shipment-table td.summary-cell { white-space: normal; }
+    .shipment-table td.hawb-cell { width: 22%; min-width: 150px; }
+    .shipment-table td.dt-status { width: 13%; }
+    .shipment-table td.dt-truck { width: 10%; }
+    .shipment-table td.dt-num { width: 7%; }
+    .shipment-table td.dt-kg { width: 10%; }
+    .shipment-table td.dt-notes { width: 40px; }
+    .shipment-table td.time-cell { width: 13%; }
+    .shipment-table td::before, .shipment-table td.hawb-cell::after { display: none; }
+    .shipment-table td.hawb-cell { display: table-cell; min-height: 0; margin: 0; padding: 3px 10px; font-size: var(--fs-sm); font-weight: 700; letter-spacing: 0; }
+    .shipment-table td.hawb-cell:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+    /* VW-Zeilen: VVL und Kundennr als zwei Spalten in einem Raster (Beschriftung klein darüber – für gemischte Listen) */
+    .vvl-table-entry { display: grid; grid-template-columns: minmax(120px, 1.3fr) minmax(90px, 1fr); gap: 0 var(--sp-3); font-size: var(--fs-sm); line-height: 1.2; }
+    .vvl-table-entry .vvl-col { display: flex; flex-direction: column; min-width: 0; }
+    .vvl-table-entry .vvl-col-kunde { padding-left: var(--sp-3); border-left: 1px solid var(--border); }
+    .vvl-table-entry .vvl-prefix, .vvl-table-entry .kundennr-prefix { margin: 0; font-size: 10px; line-height: 1.3; }
+    .vvl-table-entry .vvl-prefix::after, .vvl-table-entry .kundennr-prefix::after { content: none; }
+    .vvl-table-entry .vvl-no { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .shipment-table td.hawb-cell-vvl { padding-top: 4px; padding-bottom: 4px; }
+    /* Reine VW-Tabellen (LKW-Seite eines VW-LKW): Beschriftung EINMAL im Kopf – „HAWB.“ wird zu „VVL | KUNDENNR“ im selben
+       Raster wie die Zeilen (gleiche Spaltenbreiten → die Nummern fluchten darunter); die Zeilen zeigen nur noch die Nummern */
+    .shipment-table.vw-only th[data-sort="hawb"] .th-hawb, .shipment-table.vw-only th[data-sort="hawb"]::after { display: none; }
+    .shipment-table.vw-only th[data-sort="hawb"] .th-vvl { display: grid; grid-template-columns: minmax(120px, 1.3fr) minmax(90px, 1fr); gap: 0 var(--sp-3); }
+    .shipment-table.vw-only th[data-sort="hawb"] .th-vvl span:last-child { padding-left: var(--sp-3); border-left: 1px solid transparent; }   /* gleiche Einrückung wie die Zeilen (dort mit Trennlinie) */
+    .shipment-table.vw-only th[data-sort="hawb"].sorted-asc .th-vvl, .shipment-table.vw-only th[data-sort="hawb"].sorted-desc .th-vvl { color: var(--accent); }
+    .shipment-table.vw-only .vvl-table-entry .vvl-prefix, .shipment-table.vw-only .vvl-table-entry .kundennr-prefix { display: none; }
+    .shipment-table.vw-only td.hawb-cell-vvl { padding-top: 3px; padding-bottom: 3px; }
+    .shipment-table td.time-cell { display: table-cell; margin: 0; white-space: nowrap; font-size: var(--fs-xs); font-variant-numeric: tabular-nums; color: var(--text-muted); }
+    .shipment-table td.time-cell::before { display: none; }
+    /* „Übersicht“-Pills wiederholen am Desktop nur die WE-/Sich.-Spalten → Spalte bleibt schmal und zeigt
+       nur Zusatzinfos (z. B. Gewichtstreffer der Info-Suche) */
+    .summary-cell { display: table-cell !important; padding: 3px 10px !important; }
+    .summary-cell strong, .summary-cell .summary-divider { display: none; }
+    .summary-cell .weight-hits { display: inline-flex; margin: 0; }
+    .summary-cell:empty, .summary-cell:not(:has(.weight-hits)) { padding: 0 !important; width: 0; }
+    .shipment-table th:nth-child(8) { font-size: 0; padding: 0; }          /* Kopf „Übersicht“ ohne Text (Spalte leer) */
+    .shipment-table:has(.weight-hits) th:nth-child(8) { font-size: 11px; padding: 6px 10px; }
+    .shipment-table:has(.weight-hits) .summary-cell { width: auto; padding: 3px 10px !important; }
+    .shipment-table td.actions-cell { display: table-cell; width: 112px; padding: 0 6px; text-align: right; white-space: nowrap; }
+    td.actions-cell button { display: inline-block; vertical-align: middle; width: 30px; height: 30px; }
+    td.actions-cell button + button { margin-left: 0; }
+    td.actions-cell .restore-btn { width: auto; }
+
+    /* QR-Code: kleines Icon, der echte Code erscheint beim Überfahren (und bleibt beim Drucken sichtbar) */
+    th.qr-code-header, td.qr-code-cell { display: table-cell; width: 44px; padding: 0; text-align: center; }
+    th.qr-code-header { font-size: 0; }
+    th.qr-code-header::before { content: "QR"; font-size: 11px; }
+    td.qr-code-cell { position: relative; }
+    td.qr-code-cell::before {
+        content: "";
+        display: inline-block;
+        width: 18px;
+        height: 18px;
+        vertical-align: middle;
+        background-color: var(--text-faint);
+        -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 11h8V3H3v8zm2-6h4v4H5V5zm-2 14h8v-8H3v8zm2-6h4v4H5v-4zm8-10v8h8V3h-8zm6 6h-4V5h4v4zm-6 4h2v2h-2zm2 2h2v2h-2zm-2 2h2v2h-2zm4 0h2v2h-2zm2-4h2v2h-2zm0 4v2h2v-2zm-2-2h2v2h-2z'/%3E%3C/svg%3E") center / contain no-repeat;
+        mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 11h8V3H3v8zm2-6h4v4H5V5zm-2 14h8v-8H3v8zm2-6h4v4H5v-4zm8-10v8h8V3h-8zm6 6h-4V5h4v4zm-6 4h2v2h-2zm2 2h2v2h-2zm-2 2h2v2h-2zm4 0h2v2h-2zm2-4h2v2h-2zm0 4v2h2v-2zm-2-2h2v2h-2z'/%3E%3C/svg%3E") center / contain no-repeat;
+        transition: background-color var(--dur) var(--ease);
+    }
+    td.qr-code-cell:hover::before { background-color: var(--accent); }
+    .qr-code-cell div {
+        position: absolute;
+        right: 100%;
+        top: 50%;
+        z-index: 5;
+        display: flex;
+        padding: 8px;
+        margin-right: 4px;
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: var(--r-md);
+        box-shadow: var(--shadow-md);
+        transform: translateY(-50%) scale(.9);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
+    }
+    td.qr-code-cell:hover div, td.qr-code-cell:focus-within div { opacity: 1; transform: translateY(-50%) scale(1); }
+
+    /* Desktop-Spalten */
+    .shipment-table th.dt-cell, .shipment-table td.dt-cell { display: table-cell; }
+    th.dt-num, td.dt-num { text-align: right; font-variant-numeric: tabular-nums; }
+    td.dt-num { font-weight: 600; }
+    td.dt-num.ok { color: var(--success-text); }
+    td.dt-num.mismatch { color: var(--warning-text); }
+    td.dt-num.over { color: var(--danger-text); }
+    .dt-dim { font-weight: 400; color: var(--text-faint); }
+    td.dt-status { font-weight: 600; }
+    .dt-light { display: inline-block; width: 9px; height: 9px; margin: 0 7px 1px 0; border-radius: 50%; background-color: var(--border-strong); vertical-align: middle; box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 0%, transparent); }
+    .dt-light.ok { background-color: var(--success); }
+    .dt-light.warn { background-color: var(--warning); }
+    .dt-light.danger { background-color: var(--danger); box-shadow: 0 0 0 3px var(--danger-soft); }
+    .dt-light.muted { background-color: var(--border-strong); }
+    td.dt-status .dt-light + * { vertical-align: middle; }
+    .dt-truck-chip { display: inline-block; padding: 1px 7px; font-size: 11px; font-weight: 600; color: var(--text-muted); background-color: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; }
+    .dt-note-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; font-size: 11px; font-weight: 700; color: var(--accent-text, var(--accent)); background-color: var(--accent-soft); border-radius: 999px; }
+    .shipment-table tr.archived { border-style: none; }               /* Tabellenzeile: kein Kartenrahmen */
+    .shipment-table tbody tr.archived:hover { background-color: var(--surface-3); }
+    .shipment-table tr.archived td.hawb-cell { color: var(--text-muted); }
+    .archive-badge, .row-chip { margin-left: 6px; }
+
+    /* Modals zentriert statt Bottom-Sheet */
+    .modal-overlay { align-items: center; padding: var(--sp-6); }
+    .modal-content {
+        width: 100%;
+        max-width: 520px;
+        max-height: 88vh;
+        padding: var(--sp-6);
+        border-radius: var(--r-xl);
+        animation: pop-in .2s var(--ease);
+    }
+    .modal-content::before { display: none; }
+    #openHusModal .modal-content, #importHuModal .modal-content { max-width: 640px; }
+    .modal-tabs { margin: 0 calc(-1 * var(--sp-6)) var(--sp-3); padding: 0 var(--sp-6); }
+
+    #detailView { padding: 0 var(--sp-6) var(--sp-8); }
+    .detail-view-header { margin: 0 calc(-1 * var(--sp-6)) var(--sp-4); padding: var(--sp-2) var(--sp-6); }
+    #detailViewContent { max-width: none; margin: 0 auto; }   /* volle Breite: Packstücktabelle braucht Platz */
+
+    /* Detailansicht am Desktop: Kopfzeile (Pfad · Kennzahlen · Aktionen · QR) und Packstücktabelle.
+       Wird nur ≥ 992 px erzeugt (script.js: buildDetailHead / buildDetailPackTable) – das Handy zeigt weiterhin die Karte. */
+    #currentShipmentDetails { padding: var(--sp-5) var(--sp-6); }
+    #currentShipmentDetails > strong { font-size: var(--fs-2xl); }
+    .detail-head { margin: 0 0 var(--sp-4); padding: 0 0 var(--sp-4); border-bottom: 1px solid var(--border); }
+    .detail-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-2); margin-bottom: var(--sp-3); font-size: var(--fs-sm); color: var(--text-muted); }
+    .detail-crumb { color: var(--accent-text); text-decoration: none; padding: 2px 4px; border-radius: var(--r-sm); }
+    .detail-crumb:hover { background-color: var(--accent-soft); text-decoration: none; }
+    .detail-crumb-sep { color: var(--text-faint); }
+    .detail-crumb-current { font-family: var(--font-mono); font-weight: 700; color: var(--text); }
+    .detail-head-row { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-4); }
+    .detail-facts { display: flex; flex-wrap: wrap; gap: var(--sp-2); flex: 1 1 auto; }
+    .detail-fact { min-width: 96px; padding: 6px 10px; background-color: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md); }
+    .detail-fact-label { display: block; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); }
+    .detail-fact-value { display: block; margin-top: 2px; font-size: var(--fs-sm); font-weight: 600; color: var(--text); white-space: nowrap; }
+    .detail-fact-value .dt-light { margin-bottom: 2px; }
+    .detail-head-side { display: flex; align-items: center; gap: var(--sp-3); flex: 0 0 auto; }
+    .detail-actions { display: flex; align-items: center; gap: 2px; padding: 2px; background-color: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md); }
+    .detail-actions button { position: relative; width: 36px; height: 36px; min-width: 0; padding: 0; font-size: 0; color: var(--text-muted); background: none; border: none; border-radius: var(--r-sm); transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+    .detail-actions button::before { content: ""; display: block; width: 22px; height: 22px; margin: 0 auto; background-color: currentColor; -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat; }
+    .detail-actions button:hover { background-color: var(--surface-3); color: var(--text); }
+    .detail-actions button.edit-btn { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z'/%3E%3C/svg%3E"); }
+    .detail-actions button.pdf-btn { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 12h8v2H8v-2zm0 4h8v2H8v-2z'/%3E%3C/svg%3E"); color: var(--accent-text); }
+    .detail-actions button.pdf-btn:hover { background-color: var(--accent-soft); }
+    .detail-actions button.pdf-btn:disabled { opacity: .5; }
+    .detail-actions button.main-delete-btn { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z'/%3E%3C/svg%3E"); color: var(--danger-text); }
+    .detail-actions button.main-delete-btn:hover { background-color: var(--danger-soft); }
+    body.batch-mode-active .detail-actions button.edit-btn { display: none; }   /* wie in der Liste */
+    .detail-qr { width: 68px; height: 68px; padding: 4px; background: #fff; border: 1px solid var(--border); border-radius: var(--r-md); }
+    .detail-qr div, .detail-qr img, .detail-qr canvas { width: 58px !important; height: 58px !important; display: block; }
+
+    .detail-pack { margin: 0 0 var(--sp-4); }
+    .detail-pack-head { display: flex; align-items: baseline; gap: var(--sp-2); margin-bottom: var(--sp-2); }
+    .detail-pack-head h4 { margin: 0; font-size: var(--fs-sm); font-weight: 700; color: var(--text); }
+    .detail-pack-meta { font-size: var(--fs-xs); font-weight: 600; color: var(--text-muted); }
+    .pack-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); background-color: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
+    .pack-table th { padding: 6px 10px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; text-align: left; white-space: nowrap; color: var(--text-muted); background-color: var(--surface-2); border-bottom: 1px solid var(--border); }
+    .pack-table td { padding: 5px 10px; height: 34px; vertical-align: middle; border-bottom: 1px solid var(--border); }
+    .pack-table tbody tr:last-child td { border-bottom: none; }
+    .pack-table tbody tr:hover td { background-color: var(--surface-2); }
+    .pack-table tr.pack-row-open td { background-color: color-mix(in srgb, var(--warning-soft) 55%, transparent); }
+    .pack-table tr.pack-row-danger td { background-color: color-mix(in srgb, var(--danger-soft) 60%, transparent); }
+    .pack-table td.pack-pos { width: 40px; font-family: var(--font-mono); color: var(--text-faint); }
+    .pack-table td.pack-hu .hu-value { font-family: var(--font-mono); font-weight: 700; cursor: pointer; padding: 2px 6px; border-radius: var(--r-sm); position: relative; }
+    .pack-table td.pack-hu .hu-value:hover { background-color: var(--accent-soft); }
+    .pack-table td.pack-hu .hu-value.copied::after { content: 'Kopiert!'; position: absolute; left: 100%; top: 50%; transform: translateY(-50%); margin-left: 6px; padding: 2px 8px; font-family: var(--font-sans); font-size: var(--fs-xs); font-weight: 700; color: #fff; white-space: nowrap; background-color: var(--success); border-radius: var(--r-sm); animation: fade-in-out 1.5s ease-in-out; }
+    .pack-table .pack-sendnr { display: block; font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted); white-space: nowrap; }
+    .pack-table td.pack-sendnr-cell { white-space: nowrap; }
+    .pack-table td.pack-text { color: var(--text-muted); white-space: nowrap; }
+    .pack-table td.pack-num { font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+    .pack-table td.pack-we-cell { width: 40px; text-align: center; }
+    .pack-we { font-size: var(--fs-xs); font-weight: 700; color: var(--text-faint); }
+    .pack-we.ok { color: var(--success-text); }
+    .pack-status { display: inline-block; padding: 2px 8px; font-size: var(--fs-xs); font-weight: 700; border-radius: var(--r-full); white-space: nowrap; }
+    .pack-status.ok { color: var(--success-text); background-color: var(--success-soft); }
+    .pack-status.open { color: var(--warning-text); background-color: var(--warning-soft); }
+    .pack-status.danger { color: var(--danger-text); background-color: var(--danger-soft); }
+    .pack-table td.pack-time { font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--text-muted); }
+    .pack-table td.pack-notes { max-width: 240px; }
+    .pack-note { display: block; font-size: var(--fs-xs); color: var(--warning-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #currentShipmentDetails .summary { max-width: 560px; }
+    #currentShipmentDetails > ul { max-width: 1100px; }
+    .pack-status-note { display: inline-block; margin-left: 6px; font-size: 10px; font-weight: 600; color: var(--text-faint); white-space: nowrap; }
+    .pack-table-plain td.pack-pos { width: 44px; }
+    #huEditModal.piece-mode .hu-edit-number-group { display: none; }   /* Stück einer normalen Sendung: keine HU-Nummer */
+    #huEditModal.piece-mode .hu-edit-danger { display: none; }         /* Stück einer normalen Sendung: kein Löschen (Stückzahl über „Bearbeiten“) */
+    .hu-edit-danger { display: flex; justify-content: flex-end; margin-top: var(--sp-3); padding-top: var(--sp-3); border-top: 1px solid var(--border); }
+    .hu-edit-delete-btn { height: 34px; padding: 0 var(--sp-4); font-size: var(--fs-sm); font-weight: 700; color: var(--danger-text); background-color: var(--danger-soft); border: 1px solid color-mix(in srgb, var(--danger-text) 30%, transparent); border-radius: var(--r-md); }
+    .hu-edit-delete-btn:hover { color: #fff; background-color: var(--danger); }
+    .pack-add-btn { margin-left: auto; padding: 4px 10px; font-size: var(--fs-xs); font-weight: 700; color: var(--accent-text); background: var(--accent-soft); border: none; border-radius: var(--r-md); cursor: pointer; transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+    .pack-add-btn:hover { background: var(--accent); color: #fff; }
+    body.batch-mode-active .pack-add-btn { display: none; }   /* wie Stift/„Bearbeiten“ im Batch-Modus */
+    /* Auswahl je Packstück + Leiste „Kontrollmethode für die Auswahl“ (nur Desktop-Packstücktabelle der HU-Aufträge) */
+    .pack-table th.pack-select-cell, .pack-table td.pack-select-cell { width: 36px; padding: 0 0 0 10px; text-align: center; }
+    .pack-table input.pack-select, .pack-table input.pack-select-all { width: 16px; height: 16px; margin: 0; vertical-align: middle; cursor: pointer; accent-color: var(--accent); }
+    .pack-table input.pack-select:disabled { opacity: .25; cursor: default; }
+    .pack-select-group { display: inline-flex; align-items: center; gap: var(--sp-3); }
+    .pack-select-group-cancel { padding-left: var(--sp-3); border-left: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); }
+    .pack-select-cancel { color: var(--warning-text); background-color: var(--warning-soft); border: 1px solid color-mix(in srgb, var(--warning-text) 30%, transparent) !important; }
+    .pack-select-cancel:hover { color: #fff; background-color: var(--warning-text); }
+    .pack-select-group-delete { padding-left: var(--sp-3); border-left: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); }
+    .pack-select-delete { color: var(--danger-text); background-color: var(--danger-soft); border: 1px solid color-mix(in srgb, var(--danger-text) 30%, transparent) !important; }
+    .pack-select-delete:hover { color: #fff; background-color: var(--danger); }
+    .pack-table tbody tr:has(.pack-select:checked) td { background-color: var(--accent-soft); }
+    .pack-select-bar { display: flex; align-items: center; gap: var(--sp-3); margin: 0 0 var(--sp-2); padding: var(--sp-2) var(--sp-3); font-size: var(--fs-sm); background-color: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); border-radius: var(--r-md); }
+    .pack-select-count { font-weight: 700; color: var(--accent-text); white-space: nowrap; }
+    .pack-select-label { display: inline-flex; align-items: center; gap: var(--sp-2); margin: 0; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+    .pack-select-bar select.pack-select-status { width: auto; height: 34px; min-width: 150px; padding: 0 36px 0 var(--sp-3); font-size: var(--fs-sm); font-weight: 700; background-position: right 10px center; }
+    /* Häkchen „Kombi“ (nur bei XRY/VCK sichtbar – syncPackSelectCombo) */
+    .pack-select-combo-wrap { gap: 6px; padding: 0 var(--sp-2); height: 34px; color: var(--text); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); border-radius: var(--r-md); background-color: var(--surface); cursor: pointer; }
+    .pack-select-combo-wrap:has(input:checked) { color: var(--accent-text); border-color: var(--accent); }
+    .pack-select-bar input.pack-select-combo { width: 16px; height: 16px; margin: 0; cursor: pointer; accent-color: var(--accent); }
+    .pack-select-bar button { height: 34px; padding: 0 var(--sp-4); font-size: var(--fs-sm); font-weight: 700; border-radius: var(--r-md); }
+    .pack-select-apply { color: #fff; background-color: var(--accent); }
+    .pack-select-apply:hover { background-color: var(--accent-hover); }
+    .pack-select-clear { margin-left: auto; color: var(--text-muted); background: none; }
+    .pack-select-clear:hover { color: var(--text); background-color: var(--surface); }
+    body.batch-mode-active .pack-select-cell, body.batch-mode-active .pack-select-bar { display: none; }   /* im Batch-Modus wie Stift/„+ Packstück“ */
+    .page-summary-add { margin-left: auto; color: var(--accent-text); border-color: transparent; background: var(--accent-soft); }
+    .page-summary-add:hover { color: #fff !important; background-color: var(--accent) !important; }
+    .page-summary-add + .page-summary-btn { margin-left: 0; }
+    body.batch-mode-active .page-summary-add { display: none; }
+    .order-add-content { max-width: 560px; }
+    /* Anlieferung: Karte je LKW = Zeilen-Knopf + Werkzeuge (Stift, Papierkorb) rechts hinter einem Trennstrich */
+    .page-row-wrap { display: flex; align-items: stretch; background-color: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--shadow-sm); transition: box-shadow var(--dur) var(--ease), border-color var(--dur) var(--ease); }
+    .page-row-wrap:hover { border-color: var(--border-strong); box-shadow: var(--shadow-md); }
+    .page-row-wrap .page-row { flex: 1 1 auto; width: auto; min-width: 0; background-color: transparent; border: none; border-radius: var(--r-lg) 0 0 var(--r-lg); box-shadow: none; }
+    .page-row-wrap .page-row:hover { border-color: transparent; box-shadow: none; }
+    .page-row-wrap .page-row:active { background-color: var(--surface-2); }
+    .page-row-tools { display: flex; align-items: center; gap: 2px; padding: 0 var(--sp-3) 0 var(--sp-2); border-left: 1px solid var(--border); }
+    .page-list-muted .page-row-tools { opacity: .7; }
+    .page-row-tool { position: relative; width: 34px; height: 34px; min-width: 0; padding: 0; font-size: 0; color: var(--text-faint); background: none; border: none; border-radius: var(--r-sm); transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+    .page-row-tool::before { content: ""; display: block; width: 20px; height: 20px; margin: 0 auto; background-color: currentColor; -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat; }
+    .page-row-wrap:hover .page-row-tool { color: var(--text-muted); }
+    .page-row-tool:hover { color: var(--text); background-color: var(--surface-3); }
+    .page-row-tool.page-row-rename { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z'/%3E%3C/svg%3E"); }
+    .page-row-tool.page-row-delete { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z'/%3E%3C/svg%3E"); }
+    .page-row-tool.page-row-delete:hover { color: var(--danger-text); background-color: var(--danger-soft); }
+    body.batch-mode-active .page-row-tools { display: none; }
+    .lkw-rename-content { max-width: 440px; }
+    .lkw-rename-hint { margin: calc(-1 * var(--sp-2)) 0 var(--sp-4); font-size: var(--fs-xs); line-height: 1.45; color: var(--text-muted); }
+    .order-add-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 var(--sp-3); }
+    .order-add-grid-3 { grid-template-columns: minmax(0, 1fr) minmax(0, 1.9fr) minmax(0, .8fr); }   /* Maße (L × B × H) brauchen die breiteste Spalte */
+    .order-add-grid .form-group { min-width: 0; }
+    .order-add-grid .dim-fields .dim-field { min-width: 0; }
+    .order-add-sep { margin: var(--sp-1) 0 var(--sp-3); padding-top: var(--sp-3); border-top: 1px solid var(--border); font-size: var(--fs-xs); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); }
+    .pack-table-plain td.pack-time { width: 160px; }
+    .pack-table th.pack-edit-head, .pack-table td.pack-edit-cell { width: 36px; padding: 0 4px; text-align: center; }
+    .pack-edit-btn { width: 30px; height: 30px; padding: 0; font-size: 0; color: var(--text-faint); background: none; border: none; border-radius: var(--r-sm); opacity: .55; transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease), opacity var(--dur) var(--ease); }
+    .pack-edit-btn::before { content: ""; display: block; width: 18px; height: 18px; margin: 0 auto; background-color: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z'/%3E%3C/svg%3E") center / contain no-repeat; }
+    .pack-table tbody tr:hover .pack-edit-btn { opacity: 1; color: var(--text-muted); }
+    .pack-edit-btn:hover { background-color: var(--accent-soft); color: var(--accent-text) !important; opacity: 1; }
+    body.batch-mode-active .pack-edit-btn { display: none; }   /* wie „Bearbeiten“ in der Liste */
+    #huEditModal .modal-content { max-width: 460px; }
+    /* „Packstücke hinzufügen“ = eigene Vollbild-Seite (wie Sendungsdetails), kein mittiges Fenster: das Overlay selbst
+       ist die Seite, das Formular füllt sie, oben die gewohnte Kopfzeile mit Zurück-Pfeil, unten eine feste Leiste. */
+    #huAddModal { display: none; align-items: stretch; justify-content: stretch; padding: 0; overflow: hidden; background-color: var(--bg); -webkit-backdrop-filter: none; backdrop-filter: none; }
+    #huAddModal.visible { display: flex; animation: overlay-in .15s var(--ease); }
+    #huAddModal .modal-content { flex: 1 1 auto; width: 100%; max-width: none; max-height: none; min-height: 0; padding: 0; background: transparent; border-radius: 0; box-shadow: none; animation: none; }
+    .hu-add-header { flex-shrink: 0; margin: 0; padding: var(--sp-2) var(--sp-6); }
+    .hu-add-header h2 { flex: 0 0 auto; }
+    .hu-add-context { flex: 1; min-width: 0; margin-left: var(--sp-3); font-size: var(--fs-sm); color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hu-add-layout { flex: 1 1 auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--sp-5); min-height: 0; padding: var(--sp-4) var(--sp-6) 0; overflow: hidden; }
+    .hu-add-panel { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+    .hu-add-panel .detail-pack-head { flex-shrink: 0; }
+    .hu-add-new .hu-add-table-wrap { flex: 0 1 auto; min-height: 0; max-height: none; margin: 0; overflow: auto; background-color: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); }
+    .hu-add-existing { overflow: auto; padding-bottom: var(--sp-4); }
+    .hu-add-new .hu-add-table th:nth-child(2), .hu-add-new .hu-add-table td:nth-child(2) { width: 34%; min-width: 220px; }   /* HU-Nummer bekommt den meisten Platz */
+    .hu-add-new .hu-add-table th.hu-add-kg, .hu-add-new .hu-add-table td.hu-add-kg { width: 110px; }
+    /* VW-Auftrag: erste Spalte ist die VSE (kein Pos.), daneben die Sendungs-Nr. */
+    .hu-add-new .hu-add-table-vvl th:nth-child(1), .hu-add-new .hu-add-table-vvl td:nth-child(1) { width: 24%; min-width: 150px; padding-left: 6px; }
+    .hu-add-new .hu-add-table-vvl th:nth-child(2), .hu-add-new .hu-add-table-vvl td:nth-child(2) { width: auto; min-width: 0; }
+    .hu-add-new .hu-add-table-vvl th.hu-add-sendnr-cell, .hu-add-new .hu-add-table-vvl td.hu-add-sendnr-cell { width: 110px; min-width: 0; }
+    /* eine Spalte mehr (Sendungs-Nr.) → Maße und Gewicht etwas schmaler, damit nichts abgeschnitten wird */
+    .hu-add-new .hu-add-table-vvl th.hu-add-dim-cell, .hu-add-new .hu-add-table-vvl td.hu-add-dim-cell { width: 200px; }
+    .hu-add-new .hu-add-table-vvl td.hu-add-dim-cell .dim-field { width: 46px; min-width: 34px; }
+    .hu-add-new .hu-add-table-vvl th.hu-add-kg, .hu-add-new .hu-add-table-vvl td.hu-add-kg { width: 84px; }
+    .hu-add-new .hu-add-table-vvl td.hu-add-kg input { min-width: 0; }
+    .hu-add-existing .pack-table { table-layout: auto; }
+    /* rechts zählt nur „was ist schon da“: Zeit- und Notiz-Spalte weglassen, damit alles ohne Querscrollen passt */
+    .hu-add-existing .pack-table th:nth-last-child(-n+2), .hu-add-existing .pack-table td:nth-last-child(-n+2) { display: none; }
+    .hu-add-existing .detail-pack { margin: 0; }
+    .hu-add-existing .pack-table th { top: 0; }
+    .hu-add-existing .pack-table tbody tr:hover td { background-color: inherit; }
+    .hu-add-existing .pack-table tr.pack-row-open:hover td { background-color: color-mix(in srgb, var(--warning-soft) 55%, transparent); }
+    .hu-add-empty { padding: var(--sp-5); font-size: var(--fs-sm); color: var(--text-faint); background-color: var(--surface); border: 1px dashed var(--border-strong); border-radius: var(--r-md); }
+    #huAddModal .modal-actions.hu-add-actions { display: flex; flex-shrink: 0; flex-wrap: nowrap; align-items: center; gap: var(--sp-3); margin: 0; padding: var(--sp-3) var(--sp-6); background-color: var(--surface); border-top: 1px solid var(--border); box-shadow: 0 -4px 12px -8px rgba(0,0,0,.25); }
+    .hu-add-footer-info { flex: 1 1 auto; min-width: 0; }
+    .hu-add-footer-info .hu-add-hint { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hu-add-footer-info .hu-edit-error { margin: var(--sp-1) 0 0; }
+    #huAddModal .hu-add-actions button { flex: 0 0 auto; width: auto; min-width: 200px; }
+    #saveHuAddButton { color: #fff; background-color: var(--accent); }
+    #saveHuAddButton:hover { background-color: var(--accent-hover, var(--accent)); }
+    #cancelHuAddButton { color: var(--text); background-color: var(--surface); border: 1.5px solid var(--border-strong); }
+    .hu-add-table-wrap { max-height: 52vh; overflow: auto; margin: 0 0 var(--sp-2); border: 1px solid var(--border); border-radius: var(--r-md); }
+    .hu-add-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+    .hu-add-table th { position: sticky; top: 0; z-index: 1; padding: 6px 8px; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; text-align: left; color: var(--text-muted); background: var(--surface-2); border-bottom: 1px solid var(--border); }
+    .hu-add-table td { padding: 4px 4px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    .hu-add-table tr:last-child td { border-bottom: none; }
+    .hu-add-table th.hu-add-pos, .hu-add-table td.hu-add-pos { width: 52px; padding-left: 10px; font-family: var(--font-mono, ui-monospace, monospace); font-size: var(--fs-sm); color: var(--text-faint); white-space: nowrap; }
+    .hu-add-table th.hu-add-kg, .hu-add-table td.hu-add-kg { width: 120px; }
+    .hu-add-table th.hu-add-x, .hu-add-table td.hu-add-x { width: 34px; padding: 0 4px; text-align: center; }
+    .hu-add-table input[type="text"] { height: 36px; padding: 0 var(--sp-2); font-size: var(--fs-sm); border-color: transparent; background: transparent; box-shadow: none; }
+    .hu-add-table input[type="text"]:hover { border-color: var(--border); }
+    .hu-add-table input[type="text"]:focus { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px var(--accent-soft); }
+    .hu-add-table input.hu-add-hu { font-weight: 600; }   /* gleiche Schrift wie die übrigen Eingabefelder der Zeile, nur fett */
+    /* Maße-Felder in der Zeilentabelle „Packstücke hinzufügen“ (Basisregeln .dim-fields stehen bei den Formularen) */
+    .th-unit { font-weight: 600; color: var(--text-faint); text-transform: none; letter-spacing: 0; }
+    .hu-add-table th.hu-add-dim-cell, .hu-add-table td.hu-add-dim-cell { width: 232px; }
+    .hu-add-new .hu-add-table th:nth-child(2), .hu-add-new .hu-add-table td:nth-child(2) { width: 30%; min-width: 190px; }   /* etwas Platz an die drei Maßfelder abgeben */
+    .hu-add-table td.hu-add-dim-cell .dim-fields { width: 100%; gap: 2px; }
+    .hu-add-table td.hu-add-dim-cell .dim-field { height: 32px; min-width: 40px; padding: 0 3px; font-size: var(--fs-sm); border-color: var(--border); background: transparent; box-shadow: none; }
+    .hu-add-table td.hu-add-dim-cell .dim-field:hover { border-color: var(--text-faint); }
+    .hu-add-table td.hu-add-dim-cell .dim-field:focus { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px var(--accent-soft); }
+    .hu-add-table td.hu-add-kg input { min-width: 84px; }
+    .hu-add-row-bad td { background: var(--danger-soft); }
+    .hu-add-row-bad input.hu-add-hu { color: var(--danger-text); }
+    .hu-add-remove { width: 26px; height: 26px; padding: 0; font-size: 16px; line-height: 1; color: var(--text-faint); background: none; border: none; border-radius: var(--r-sm); cursor: pointer; }
+    .hu-add-remove:hover { color: var(--danger-text); background: var(--danger-soft); }
+    .hu-add-hint { margin: 0 0 var(--sp-3); font-size: var(--fs-xs); color: var(--text-faint); }
+    .hu-edit-context { margin: calc(-1 * var(--sp-2)) 0 var(--sp-4); font-size: var(--fs-sm); color: var(--text-muted); }
+    #huEditNumber { font-family: var(--font-mono); font-weight: 700; letter-spacing: .02em; }
+    .hu-edit-error { margin: calc(-1 * var(--sp-2)) 0 var(--sp-3); padding: var(--sp-2) var(--sp-3); font-size: var(--fs-sm); font-weight: 600; color: var(--danger-text); background-color: var(--danger-soft); border-radius: var(--r-md); }
+
+    /* Startseite: vier Kacheln nebeneinander; Unterseiten wie die Detailansicht; Filter der Info-Seite in einer Reihe */
+    .home-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-4); }
+    .home-tile { min-height: 132px; }
+    #pageView { padding: 0 var(--sp-6) var(--sp-8); }
+    .page-content { max-width: 1240px; margin: 0 auto; }   /* so breit wie die Startseite: dichte Tabelle braucht Platz */
+    .page-shipments .row-chip { display: none; }            /* LKW steht am Desktop in der eigenen Spalte */
+    .page-summary, .page-banner, .page-details, .page-list { max-width: 900px; margin-left: auto; margin-right: auto; }
+    .admin-invite, #pageContent:has(.admin-invite) > .page-note, #pageContent:has(.admin-invite) > .page-section-title { max-width: 900px; margin-left: auto; margin-right: auto; }   /* Seite „Mitarbeiter“: eine Spalte wie die Liste */
+    .shipment-table td.hawb-cell-vvl { width: 24%; min-width: 250px; }
+    .shipment-table:has(td.hawb-cell-vvl) td.dt-status { width: 10%; }   /* VW-Zeilen: Status-Spalte etwas schmaler, damit QR-Spalte Platz behält */
+    .page-list:has(td.hawb-cell-vvl), #pageContent:has(td.hawb-cell-vvl) .page-shipments { max-width: none; }   /* VW-LKW-Seite: Tabelle darf die volle Seitenbreite nutzen */
+    .weight-hits { flex-basis: auto; margin-top: 0; }
+
+    /* Info & Suche: Filter als feste Seitenleiste links, Ergebnisse rechts – wie ein Arbeitsplatz-System */
+    .info-layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: var(--sp-5); align-items: start; }
+    .info-main .shipment-table td.hawb-cell { width: 18%; min-width: 130px; }
+    .info-form {
+        position: sticky;
+        top: 72px;
+        margin: 0;
+        padding: var(--sp-4);
+        background-color: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--r-lg);
+        box-shadow: var(--shadow-sm);
+    }
+    .info-form-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); margin-bottom: var(--sp-3); }
+    .info-form-title { font-size: var(--fs-xs); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); }
+    .info-search-wrapper input[type="search"] { height: 40px; font-size: var(--fs-sm); }
+    .info-search-wrapper input[type="search"]::placeholder { font-size: var(--fs-xs); }
+    .info-search-wrapper .info-search-clear { width: 28px; height: 28px; font-size: 18px; }
+    .info-reset-row { display: none; }   /* Desktop: „Zurücksetzen“ steht im Kopf der Seitenleiste */
+    .info-filters { grid-template-columns: 1fr; gap: var(--sp-3); margin-top: var(--sp-3); }
+    .info-filters label, .info-filters .info-weight, .info-filters .info-dates { grid-column: auto; }
+    .info-filters select { height: 36px; }
+    .info-weight-inputs input[type="text"], .info-weight-inputs input[type="date"] { height: 36px; }
+    .info-filters .info-archive { grid-column: auto; min-height: 0; padding-top: var(--sp-2); border-top: 1px solid var(--border); font-size: var(--fs-sm); }
+    .info-main { min-width: 0; }
+    .info-main .page-note { margin-top: 0; }
+    .info-main .page-section-title:first-child { margin-top: 0; }
+}
+
+
+/* ===================================================================
+   15. DARK MODE
+   =================================================================== */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg:            #0b1220;
+        --surface:       #111a2e;
+        --surface-2:     #16213a;
+        --surface-3:     #1c2942;
+        --border:        #24334f;
+        --border-strong: #33456a;
+        --text:          #e5e9f2;
+        --text-muted:    #9aa8c2;
+        --text-faint:    #6b7a99;
+        --overlay:       rgba(0, 0, 0, .65);
+
+        --accent:        #3b82f6;
+        --accent-hover:  #60a5fa;
+        --accent-soft:   rgba(59, 130, 246, .18);
+        --accent-text:   #93c5fd;
+
+        --success:       #22c55e;
+        --success-hover: #4ade80;
+        --success-soft:  rgba(34, 197, 94, .16);
+        --success-text:  #86efac;
+
+        --warning:       #f59e0b;
+        --warning-hover: #fbbf24;
+        --warning-soft:  rgba(245, 158, 11, .16);
+        --warning-text:  #fcd34d;
+
+        --danger:        #ef4444;
+        --danger-hover:  #f87171;
+        --danger-soft:   rgba(239, 68, 68, .16);
+        --danger-text:   #fca5a5;
+
+        --info:          #06b6d4;
+        --info-hover:    #22d3ee;
+        --info-soft:     rgba(6, 182, 212, .16);
+        --info-text:     #67e8f9;
+
+        --shadow-sm: 0 1px 2px rgba(0, 0, 0, .4);
+        --shadow-md: 0 2px 8px rgba(0, 0, 0, .45);
+        --shadow-lg: 0 12px 32px rgba(0, 0, 0, .6);
+    }
+    select {
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%239aa8c2' d='M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z'/></svg>");
+    }
+    .batch-slider { background-color: var(--border-strong); }
+    .main-action-button, #saveBatchButton { color: #fff; }
+    #batchScanFeedbackModal .modal-content { background-color: #000; }
+}
+
+
+/* ===================================================================
+   16. KLASSEN FÜR JS-GENERIERTES MARKUP (ersetzen frühere Inline-Styles)
+   =================================================================== */
+.detail-meta { font-family: var(--font-sans); font-size: var(--fs-sm); color: var(--text-muted); }
+.detail-meta-strong { font-weight: 700; margin-bottom: var(--sp-1); }
+.detail-divider { margin: var(--sp-2) 0; border: none; border-top: 1px dashed var(--border-strong); }
+
+.suspicion-heading {
+    margin: var(--sp-5) 0 var(--sp-3);
+    padding-top: var(--sp-4);
+    font-size: var(--fs-md);
+    color: var(--danger-text);
+    border-top: 2px solid var(--border);
+}
+.hu-order-group-warning { border-left-color: var(--warning); }
+.hu-order-group-warning .hu-list li { display: block; }
+.hu-order-group-warning .hu-list strong { font-family: var(--font-sans); font-size: var(--fs-xs); color: var(--text-muted); }
+
+.lkw-empty { padding: var(--sp-2) var(--sp-3); font-size: var(--fs-xs); color: var(--text-faint); list-style: none; }
+.lkw-menu-item { width: 100%; overflow: hidden; -webkit-user-select: none; user-select: none; }
