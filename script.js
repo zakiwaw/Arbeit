@@ -6035,15 +6035,24 @@ function openSecurityReport(base, shipmentsPool, preopenedTab) {
             // Packstückliste
             ensure(45);
             const hasPos = rows.some(r => r.pos), hasSub = rows.some(r => r.sub);
+            // Maße: Einheit in die Spaltenüberschrift (wenn alle Zeilen dieselbe haben), Zelle „L × B × H“ – bleibt einzeilig.
+            // Gewicht: normalisiert als „42 kg“ (Importwerte wie „42,000KG“ brachen sonst mitten im Wort um).
+            const dimsOf = r => splitDimensions(r.dimensions);
+            const units = Array.from(new Set(rows.map(r => { const d = dimsOf(r); return d ? d.unit : ''; }).filter(u => u)));
+            const dimUnit = (units.length === 1 && rows.every(r => !r.dimensions || dimsOf(r))) ? units[0] : '';
+            const dimText = r => { const d = dimsOf(r); return d ? `${d.l} × ${d.b} × ${d.h}${(dimUnit || !d.unit) ? '' : ' ' + d.unit.toLowerCase()}` : r.dimensions; };
+            const weightText = r => { const kg = parseWeightKg(r.weight); return kg === null ? r.weight : formatKg(kg); };
             const cols = [];
             if (hasPos) cols.push({ h: 'Pos.', w: 12, get: r => r.pos, st: { halign: 'right' } });
-            cols.push({ h: hasSub ? 'VSE\nSendungs-Nr.' : (s.isHuListOrder ? 'HU-Nummer' : 'Sendungsnummer'), w: 'auto', get: r => r.sub ? `${r.nr}\n${r.sub}` : r.nr, st: { fontStyle: 'bold' } });
-            if (rows.some(r => r.packaging)) cols.push({ h: 'Verpackung', w: 31, get: r => r.packaging });
-            if (rows.some(r => r.dimensions)) cols.push({ h: 'Maße', w: 29, get: r => r.dimensions });
-            if (rows.some(r => r.weight)) cols.push({ h: 'Gewicht', w: 16, get: r => r.weight, st: { halign: 'right' } });
-            cols.push({ h: 'WE', w: 10, get: r => r.we ? 'Ja' : '–', st: { halign: 'center' } });
-            cols.push({ h: 'Kontrolle', w: 25, get: r => (r.state === 'secured' ? r.method : (r.state === 'dunkel' ? 'Dunkelalarm' : 'Offen')) + (r.kombi.length ? `\n+ ${r.kombi.join('/')} (Kombi)` : ''), st: { fontStyle: 'bold' } });
-            cols.push({ h: 'Datum / Uhrzeit', w: 30, get: r => r.time ? fmtDT(r.time) : '' });
+            // VW: VSE und Sendungs-Nr. nebeneinander (zwei Spalten) statt untereinander – jede Zeile bleibt einzeilig
+            cols.push({ h: hasSub ? 'VSE' : (s.isHuListOrder ? 'HU-Nummer' : 'Sendungsnummer'), w: 'auto', get: r => r.nr, st: { fontStyle: 'bold' } });
+            if (hasSub) cols.push({ h: 'Sendungs-Nr.', w: 'auto', get: r => r.sub });
+            if (rows.some(r => r.packaging)) cols.push({ h: 'Verpackung', w: hasSub ? 22 : 28, get: r => r.packaging });
+            if (rows.some(r => r.dimensions)) cols.push({ h: dimUnit ? `Maße (${dimUnit.toLowerCase()})` : 'Maße', w: 33, get: dimText });
+            if (rows.some(r => r.weight)) cols.push({ h: 'Gewicht', w: 16, get: weightText, st: { halign: 'right' } });
+            cols.push({ h: 'WE', w: 9, get: r => r.we ? 'Ja' : '–', st: { halign: 'center' } });
+            cols.push({ h: 'Kontrolle', w: 24, get: r => (r.state === 'secured' ? r.method : (r.state === 'dunkel' ? 'Dunkelalarm' : 'Offen')) + (r.kombi.length ? `\n+ ${r.kombi.join('/')} (Kombi)` : ''), st: { fontStyle: 'bold' } });
+            cols.push({ h: 'Datum / Uhrzeit', w: 31, get: r => r.time ? fmtDT(r.time) : '' });
             const colKontrolle = cols.findIndex(c => c.h === 'Kontrolle'), colWe = cols.findIndex(c => c.h === 'WE');
             const body = [], meta = [];
             rows.forEach(r => {
