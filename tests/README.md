@@ -25,3 +25,10 @@ node tests/regress.js         # Grundfunktionen: Scan, Batch, Startseite, Unters
 Jeder Test endet mit `ALL GOOD` (Exit-Code 0) oder `SOME FAILED` (Exit-Code 1) – Ketten wie `node tests/x.js && git push` brechen bei Fehlern ab.
 
 Umgebungsvariablen: `APP_URL` (Standard `http://127.0.0.1:8000/index.html`), `CHROMIUM`, `PUPPETEER_MODULE`.
+
+## Werkzeuge (keine Tests)
+```bash
+node tests/tools/nachweis-samples.js /tmp   # Beispiel-Sicherungsnachweise (VW 20 Packstücke, MAN) → /tmp/vw.pdf, /tmp/man.pdf
+node tests/tools/pdfshot.js /tmp/vw.pdf .arena-shots/nachweis-vw 3   # PDF-Seiten als PNG (pdf.js im Headless-Chrome)
+```
+`pdfshot.js` braucht `.arena-shots/pdfjs/pdf.mjs` + `pdf.worker.mjs` (aus `npm pack pdfjs-dist@4`, Ordner `build/`) und den Server auf :8000.

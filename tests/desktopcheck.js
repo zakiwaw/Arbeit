@@ -606,6 +606,9 @@ function bigData() {
       assert(has('bersicht Vorverladeliste 100004158949') && has('2 Aufträge') && has('noch nicht kontrolliert') && has('Auftrag 2 von 2'), 'VW-Nachweis: Übersicht der VVL, Hinweis auf offene Packstücke, Aufträge nummeriert');
       // Packstückliste einzeilig: VSE und Sendungs-Nr. als zwei Spalten, Einheit im Kopf „Maße (mm)“, Gewicht als „100 kg“ (statt „100 KG“ / „1200x800x600 MM“ in der Zelle)
       assert(has('Sendungs-Nr.') && !has('VSE\nSendungs') && has('Maße \\(mm\\)') && has('1200 × 800 × 600') && !has('1200x800x600 MM') && has('100 kg') && !has('100 KG'), 'VW-Nachweis: VSE/Sendungs-Nr. nebeneinander, Maße ohne Einheit in der Zelle, Gewicht normalisiert');
+      // Übersicht: Gewicht je Auftrag + Summenzeile (796201 = 100 kg, 938203 = 200 kg → 300 kg); je Auftrag Summenzeile unter der Liste
+      assert(has('Gewicht') && has('Gesamt') && has('300 kg') && has('200 kg') && has('Gesamt · 2 Packstücke') && has('Gesamt · 1 Packstück'), 'VW-Nachweis: Gewicht in der Übersicht mit Gesamtsumme, Summenzeile je Auftrag');
+      assert(!has('PLSO'), 'VW-Nachweis: keine PLSO/Spediteur-Zeile (nur bei MAN)');
       // MAN-Inhalt
       await hook();
       await page.evaluate(() => document.querySelector('tr[data-basenumber="9008295951"] .pdf-btn').click()); await wait(1200);
@@ -614,6 +617,8 @@ function bigData() {
       assert(h2('Rechnung 9008295951') && h2('PDF0001') && h2('PDF0003') && h2('Bemerkung zu PDF0003: Notiz A') && h2('VCK') && h2('Kombi'), 'MAN-Nachweis: Rechnung, HUs, Bemerkung als eigene Zeile, Kombi enthalten');
       assert(h2('NICHT ERTEILT') && h2('2 von 3 Packstücken noch nicht kontrolliert') && h2('Röntgenkontrolle') && h2('Sichtkontrolle'), 'MAN-Nachweis: Status NICHT ERTEILT bei offenen Packstücken, Kontrollmethoden im Klartext');
       assert(h2('Maße \\(cm\\)') && h2('10 × 10 × 10') && h2('5 kg') && !h2('5 KG'), 'MAN-Nachweis: Einheit cm im Spaltenkopf, Gewicht normalisiert');
+      // MAN: PLSO · Spediteur · Land unter dem Titel; Summenzeile mit Gesamtgewicht (3 Packstücke × 5 kg)
+      assert(h2('PLSO 318101') && h2('Spediteur DHL') && h2('Land AUSTRALIEN') && h2('Gesamt · 3 Packstücke') && h2('15 kg'), 'MAN-Nachweis: PLSO/Spediteur/Land unter dem Titel, Gesamtgewicht in der Summenzeile');
       // Genau vier Kopfzeilen (Status, Methode, erteilt von/am, RegB) – kein Erklärungsblock, keine Legende, keine Unterschriftsfelder
       assert(h2('Sicherheitsstatus') && h2('Kontrollmethode') && h2('Erteilt von / am') && h2('RegB-Nummer') && h2('DE/RA/00889-07') && h2('6.3.2.6') && h2('ohne Unterschrift') && !h2('Inhalt der Sendung') && !h2('Legende') && !h2('Unterschrift:'), 'MAN-Nachweis: vier Kopfzeilen + RegB-Nummer, kein Erklärungsblock/Legende/Unterschriftsfeld');
       // Vollständig gesicherte Einzelsendung → SPX mit Name + Zeitpunkt der Erteilung

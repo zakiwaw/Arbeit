@@ -5995,7 +5995,17 @@ function openSecurityReport(base, shipmentsPool, preopenedTab) {
             doc.setFillColor(...color); doc.roundedRect(xRight - w, yTop, w, 7, 1.5, 1.5, 'F');
             doc.setTextColor(255, 255, 255); doc.text(text, xRight - w / 2, yTop + 4.8, { align: 'center' });
         };
-        const sectionTitle = (text, st) => { ensure(40); doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(...dark); doc.text(text, M, y + 5); if (st) badge(st.badge, st.color, W - M, y); y += 12; };
+        const sectionTitle = (text, st, sub) => {
+            ensure(sub ? 46 : 40);
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(...dark); doc.text(text, M, y + 5);
+            if (st) badge(st.badge, st.color, W - M, y);
+            y += 12;
+            if (sub) { doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(...mid); doc.text(sub, M, y - 3); y += 5; }
+        };
+        // MAN-Auftrag: PLSO · Spediteur · Land als Zeile unter dem Titel (die vier Kopfzeilen bleiben unverändert)
+        const subtitleOf = s => isMan(s) ? [s.plsoNumber ? `PLSO ${s.plsoNumber}` : '', `Spediteur ${s.freightForwarder}`, `Land ${s.destinationCountry}`].filter(Boolean).join('   ·   ') : '';
+        // Gesamtgewicht aus den Zeilen der Packstückliste (je Packstück einmal; nur Zeilen mit lesbarer Angabe)
+        const rowsKg = rows => rows.reduce((a, r) => { const kg = parseWeightKg(r.weight); if (kg !== null) { a.sum += kg; a.n++; } return a; }, { sum: 0, n: 0 });
         // Sicherheitsstatus der Sendung (SPX nur, wenn alle Packstücke kontrolliert sind)
         const stateOf = p => {
             if (p.dunkel > 0) return { key: 'dunkel', color: red, badge: 'DUNKELALARM', status: `NICHT ERTEILT – Dunkelalarm offen (${pcs(p.dunkel)}), andere Kontrollmethode erforderlich` };
@@ -6021,7 +6031,7 @@ function openSecurityReport(base, shipmentsPool, preopenedTab) {
         };
         const drawShipment = (s, idx) => {
             const p = shipmentProgress(s), st = stateOf(p), rows = pdfPackRows(s), ms = methodSummary(s);
-            sectionTitle(parent ? `${refOf(s)} – Auftrag ${idx + 1} von ${list.length}` : refOf(s), st);
+            sectionTitle(parent ? `${refOf(s)} – Auftrag ${idx + 1} von ${list.length}` : refOf(s), st, subtitleOf(s));
             // Vier Zeilen: Status, Methode, erteilt von/am, RegB
             const LW = 42;
             summaryLines(s, st, ms).forEach(([label, value, color]) => {
@@ -6049,11 +6059,14 @@ function openSecurityReport(base, shipmentsPool, preopenedTab) {
             if (hasSub) cols.push({ h: 'Sendungs-Nr.', w: 'auto', get: r => r.sub });
             if (rows.some(r => r.packaging)) cols.push({ h: 'Verpackung', w: hasSub ? 22 : 28, get: r => r.packaging });
             if (rows.some(r => r.dimensions)) cols.push({ h: dimUnit ? `Maße (${dimUnit.toLowerCase()})` : 'Maße', w: 33, get: dimText });
-            if (rows.some(r => r.weight)) cols.push({ h: 'Gewicht', w: 16, get: weightText, st: { halign: 'right' } });
+            if (rows.some(r => r.weight)) cols.push({ h: 'Gewicht', w: 19, get: weightText, st: { halign: 'right' } });
             cols.push({ h: 'WE', w: 9, get: r => r.we ? 'Ja' : '–', st: { halign: 'center' } });
             cols.push({ h: 'Kontrolle', w: 24, get: r => (r.state === 'secured' ? r.method : (r.state === 'dunkel' ? 'Dunkelalarm' : 'Offen')) + (r.kombi.length ? `\n+ ${r.kombi.join('/')} (Kombi)` : ''), st: { fontStyle: 'bold' } });
-            cols.push({ h: 'Datum / Uhrzeit', w: 31, get: r => r.time ? fmtDT(r.time) : '' });
-            const colKontrolle = cols.findIndex(c => c.h === 'Kontrolle'), colWe = cols.findIndex(c => c.h === 'WE');
+            cols.push({ h: 'Datum / Uhrzeit', w: 28, get: r => r.time ? fmtDT(r.time) : '' });
+            const colKontrolle = cols.findIndex(c => c.h === 'Kontrolle'), colWe = cols.findIndex(c => c.h === 'WE'), colKg = cols.findIndex(c => c.h === 'Gewicht');
+            // Summenzeile: Anzahl + Gesamtgewicht (auf der letzten Seite der Liste)
+            const kgTot = rowsKg(rows);
+            const foot = colKg > 0 ? [[{ content: `Gesamt · ${pcs(rows.length)}` + (kgTot.n < rows.length ? ` · Gewicht aus ${kgTot.n} Angaben` : ''), colSpan: colKg }, { content: formatKg(kgTot.sum), styles: { halign: 'right' } }, { content: '', colSpan: cols.length - colKg - 1 }]] : null;
             const body = [], meta = [];
             rows.forEach(r => {
                 body.push(cols.map(c => c.get(r))); meta.push({ r, note: false });
@@ -6062,7 +6075,8 @@ function openSecurityReport(base, shipmentsPool, preopenedTab) {
             const columnStyles = {}; cols.forEach((c, i) => { columnStyles[i] = Object.assign({ cellWidth: c.w }, c.st || {}); });
             if (body.length) {
                 doc.autoTable(Object.assign({}, tableBase, {
-                    startY: y, head: [cols.map(c => c.h)], body,
+                    startY: y, head: [cols.map(c => c.h)], body, foot: foot || undefined, showFoot: 'lastPage',
+                    footStyles: { fillColor: fillHead, textColor: dark, fontStyle: 'bold' },
                     margin: { left: M, right: M, top: TOP + 8, bottom: BOTTOM },
                     didDrawPage: data => { if (data.pageNumber > 1) { header(); doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(...dark); doc.text(`${refOf(s)} – Packstückliste (Fortsetzung)`, M, TOP + 3); } },
                     styles: { font: 'helvetica', fontSize: 8.5, cellPadding: { top: 2.2, bottom: 2.2, left: 2, right: 2 }, textColor: dark, lineColor: line, lineWidth: 0.25, overflow: 'linebreak', valign: 'middle' },
@@ -6091,14 +6105,21 @@ function openSecurityReport(base, shipmentsPool, preopenedTab) {
             doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(...mid);
             doc.text(`LKW ${truckShortName(clicked.truckId)} · ${pluralize(list.length, 'Auftrag', 'Aufträge')} · ${pcs(tot.exp)} · Wareneingang ${tot.we} von ${tot.exp} · kontrolliert ${tot.sec} von ${tot.exp}` + (tot.open ? ` · offen ${tot.open}` : '') + (tot.dunkel ? ` · Dunkelalarm ${tot.dunkel}` : ''), M, y);
             y += 6;
-            const ovBody = list.map(s => { const p = shipmentProgress(s), st = stateOf(p), ms = methodSummary(s); return [String(s.hawb), p.expected === null ? '–' : String(p.expected), String(p.we), String(p.counted), ms.codes.join(', ') || '–', st.badge + (p.pending ? `\n${p.pending} offen` : '')]; });
+            const ovKg = list.map(s => rowsKg(pdfPackRows(s)));
+            const ovKgTot = ovKg.reduce((a, k) => { a.sum += k.sum; a.n += k.n; return a; }, { sum: 0, n: 0 });
+            const ovBody = list.map((s, i) => { const p = shipmentProgress(s), st = stateOf(p), ms = methodSummary(s); return [String(s.hawb), p.expected === null ? '–' : String(p.expected), String(p.we), String(p.counted), ovKg[i].n ? formatKg(ovKg[i].sum) : '–', ms.codes.join(', ') || '–', st.badge + (p.pending ? `\n${p.pending} offen` : '')]; });
             const ovColors = list.map(s => stateOf(shipmentProgress(s)).color);
             doc.autoTable(Object.assign({}, tableBase, {
-                startY: y, head: [['Kundennr.', 'Packstücke', 'Wareneingang', 'Kontrolliert', 'Methode(n)', 'Sicherheitsstatus']], body: ovBody,
-                styles: { font: 'helvetica', fontSize: 9.5, cellPadding: { top: 2.6, bottom: 2.6, left: 3, right: 3 }, textColor: dark, lineColor: line, lineWidth: 0.25, overflow: 'linebreak', valign: 'middle' },
-                headStyles: { fillColor: fillHead, textColor: dark, fontStyle: 'bold', fontSize: 9 },
-                columnStyles: { 0: { cellWidth: 26, fontStyle: 'bold' }, 1: { cellWidth: 25, halign: 'right' }, 2: { cellWidth: 30, halign: 'right' }, 3: { cellWidth: 25, halign: 'right' }, 4: { cellWidth: 'auto' }, 5: { cellWidth: 40, fontStyle: 'bold' } },
-                didParseCell: data => { if (data.section === 'body' && data.column.index === 5) data.cell.styles.textColor = ovColors[data.row.index]; }
+                startY: y, head: [['Kundennr.', 'Packstücke', 'Wareneingang', 'Kontrolliert', 'Gewicht', 'Methode(n)', 'Sicherheitsstatus']], body: ovBody,
+                foot: [['Gesamt', String(tot.exp), String(tot.we), String(tot.sec), ovKgTot.n ? formatKg(ovKgTot.sum) : '–', { content: '', colSpan: 2 }]], showFoot: 'lastPage',
+                styles: { font: 'helvetica', fontSize: 9.5, cellPadding: { top: 2.6, bottom: 2.6, left: 2.5, right: 2.5 }, textColor: dark, lineColor: line, lineWidth: 0.25, overflow: 'linebreak', valign: 'middle' },
+                headStyles: { fillColor: fillHead, textColor: dark, fontStyle: 'bold', fontSize: 9, halign: 'left' },
+                footStyles: { fillColor: fillHead, textColor: dark, fontStyle: 'bold', fontSize: 9.5 },
+                columnStyles: { 0: { cellWidth: 24, fontStyle: 'bold' }, 1: { cellWidth: 23, halign: 'right' }, 2: { cellWidth: 28, halign: 'right' }, 3: { cellWidth: 24, halign: 'right' }, 4: { cellWidth: 23, halign: 'right' }, 5: { cellWidth: 'auto' }, 6: { cellWidth: 34, fontStyle: 'bold' } },
+                didParseCell: data => {
+                    if (data.section === 'body' && data.column.index === 6) data.cell.styles.textColor = ovColors[data.row.index];
+                    if ((data.section === 'head' || data.section === 'foot') && data.column.index >= 1 && data.column.index <= 4) data.cell.styles.halign = 'right';   // Zahlenspalten: Kopf/Summe wie Werte rechtsbündig
+                }
             }));
             y = doc.lastAutoTable.finalY + 8;
             doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
