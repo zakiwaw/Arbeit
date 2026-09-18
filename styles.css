@@ -2874,3 +2874,38 @@ body.auth-open { overflow: hidden; }
 
 .lkw-empty { padding: var(--sp-2) var(--sp-3); font-size: var(--fs-xs); color: var(--text-faint); list-style: none; }
 .lkw-menu-item { width: 100%; overflow: hidden; -webkit-user-select: none; user-select: none; }
+
+/* ---- Seite „Aufträge erfassen“ (Text einfügen → Aufträge erkennen → QR-Code oder direkt anlegen) ---- */
+.erf-tabs { display: flex; gap: var(--sp-1); margin-bottom: var(--sp-3); border-bottom: 2px solid var(--border); overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.erf-tab { flex: 0 0 auto; padding: 10px 14px; margin-bottom: -2px; font-size: var(--fs-sm); font-weight: 600; color: var(--text-muted); background: transparent; border: 0; border-bottom: 3px solid transparent; border-radius: 0; white-space: nowrap; }
+.erf-tab.is-active { color: var(--accent-text); border-bottom-color: var(--accent); }
+.erf-input { display: block; min-height: 220px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: var(--fs-sm); line-height: 1.4; resize: vertical; }
+.erf-actions { display: flex; flex-direction: column; gap: var(--sp-2); margin: var(--sp-3) 0 var(--sp-4); }
+.erf-actions .main-action-button { margin: 0; }
+.erf-notice { align-items: flex-start; }
+.erf-notice.is-ok { color: var(--success-text); background-color: var(--success-soft); }
+.erf-notice.is-error, .page-banner.is-error { color: var(--danger-text); background-color: var(--danger-soft); }
+.erf-result { margin-top: var(--sp-2); }
+.erf-row { display: flex; flex-direction: column; gap: 2px; }
+.erf-hus { font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; word-break: break-all; }
+.erf-buttons { display: flex; flex-direction: column; gap: var(--sp-2); margin: var(--sp-4) 0 var(--sp-3); }
+.erf-buttons .main-action-button { margin: 0; }
+.erf-secondary { background-color: var(--surface); color: var(--accent-text); border: 1.5px solid var(--accent); }
+.erf-secondary:hover { background-color: var(--accent-soft); }
+.erf-secondary:disabled { opacity: .5; }
+.erf-toobig { color: var(--warning-text); }
+.erf-qr { display: flex; flex-direction: column; align-items: center; gap: var(--sp-3); padding: var(--sp-4); background: #fff; border: 1px solid var(--border); border-radius: var(--r-lg); }
+.erf-qr img, .erf-qr canvas { max-width: 100%; height: auto; }
+.erf-qr .page-note { margin: 0; color: #475569; }
+
+@media (min-width: 992px) {
+    /* Seite „Aufträge erfassen“ am Schreibtisch: eine Spalte (max. 900 px) wie „Mitarbeiter“, Knöpfe nebeneinander */
+    #pageContent:has(.erf-tabs) > * { max-width: 900px; margin-left: auto; margin-right: auto; }
+    .erf-input { min-height: 300px; }
+    .erf-actions, .erf-buttons { flex-direction: row; align-items: center; }
+    .erf-actions .main-action-button, .erf-buttons .main-action-button { width: auto; flex: 1 1 auto; }
+    .erf-actions .page-link-btn, .erf-buttons .page-link-btn { width: auto; flex: 0 0 auto; }
+    .erf-row { flex-direction: row; justify-content: space-between; align-items: baseline; gap: var(--sp-3); }
+    .erf-row > div:first-child { flex: 1 1 auto; }
+    .erf-hus { flex: 0 0 auto; max-width: 40%; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; word-break: normal; }
+}

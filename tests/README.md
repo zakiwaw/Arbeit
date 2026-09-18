@@ -20,6 +20,7 @@ node tests/soundcheck.js      # Töne: wann Fehler-/Nachlieferungs-Ton, parallel
 node tests/zoomcheck.js       # Browser-Zoom ist unterbunden, Scrollen/Tippen weiterhin möglich
 node tests/authcheck.js       # Anmeldung (PIN): Anmeldeseite, Einladungslink, Token je Anfrage, Seite „Mitarbeiter“, Abmelden, 30-Min-Abmeldung
 node tests/backendcheck.js    # Server-Skript offline (ohne Chrome/Server): Anmelde-Logik in backend/Code.gs Schritt für Schritt
+node tests/erfassencheck.js   # Seite „Aufträge erfassen“: Parser = Original-Generator (tests/reference), QR-Inhalt, Direkt anlegen, Scan-Weg
 node tests/regress.js         # Grundfunktionen: Scan, Batch, Startseite, Unterseiten, Info-Filter
 ```
 Jeder Test endet mit `ALL GOOD` (Exit-Code 0) oder `SOME FAILED` (Exit-Code 1) – Ketten wie `node tests/x.js && git push` brechen bei Fehlern ab.
@@ -32,3 +33,5 @@ node tests/tools/nachweis-samples.js /tmp   # Beispiel-Sicherungsnachweise (VW 2
 node tests/tools/pdfshot.js /tmp/vw.pdf .arena-shots/nachweis-vw 3   # PDF-Seiten als PNG (pdf.js im Headless-Chrome)
 ```
 `pdfshot.js` braucht `.arena-shots/pdfjs/pdf.mjs` + `pdf.worker.mjs` (aus `npm pack pdfjs-dist@4`, Ordner `build/`) und den Server auf :8000.
+
+`tests/reference/multi-auftrag-qr-generator.html` ist der frühere externe „Multi-Auftrag QR-Code Generator“ – Referenz für den QR-Inhalt (erfassencheck führt seine Parser mit aus und vergleicht).

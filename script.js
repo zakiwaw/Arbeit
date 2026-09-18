@@ -80,7 +80,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const sideMenuEl = document.getElementById('side-menu');
     const menuOverlayEl = document.getElementById('menu-overlay');
     const resetDataButtonEl = document.getElementById('resetDataButton');
-    const sendSummaryEmailButtonEl = document.getElementById('sendSummaryEmailButton');
     const noteToggleButtonEl = document.getElementById('noteToggleButton');
     const noteInputContainerEl = document.getElementById('noteInputContainer');
     const noteInputEl = document.getElementById('noteInput');
@@ -263,7 +262,6 @@ const suspicionDeclineBtnEl = document.getElementById('suspicionDeclineBtn');
         
 
     // --- Konstanten & Konfiguration ---
-    const WEB_APP_URL_BACKEND = 'https://script.google.com/macros/s/AKfycbyBtlm37WxzXdFCDjQuSIWfnQiTny6gwrmXuoq_cacGY9_bkqZxuuW7aJEqLuHJhWYg/exec'; // Mail_13
     // Daten-Backend (backend/Code.gs). Bereitstellung "Version 10" vom 05.09.2026 – bei einer NEUEN Bereitstellung hier die URL anpassen.
     // Vorherige Bereitstellung (altes Skript V1): AKfycbw_ug_levQ7LuOn27CijAdkabnz5utME2aEeN6s560RzSb8lKCsSo5VT4nyOebRJnd0gw
     const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyjaxBurmTWWJENUF2nr2WB5S6Le5ja-bcZ9OtBLktATx1zGAAZCa5IlvFaL1_yl6jjgA/exec';
@@ -4322,6 +4320,410 @@ function infoOptionsHtml(options, selected) {
     return options.map(o => `<option value="${escapeHtml(o[0])}"${o[0] === selected ? ' selected' : ''}>${escapeHtml(o[1])}</option>`).join('');
 }
 
+
+    // MAN-Aufträge aus dem QR-Inhalt „FRT_MULTI_V1;;;Rechnung|Spediteur|Land|PLSO|||Pos HU|Verpackung|Maße|Gewicht~~~…“ anlegen:
+    // ein neuer MAN-LKW mit allen Aufträgen. Gleicher Code für den Scan und für die Seite „Aufträge erfassen“ (Direkt anlegen).
+    function importMultiOrdersPayload(payload) {
+            const parts = payload.split(';;;').slice(1);
+            
+                        const shipments = loadShipments();
+            const now = new Date().toISOString();
+            let addedCount = 0, duplicateCount = 0, processedOrders = [];
+            
+            // --- START NEUE LOGIK FÜR FESTE MAN-NUMMERN ---
+            // --- NEU (ERSETZEN MIT) ---
+let maxMan = 0;
+Object.values(shipments).forEach(s => {
+    // Prüfe das UNVERÄNDERLICHE Feld originalManNumber
+    if (typeof s.originalManNumber === 'number' && s.originalManNumber > maxMan) {
+        maxMan = s.originalManNumber;
+    }
+    // Fallback für alte Daten ohne originalManNumber: truckId prüfen
+    else if (s.truckId && s.truckId.startsWith('MAN ') && typeof s.originalManNumber === 'undefined') {
+        const num = parseInt(s.truckId.replace('MAN ', ''), 10);
+        if (!isNaN(num) && num > maxMan) {
+            maxMan = num;
+        }
+    }
+});
+const newManNumber = maxMan + 1;
+const manTruckId = 'MAN ' + newManNumber;
+
+
+
+            
+            
+            parts.forEach(orderData => {
+            const [metaAndOrder, huData] = orderData.split('|||');
+            if (!metaAndOrder || !huData) return;
+            
+            const metaParts = metaAndOrder.split('|');
+            let orderNumber = metaParts[0];
+
+            // --- START: AUTOMATISCHE UMBENENNUNG FÜR NACHLIEFERUNGEN ---
+            if (orderNumber.toUpperCase().includes('NACHLIEFERUNG')) {
+                let suffixNum = 1;
+                let proposedName = orderNumber;
+                
+                while (isBaseTaken(shipments, proposedName)) {
+                    proposedName = `NACHLIEFERUNG ${suffixNum}`;
+                    suffixNum++;
+                }
+                orderNumber = proposedName;
+            }
+            // Nummer liegt im Archiv (alter, abgeschlossener Auftrag) → neuen Auftrag unter „NUMMER (2)“ anlegen
+            else if (!shipments[orderNumber] && isArchivedBase(orderNumber)) {
+                orderNumber = nextFreeBaseName(shipments, orderNumber);
+            }
+                
+                const hasFullMeta = metaParts.length >= 4;
+                processedOrders.push(orderNumber);
+                const hus = huData.split('~~~').filter(Boolean);
+
+                if (!shipments[orderNumber]) {
+    const newShipment = {
+        hawb: orderNumber, lastModified: now, totalPiecesExpected: hus.length,
+        scannedItems: [], mitarbeiter: MITARBEITER_NAME, isHuListOrder: true,
+        truckId: manTruckId,
+        originalManNumber: newManNumber, // <-- NEU: Unveränderliche Nummer
+    };
+
+                    if (hasFullMeta) {
+                        newShipment.freightForwarder = metaParts[1];
+                        newShipment.destinationCountry = metaParts[2];
+                        newShipment.plsoNumber = metaParts[3];
+                    }
+                    shipments[orderNumber] = newShipment;
+                    hus.forEach((huString, index) => {
+                        const huData = parseComplexHuString(huString);
+                        newShipment.scannedItems.push({ 
+                            rawInput: huData.rawInput, status: 'Anstehend', timestamp: now, 
+                            isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null, 
+                            position: huData.position || (index + 1),
+                            packaging: huData.packaging, dimensions: huData.dimensions, grossWeight: huData.grossWeight
+                        });
+                    });
+                    addedCount += hus.length;
+                }
+            });
+            saveShipments(shipments);
+            return { processedOrders, addedCount, truckId: manTruckId };
+    }
+
+    // Vorverladeliste aus dem QR-Inhalt „FRT_VVL_V1;;;Kundennr|VVL|||VSE:Sendungsnr|Gewicht|Maße~~~…“ anlegen/ergänzen.
+    // Gleicher Code für den Scan und für die Seite „Aufträge erfassen“ (Direkt anlegen).
+    function importVvlPayload(payload) {
+    const parts = payload.split(';;;').slice(1);
+    const shipments = loadShipments();
+    const now = new Date().toISOString();
+    let addedPositionsCount = 0;
+    let newOrders = new Set();
+    let updatedOrders = new Set();
+    let processedVVLs = new Set();
+
+
+
+    parts.forEach(orderData => {
+        const [meta, huData] = orderData.split('|||');
+        if (!meta || !huData) return;
+
+        const [originalKundennr, vorverladelisteNr] = meta.split('|');
+        let kundennr = originalKundennr;
+
+        // --- START NEU: Verhindert das Überschreiben bestehender LKWs ---
+        // Wenn die Kundennummer schon im System ist, aber zu einer ANDEREN Vorverladeliste gehört,
+        // hängen wir eine Nummer an (z.B. "12345 (2)"), damit der alte LKW seinen Auftrag behält.
+        // Gleiches gilt, wenn die Kundennummer im Archiv liegt (alte VVL, längst abgeschlossen): der Server würde sonst
+        // den archivierten Auftrag mit dem neuen zusammenführen.
+        const takenByOtherVvl = (shipments[kundennr] && shipments[kundennr].parentOrderNumber && shipments[kundennr].parentOrderNumber !== vorverladelisteNr)
+            || (!shipments[kundennr] && isArchivedBase(kundennr));
+        if (takenByOtherVvl) {
+            let suffixNum = 2;
+            while (isBaseTaken(shipments, `${originalKundennr} (${suffixNum})`)) {
+                suffixNum++;
+            }
+            kundennr = `${originalKundennr} (${suffixNum})`;
+        }
+        // --- ENDE NEU ---
+
+        const positionen = huData.split('~~~').filter(Boolean);
+        processedVVLs.add(vorverladelisteNr);
+
+        const parseVvlPosition = (pos) => {
+
+
+
+
+
+            
+            
+            
+            const [mainPart, grossWeightRaw = 'N/A', dimensionsRaw = 'N/A'] = pos.split('|').map(part => part.trim());
+            const [vse, sendnr] = mainPart.split(':').map(part => part.trim());
+
+            const grossWeight = grossWeightRaw && grossWeightRaw !== 'N/A'
+                ? (grossWeightRaw.toUpperCase().includes('KG') ? grossWeightRaw.toUpperCase() : `${grossWeightRaw} KG`)
+                : 'N/A';
+
+            let dimensions = 'N/A';
+            if (dimensionsRaw && dimensionsRaw !== 'N/A') {
+                const dimParts = dimensionsRaw
+                    .replace(/mm/gi, '')
+                    .split('x')
+                    .map(part => part.trim());
+
+                if (dimParts.length === 3) {
+                    const clean = (value) => {
+                        const parsed = parseInt(value, 10);
+                        return Number.isNaN(parsed) ? value : String(parsed);
+                    };
+                    dimensions = `${clean(dimParts[0])}x${clean(dimParts[1])}x${clean(dimParts[2])} MM`;
+                }
+            }
+
+            return { vse, sendnr: sendnr || '', grossWeight, dimensions };
+        };
+
+        if (!shipments[kundennr]) {
+            newOrders.add(kundennr);
+            shipments[kundennr] = {
+                hawb: kundennr,
+                lastModified: now,
+                totalPiecesExpected: positionen.length,
+                scannedItems: [],
+                mitarbeiter: MITARBEITER_NAME,
+                isHuListOrder: true,
+                parentOrderNumber: vorverladelisteNr,
+                truckId: 'VVL-' + vorverladelisteNr,
+            };
+
+            if (KUNDENNR_CARRIER_MAP[kundennr]) {
+                shipments[kundennr].freightForwarder = KUNDENNR_CARRIER_MAP[kundennr];
+            }
+
+            positionen.forEach(pos => {
+                const { vse, sendnr, grossWeight, dimensions } = parseVvlPosition(pos);
+                if (!vse) return;
+
+                shipments[kundennr].scannedItems.push({
+                    rawInput: vse,
+                    sendnr: sendnr,
+                    grossWeight: grossWeight,
+                    dimensions: dimensions,
+                    status: 'Anstehend',
+                    timestamp: now,
+                    isCombination: false,
+                    notes: [],
+                    isCancelled: false,
+                    cancelledTimestamp: null
+                });
+            });
+
+            addedPositionsCount += positionen.length;
+        } else {
+            updatedOrders.add(kundennr);
+            const existingShipment = shipments[kundennr];
+            let newPositionsAddedToThisCustomer = 0;
+
+            if (KUNDENNR_CARRIER_MAP[kundennr] && !existingShipment.freightForwarder) {
+                existingShipment.freightForwarder = KUNDENNR_CARRIER_MAP[kundennr];
+            }
+
+            existingShipment.parentOrderNumber = vorverladelisteNr;
+            existingShipment.truckId = 'VVL-' + vorverladelisteNr;
+
+            positionen.forEach(pos => {
+                const { vse, sendnr, grossWeight, dimensions } = parseVvlPosition(pos);
+                if (!vse) return;
+
+                const alreadyExists = existingShipment.scannedItems.some(item => item.rawInput === vse);
+                if (!alreadyExists) {
+                    existingShipment.scannedItems.push({
+                        rawInput: vse,
+                        sendnr: sendnr,
+                        grossWeight: grossWeight,
+                        dimensions: dimensions,
+                        status: 'Anstehend',
+                        timestamp: now,
+                        isCombination: false,
+                        notes: [],
+                        isCancelled: false,
+                        cancelledTimestamp: null
+                    });
+                    newPositionsAddedToThisCustomer++;
+                }
+            });
+
+            if (newPositionsAddedToThisCustomer > 0) {
+                existingShipment.totalPiecesExpected = (existingShipment.totalPiecesExpected || 0) + newPositionsAddedToThisCustomer;
+                existingShipment.lastModified = now;
+                addedPositionsCount += newPositionsAddedToThisCustomer;
+            }
+        }
+    });
+
+    saveShipments(shipments);
+    return { processedVVLs: [...processedVVLs], addedPositionsCount, newOrders: newOrders.size, updatedOrders: updatedOrders.size };
+    }
+
+// ---- Seite „Aufträge erfassen“ (ehem. externer „Multi-Auftrag QR-Code Generator“) ----------------------------------
+// Text aus dem MAN-Dokument / der Vorverladeliste einfügen → Aufträge werden erkannt (Parser 1:1 aus dem Generator) →
+// wahlweise als QR-Code anzeigen (für ein anderes Gerät) oder direkt in der App anlegen (gleicher Import wie beim Scan).
+const ERF_MODES = { man: 'MAN Fracht', vvl: 'Vorverladeliste (VW)', standard: 'Standard (Leerzeilen)' };
+const ERF_PLACEHOLDERS = {
+    vvl: 'Daten aus der Vorverladeliste hier einfügen …\nErkannt werden Vorverladeliste-Nr., Kundennr. und die Positionen.\n\nBeispiel:\nVorverladeliste-Nr.: 100004049786\n\nKundennr: 9974021\n873227447 8255014\n…',
+    man: 'Daten vom MAN-Dokument hier einfügen …\nErkannt werden Spediteur, Rechnung, PLSO und HUs – auch das „Nachlieferung“-Format.\n\nBeispiel:\nMaersk Logistics & Services/Senator, Südafrika\n9007988206\n3181 0128115\n1 0925102219E2|Einwegpalette B03|120x80x60 CM|42 KG\n\nBeispiel Nachlieferung:\nLogwin, Singapur\nNachlieferung\n3181 0128082\n1 9251021068F\n2 92510210CB3',
+    standard: 'Aufträge hier einfügen – jeder Auftrag durch eine LEERZEILE getrennt.\nDie ERSTE Zeile pro Auftrag ist die Auftragsnummer.\n\nBeispiel:\nAUFTRAGSNUMMER_1\nHU1\nHU2\n\nAUFTRAGSNUMMER_2\nHU3\n…'
+};
+const ERF_QR_MAX_CHARS = 2300;   // wie im Generator: darüber ist der QR-Code für Handykameras nicht mehr zuverlässig lesbar
+const erfState = { mode: 'man', text: '', result: null, notice: null };
+function erfReplaceUmlauts(str) { return String(str).replace(/ä/g, 'ae').replace(/Ä/g, 'Ae').replace(/ö/g, 'oe').replace(/Ö/g, 'Oe').replace(/ü/g, 'ue').replace(/Ü/g, 'Ue').replace(/ß/g, 'ss'); }
+function erfParseVvl(inputText) {
+    const lines = inputText.split('\n').map(l => l.trim()).filter(Boolean);
+    let mainVvlNr = null, currentOrder = null; const finalOrders = [];
+    const normalizeDimensionPart = value => { const cleaned = String(value || '').trim(); return cleaned ? String(parseInt(cleaned, 10)) : '0'; };
+    for (const line of lines) {
+        if (line.toLowerCase().startsWith('vorverladeliste-nr.')) { mainVvlNr = line.split(':')[1].trim(); continue; }
+        if (line.toLowerCase().startsWith('kundennr')) {
+            if (currentOrder) finalOrders.push(currentOrder);
+            currentOrder = { orderId: line.split(':')[1].trim(), parentVvl: mainVvlNr, hus: [] }; continue;
+        }
+        if (currentOrder && /^\d/.test(line)) {
+            if (line.includes('|') && line.includes(':')) {
+                const [mainPart, grossWeightRaw = 'N/A', dimensionsRaw = 'N/A'] = line.split('|').map(p => p.trim());
+                const [vse, sendnr] = mainPart.split(':').map(p => p.trim());
+                if (vse && sendnr) {
+                    let normalizedDimensions = 'N/A';
+                    if (dimensionsRaw !== 'N/A') {
+                        const dimParts = dimensionsRaw.split('x').map(p => normalizeDimensionPart(p.replace(/mm/i, '').trim()));
+                        if (dimParts.length === 3) normalizedDimensions = `${dimParts[0]}x${dimParts[1]}x${dimParts[2]} MM`;
+                    }
+                    const normalizedGrossWeight = grossWeightRaw.toUpperCase().includes('KG') ? grossWeightRaw.toUpperCase() : `${grossWeightRaw} KG`;
+                    currentOrder.hus.push(`${vse}:${sendnr}|${normalizedGrossWeight}|${normalizedDimensions}`);
+                }
+            } else {
+                const [vse, sendnr] = line.split(/\s+/);
+                if (vse && sendnr) currentOrder.hus.push(`${vse}:${sendnr}|N/A|N/A`);
+            }
+        }
+    }
+    if (currentOrder) finalOrders.push(currentOrder);
+    if (!mainVvlNr) return { error: 'Keine „Vorverladeliste-Nr.:“ im Text gefunden.' };
+    if (!finalOrders.length) return { error: 'Keine „Kundennr:“ mit Positionen gefunden.' };
+    return { orders: finalOrders.map(o => Object.assign(o, { parentVvl: o.parentVvl || mainVvlNr })) };
+}
+function erfParseMan(inputText) {
+    const finalOrders = [];
+    for (const block of inputText.trim().split(/\n\s*\n/)) {
+        const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+        if (lines.length < 3) continue;                       // Spediteur, Rechnung und PLSO sind das Minimum
+        const spediteurLandLine = lines.shift(), orderIdLine = lines.shift(), plsoLine = lines.shift();
+        const [spediteur, land] = spediteurLandLine.split(',');
+        finalOrders.push({ orderId: orderIdLine, plso: plsoLine, spediteur: spediteur ? spediteur.trim() : 'Unbekannt', land: land ? land.trim() : 'Unbekannt', hus: lines });
+    }
+    if (!finalOrders.length) return { error: 'Kein Auftrag erkannt. Je Auftrag: Zeile 1 „Spediteur, Land“, Zeile 2 Rechnung, Zeile 3 PLSO, danach die HUs – Aufträge durch eine Leerzeile trennen.' };
+    return { orders: finalOrders };
+}
+function erfParseStandard(inputText) {
+    const orders = inputText.split(/\n\s*\n/).map(block => { const lines = block.trim().split('\n').map(l => l.trim()).filter(Boolean); if (!lines.length) return null; return { orderId: lines.shift(), hus: lines }; }).filter(Boolean);
+    if (!orders.length) return { error: 'Kein Auftrag erkannt.' };
+    return { orders };
+}
+// QR-Inhalt genau wie der Generator: FRT_MULTI_V1 / FRT_VVL_V1 + je Auftrag ;;;Kopf|||HU~~~HU
+function erfBuildPayload(mode, orders) {
+    let allData = '';
+    for (const order of orders) {
+        let head;
+        if (mode === 'vvl') head = `;;;${erfReplaceUmlauts(order.orderId).toUpperCase()}|${erfReplaceUmlauts(order.parentVvl).toUpperCase()}|||`;
+        else head = `;;;${erfReplaceUmlauts(order.orderId).toUpperCase()}|${erfReplaceUmlauts(order.spediteur || 'N/A').toUpperCase()}|${erfReplaceUmlauts(order.land || 'N/A').toUpperCase()}|${erfReplaceUmlauts(order.plso || 'N/A').toUpperCase()}|||`;
+        allData += head + order.hus.join('~~~');
+    }
+    return (mode === 'vvl' ? 'FRT_VVL_V1' : 'FRT_MULTI_V1') + allData;
+}
+function erfParse(mode, text) { return mode === 'vvl' ? erfParseVvl(text) : (mode === 'man' ? erfParseMan(text) : erfParseStandard(text)); }
+function erfAnalyze() {
+    const text = erfState.text.trim();
+    if (!text) { erfState.result = { error: 'Bitte zuerst den Text einfügen.' }; return; }
+    const r = erfParse(erfState.mode, text);
+    erfState.result = r.error ? r : { orders: r.orders, payload: erfBuildPayload(erfState.mode, r.orders) };
+}
+function erfOrderSummary(o) {
+    const n = o.hus.length, pieces = pluralize(n, 'Packstück', 'Packstücke');
+    if (erfState.mode === 'vvl') return `<strong>Kundennr. ${escapeHtml(o.orderId)}</strong> · VVL ${escapeHtml(o.parentVvl)} · ${pieces}`;
+    if (erfState.mode === 'man') return `<strong>${escapeHtml(o.orderId)}</strong> · ${escapeHtml(o.spediteur)} · ${escapeHtml(o.land)} · PLSO ${escapeHtml(o.plso)} · ${pieces}`;
+    return `<strong>${escapeHtml(o.orderId)}</strong> · ${pieces}`;
+}
+function renderErfassenPage() {
+    const st = erfState, r = st.result;
+    setPageHeader('Aufträge erfassen', r && r.orders ? pluralize(r.orders.length, 'Auftrag', 'Aufträge') : '');
+    let html = `<div class="erf-tabs" role="tablist">${Object.keys(ERF_MODES).map(m => `<button type="button" class="erf-tab ${st.mode === m ? 'is-active' : ''}" data-erf-mode="${m}" role="tab" aria-selected="${st.mode === m}">${ERF_MODES[m]}</button>`).join('')}</div>`;
+    html += `<textarea id="erfInput" class="erf-input" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="${escapeHtml(ERF_PLACEHOLDERS[st.mode])}">${escapeHtml(st.text)}</textarea>`;
+    html += `<div class="erf-actions"><button type="button" class="main-action-button" id="erfAnalyzeBtn">Aufträge erkennen</button><button type="button" class="page-link-btn" id="erfClearBtn">Leeren</button></div>`;
+    if (st.notice) html += `<div class="page-banner erf-notice is-${st.notice.kind}"><span>${escapeHtml(st.notice.text)}</span><button type="button" class="page-link-btn" data-erf-notice-close>OK</button></div>`;
+    if (r && r.error) html += `<div class="page-banner is-error"><span>${escapeHtml(r.error)}</span></div>`;
+    else if (r && r.orders) {
+        const tooBig = r.payload.length > ERF_QR_MAX_CHARS;
+        const hus = r.orders.reduce((n, o) => n + o.hus.length, 0);
+        html += `<section class="erf-result"><h3 class="page-section-title">Erkannt: ${pluralize(r.orders.length, 'Auftrag', 'Aufträge')}, ${pluralize(hus, 'Packstück', 'Packstücke')}</h3>`;
+        html += `<ul class="page-list erf-list">${r.orders.map(o => `<li class="page-row erf-row"><div>${erfOrderSummary(o)}</div><div class="erf-hus">${escapeHtml(o.hus.slice(0, 3).map(h => h.split('|')[0]).join(' · '))}${o.hus.length > 3 ? ` · +${o.hus.length - 3} weitere` : ''}</div></li>`).join('')}</ul>`;
+        html += `<div class="erf-buttons">
+            <button type="button" class="main-action-button erf-create" id="erfCreateBtn">${st.mode === 'vvl' ? 'Direkt anlegen (VW-LKW)' : 'Direkt anlegen (neuer MAN-LKW)'}</button>
+            <button type="button" class="main-action-button erf-secondary" id="erfQrBtn" ${tooBig ? 'disabled' : ''}>QR-Code anzeigen</button>
+            <button type="button" class="page-link-btn" id="erfCopyBtn">Inhalt kopieren</button>
+        </div>`;
+        if (tooBig) html += `<p class="page-note erf-toobig">Zu groß für einen QR-Code (${r.payload.length} von max. ${ERF_QR_MAX_CHARS} Zeichen) – bitte „Direkt anlegen“ nutzen oder den Inhalt kopieren.</p>`;
+        html += `<div id="erfQr" class="erf-qr ${st.showQr && !tooBig ? '' : 'hidden'}"><div id="erfQrCode"></div><p class="page-note">Mit dem anderen Gerät im Scan-Feld abscannen.</p></div>`;
+        html += '</section>';
+    }
+    pageContentEl.innerHTML = html;
+    if (st.showQr && r && r.orders && r.payload.length <= ERF_QR_MAX_CHARS && typeof QRCode !== 'undefined') {
+        new QRCode(document.getElementById('erfQrCode'), { text: r.payload, width: 300, height: 300, correctLevel: QRCode.CorrectLevel.M });
+    }
+    const ta = document.getElementById('erfInput');
+    if (ta) ta.addEventListener('input', () => { erfState.text = ta.value; });
+}
+function handleErfassenPageClick(event) {
+    const t = event.target;
+    const tab = t.closest('[data-erf-mode]');
+    if (tab) { erfState.mode = tab.dataset.erfMode; erfState.result = null; erfState.showQr = false; renderErfassenPage(); return; }
+    if (t.closest('[data-erf-notice-close]')) { erfState.notice = null; renderErfassenPage(); return; }
+    if (t.closest('#erfAnalyzeBtn')) { erfState.showQr = false; erfState.notice = null; erfAnalyze(); renderErfassenPage(); return; }
+    if (t.closest('#erfClearBtn')) { erfState.text = ''; erfState.result = null; erfState.showQr = false; erfState.notice = null; renderErfassenPage(); return; }
+    if (t.closest('#erfQrBtn')) { erfState.showQr = !erfState.showQr; renderErfassenPage(); if (erfState.showQr) document.getElementById('erfQr')?.scrollIntoView({ block: 'nearest' }); return; }
+    if (t.closest('#erfCopyBtn')) {
+        const btn = t.closest('#erfCopyBtn'), txt = erfState.result && erfState.result.payload;
+        if (!txt) return;
+        (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => { btn.textContent = 'Kopiert!'; setTimeout(() => { btn.textContent = 'Inhalt kopieren'; }, 2000); })
+            .catch(() => { window.prompt('Inhalt zum Kopieren:', txt); });
+        return;
+    }
+    if (t.closest('#erfCreateBtn')) { erfCreateDirect(); }
+}
+// „Direkt anlegen“: exakt derselbe Import wie beim Scannen des QR-Codes – nur ohne Kamera und ohne Neuladen der Seite
+function erfCreateDirect() {
+    const r = erfState.result; if (!r || !r.orders) return;
+    if (isBatchModeActive) { erfState.notice = { kind: 'error', text: 'Bitte zuerst den Batch-Modus beenden.' }; renderErfassenPage(); return; }
+    const n = r.orders.length, hus = r.orders.reduce((a, o) => a + o.hus.length, 0);
+    const what = erfState.mode === 'vvl' ? `Vorverladeliste ${r.orders[0].parentVvl}: ${pluralize(n, 'Kundenauftrag', 'Kundenaufträge')}` : `${pluralize(n, 'Auftrag', 'Aufträge')} als neuer MAN-LKW`;
+    if (!confirm(`${what} mit ${pluralize(hus, 'Packstück', 'Packstücken')} jetzt anlegen?`)) return;
+    try {
+        let text;
+        if (erfState.mode === 'vvl') {
+            const res = importVvlPayload(r.payload);
+            text = `Vorverladeliste ${res.processedVVLs.join(', ')} angelegt: ${res.newOrders} neue Aufträge, ${res.updatedOrders} ergänzt, ${res.addedPositionsCount} Positionen.`;
+        } else {
+            const res = importMultiOrdersPayload(r.payload);
+            text = `${truckShortName(res.truckId)} angelegt: ${pluralize(res.processedOrders.length, 'Auftrag', 'Aufträge')}, ${pluralize(res.addedCount, 'Packstück', 'Packstücke')}.`;
+        }
+        renderTable(); renderLkwMenu(); refreshHomeViews();
+        erfState.text = ''; erfState.result = null; erfState.showQr = false; erfState.notice = { kind: 'ok', text };
+    } catch (e) {
+        console.error('Direkt anlegen fehlgeschlagen:', e);
+        erfState.notice = { kind: 'error', text: `Anlegen fehlgeschlagen: ${e.message}` };
+    }
+    renderErfassenPage();
+}
+
 const PAGE_RENDERERS = {
     anlieferung: {
         render() {
@@ -4420,6 +4822,10 @@ const PAGE_RENDERERS = {
     mitarbeiter: {
         render() { if (!isAdmin()) { showHome(); return; } adminState.users = null; adminState.notice = null; renderAdminPage(); },
         update() { if (!isAdmin()) { showHome(); return; } renderAdminPage(); }
+    },
+    erfassen: {
+        render() { renderErfassenPage(); },
+        update() { /* Eingabe bleibt stehen – Sync-Neuzeichnen darf den Text nicht verwerfen */ }
     },
     info: {
         truckOptions(trucks) {
@@ -4626,6 +5032,7 @@ function handleAdminPageClick(event) {
 if (pageContentEl) pageContentEl.addEventListener('click', (event) => {
     const target = event.target;
     if (currentPage && currentPage.id === 'mitarbeiter') { handleAdminPageClick(event); return; }
+    if (currentPage && currentPage.id === 'erfassen') { handleErfassenPageClick(event); return; }
     const truckBtn = target.closest('.page-row[data-truckid]');
     if (truckBtn) { openPage({ id: 'lkw', truckId: truckBtn.dataset.truckid }); return; }
     const rename = target.closest('[data-lkw-rename]');
@@ -6262,33 +6669,6 @@ function openSecurityReport(base, shipmentsPool, preopenedTab) {
             }
         }
 
-        async function sendSummaryEmail() {
-            removeActiveInlineNoteEditor();
-            if (!WEB_APP_URL || WEB_APP_URL.includes('YOUR_DEPLOYED_WEB_APP_URL_HERE')) {
-                 sheetStatusEl.textContent = 'Fehler: Web App URL fehlt.'; sheetStatusEl.style.color = 'red';
-                 alert("Fehler: Web App URL fehlt."); return;
-            }
-            const shipmentsData = loadShipments();
-            if (Object.keys(shipmentsData).length === 0) {
-                sheetStatusEl.textContent = 'Keine Daten für Zusammenfassung.'; sheetStatusEl.style.color = 'blue';
-                setTimeout(() => { if(sheetStatusEl.style.color === 'blue') sheetStatusEl.textContent = ''; }, 3000); return;
-            }
-            sheetStatusEl.textContent = 'Sende E-Mail-Zusammenfassung...'; sheetStatusEl.style.color = '#f0ad4e';
-            sendSummaryEmailButtonEl.disabled = true; clearError();
-            try {
-                const result = await postToServer('sendSummaryEmail', { allShipmentsData: shipmentsData, mitarbeiter: MITARBEITER_NAME });
-                sheetStatusEl.textContent = `Erfolg: ${result.message || 'Zusammenfassung gesendet.'}`; sheetStatusEl.style.color = 'green';
-                setTimeout(closeSideMenu, 1500);
-            } catch (error) {
-                console.error("Fehler beim Senden der E-Mail:", error);
-                sheetStatusEl.textContent = `Fehler: ${error.message}`; sheetStatusEl.style.color = 'red';
-                alert(`Fehler beim Senden der Zusammenfassung:\n${error.message}`);
-            } finally {
-                sendSummaryEmailButtonEl.disabled = false;
-                setTimeout(() => { if (sheetStatusEl.textContent && !sheetStatusEl.textContent.startsWith('Erfolg')) sheetStatusEl.textContent = ''; }, 7000);
-            }
-        }
-
         // --- Seitenmenü ---
         function openSideMenu() { removeActiveInlineNoteEditor(); sideMenuEl.classList.add('open'); menuOverlayEl.classList.add('visible'); }
         function closeSideMenu() { sideMenuEl.classList.remove('open'); menuOverlayEl.classList.remove('visible'); sheetStatusEl.textContent = ''; focusShipmentInput(); }
@@ -6538,265 +6918,21 @@ document.addEventListener('change', (event) => {
                 shipmentNumberInputEl.value = ''; 
                 return;
             }
-            const parts = currentValue.split(';;;').slice(1);
-            
-                        const shipments = loadShipments();
-            const now = new Date().toISOString();
-            let addedCount = 0, duplicateCount = 0, processedOrders = [];
-            
-            // --- START NEUE LOGIK FÜR FESTE MAN-NUMMERN ---
-            // --- NEU (ERSETZEN MIT) ---
-let maxMan = 0;
-Object.values(shipments).forEach(s => {
-    // Prüfe das UNVERÄNDERLICHE Feld originalManNumber
-    if (typeof s.originalManNumber === 'number' && s.originalManNumber > maxMan) {
-        maxMan = s.originalManNumber;
-    }
-    // Fallback für alte Daten ohne originalManNumber: truckId prüfen
-    else if (s.truckId && s.truckId.startsWith('MAN ') && typeof s.originalManNumber === 'undefined') {
-        const num = parseInt(s.truckId.replace('MAN ', ''), 10);
-        if (!isNaN(num) && num > maxMan) {
-            maxMan = num;
-        }
-    }
-});
-const newManNumber = maxMan + 1;
-const manTruckId = 'MAN ' + newManNumber;
-
-
-
-            
-            
-            parts.forEach(orderData => {
-            const [metaAndOrder, huData] = orderData.split('|||');
-            if (!metaAndOrder || !huData) return;
-            
-            const metaParts = metaAndOrder.split('|');
-            let orderNumber = metaParts[0];
-
-            // --- START: AUTOMATISCHE UMBENENNUNG FÜR NACHLIEFERUNGEN ---
-            if (orderNumber.toUpperCase().includes('NACHLIEFERUNG')) {
-                let suffixNum = 1;
-                let proposedName = orderNumber;
-                
-                while (isBaseTaken(shipments, proposedName)) {
-                    proposedName = `NACHLIEFERUNG ${suffixNum}`;
-                    suffixNum++;
-                }
-                orderNumber = proposedName;
-            }
-            // Nummer liegt im Archiv (alter, abgeschlossener Auftrag) → neuen Auftrag unter „NUMMER (2)“ anlegen
-            else if (!shipments[orderNumber] && isArchivedBase(orderNumber)) {
-                orderNumber = nextFreeBaseName(shipments, orderNumber);
-            }
-                
-                const hasFullMeta = metaParts.length >= 4;
-                processedOrders.push(orderNumber);
-                const hus = huData.split('~~~').filter(Boolean);
-
-                if (!shipments[orderNumber]) {
-    const newShipment = {
-        hawb: orderNumber, lastModified: now, totalPiecesExpected: hus.length,
-        scannedItems: [], mitarbeiter: MITARBEITER_NAME, isHuListOrder: true,
-        truckId: manTruckId,
-        originalManNumber: newManNumber, // <-- NEU: Unveränderliche Nummer
-    };
-
-                    if (hasFullMeta) {
-                        newShipment.freightForwarder = metaParts[1];
-                        newShipment.destinationCountry = metaParts[2];
-                        newShipment.plsoNumber = metaParts[3];
-                    }
-                    shipments[orderNumber] = newShipment;
-                    hus.forEach((huString, index) => {
-                        const huData = parseComplexHuString(huString);
-                        newShipment.scannedItems.push({ 
-                            rawInput: huData.rawInput, status: 'Anstehend', timestamp: now, 
-                            isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null, 
-                            position: huData.position || (index + 1),
-                            packaging: huData.packaging, dimensions: huData.dimensions, grossWeight: huData.grossWeight
-                        });
-                    });
-                    addedCount += hus.length;
-                }
-            });
-            saveShipments(shipments);
-            alert(`Multi-Import abgeschlossen:\n- Verarbeitete Aufträge: ${processedOrders.length}\n- Neue HUs hinzugefügt: ${addedCount}`);
+            const r = importMultiOrdersPayload(currentValue);
+            alert(`Multi-Import abgeschlossen:\n- Verarbeitete Aufträge: ${r.processedOrders.length}\n- Neue HUs hinzugefügt: ${r.addedCount}`);
             location.reload();
             return;
         } 
-      
-
-
-
-
-
-
-
-  
 else if (currentValue.startsWith('FRT_VVL_V1')) {
     if (!confirm("Eine Vorverladeliste wurde erkannt.\n\nMöchtest du alle darin enthaltenen Kundenaufträge jetzt importieren?")) {
         shipmentNumberInputEl.value = '';
         return;
     }
-
-    const parts = currentValue.split(';;;').slice(1);
-    const shipments = loadShipments();
-    const now = new Date().toISOString();
-    let addedPositionsCount = 0;
-    let newOrders = new Set();
-    let updatedOrders = new Set();
-    let processedVVLs = new Set();
-
-
-
-    parts.forEach(orderData => {
-        const [meta, huData] = orderData.split('|||');
-        if (!meta || !huData) return;
-
-        const [originalKundennr, vorverladelisteNr] = meta.split('|');
-        let kundennr = originalKundennr;
-
-        // --- START NEU: Verhindert das Überschreiben bestehender LKWs ---
-        // Wenn die Kundennummer schon im System ist, aber zu einer ANDEREN Vorverladeliste gehört,
-        // hängen wir eine Nummer an (z.B. "12345 (2)"), damit der alte LKW seinen Auftrag behält.
-        // Gleiches gilt, wenn die Kundennummer im Archiv liegt (alte VVL, längst abgeschlossen): der Server würde sonst
-        // den archivierten Auftrag mit dem neuen zusammenführen.
-        const takenByOtherVvl = (shipments[kundennr] && shipments[kundennr].parentOrderNumber && shipments[kundennr].parentOrderNumber !== vorverladelisteNr)
-            || (!shipments[kundennr] && isArchivedBase(kundennr));
-        if (takenByOtherVvl) {
-            let suffixNum = 2;
-            while (isBaseTaken(shipments, `${originalKundennr} (${suffixNum})`)) {
-                suffixNum++;
-            }
-            kundennr = `${originalKundennr} (${suffixNum})`;
-        }
-        // --- ENDE NEU ---
-
-        const positionen = huData.split('~~~').filter(Boolean);
-        processedVVLs.add(vorverladelisteNr);
-
-        const parseVvlPosition = (pos) => {
-
-
-
-
-
-            
-            
-            
-            const [mainPart, grossWeightRaw = 'N/A', dimensionsRaw = 'N/A'] = pos.split('|').map(part => part.trim());
-            const [vse, sendnr] = mainPart.split(':').map(part => part.trim());
-
-            const grossWeight = grossWeightRaw && grossWeightRaw !== 'N/A'
-                ? (grossWeightRaw.toUpperCase().includes('KG') ? grossWeightRaw.toUpperCase() : `${grossWeightRaw} KG`)
-                : 'N/A';
-
-            let dimensions = 'N/A';
-            if (dimensionsRaw && dimensionsRaw !== 'N/A') {
-                const dimParts = dimensionsRaw
-                    .replace(/mm/gi, '')
-                    .split('x')
-                    .map(part => part.trim());
-
-                if (dimParts.length === 3) {
-                    const clean = (value) => {
-                        const parsed = parseInt(value, 10);
-                        return Number.isNaN(parsed) ? value : String(parsed);
-                    };
-                    dimensions = `${clean(dimParts[0])}x${clean(dimParts[1])}x${clean(dimParts[2])} MM`;
-                }
-            }
-
-            return { vse, sendnr: sendnr || '', grossWeight, dimensions };
-        };
-
-        if (!shipments[kundennr]) {
-            newOrders.add(kundennr);
-            shipments[kundennr] = {
-                hawb: kundennr,
-                lastModified: now,
-                totalPiecesExpected: positionen.length,
-                scannedItems: [],
-                mitarbeiter: MITARBEITER_NAME,
-                isHuListOrder: true,
-                parentOrderNumber: vorverladelisteNr,
-                truckId: 'VVL-' + vorverladelisteNr,
-            };
-
-            if (KUNDENNR_CARRIER_MAP[kundennr]) {
-                shipments[kundennr].freightForwarder = KUNDENNR_CARRIER_MAP[kundennr];
-            }
-
-            positionen.forEach(pos => {
-                const { vse, sendnr, grossWeight, dimensions } = parseVvlPosition(pos);
-                if (!vse) return;
-
-                shipments[kundennr].scannedItems.push({
-                    rawInput: vse,
-                    sendnr: sendnr,
-                    grossWeight: grossWeight,
-                    dimensions: dimensions,
-                    status: 'Anstehend',
-                    timestamp: now,
-                    isCombination: false,
-                    notes: [],
-                    isCancelled: false,
-                    cancelledTimestamp: null
-                });
-            });
-
-            addedPositionsCount += positionen.length;
-        } else {
-            updatedOrders.add(kundennr);
-            const existingShipment = shipments[kundennr];
-            let newPositionsAddedToThisCustomer = 0;
-
-            if (KUNDENNR_CARRIER_MAP[kundennr] && !existingShipment.freightForwarder) {
-                existingShipment.freightForwarder = KUNDENNR_CARRIER_MAP[kundennr];
-            }
-
-            existingShipment.parentOrderNumber = vorverladelisteNr;
-            existingShipment.truckId = 'VVL-' + vorverladelisteNr;
-
-            positionen.forEach(pos => {
-                const { vse, sendnr, grossWeight, dimensions } = parseVvlPosition(pos);
-                if (!vse) return;
-
-                const alreadyExists = existingShipment.scannedItems.some(item => item.rawInput === vse);
-                if (!alreadyExists) {
-                    existingShipment.scannedItems.push({
-                        rawInput: vse,
-                        sendnr: sendnr,
-                        grossWeight: grossWeight,
-                        dimensions: dimensions,
-                        status: 'Anstehend',
-                        timestamp: now,
-                        isCombination: false,
-                        notes: [],
-                        isCancelled: false,
-                        cancelledTimestamp: null
-                    });
-                    newPositionsAddedToThisCustomer++;
-                }
-            });
-
-            if (newPositionsAddedToThisCustomer > 0) {
-                existingShipment.totalPiecesExpected = (existingShipment.totalPiecesExpected || 0) + newPositionsAddedToThisCustomer;
-                existingShipment.lastModified = now;
-                addedPositionsCount += newPositionsAddedToThisCustomer;
-            }
-        }
-    });
-
-    saveShipments(shipments);
-    alert(`Import der Vorverladeliste(n) [${[...processedVVLs].join(', ')}] abgeschlossen:\n\n- ${addedPositionsCount} neue Positionen importiert.\n- ${newOrders.size} neue Aufträge angelegt.\n- ${updatedOrders.size} Aufträge aktualisiert.`);
+    const r = importVvlPayload(currentValue);
+    alert(`Import der Vorverladeliste(n) [${r.processedVVLs.join(', ')}] abgeschlossen:\n\n- ${r.addedPositionsCount} neue Positionen importiert.\n- ${r.newOrders} neue Aufträge angelegt.\n- ${r.updatedOrders} Aufträge aktualisiert.`);
     location.reload();
     return;
 }
-
-
-
 
         if (isBatchModeActive) {
             if (currentValue.length > 0) mainActionButtonEl.click();
@@ -7125,6 +7261,11 @@ if (huEditFormEl) {
     showOpenHusButtonEl.addEventListener('click', (e) => {
         e.preventDefault();
         showOpenHusSummary();
+    });
+    document.getElementById('erfassenButton')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        closeSideMenu();
+        openPage({ id: 'erfassen' });
     });
     document.getElementById('manageUsersButton')?.addEventListener('click', (e) => {
         e.preventDefault();
