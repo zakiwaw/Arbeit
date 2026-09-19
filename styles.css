@@ -506,6 +506,30 @@ input:focus-visible + .batch-slider { box-shadow: var(--focus-ring); }
     transition: color var(--dur) var(--ease);
 }
 .scan-input-wrapper .input-icon svg { width: 22px; height: 22px; }
+/* Umschalter Scanner ↔ Tastatur: das Symbol im Feld ist antippbar (44 px Trefferfläche) und zeigt den aktiven Modus */
+.scan-input-wrapper .input-mode-toggle {
+    left: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: var(--r-md);
+    pointer-events: auto;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+.scan-input-wrapper .input-mode-toggle:active { background-color: var(--surface-3); }
+.scan-input-wrapper .input-mode-toggle .icon-scan { display: flex; }
+.scan-input-wrapper .input-mode-toggle .icon-keyboard { display: none; }
+.scan-input-wrapper.keyboard-mode .input-mode-toggle .icon-scan { display: none; }
+.scan-input-wrapper.keyboard-mode .input-mode-toggle .icon-keyboard { display: flex; }
+.scan-input-wrapper.keyboard-mode .input-mode-toggle { color: var(--accent); }
+.scan-input-wrapper.keyboard-mode input[type="text"]:focus { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.scan-input-wrapper.keyboard-mode:focus-within .input-mode-toggle { color: var(--accent); }
 .scan-input-wrapper input[type="text"] {
     height: 56px;
     padding-left: 48px;

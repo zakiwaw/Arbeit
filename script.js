@@ -6971,9 +6971,39 @@ else if (currentValue.startsWith('FRT_VVL_V1')) {
         focusShipmentInput();
     });
 
+    // Umschalter Scanner ↔ Tastatur (Symbol links im Scan-Feld). Scanner-Modus = inputMode „none“ (keine Bildschirmtastatur),
+    // Tastatur-Modus = „text“. Die Anzeige (Barcode- bzw. Tastatur-Symbol) folgt immer dem tatsächlichen inputMode.
+    const scanWrapperEl = shipmentNumberInputEl.closest('.scan-input-wrapper');
+    const inputModeToggleEl = document.getElementById('inputModeToggle');
+    function reflectInputMode() {
+        const kb = shipmentNumberInputEl.inputMode === 'text';
+        if (scanWrapperEl) scanWrapperEl.classList.toggle('keyboard-mode', kb);
+        if (inputModeToggleEl) { inputModeToggleEl.setAttribute('aria-pressed', kb ? 'true' : 'false'); inputModeToggleEl.setAttribute('aria-label', kb ? 'Zurück zum Scanner' : 'Tastatur einblenden'); }
+    }
+    let inputModeSwitching = false;
+    function setInputMode(mode) {
+        inputModeSwitching = true;
+        shipmentNumberInputEl.inputMode = mode;
+        reflectInputMode();
+        // Neu fokussieren, damit iOS/Android die geänderte Tastaturanforderung übernimmt (Tastatur auf bzw. zu)
+        shipmentNumberInputEl.blur();
+        setTimeout(() => { shipmentNumberInputEl.focus(); inputModeSwitching = false; }, 30);
+    }
+    if (inputModeToggleEl) {
+        // pointerdown statt click: sonst nimmt der Tipp dem Feld erst den Fokus (blur → Scanner-Modus) und der Wechsel „springt“
+        inputModeToggleEl.addEventListener('pointerdown', (e) => { e.preventDefault(); });
+        inputModeToggleEl.addEventListener('click', (e) => {
+            e.preventDefault();
+            setInputMode(shipmentNumberInputEl.inputMode === 'text' ? 'none' : 'text');
+        });
+    }
+    new MutationObserver(reflectInputMode).observe(shipmentNumberInputEl, { attributes: true, attributeFilter: ['inputmode'] });
+    reflectInputMode();
+
     shipmentNumberInputEl.addEventListener('blur', () => {
         // Setzt den Modus IMMER zurück in den Scanner-Modus, wenn der Fokus verloren geht.
-        // So ist das Feld für den nächsten Scan bereit.
+        // So ist das Feld für den nächsten Scan bereit. Ausnahme: der Umschalter selbst wechselt gerade (er fokussiert gleich neu).
+        if (inputModeSwitching) return;
         shipmentNumberInputEl.inputMode = 'none';
     
         // Bestehende Logik für den Batch-Modus beibehalten: Sofort neu fokussieren.

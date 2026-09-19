@@ -62,5 +62,34 @@ const wait = (ms) => new Promise(r => setTimeout(r, ms));
     assert(await page.$eval('#side-menu', e => e.classList.contains('open')), 'Seitenmenü öffnet');
     assert((await page.$$eval('.lkw-toggle', e => e.length)) >= 1, 'Seitenmenü zeigt LKW-Schalter');
     assert(page.__errors.length === 0, `Keine JS-Fehler (${page.__errors.join('; ')})`);
+
+    // ---- Scan-Feld: Symbol links schaltet Scanner ↔ Tastatur um (inputMode none ↔ text), Verlassen → zurück zu Scanner ----
+    {
+      const be2 = makeBackend(sampleData(), {});
+      const p2 = await openApp(browser, be2, { viewport: { width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true } }); await wait(400);
+      const st = () => p2.evaluate(() => { const i = document.getElementById('shipmentNumberInput'), w = i.closest('.scan-input-wrapper'), b = document.getElementById('inputModeToggle'); const r = b.getBoundingClientRect(); return { mode: i.inputMode, kb: w.classList.contains('keyboard-mode'), pressed: b.getAttribute('aria-pressed'), scanIcon: getComputedStyle(b.querySelector('.icon-scan')).display, kbIcon: getComputedStyle(b.querySelector('.icon-keyboard')).display, w: r.width, h: r.height, focused: document.activeElement === i }; });
+      const s0 = await st();
+      assert(s0.mode === 'none' && !s0.kb && s0.pressed === 'false' && s0.scanIcon !== 'none' && s0.kbIcon === 'none' && s0.w >= 44 && s0.h >= 44, `Start: Scanner-Modus, Barcode-Symbol, Trefferfläche ≥ 44 px (${JSON.stringify(s0)})`);
+      await p2.evaluate(() => document.getElementById('inputModeToggle').click()); await wait(150);
+      const s1 = await st();
+      assert(s1.mode === 'text' && s1.kb && s1.pressed === 'true' && s1.scanIcon === 'none' && s1.kbIcon !== 'none' && s1.focused, `Tipp aufs Symbol: Tastatur-Modus (inputMode text), Tastatur-Symbol, Feld fokussiert (${JSON.stringify(s1)})`);
+      await p2.evaluate(() => document.getElementById('inputModeToggle').click()); await wait(150);
+      const s2 = await st();
+      assert(s2.mode === 'none' && !s2.kb && s2.scanIcon !== 'none' && s2.focused, 'Erneuter Tipp: zurück zum Scanner-Modus, Feld bleibt fokussiert');
+      await p2.evaluate(() => document.getElementById('inputModeToggle').click()); await wait(150);
+      await p2.evaluate(() => { document.getElementById('shipmentNumberInput').blur(); }); await wait(100);
+      const s3 = await st();
+      assert(s3.mode === 'none' && !s3.kb, 'Feld verlassen → Scanner-Modus und Barcode-Symbol zurück');
+      await p2.evaluate(() => document.getElementById('shipmentNumberInput').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))); await wait(150);
+      const s4 = await st();
+      assert(s4.mode === 'text' && s4.kb, 'Doppeltipp ins Feld schaltet weiterhin auf Tastatur (Anzeige folgt)');
+      await p2.evaluate(() => { const i = document.getElementById('shipmentNumberInput'); i.value = '123'; i.dispatchEvent(new Event('input', { bubbles: true })); });
+      await p2.evaluate(() => document.getElementById('mainActionButton').click()); await wait(600);
+      assert(be2.store['123'] && be2.store['123'].scannedItems.length >= 1, 'Scan aus dem Tastatur-Modus wird wie gewohnt verbucht');
+      await p2.evaluate(() => document.getElementById('inputModeToggle').click()); await wait(150);
+      await p2.screenshot({ path: '.arena-shots/scan-toggle-keyboard.png', clip: { x: 0, y: 0, width: 390, height: 330 } });
+      assert(p2.__errors.length === 0, `Keine JS-Fehler (Umschalter) (${p2.__errors.join(' | ')})`);
+      await p2.close();
+    }
   } finally { await browser.close(); finish(); }
 })().catch(e => { console.error('ERR', e); process.exit(1); });
