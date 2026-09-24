@@ -7,6 +7,12 @@
     <meta name="theme-color" content="#f1f5f9" media="(prefers-color-scheme: light)">
     <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
     <title>Fracht Tracker (V8.18 - Refactored)</title>
+    <!-- Als App installierbar (Android/Zebra: Chrome-Menü → „App installieren“ / „Zum Startbildschirm hinzufügen“):
+         läuft dann ohne Adressleiste und fest im Hochformat (orientation: portrait im Manifest) -->
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png">
+    <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-title" content="Fracht Tracker">
     <link rel="stylesheet" href="styles.css">
 
     <!-- Bibliotheken werden lokal ausgeliefert (kein CDN mehr nötig):

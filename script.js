@@ -28,6 +28,18 @@ if (typeof window.QRCode === 'undefined') console.error('qrcode.js konnte nicht 
     });
 })();
 
+// Hochformat festhalten, wenn die App installiert ist (Startbildschirm, „standalone“). Im normalen Browser-Tab erlaubt
+// Android das Sperren nicht (nur im Vollbild) – dort greift ausschließlich die Geräteeinstellung „Automatisch drehen“.
+// Das Manifest (orientation: portrait) erledigt es beim Start der installierten App; dies ist die Absicherung, falls das
+// System die Sperre zwischenzeitlich aufhebt (z. B. nach dem Zurückkehren aus einer anderen App).
+(function lockPortraitWhenInstalled() {
+    const standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+    if (!standalone || !screen.orientation || typeof screen.orientation.lock !== 'function') return;
+    const lock = () => { try { screen.orientation.lock('portrait').catch(() => { /* nicht erlaubt/unterstützt → Manifest entscheidet */ }); } catch (e) { /* ältere Browser */ } };
+    lock();
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) lock(); });
+})();
+
 document.addEventListener('DOMContentLoaded', function() {
 
     const mainInputFormEl = document.getElementById('main-input-form'); // Dieser sollte schon da sein

@@ -91,5 +91,20 @@ const wait = (ms) => new Promise(r => setTimeout(r, ms));
       assert(p2.__errors.length === 0, `Keine JS-Fehler (Umschalter) (${p2.__errors.join(' | ')})`);
       await p2.close();
     }
+
+    // ---- Installierbar (Manifest): Hochformat fest, Symbole vorhanden, Kopf-Verweise gesetzt ----
+    {
+      const be3 = makeBackend(sampleData(), {});
+      const p3 = await openApp(browser, be3, {}); await wait(300);
+      const head = await p3.evaluate(() => ({ manifest: document.querySelector('link[rel="manifest"]')?.getAttribute('href'), icon: document.querySelector('link[rel="icon"]')?.getAttribute('href'), apple: document.querySelector('link[rel="apple-touch-icon"]')?.getAttribute('href'), title: document.querySelector('meta[name="apple-mobile-web-app-title"]')?.content }));
+      assert(head.manifest === 'manifest.webmanifest' && head.icon === 'assets/icons/icon-192.png' && head.apple === 'assets/icons/apple-touch-icon.png' && head.title === 'Fracht Tracker', `Kopf: Manifest + Symbole verlinkt (${JSON.stringify(head)})`);
+      const mf = await p3.evaluate(async () => { const r = await fetch('manifest.webmanifest'); return { ok: r.ok, type: r.headers.get('content-type'), json: await r.json() }; });
+      assert(mf.ok && mf.json.display === 'standalone' && mf.json.orientation === 'portrait' && mf.json.start_url === './' && mf.json.scope === './' && mf.json.name === 'Fracht Tracker' && mf.json.lang === 'de', `Manifest: standalone + Hochformat (orientation: portrait) (${JSON.stringify({ d: mf.json.display, o: mf.json.orientation, s: mf.json.start_url })})`);
+      const icons = await p3.evaluate(async (list) => { const out = []; for (const i of list) { const r = await fetch(i.src); const b = new Uint8Array(await r.arrayBuffer()); const dv = new DataView(b.buffer); out.push({ src: i.src, ok: r.ok, png: b[0] === 0x89 && b[1] === 0x50, w: dv.getUint32(16), h: dv.getUint32(20), sizes: i.sizes, purpose: i.purpose }); } return out; }, mf.json.icons);
+      const iconsOk = icons.length === 3 && icons.every(i => i.ok && i.png && `${i.w}x${i.h}` === i.sizes) && icons.some(i => i.sizes === '192x192') && icons.some(i => i.sizes === '512x512' && i.purpose === 'any') && icons.some(i => i.purpose === 'maskable');
+      assert(iconsOk, `Symbole 192/512 + maskable vorhanden, Maße stimmen mit dem Manifest überein (${JSON.stringify(icons.map(i => [i.sizes, i.w + 'x' + i.h, i.purpose]))})`);
+      assert(p3.__errors.length === 0, `Keine JS-Fehler (Manifest/Hochformat-Sperre im Tab ist still) (${p3.__errors.join(' | ')})`);
+      await p3.close();
+    }
   } finally { await browser.close(); finish(); }
 })().catch(e => { console.error('ERR', e); process.exit(1); });

@@ -31,6 +31,7 @@ Umgebungsvariablen: `APP_URL` (Standard `http://127.0.0.1:8000/index.html`), `CH
 ```bash
 node tests/tools/nachweis-samples.js /tmp   # Beispiel-Sicherungsnachweise (VW 20 Packstücke, MAN) → /tmp/vw.pdf, /tmp/man.pdf
 node tests/tools/pdfshot.js /tmp/vw.pdf .arena-shots/nachweis-vw 3   # PDF-Seiten als PNG (pdf.js im Headless-Chrome)
+node tests/tools/make-icons.js   # App-Symbole (assets/icons/*.png) aus dem Barcode-Zeichen neu rendern (nur nach Design-Änderung nötig)
 ```
 `pdfshot.js` braucht `.arena-shots/pdfjs/pdf.mjs` + `pdf.worker.mjs` (aus `npm pack pdfjs-dist@4`, Ordner `build/`) und den Server auf :8000.
 
