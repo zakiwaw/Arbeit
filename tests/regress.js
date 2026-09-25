@@ -92,6 +92,61 @@ const wait = (ms) => new Promise(r => setTimeout(r, ms));
       await p2.close();
     }
 
+    // Erste Seite schließen: alle Seiten teilen sich localStorage – ihr Sync-Abruf würde die Daten der folgenden Blöcke überschreiben
+    await page.close();
+
+    // ---- Scan-Zeitleiste auf schmalen Geräten (Zebra, 360 px): Methode neben der Nummer, Storno in der Aktionszeile ----
+    {
+      const now = Date.now(); const t = (min) => new Date(now - min * 60000).toISOString();
+      const mk = (hu, pos, status, minAgo, extra = {}) => ({ rawInput: hu, position: pos, status, timestamp: t(minAgo), isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null, ...extra });
+      const zebraData = () => ({ '9008295951': { hawb: '9008295951', lastModified: t(0), totalPiecesExpected: 4, isHuListOrder: true, truckId: 'MAN 1', originalManNumber: 1, mitarbeiter: 'T', plsoNumber: 'PLSO1', freightForwarder: 'DHL', destinationCountry: 'US',
+        scannedItems: [mk('09260409072F', 3, 'XRY', 5), mk('09260409176B', 4, 'Wareneingang', 11 + 24 * 60, { notes: ['Beschädigt'] }), mk('0926040955AA', 1, 'Anstehend', 0), mk('0926040955AB', 2, 'Anstehend', 0)] } });
+      const zebra = { width: 360, height: 600, isMobile: true, hasTouch: true, deviceScaleFactor: 2 };
+      // Start direkt per Adresse ?sendung=… (auch: Neuladen in den Details) – die Details müssen Inhalt zeigen, nicht den Platzhalter
+      const bz = makeBackend(zebraData(), {});
+      const pz = await openApp(browser, bz, { viewport: zebra, query: '?sendung=9008295951' }); await wait(1200);
+      const start = await pz.evaluate(() => ({ open: !document.getElementById('detailView').classList.contains('hidden'), hus: document.querySelectorAll('#currentShipmentDetails .scan-main-info .hu-value').length, base: document.getElementById('currentShipmentDetails').dataset.base, placeholder: /Geben Sie eine Sendungsnummer/.test(document.getElementById('currentShipmentDetails').textContent) }));
+      assert(start.open && start.hus === 2 && start.base === '9008295951' && !start.placeholder, `Start per ?sendung=…: Details zeigen die Sendung, nicht den Platzhalter (${JSON.stringify(start)})`);
+      const row = await pz.evaluate(() => {
+        const li = document.querySelector('#currentShipmentDetails > ul > li'); const info = li.querySelector('.scan-main-info');
+        const b = (el) => { const r = el.getBoundingClientRect(); return { l: Math.round(r.left), r: Math.round(r.right), t: Math.round(r.top), h: Math.round(r.height) }; };
+        const hu = b(info.querySelector('.hu-value')), st = b(info.querySelector('.status')), inf = b(info);
+        const btn = li.querySelector('.cancel-button'), link = li.querySelector('.add-note-link');
+        return { hu, st, inf, sameLine: Math.abs((hu.t + hu.h / 2) - (st.t + st.h / 2)) < 4, pillAfterHu: st.l > hu.r && st.r <= inf.r, arrow: getComputedStyle(info.querySelector('.scan-arrow')).display,
+          btnInActions: !!btn && btn.parentElement.classList.contains('scan-actions-and-notes'), btnH: btn ? Math.round(btn.getBoundingClientRect().height) : 0, btnLeftOfLink: !!btn && !!link && btn.getBoundingClientRect().right < link.getBoundingClientRect().left, huWinsOverlap: document.elementFromPoint(hu.l + 6, hu.t + hu.h - 3)?.closest('.hu-value') === info.querySelector('.hu-value'), padRight: getComputedStyle(info).paddingRight };
+      });
+      assert(row.sameLine && row.pillAfterHu, `360 px: Kontrollmethode steht neben der HU-Nummer (12 Zeichen + Position) (${JSON.stringify({ hu: row.hu, st: row.st, inf: row.inf })})`);
+      assert(row.arrow === 'none' && row.padRight === '0px', `Handy: Pfeil ausgeblendet, HU-Zeile nutzt die volle Kartenbreite (${row.arrow}, ${row.padRight})`);
+      assert(row.btnInActions && row.btnH >= 44 && row.btnLeftOfLink && row.huWinsOverlap, `Storno sitzt in der Aktionszeile unten links vor „Notiz hinzufügen“, 44 px hoch; unterer Rand des HU-Kastens bleibt Kopier-Tippfläche (${JSON.stringify({ inActions: row.btnInActions, h: row.btnH, left: row.btnLeftOfLink, huWins: row.huWinsOverlap })})`);
+      // Storno funktioniert von dort aus weiterhin (Dialog wird bestätigt)
+      const beforeCancel = await pz.evaluate(() => document.querySelectorAll('#currentShipmentDetails li.cancelled-item').length);
+      let dialogs = 0; pz.on('dialog', () => dialogs++);
+      await pz.evaluate(() => document.querySelector('#currentShipmentDetails .cancel-button').click()); await wait(1000);
+      const afterCancel = await pz.evaluate(() => ({ cancelled: document.querySelectorAll('#currentShipmentDetails li.cancelled-item').length, open: !document.getElementById('detailView').classList.contains('hidden') }));
+      assert(afterCancel.cancelled === beforeCancel + 1 && afterCancel.open && bz.store['9008295951'].scannedItems.some(i => i.isCancelled), `Storno aus der Aktionszeile storniert den Scan und bleibt in den Details (${beforeCancel} → ${afterCancel.cancelled}, Dialoge: ${dialogs}, Server: ${bz.store['9008295951'].scannedItems.filter(i => i.isCancelled).length})`);
+      assert(pz.__errors.length === 0, `Zebra-Ansicht: keine JS-Fehler (${pz.__errors.join(' | ')})`);
+      await pz.close();
+      // Desktop: Pfeil sichtbar, Storno ebenfalls in der Aktionszeile
+      const pd = await openApp(browser, makeBackend(zebraData(), {}), { viewport: { width: 1600, height: 900, deviceScaleFactor: 1 }, query: '?sendung=9008295951' }); await wait(1200);
+      const desk = await pd.evaluate(() => { const li = document.querySelector('#currentShipmentDetails > ul > li'); return { arrow: getComputedStyle(li.querySelector('.scan-arrow')).display, btn: li.querySelector('.scan-actions-and-notes .cancel-button') !== null }; });
+      assert(desk.arrow !== 'none' && desk.btn, `Desktop: Pfeil „→“ sichtbar, Storno in der Aktionszeile (${JSON.stringify(desk)})`);
+      await pd.close();
+    }
+
+    // ---- Sync: geöffnete Details eines HU-Listen-Auftrags (MAN/VW) aktualisieren sich bei Fremdänderung ----
+    {
+      const bs = makeBackend(sampleData(), {});
+      const ps = await openApp(browser, bs, {});
+      await ps.evaluate(() => document.querySelector('#shipmentTableBody tr[data-basenumber="9007000001"] td.hawb-cell').click()); await wait(600);
+      const s0 = await ps.evaluate(() => ({ open: !document.getElementById('detailView').classList.contains('hidden'), statuses: document.querySelectorAll('#currentShipmentDetails .scan-main-info .status').length, pending: document.querySelectorAll('#pendingHuList li').length }));
+      // anderes Gerät sichert HU1001 mit XRY
+      bs.store['9007000001'].scannedItems[0].status = 'XRY'; bs.store['9007000001'].scannedItems[0].timestamp = new Date().toISOString(); bs.store['9007000001'].lastModified = new Date().toISOString(); bs.version++;
+      await wait(4500);
+      const s1 = await ps.evaluate(() => ({ open: !document.getElementById('detailView').classList.contains('hidden'), statuses: [...document.querySelectorAll('#currentShipmentDetails .scan-main-info .status')].map(e => e.textContent), pending: document.querySelectorAll('#pendingHuList li').length }));
+      assert(s0.open && s0.statuses === 0 && s0.pending === 3 && s1.open && s1.statuses.join() === 'XRY' && s1.pending === 2, `HU-Listen-Details offen: Fremd-Scan erscheint ohne Neuöffnen (${JSON.stringify(s0)} → ${JSON.stringify(s1)})`);
+      await ps.close();
+    }
+
     // ---- Installierbar (Manifest): Hochformat fest, Symbole vorhanden, Kopf-Verweise gesetzt ----
     {
       const be3 = makeBackend(sampleData(), {});

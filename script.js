@@ -1550,8 +1550,7 @@ function refreshViewsAfterRemoteChange() {
     const detailOpen = detailViewEl && !detailViewEl.classList.contains('hidden');
     const editing = currentDetailsDivEl && currentDetailsDivEl.querySelector('.inline-note-editor');
     if (detailOpen && !editing) {
-        const title = document.getElementById('shipmentDetailTitle');
-        const base = title ? title.dataset.hawb : '';
+        const base = currentDetailsDivEl.dataset.base || '';   // auch HU-Listen-Aufträge (MAN/VW), nicht nur Einzelsendungen
         if (base && loadShipments()[base]) {
             displayCurrentShipmentDetails(base);
             if (msg) { errorDisplayEl.textContent = msg; errorDisplayEl.style.color = msgColor; } // Meldung nicht wegwischen
@@ -2957,6 +2956,9 @@ function displayCurrentShipmentDetails(baseNumberToDisplay) {
     const shipment = baseNumberToDisplay ? (shipments[baseNumberToDisplay] || (archivedView ? detailArchived.shipment : null)) : null;
     if (!archivedView) detailArchived = null;
 
+    // Merken, welche Sendung gerade angezeigt wird (für Sync-Aktualisierung und Start per Adresse) – gilt für alle
+    // Sendungsarten; der Titel #shipmentDetailTitle existiert nur bei Einzelsendungen.
+    displayTarget.dataset.base = shipment ? baseNumberToDisplay : '';
     if (!baseNumberToDisplay || !shipment) {
         displayTarget.innerHTML = 'Geben Sie eine Sendungsnummer ein oder wählen Sie eine aus der Liste.';
         displayTarget.style.borderColor = '#aac';
@@ -3084,7 +3086,8 @@ let numberPart = isManOrder && item.position ? `<span class="position-number">${
 let sendnrHtml = item.sendnr ? `<span class="sendnr-display"> (${escapeHtml(item.sendnr)})</span>` : '';
 // --- START DER ÄNDERUNG ---
 // Cursor und Titel hinzugefügt, um Klickbarkeit zu signalisieren
-detailsHtml += `${numberPart}<span class="hu-value" style="cursor:pointer;" title="Klicken zum Kopieren">${escapeHtml(item.rawInput)}</span>${sendnrHtml} \u2192 <span class="status">${escapeHtml(item.status)}</span>${item.isCombination ? ` <span class="combo">(Kombi)</span>` : ''}`;
+// Pfeil als eigenes Element: auf dem Handy ausgeblendet (Platz), am Desktop sichtbar
+detailsHtml += `${numberPart}<span class="hu-value" style="cursor:pointer;" title="Klicken zum Kopieren">${escapeHtml(item.rawInput)}</span>${sendnrHtml}<span class="scan-arrow" aria-hidden="true">\u2192</span><span class="status">${escapeHtml(item.status)}</span>${item.isCombination ? ` <span class="combo">(Kombi)</span>` : ''}`;
 // --- ENDE DER ÄNDERUNG ---
 //...
         if (isCancelled) {
@@ -3092,9 +3095,6 @@ detailsHtml += `${numberPart}<span class="hu-value" style="cursor:pointer;" titl
             detailsHtml += `<span class="cancelled-info"> (storniert am ${cancelDt ? cancelDt.toLocaleString('de-DE') : 'Unbekannt'})</span>`;
         }
         detailsHtml += `</div>`;
-        if (!isCancelled && !archivedView) {
-            detailsHtml += `<button class="cancel-button" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}">Storno</button>`;
-        }
         detailsHtml += `<div class="scan-actions-and-notes">`;
         if (Array.isArray(item.notes) && item.notes.length > 0) {
             let notesListHtml = '<div class="notes-container">';
@@ -3112,6 +3112,9 @@ detailsHtml += `${numberPart}<span class="hu-value" style="cursor:pointer;" titl
             detailsHtml += notesListHtml;
         }
         if (!isCancelled && !archivedView) {
+            // Storno steht in der Aktionszeile unten links (nicht mehr oben rechts) – so hat die HU-Zeile die volle Breite
+            // und die Kontrollmethode passt auch auf schmalen Geräten (Zebra, 360 px) neben die Nummer.
+            detailsHtml += `<button class="cancel-button" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}">Storno</button>`;
             detailsHtml += `<a href="#" class="add-note-link" data-basenumber="${escapeHtml(baseNumberToDisplay)}" data-timestamp="${item.timestamp}" title="Weitere Notiz hinzuf\u00FCgen">Notiz hinzuf\u00FCgen</a>`;
         }
         detailsHtml += `<div class="inline-note-editor-placeholder"></div>`;
@@ -5631,8 +5634,11 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
                 comboCheckboxEl.disabled = securityStatusSelectEl.value !== 'XRY'; // Entsperren, wenn XRY
                 currentBatch = [];
                 updateBatchUI();
-                // Ggf. Details der aktuellen Eingabe wieder anzeigen
-                displayCurrentShipmentDetails(processShipmentNumber(shipmentNumberInputEl.value).baseNumber);
+                // Ggf. Details der aktuellen Eingabe wieder anzeigen. Eine bereits geöffnete Detailansicht (Start per Adresse
+                // ?sendung=… oder Neuladen in den Details) bleibt stehen – sonst überschrieb der Startaufruf sie mit dem Platzhalter.
+                const inputBase = processShipmentNumber(shipmentNumberInputEl.value).baseNumber;
+                const openBase = (detailViewEl && !detailViewEl.classList.contains('hidden') && currentDetailsDivEl) ? (currentDetailsDivEl.dataset.base || '') : '';
+                displayCurrentShipmentDetails(inputBase || openBase);
             }
             toggleMainInputControls(true); // Generelle UI-Controls (de)aktivieren
             updateEditButtonVisibilityInTable();

@@ -1601,7 +1601,6 @@ th.qr-code-header, td.qr-code-cell { display: none; }
     flex-wrap: wrap;
     align-items: center;
     gap: 2px var(--sp-2);
-    padding-right: 72px; /* Platz für Storno */
     white-space: normal;
     overflow: visible;
     overflow-wrap: anywhere;
@@ -1618,6 +1617,8 @@ th.qr-code-header, td.qr-code-cell { display: none; }
 #currentShipmentDetails .scan-main-info .hu-value {
     display: inline-flex;
     align-items: center;
+    position: relative;
+    z-index: 1; /* liegt über der (per Minus-Rand hochgezogenen) Tippfläche von Storno/Notiz darunter */
     min-height: 36px;
     padding: 0 var(--sp-2);
     font-family: var(--font-mono);
@@ -1629,7 +1630,7 @@ th.qr-code-header, td.qr-code-cell { display: none; }
     border-radius: var(--r-sm);
 }
 #currentShipmentDetails .scan-main-info .hu-value:active { background-color: var(--accent-soft); border-color: var(--accent); }
-#currentShipmentDetails .scan-main-info .position-number { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-faint); }
+#currentShipmentDetails .scan-main-info .position-number { min-width: 2em; padding-right: 0; font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-faint); } /* enger als in der Offen-Liste: Platz für die Methode daneben */
 #currentShipmentDetails li .status {
     display: inline-block;
     padding: 3px 8px;
@@ -1653,13 +1654,20 @@ th.qr-code-header, td.qr-code-cell { display: none; }
 #currentShipmentDetails li.cancelled-item .add-note-link { color: var(--cancelled-color) !important; cursor: default; text-decoration: none; }
 #currentShipmentDetails li.cancelled-item .add-note-link { display: none; }
 
-/* Storno: dezenter Text-Button rechts, 44 px Tippfläche */
+/* Pfeil zwischen Nummer und Kontrollmethode: auf dem Handy ausgeblendet (Platz), am Desktop sichtbar */
+#currentShipmentDetails .scan-main-info .scan-arrow { display: none; color: var(--text-faint); }
+@media (min-width: 992px) { #currentShipmentDetails .scan-main-info .scan-arrow { display: inline; } }
+/* Handy: Sendungs-Nr. (VW) und „(Kombi)“ hinter die Kontrollmethode – so bleibt die Methode neben der Nummer, wenn
+   es eng wird (Zebra 360 px), und die Zusätze rutschen in die nächste Zeile statt der Methode */
+@media (max-width: 991px) {
+    #currentShipmentDetails .scan-main-info .sendnr-display,
+    #currentShipmentDetails .scan-main-info .combo { order: 1; }
+}
+/* Storno: dezenter Text-Button in der Aktionszeile unten links (Notiz rechts), 44 px Tippfläche ohne Höhenzuwachs */
 .cancel-button {
-    position: absolute;
-    right: var(--sp-1);
-    top: var(--sp-2);
     min-height: var(--touch-min);
     min-width: var(--touch-min);
+    margin: calc(-1 * var(--sp-2)) auto calc(-1 * var(--sp-2)) calc(-1 * var(--sp-2));
     padding: 0 var(--sp-2);
     font-family: var(--font-sans);
     font-size: var(--fs-xs);
@@ -1760,7 +1768,8 @@ th.qr-code-header, td.qr-code-cell { display: none; }
 #currentShipmentDetails li .add-note-link:active { color: var(--accent); background-color: var(--accent-soft); text-decoration: none; }
 #currentShipmentDetails li .editable-note:hover { color: var(--accent-hover); }
 /* Wenn Notizen da sind, sitzt der Link unter der letzten Notiz und darf nicht nach oben ragen */
-#currentShipmentDetails .scan-actions-and-notes:has(.notes-container) .add-note-link { margin-top: 0; }
+#currentShipmentDetails .scan-actions-and-notes:has(.notes-container) .add-note-link,
+#currentShipmentDetails .scan-actions-and-notes:has(.notes-container) .cancel-button { margin-top: 0; }
 
 /* Offene Positionen (HU-Liste in den Details) */
 #pendingHuList {
