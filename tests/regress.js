@@ -133,6 +133,51 @@ const wait = (ms) => new Promise(r => setTimeout(r, ms));
       await pd.close();
     }
 
+    // ---- Notiz-Sheet auf kleinem Display: bleibt über der Tastatur, Enter/✓ speichert, Escape bricht ab ----
+    {
+      const now = Date.now(); const t = (min) => new Date(now - min * 60000).toISOString();
+      const mk = (hu, pos, status, minAgo, extra = {}) => ({ rawInput: hu, position: pos, status, timestamp: t(minAgo), isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null, ...extra });
+      const bn = makeBackend({ '9008295951': { hawb: '9008295951', lastModified: t(0), totalPiecesExpected: 2, isHuListOrder: true, truckId: 'MAN 1', originalManNumber: 1, mitarbeiter: 'T', plsoNumber: 'PLSO1', freightForwarder: 'DHL', destinationCountry: 'US', scannedItems: [mk('09260409072F', 1, 'XRY', 5), mk('0926040955AB', 2, 'Anstehend', 0)] } }, {});
+      const pn = await openApp(browser, bn, { viewport: { width: 360, height: 600, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }, query: '?sendung=9008295951' }); await wait(1200);
+      await pn.evaluate(() => document.querySelector('#currentShipmentDetails .add-note-link').click()); await wait(400);
+      // Tastatur simulieren: sichtbarer Ausschnitt nur noch 300 px hoch (Zebra: 600 − Tastatur)
+      const kb = await pn.evaluate(async () => {
+        Object.defineProperty(VisualViewport.prototype, 'height', { configurable: true, get: () => 300 });
+        visualViewport.dispatchEvent(new Event('resize'));
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+        const ov = document.getElementById('noteEditModal'); const b = (el) => el.getBoundingClientRect();
+        const save = b(document.getElementById('saveNoteEditButton')), cancel = b(document.getElementById('cancelNoteEditButton')), ta = b(document.getElementById('noteEditTextarea'));
+        return { visible: ov.classList.contains('visible'), ovH: Math.round(b(ov).height), saveBottom: Math.round(save.bottom), cancelBottom: Math.round(cancel.bottom), saveH: Math.round(save.height), taH: Math.round(ta.height), focused: document.activeElement === document.getElementById('noteEditTextarea') };
+      });
+      assert(kb.visible && kb.ovH === 300 && kb.saveBottom <= 300 && kb.cancelBottom <= 300 && kb.saveH >= 44 && kb.taH >= 64, `Tastatur offen (300 px sichtbar): Speichern/Abbrechen liegen im sichtbaren Bereich, Textfeld schrumpft nur bis 64 px (${JSON.stringify(kb)})`);
+      // Umschalt+Enter = Zeilenumbruch, Enter/✓ = speichern
+      await pn.evaluate(() => { const ta = document.getElementById('noteEditTextarea'); ta.focus(); ta.value = 'Karton offen'; });
+      await pn.keyboard.down('Shift'); await pn.keyboard.press('Enter'); await pn.keyboard.up('Shift'); await pn.keyboard.type('Foto gemacht'); await wait(100);
+      const multi = await pn.evaluate(() => document.getElementById('noteEditTextarea').value);
+      assert(multi === 'Karton offen\nFoto gemacht', `Umschalt+Enter macht einen Zeilenumbruch (${JSON.stringify(multi)})`);
+      await pn.keyboard.press('Enter'); await wait(600);
+      const saved = await pn.evaluate(() => ({ visible: document.getElementById('noteEditModal').classList.contains('visible'), notes: [...document.querySelectorAll('#currentShipmentDetails .note-item')].map(n => n.textContent.trim()) }));
+      assert(!saved.visible && saved.notes.some(n => /Karton offen/.test(n)) && bn.store['9008295951'].scannedItems[0].notes.join('|') === 'Karton offen\nFoto gemacht', `Enter/✓ speichert die Notiz und schließt das Sheet (${JSON.stringify(saved)})`);
+      // Tastatur zu → Overlay wieder in voller Höhe; Escape bricht ohne Speichern ab
+      const closed = await pn.evaluate(async () => { Object.defineProperty(VisualViewport.prototype, 'height', { configurable: true, get: () => 600 }); visualViewport.dispatchEvent(new Event('resize')); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); return document.getElementById('noteEditModal').style.height; });
+      assert(closed === '', `Tastatur zu: Inline-Maße des Overlays werden entfernt (${JSON.stringify(closed)})`);
+      await pn.evaluate(() => document.querySelector('#currentShipmentDetails .add-note-link').click()); await wait(400);
+      await pn.evaluate(() => { const ta = document.getElementById('noteEditTextarea'); ta.focus(); ta.value = 'Verworfen'; });
+      await pn.keyboard.press('Escape'); await wait(300);
+      const esc = await pn.evaluate(() => ({ visible: document.getElementById('noteEditModal').classList.contains('visible'), n: document.querySelectorAll('#currentShipmentDetails .note-item').length }));
+      assert(!esc.visible && esc.n === 1 && bn.store['9008295951'].scannedItems[0].notes.length === 1, `Escape schließt ohne zu speichern (${JSON.stringify(esc)})`);
+      // Batch-Notiz: Enter = „Übernehmen & Scannen“
+      await pn.evaluate(() => document.getElementById('backToMainViewBtn').click()); await wait(300);
+      await pn.evaluate(() => { const t = document.getElementById('batchModeToggle'); if (!t.checked) t.click(); const n = document.getElementById('batchNoteToggle'); if (n && !n.checked) n.click(); }); await wait(300);
+      await scan(pn, '0926040955AB', 500);
+      const bm = await pn.evaluate(() => ({ visible: document.getElementById('batchNoteModal').classList.contains('visible'), focused: document.activeElement === document.getElementById('batchNoteInput') }));
+      await pn.keyboard.type('Palette 3'); await pn.keyboard.press('Enter'); await wait(500);
+      const bm2 = await pn.evaluate(() => ({ visible: document.getElementById('batchNoteModal').classList.contains('visible'), items: document.querySelectorAll('#batchList li').length, text: document.getElementById('batchList').textContent }));
+      assert(bm.visible && bm.focused && !bm2.visible && bm2.items === 1 && /Palette 3/.test(bm2.text), `Batch-Notiz: Enter übernimmt die Notiz und scannt weiter (${JSON.stringify({ bm, bm2: { visible: bm2.visible, items: bm2.items } })})`);
+      assert(pn.__errors.length === 0, `Notiz-Sheet: keine JS-Fehler (${pn.__errors.join(' | ')})`);
+      await pn.close();
+    }
+
     // ---- Sync: geöffnete Details eines HU-Listen-Auftrags (MAN/VW) aktualisieren sich bei Fremdänderung ----
     {
       const bs = makeBackend(sampleData(), {});

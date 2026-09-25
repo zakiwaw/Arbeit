@@ -1965,9 +1965,10 @@ body.modal-open { overflow: hidden; }
     width: 100%;
     max-width: 100%;
     max-height: 92vh;
-    max-height: 92dvh;
+    max-height: min(92dvh, 100%); /* 100 % = Overlay – bei offener Tastatur auf den sichtbaren Ausschnitt begrenzt (script.js) */
     margin: 0;
     padding: var(--sp-5) var(--sp-4) calc(var(--sp-4) + env(safe-area-inset-bottom, 0px));
+    overflow-y: auto; /* passt das Sheet nicht, scrollt es innen statt hinter der Tastatur zu verschwinden */
     background-color: var(--surface);
     border: none;
     border-radius: var(--r-xl) var(--r-xl) 0 0;
@@ -1991,6 +1992,9 @@ body.modal-open { overflow: hidden; }
 .modal-content label { margin-bottom: var(--sp-1); }
 .modal-content input[type="number"], .modal-content input[type="text"] { font-size: var(--fs-md); }
 #huListTextarea, #noteEditTextarea { font-family: var(--font-mono); font-size: var(--fs-sm); }
+/* Notiz-Sheet: Textfeld gibt bei wenig Platz (Tastatur offen, kleines Display) nach, damit Speichern/Abbrechen sichtbar bleiben */
+#note-edit-form .form-group { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+#noteEditTextarea { flex: 1 1 auto; min-height: 64px; }
 
 .modal-actions {
     display: flex;
@@ -2573,7 +2577,7 @@ body.auth-open { overflow: hidden; }
     .modal-content {
         width: 100%;
         max-width: 520px;
-        max-height: 88vh;
+        max-height: min(88vh, 100%);
         padding: var(--sp-6);
         border-radius: var(--r-xl);
         animation: pop-in .2s var(--ease);

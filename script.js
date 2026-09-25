@@ -7171,6 +7171,44 @@ if (huEditFormEl) {
     noteEditModalEl.addEventListener('click', (e) => {
         if (e.target === noteEditModalEl) closeNoteEditModal();
     });
+    // Schnell speichern/abbrechen ohne die Knöpfe: Enter bzw. die ✓-Taste der Bildschirmtastatur (enterkeyhint="done")
+    // speichert die Notiz, Umschalt+Enter macht einen Zeilenumbruch, Escape bricht ab.
+    noteEditTextareaEl.addEventListener('keydown', (e) => {
+        if (e.isComposing) return;
+        if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+            e.preventDefault();
+            if (typeof noteEditFormEl.requestSubmit === 'function') noteEditFormEl.requestSubmit();
+            else noteEditFormEl.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+        } else if (e.key === 'Escape') { e.preventDefault(); closeNoteEditModal(); }
+    });
+    // Batch-Notiz: Enter/✓ = „Übernehmen & Scannen“ (gleiche Bedienung wie bei der Notiz)
+    batchNoteInputEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); confirmBatchNoteButtonEl.click(); }
+    });
+
+    // Modale über der Bildschirmtastatur halten: Android (Chrome) und iOS verkleinern bei offener Tastatur nur den
+    // sichtbaren Ausschnitt (visualViewport), nicht das Layout – ein unten angedocktes Sheet läge sonst hinter der
+    // Tastatur (Zebra: „Speichern/Abbrechen“ unsichtbar). Sichtbare Overlays werden auf den sichtbaren Ausschnitt
+    // begrenzt; ist die Tastatur zu, werden die Maße wieder entfernt. Am Desktop passiert nichts (keine Differenz).
+    (function keepModalsAboveKeyboard() {
+        const vv = window.visualViewport;
+        if (!vv) return;
+        let raf = 0;
+        const apply = () => {
+            raf = 0;
+            const keyboardOpen = (window.innerHeight - vv.height) > 80;   // kleinere Differenzen = Adressleiste/Rundung
+            document.querySelectorAll('.modal-overlay').forEach(el => {
+                if (keyboardOpen && el.classList.contains('visible')) {
+                    el.style.top = Math.max(0, vv.offsetTop) + 'px'; el.style.height = Math.round(vv.height) + 'px'; el.style.bottom = 'auto';
+                } else if (el.style.height) { el.style.top = ''; el.style.height = ''; el.style.bottom = ''; }
+            });
+        };
+        const schedule = () => { if (!raf) raf = requestAnimationFrame(apply); };
+        vv.addEventListener('resize', schedule);
+        vv.addEventListener('scroll', schedule);
+        document.addEventListener('focusin', schedule);
+        document.addEventListener('focusout', () => setTimeout(schedule, 60));
+    })();
 
     // Modals
     saveEditButtonEl.addEventListener('click', saveShipmentChangesFromModal);
