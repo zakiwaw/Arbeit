@@ -2012,7 +2012,8 @@ function fitTextToContainer(element, container, initialFontSize, minFontSize, pa
     }
 }
 // --- ENDE DER ÄNDERUNG: Dynamisches Font-Sizing Hilfsfunktion ---
-        function focusShipmentInput() {
+        // opts.keepScroll: Fokus ohne Scrollen (beim Zurückkehren aus Details/Unterseite – sonst springt die Seite zum Feld nach oben)
+        function focusShipmentInput(opts) {
             if (isAuthViewOpen()) return; // Anmeldeseite hat den Fokus (PIN-Feld)
             const isModalVisible = (sel) => document.querySelector(sel)?.classList.contains('visible');
             // ANFORDERUNG 2: Das neue HU-Import-Modal zur Prüfung hinzufügen
@@ -2026,7 +2027,8 @@ function fitTextToContainer(element, container, initialFontSize, minFontSize, pa
             if (typeof currentPage !== 'undefined' && currentPage && pageViewEl && !pageViewEl.classList.contains('hidden')) return;
             if (shipmentNumberInputEl && !shipmentNumberInputEl.disabled) {
                 shipmentNumberInputEl.inputMode = 'none'; // Für Scanner
-                setTimeout(() => shipmentNumberInputEl.focus(), 0);
+                const keepScroll = !!(opts && opts.keepScroll);
+                setTimeout(() => shipmentNumberInputEl.focus(keepScroll ? { preventScroll: true } : undefined), 0);
             }
         }
 
@@ -3966,7 +3968,7 @@ function showHome() {
     if (pageContentEl) pageContentEl.innerHTML = '';
     updateHomeLayout();
     window.scrollTo(0, lastScrollPosition);
-    focusShipmentInput(); // Scanner wieder scharf (wie nach dem Schließen der Detailansicht)
+    focusShipmentInput({ keepScroll: true }); // Scanner wieder scharf – ohne nach oben zu springen
 }
 // Zurück-Knopf der Seite: über den Verlauf schließen, damit Verlauf und Anzeige zusammenpassen
 function closePage() {
@@ -5106,6 +5108,10 @@ if (sideMenuEl) sideMenuEl.addEventListener('click', (e) => { const a = e.target
 // Verlauf beim Start normalisieren; eine offene Seite (Adresse ?seite=… – z. B. nach Neuladen/Import) wieder öffnen
 let pendingDetailFromUrl = null; // ?sendung=… aus der Adresse, das beim Start noch nicht lokal vorlag (s. renderTable)
 (function initHistory() {
+    // Scroll-Stand verwalten wir selbst (lastScrollPosition): Der Browser würde beim Zurück (popstate) sonst die Position
+    // des Verlaufseintrags wiederherstellen – und die ist 0, weil der Eintrag entsteht, während die Hauptansicht schon
+    // ausgeblendet ist. Ergebnis war: nach „Zurück“ aus den Details stand die Liste immer ganz oben.
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
     let saved = (history.state && history.state.frtPage) ? history.state.frtPage : null;
     if (!saved) {
         const q = new URLSearchParams(location.search);
@@ -5120,9 +5126,13 @@ let pendingDetailFromUrl = null; // ?sendung=… aus der Adresse, das beim Start
 })();
 
 
+let lastPageScrollTop = 0; // Scroll-Stand der Unterseite (eigener Scroll-Container), geht beim Ausblenden verloren
 function showDetailView(baseNumber) {
-    // 1. Aktuelle Scroll-Position der Hauptseite speichern
-    lastScrollPosition = window.scrollY;
+    // 1. Aktuelle Scroll-Position merken: Startseite = Fenster-Scroll; von einer Unterseite aus deren eigenen Scroll-Stand
+    //    (lastScrollPosition bleibt dann unangetastet – sie gehört der Startseite für das spätere „Zurück“ von der Unterseite)
+    const pageOpen = !!(pageViewEl && !pageViewEl.classList.contains('hidden'));
+    if (!pageOpen) lastScrollPosition = window.scrollY;
+    lastPageScrollTop = pageOpen ? pageViewEl.scrollTop : 0;
 
     // 2. Die Detail-Daten in den Container der Detail-Ansicht laden
     displayCurrentShipmentDetails(baseNumber);
@@ -5145,12 +5155,10 @@ function showDetailView(baseNumber) {
 function hideDetailView() {
     // 1. Ansichten zurückschalten – zurück zur Unterseite, von der aus geöffnet wurde, sonst zur Hauptansicht
     detailViewEl.classList.add('hidden');
-    if (currentPage && pageViewEl) pageViewEl.classList.remove('hidden');
-    else mainViewEl.classList.remove('hidden');
-
-    // 2. Zur gespeicherten Scroll-Position zurückkehren
-    window.scrollTo(0, lastScrollPosition);
-    focusShipmentInput(); // Fokus wieder auf das Eingabefeld setzen
+    // 2. Zur gespeicherten Scroll-Position zurückkehren – der Fokus aufs Scan-Feld darf dabei nicht nach oben scrollen
+    if (currentPage && pageViewEl) { pageViewEl.classList.remove('hidden'); pageViewEl.scrollTop = lastPageScrollTop; }
+    else { mainViewEl.classList.remove('hidden'); window.scrollTo(0, lastScrollPosition); }
+    focusShipmentInput({ keepScroll: true });
 }
 
 

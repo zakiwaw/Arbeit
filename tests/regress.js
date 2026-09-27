@@ -178,6 +178,35 @@ const wait = (ms) => new Promise(r => setTimeout(r, ms));
       await pn.close();
     }
 
+    // ---- Zurück aus den Details: Liste/Unterseite stehen wieder dort, wo man vorher gescrollt hatte ----
+    {
+      const nowIso = new Date().toISOString(); const many = {};
+      for (let i = 1; i <= 25; i++) many['S' + String(i).padStart(2, '0')] = { hawb: 'S' + String(i).padStart(2, '0'), lastModified: new Date(Date.now() - i * 60000).toISOString(), totalPiecesExpected: 3, mitarbeiter: 'T', isHuListOrder: false, scannedItems: [{ rawInput: 'S' + String(i).padStart(2, '0') + '+0001', status: 'Wareneingang', timestamp: nowIso, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null }] };
+      const bsc = makeBackend(many, {});
+      const psc = await openApp(browser, bsc, {}); await wait(500);
+      // 1) Startseite: nach unten scrollen, unterste Karte öffnen, zurück
+      const y0 = await psc.evaluate(() => { window.scrollTo(0, document.body.scrollHeight); return window.scrollY; });
+      await psc.evaluate(() => { const rows = document.querySelectorAll('#shipmentTableBody tr[data-basenumber]'); rows[rows.length - 1].querySelector('td.hawb-cell').click(); }); await wait(400);
+      const opened = await psc.evaluate(() => !document.getElementById('detailView').classList.contains('hidden'));
+      await psc.evaluate(() => document.getElementById('backToMainViewBtn').click()); await wait(600);
+      const y1 = await psc.evaluate(() => ({ y: window.scrollY, detail: !document.getElementById('detailView').classList.contains('hidden'), focus: document.activeElement?.id, restoration: history.scrollRestoration }));
+      assert(y0 > 300 && opened && !y1.detail && Math.abs(y1.y - y0) <= 2 && y1.focus === 'shipmentNumberInput' && y1.restoration === 'manual', `Startseite: nach „Zurück“ aus den Details bleibt die Scroll-Position (${y0} → ${y1.y}), Scan-Feld wieder fokussiert`);
+      // 2) Unterseite (Offene Sendungen): scrollen, Zeile öffnen, zurück → Unterseite an alter Stelle; nochmal zurück → Startseite an alter Stelle
+      await psc.evaluate(() => window.scrollTo(0, 200)); await wait(100);
+      await psc.evaluate(() => document.querySelector('.home-tile[data-page="offen"], [data-home-tile="offen"], #homeHub [data-page="offen"]')?.click()); await wait(600);
+      const pv = await psc.evaluate(() => { const pv = document.getElementById('pageView'); pv.scrollTop = 500; return { open: !pv.classList.contains('hidden'), st: pv.scrollTop, rows: pv.querySelectorAll('tr[data-basenumber]').length }; });
+      await psc.evaluate(() => { const rows = document.querySelectorAll('#pageView tr[data-basenumber]'); rows[rows.length - 1].querySelector('td.hawb-cell').click(); }); await wait(400);
+      const d2 = await psc.evaluate(() => !document.getElementById('detailView').classList.contains('hidden'));
+      await psc.evaluate(() => document.getElementById('backToMainViewBtn').click()); await wait(600);
+      const pv2 = await psc.evaluate(() => { const pv = document.getElementById('pageView'); return { open: !pv.classList.contains('hidden'), st: pv.scrollTop, detail: !document.getElementById('detailView').classList.contains('hidden') }; });
+      assert(pv.open && pv.st === 500 && pv.rows >= 20 && d2 && pv2.open && !pv2.detail && Math.abs(pv2.st - 500) <= 2, `Unterseite: nach „Zurück“ aus den Details bleibt der Scroll-Stand der Seite (${pv.st} → ${pv2.st})`);
+      await psc.evaluate(() => document.getElementById('pageBackBtn').click()); await wait(600);
+      const home = await psc.evaluate(() => ({ y: window.scrollY, page: !document.getElementById('pageView').classList.contains('hidden') }));
+      assert(!home.page && Math.abs(home.y - 200) <= 2, `Unterseite schließen: Startseite steht wieder bei der alten Position (200 → ${home.y})`);
+      assert(psc.__errors.length === 0, `Scroll-Rückkehr: keine JS-Fehler (${psc.__errors.join(' | ')})`);
+      await psc.close();
+    }
+
     // ---- Sync: geöffnete Details eines HU-Listen-Auftrags (MAN/VW) aktualisieren sich bei Fremdänderung ----
     {
       const bs = makeBackend(sampleData(), {});
