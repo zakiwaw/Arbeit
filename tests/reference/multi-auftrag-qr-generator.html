@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Multi-Auftrag QR-Code Generator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; max-width: 900px; margin: 20px auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px; background-color: #fdfdfd; }
+        h1 { text-align: center; color: #333; font-size: 1.8em; margin-bottom: 25px; }
+        .tabs { display: flex; border-bottom: 2px solid #eee; margin-bottom: 20px; }
+        .tab-btn { padding: 10px 20px; cursor: pointer; border: none; background-color: transparent; font-size: 1.05em; color: #555; border-bottom: 3px solid transparent; transition: all 0.2s ease-in-out; }
+        .tab-btn:hover { background-color: #f4f4f4; }
+        .tab-btn.active { color: #007bff; font-weight: bold; border-bottom-color: #007bff; }
+        textarea { width: 100%; height: 300px; padding: 12px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 5px; font-family: monospace; font-size: 1em; margin-bottom: 15px; }
+        button#generateBtn { display: block; width: 100%; padding: 14px; font-size: 1.2em; font-weight: bold; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 15px; transition: background-color 0.2s; }
+        button#generateBtn:hover { background-color: #218838; }
+        #qrcode-container { margin-top: 30px; padding-top: 20px; border-top: 2px solid #eee; display: flex; flex-wrap: wrap; justify-content: center; gap: 30px; }
+        .qr-code-wrapper { text-align: center; padding: 15px; border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .qr-code-wrapper h3 { margin: 0 0 10px 0; font-size: 1em; color: #555; }
+        .title-container { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .title-container h3 { margin: 0; }
+        .copy-btn { padding: 5px 12px; font-size: 0.9em; font-weight: bold; cursor: pointer; border: 1px solid #007bff; color: #007bff; background-color: white; border-radius: 4px; transition: all 0.2s; }
+        .copy-btn:hover { background-color: #007bff; color: white; }
+    </style>
+</head>
+<body>
+    <h1>Multi-Auftrag QR-Code Generator</h1>
+    <div class="tabs">
+        <button class="tab-btn" data-mode="vvl">Vorverladeliste (VW)</button>
+        <button class="tab-btn active" data-mode="man">MAN Fracht (Intelligente Erkennung)</button>
+        <button class="tab-btn" data-mode="standard">Standard (Trennung mit Leerzeilen)</button>
+    </div>
+    <textarea id="dataInput"></textarea>
+    <button id="generateBtn">Scanbare QR-Codes erstellen</button>
+    <div id="qrcode-container"></div>
+
+<script>
+    const dataInput = document.getElementById('dataInput');
+    const generateBtn = document.getElementById('generateBtn');
+    const qrcodeContainer = document.getElementById('qrcode-container');
+    const tabs = document.querySelectorAll('.tab-btn');
+    let activeMode = 'man'; // Standard auf MAN setzen
+
+    const placeholders = {
+        vvl: `Daten aus der Vorverladeliste hier einfügen...
+Der Generator erkennt Vorverladeliste-Nr., Kundennr. und die Positionen.
+
+Beispiel:
+Vorverladeliste-Nr.: 100004049786
+
+Kundennr: 9974021
+873227447 8255014
+...`,
+        man: `Daten von MAN-Dokument hier einfügen...\nDer Generator erkennt Spediteur, Rechnung, PLSO und HUs.\nEr kann auch das "Nachlieferung"-Format erkennen.\n\nBeispiel Standard:\nMaersk Logistics & Services/Senator, Südafrika\n9007988206\n3181 0128115\n1 0925102219E2|Einwegpalette B03|...|42 KG\n\nBeispiel Nachlieferung:\nLogwin, Singapur\nNachlieferung\n3181 0128082\n1 9251021068F\n2 92510210CB3`,
+        standard: `Fügen Sie Ihre Aufträge hier ein.\nJeder Auftrag MUSS durch eine LEERZEILE getrennt sein.\nDie ERSTE Zeile pro Auftrag ist die Auftragsnummer.\n\nBeispiel:\nAUFTRAGSNUMMER_1\nHU1\nHU2\n\nAUFTRAGSNUMMER_2\nHU3\n...`
+    };
+
+    function updateUIForMode(mode) {
+        dataInput.placeholder = placeholders[mode];
+        tabs.forEach(tab => tab.classList.toggle('active', tab.dataset.mode === mode));
+    }
+    tabs.forEach(tab => tab.addEventListener('click', () => {
+        activeMode = tab.dataset.mode;
+        updateUIForMode(activeMode);
+    }));
+    updateUIForMode(activeMode);
+
+    function replaceUmlauts(str) { return str.toString().replace(/ä/g, 'ae').replace(/Ä/g, 'Ae').replace(/ö/g, 'oe').replace(/Ö/g, 'Oe').replace(/ü/g, 'ue').replace(/Ü/g, 'Ue').replace(/ß/g, 'ss'); }
+    
+    
+function parseVvlFormat(inputText) {
+    const lines = inputText.split('\n').map(l => l.trim()).filter(Boolean);
+    let mainVvlNr = null;
+    let finalOrders = [];
+    let currentOrder = null;
+
+    const normalizeDimensionPart = (value) => {
+        const cleaned = String(value || '').trim();
+        if (!cleaned) return '0';
+        return String(parseInt(cleaned, 10));
+    };
+
+    for (const line of lines) {
+        if (line.toLowerCase().startsWith('vorverladeliste-nr.')) {
+            mainVvlNr = line.split(':')[1].trim();
+            continue;
+        }
+
+        if (line.toLowerCase().startsWith('kundennr')) {
+            if (currentOrder) finalOrders.push(currentOrder);
+            const kundennr = line.split(':')[1].trim();
+            currentOrder = { orderId: kundennr, parentVvl: mainVvlNr, hus: [] };
+            continue;
+        }
+
+        if (currentOrder && /^\d/.test(line)) {
+            if (line.includes('|') && line.includes(':')) {
+                const [mainPart, grossWeightRaw = 'N/A', dimensionsRaw = 'N/A'] = line.split('|').map(p => p.trim());
+                const [vse, sendnr] = mainPart.split(':').map(p => p.trim());
+
+                if (vse && sendnr) {
+                    let normalizedDimensions = 'N/A';
+
+                    if (dimensionsRaw !== 'N/A') {
+                        const dimParts = dimensionsRaw.split('x').map(p => normalizeDimensionPart(p.replace(/mm/i, '').trim()));
+                        if (dimParts.length === 3) {
+                            normalizedDimensions = `${dimParts[0]}x${dimParts[1]}x${dimParts[2]} MM`;
+                        }
+                    }
+
+                    const normalizedGrossWeight = grossWeightRaw.toUpperCase().includes('KG')
+                        ? grossWeightRaw.toUpperCase()
+                        : `${grossWeightRaw} KG`;
+
+                    currentOrder.hus.push(`${vse}:${sendnr}|${normalizedGrossWeight}|${normalizedDimensions}`);
+                }
+            } else {
+                const [vse, sendnr] = line.split(/\s+/);
+                if (vse && sendnr) {
+                    currentOrder.hus.push(`${vse}:${sendnr}|N/A|N/A`);
+                }
+            }
+        }
+    }
+
+    if (currentOrder) finalOrders.push(currentOrder);
+
+    if (!mainVvlNr) {
+        alert("Fehler: Konnte keine Vorverladeliste-Nr. im Text finden.");
+        return [];
+    }
+
+    return finalOrders;
+}
+
+
+
+    // --- START DER ÄNDERUNG ---
+    // --- START DER KORRIGIERTEN FUNKTION ---
+function parseManFormat(inputText) {
+    const finalOrders = [];
+    // Der Trick: Wir teilen den Text nicht nach Zeilen, sondern nach leeren Blöcken auf.
+    // Das macht die Erkennung viel robuster.
+    const blocks = inputText.trim().split(/\n\s*\n/);
+
+    for (const block of blocks) {
+        const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+        if (lines.length < 3) continue; // Ein gültiger Block hat mindestens Spediteur, Rechnung und PLSO.
+
+        // Wir nehmen an, dass die Struktur immer gleich ist:
+        const spediteurLandLine = lines.shift(); // Zeile 1: "Spediteur, Land"
+        const orderIdLine = lines.shift();       // Zeile 2: Rechnungsnummer (kann jetzt alles sein)
+        const plsoLine = lines.shift();          // Zeile 3: PLSO-Nummer
+        const hus = lines;                       // Der Rest sind die HUs
+
+        const [spediteur, land] = spediteurLandLine.split(',');
+
+        finalOrders.push({
+            orderId: orderIdLine,
+            plso: plsoLine,
+            spediteur: spediteur ? spediteur.trim() : 'Unbekannt',
+            land: land ? land.trim() : 'Unbekannt',
+            hus: hus
+        });
+    }
+    return finalOrders;
+}
+// --- ENDE DER KORRIGIERTEN FUNKTION ---
+
+    function parseStandardFormat(inputText) {
+        return inputText.split(/\n\s*\n/).map(block => {
+            const lines = block.trim().split('\n').map(l => l.trim()).filter(Boolean);
+            if (lines.length < 1) return null;
+            const orderId = lines.shift();
+            return { orderId, hus: lines };
+        }).filter(Boolean);
+    }
+
+    function generateQrCodes(orders) {
+        if (orders.length === 0) {
+            qrcodeContainer.innerHTML = '';
+            return;
+        }
+
+        const QR_DATA_PREFIX_MAN = "FRT_MULTI_V1";
+        const QR_DATA_PREFIX_VVL = "FRT_VVL_V1";
+        const QR_CODE_MAX_CHARS = 2300;
+
+        let allData = "";
+        for (const order of orders) {
+            let orderHeader = '';
+            if (activeMode === 'vvl') {
+                const cleanOrderId = replaceUmlauts(order.orderId).toUpperCase();
+                const cleanParentVvl = replaceUmlauts(order.parentVvl).toUpperCase();
+                orderHeader = `;;;${cleanOrderId}|${cleanParentVvl}|||`;
+            } else {
+                const cleanSped = replaceUmlauts(order.spediteur || 'N/A').toUpperCase();
+                const cleanLand = replaceUmlauts(order.land || 'N/A').toUpperCase();
+                const cleanOrderId = replaceUmlauts(order.orderId).toUpperCase();
+                const cleanPlso = replaceUmlauts(order.plso || 'N/A').toUpperCase();
+                orderHeader = `;;;${cleanOrderId}|${cleanSped}|${cleanLand}|${cleanPlso}|||`;
+            }
+            const husString = order.hus.join("~~~");
+            allData += orderHeader + husString;
+        }
+
+        if (allData.length === 0) {
+            qrcodeContainer.innerHTML = '';
+            return;
+        }
+
+        const prefix = activeMode === 'vvl' ? QR_DATA_PREFIX_VVL : QR_DATA_PREFIX_MAN;
+        const fullQrData = prefix + allData;
+
+        qrcodeContainer.innerHTML = '';
+        const wrapper = document.createElement('div');
+        wrapper.className = 'qr-code-wrapper';
+
+        const titleContainer = document.createElement('div');
+        titleContainer.className = 'title-container';
+        const title = document.createElement('h3');
+        const copyBtn = document.createElement('button');
+        copyBtn.textContent = 'Inhalt kopieren';
+        copyBtn.className = 'copy-btn';
+        
+        copyBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(fullQrData).then(() => {
+                copyBtn.textContent = 'Kopiert!';
+                setTimeout(() => { copyBtn.textContent = 'Inhalt kopieren'; }, 2000);
+            }).catch(err => {
+                console.error('Fehler beim Kopieren: ', err);
+                alert('Kopieren in die Zwischenablage ist fehlgeschlagen.');
+            });
+        });
+
+        titleContainer.appendChild(title);
+        titleContainer.appendChild(copyBtn);
+        wrapper.appendChild(titleContainer);
+        
+        const qrElement = document.createElement('div');
+        wrapper.appendChild(qrElement);
+        qrcodeContainer.appendChild(wrapper);
+
+        if (fullQrData.length > QR_CODE_MAX_CHARS) {
+            title.textContent = 'Daten zu groß für QR-Code!';
+            qrElement.innerHTML = `
+                <p style="color: red; font-weight: bold; font-size: 1em; margin-top: 20px;">
+                    Die Datenmenge überschreitet das Limit.
+                </p>
+                <p style="font-size: 0.9em; margin-top: 10px; color: #555;">
+                    (Generiert: ${fullQrData.length} / Max: ${QR_CODE_MAX_CHARS} Zeichen)
+                </p>
+                <p style="font-size: 0.9em; margin-top: 15px;">
+                    Bitte verwenden Sie den Button "Inhalt kopieren", um die Daten manuell zu übertragen.
+                </p>
+            `;
+        } else {
+            title.textContent = 'QR-Code (Alle Daten)';
+            new QRCode(qrElement, { text: fullQrData, width: 300, height: 300, correctLevel: QRCode.CorrectLevel.M });
+        }
+    }
+
+
+    generateBtn.addEventListener('click', () => {
+        const inputText = dataInput.value.trim();
+        if (!inputText) return alert("Bitte Daten einfügen!");
+        let parsedOrders;
+        if (activeMode === 'vvl') {
+            parsedOrders = parseVvlFormat(inputText);
+        } else if (activeMode === 'man') {
+            parsedOrders = parseManFormat(inputText);
+        } else {
+            parsedOrders = parseStandardFormat(inputText);
+        }
+        generateQrCodes(parsedOrders);
+    });
+</script>
+
+</body>
+</html>
