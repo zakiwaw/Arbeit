@@ -203,6 +203,16 @@ const wait = (ms) => new Promise(r => setTimeout(r, ms));
       await psc.evaluate(() => document.getElementById('pageBackBtn').click()); await wait(600);
       const home = await psc.evaluate(() => ({ y: window.scrollY, page: !document.getElementById('pageView').classList.contains('hidden') }));
       assert(!home.page && Math.abs(home.y - 200) <= 2, `Unterseite schließen: Startseite steht wieder bei der alten Position (200 → ${home.y})`);
+      // 3) Aktionen auf der Startseite (Löschen, Bearbeiten-Abbrechen) lassen die Seite ebenfalls stehen – auch wenn das Scan-Feld
+      //    den Fokus verloren hatte (so ist es auf dem Handy nach einem Tipp auf einen Knopf)
+      await psc.evaluate(() => { window.scrollTo(0, 500); document.activeElement && document.activeElement.blur(); }); await wait(100);
+      const delBase = await psc.evaluate(() => { const row = document.querySelectorAll('#shipmentTableBody tr[data-basenumber]')[2]; row.querySelector('.main-delete-btn').click(); return row.dataset.basenumber; }); await wait(600);
+      const afterDel = await psc.evaluate(() => ({ y: window.scrollY, focus: document.activeElement?.id, rows: document.querySelectorAll('#shipmentTableBody tr[data-basenumber]').length }));
+      assert(Math.abs(afterDel.y - 500) <= 2 && afterDel.focus === 'shipmentNumberInput' && !bsc.store[delBase] && afterDel.rows === 5, `Startseite: Sendung löschen springt nicht nach oben (500 → ${afterDel.y}), Scan-Feld wieder fokussiert, ${delBase} gelöscht`);
+      await psc.evaluate(() => { document.activeElement && document.activeElement.blur(); document.querySelectorAll('#shipmentTableBody tr[data-basenumber]')[2].querySelector('.edit-btn').click(); }); await wait(300);
+      await psc.evaluate(() => document.getElementById('cancelEditButton').click()); await wait(400);
+      const afterEdit = await psc.evaluate(() => ({ y: window.scrollY, modal: document.getElementById('editModal').classList.contains('visible') }));
+      assert(Math.abs(afterEdit.y - 500) <= 2 && !afterEdit.modal, `Startseite: Bearbeiten → Abbrechen springt nicht nach oben (500 → ${afterEdit.y})`);
       assert(psc.__errors.length === 0, `Scroll-Rückkehr: keine JS-Fehler (${psc.__errors.join(' | ')})`);
       await psc.close();
     }

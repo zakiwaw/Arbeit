@@ -2012,8 +2012,10 @@ function fitTextToContainer(element, container, initialFontSize, minFontSize, pa
     }
 }
 // --- ENDE DER ÄNDERUNG: Dynamisches Font-Sizing Hilfsfunktion ---
-        // opts.keepScroll: Fokus ohne Scrollen (beim Zurückkehren aus Details/Unterseite – sonst springt die Seite zum Feld nach oben)
-        function focusShipmentInput(opts) {
+        // Fokus immer OHNE Scrollen: Nach jeder Aktion weiter unten auf der Seite (Löschen, Bearbeiten-Abbrechen, Zurück aus
+        // Details …) wird das Scan-Feld wieder scharf gemacht – ein normaler focus() würde die Seite dabei nach oben springen
+        // lassen. Der Scanner braucht nur den Fokus, nicht die Sicht aufs Feld; wer tippen will, tippt das Feld selbst an.
+        function focusShipmentInput() {
             if (isAuthViewOpen()) return; // Anmeldeseite hat den Fokus (PIN-Feld)
             const isModalVisible = (sel) => document.querySelector(sel)?.classList.contains('visible');
             // ANFORDERUNG 2: Das neue HU-Import-Modal zur Prüfung hinzufügen
@@ -2027,8 +2029,7 @@ function fitTextToContainer(element, container, initialFontSize, minFontSize, pa
             if (typeof currentPage !== 'undefined' && currentPage && pageViewEl && !pageViewEl.classList.contains('hidden')) return;
             if (shipmentNumberInputEl && !shipmentNumberInputEl.disabled) {
                 shipmentNumberInputEl.inputMode = 'none'; // Für Scanner
-                const keepScroll = !!(opts && opts.keepScroll);
-                setTimeout(() => shipmentNumberInputEl.focus(keepScroll ? { preventScroll: true } : undefined), 0);
+                setTimeout(() => shipmentNumberInputEl.focus({ preventScroll: true }), 0);
             }
         }
 
@@ -3968,7 +3969,7 @@ function showHome() {
     if (pageContentEl) pageContentEl.innerHTML = '';
     updateHomeLayout();
     window.scrollTo(0, lastScrollPosition);
-    focusShipmentInput({ keepScroll: true }); // Scanner wieder scharf – ohne nach oben zu springen
+    focusShipmentInput(); // Scanner wieder scharf – ohne nach oben zu springen
 }
 // Zurück-Knopf der Seite: über den Verlauf schließen, damit Verlauf und Anzeige zusammenpassen
 function closePage() {
@@ -5158,7 +5159,7 @@ function hideDetailView() {
     // 2. Zur gespeicherten Scroll-Position zurückkehren – der Fokus aufs Scan-Feld darf dabei nicht nach oben scrollen
     if (currentPage && pageViewEl) { pageViewEl.classList.remove('hidden'); pageViewEl.scrollTop = lastPageScrollTop; }
     else { mainViewEl.classList.remove('hidden'); window.scrollTo(0, lastScrollPosition); }
-    focusShipmentInput({ keepScroll: true });
+    focusShipmentInput();
 }
 
 
