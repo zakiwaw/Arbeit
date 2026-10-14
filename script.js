@@ -3816,6 +3816,7 @@ const homeHubEl = document.getElementById('homeHub');
 const pageViewEl = document.getElementById('pageView');
 const pageTitleEl = document.getElementById('pageTitle');
 const pageBadgeEl = document.getElementById('pageBadge');
+const pageHeaderActionsEl = document.getElementById('pageHeaderActions'); // rechts in der Kopfzeile, z. B. ⋮-Menü der LKW-Seite
 const pageContentEl = document.getElementById('pageContent');
 const pageBackBtnEl = document.getElementById('pageBackBtn');
 const listCaptionEl = document.getElementById('listCaption');
@@ -4012,9 +4013,14 @@ window.addEventListener('popstate', (e) => {
 });
 
 // ---- Seiten zeichnen ----------------------------------------------------------
-function setPageHeader(title, badge, titleHtml) {
+function setPageHeader(title, badge, titleHtml, actionsHtml) {
     if (pageTitleEl) { if (titleHtml) pageTitleEl.innerHTML = titleHtml; else pageTitleEl.textContent = title; }
     if (pageBadgeEl) { pageBadgeEl.textContent = badge || ''; pageBadgeEl.classList.toggle('hidden', !badge); }
+    if (pageHeaderActionsEl) {
+        const keepOpen = isLkwActionMenuOpen();      // offenes ⋮-Menü übersteht ein Neuzeichnen (z. B. Sync-Änderung)
+        pageHeaderActionsEl.innerHTML = actionsHtml || '';
+        if (keepOpen) setLkwActionMenu(true);
+    }
 }
 function renderCurrentPage(fresh) {
     if (!currentPage || !pageContentEl) return;
@@ -4136,16 +4142,51 @@ function saveLkwRenameFromModal() {
 function deleteTruckFromPage(truckId) {
     const shipments = loadShipments();
     const t = collectTrucks(shipments, loadLkwStatus()).find(x => x.truckId === truckId);
-    if (!t || !t.bases.length) { displayError(`LKW ${escapeHtml(truckId)} nicht mehr gefunden.`); renderTable(); return; }
+    if (!t || !t.bases.length) { displayError(`LKW ${escapeHtml(truckId)} nicht mehr gefunden.`); renderTable(); return false; }
     const what = `${pluralize(t.bases.length, 'Auftrag', 'Aufträge')} mit ${t.hus} HUs`;
-    if (!confirm(`LKW „${t.name}“ löschen?\n\n${what} werden mit allen Scans auf allen Geräten entfernt. Das lässt sich nicht rückgängig machen.`)) return;
+    if (!confirm(`LKW „${t.name}“ löschen?\n\n${what} werden mit allen Scans auf allen Geräten entfernt. Das lässt sich nicht rückgängig machen.`)) return false;
     t.bases.forEach(b => { delete shipments[b]; });
     const status = loadLkwStatus();
     if (truckId in status) { delete status[truckId]; saveLkwStatus(status); }   // sonst gälte ein später neu importierter LKW gleicher Kennung als deaktiviert
     saveShipments(shipments);
     renderTable(); renderLkwMenu();
     displayError(`LKW „${t.name}“ gelöscht (${what}).`, 'green', 3000);
+    return true;
 }
+// ⋮-Menü rechts in der Kopfzeile der LKW-Seite: Umbenennen · Deaktivieren/Aktivieren · Löschen. Die Einträge tragen dieselben
+// data-Attribute wie die bisherigen Knöpfe (data-lkw-rename / -deactivate / -activate / -delete) → gleiche Handler, gleiche Rückfragen.
+const LKW_MENU_ICONS = {
+    dots: 'M12,16A2,2 0 0,1 14,18A2,2 0 0,1 12,20A2,2 0 0,1 10,18A2,2 0 0,1 12,16M12,10A2,2 0 0,1 14,12A2,2 0 0,1 12,14A2,2 0 0,1 10,12A2,2 0 0,1 12,10M12,4A2,2 0 0,1 14,6A2,2 0 0,1 12,8A2,2 0 0,1 10,6A2,2 0 0,1 12,4Z',
+    rename: 'M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z',
+    off: 'M11.83,9L15,12.16C15,12.11 15,12.05 15,12A3,3 0 0,0 12,9C11.94,9 11.89,9 11.83,9M7.53,9.8L9.08,11.35C9.03,11.56 9,11.77 9,12A3,3 0 0,0 12,15C12.22,15 12.44,14.97 12.65,14.92L14.2,16.47C13.53,16.8 12.79,17 12,17A5,5 0 0,1 7,12C7,11.21 7.2,10.47 7.53,9.8M2,4.27L4.28,6.55L4.73,7C3.08,8.3 1.78,10 1,12C2.73,16.39 7,19.5 12,19.5C13.55,19.5 15.03,19.2 16.38,18.66L16.81,19.08L19.73,22L21,20.73L3.27,3M12,7A5,5 0 0,1 17,12C17,12.64 16.87,13.26 16.64,13.82L19.57,16.75C21.07,15.5 22.27,13.86 23,12C21.27,7.61 17,4.5 12,4.5C10.6,4.5 9.26,4.75 8,5.2L10.17,7.35C10.74,7.13 11.35,7 12,7Z',
+    on: 'M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z',
+    del: 'M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z'
+};
+const lkwMenuIcon = (k) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="${LKW_MENU_ICONS[k]}"/></svg>`;
+function lkwActionMenuHtml(t) {
+    const id = escapeHtml(t.truckId);
+    const item = (k, attr, label, cls) => `<button type="button" class="page-action-item${cls ? ' ' + cls : ''}" role="menuitem" ${attr}="${id}">${lkwMenuIcon(k)}<span>${label}</span></button>`;
+    return `<div class="page-action-wrap">
+        <button type="button" class="page-menu-btn" data-lkw-menu="${id}" aria-haspopup="menu" aria-expanded="false" aria-label="Aktionen für ${escapeHtml(t.name)}" title="Aktionen für diesen LKW">${lkwMenuIcon('dots')}</button>
+        <div class="page-action-menu hidden" role="menu" aria-label="LKW-Aktionen">
+            ${item('rename', 'data-lkw-rename', 'LKW umbenennen')}
+            ${t.active ? item('off', 'data-lkw-deactivate', 'LKW deaktivieren') : item('on', 'data-lkw-activate', 'LKW aktivieren')}
+            <div class="page-action-sep" role="separator"></div>
+            ${item('del', 'data-lkw-delete', 'LKW löschen', 'is-danger')}
+        </div>
+    </div>`;
+}
+function lkwActionMenuEls() {
+    const wrap = pageHeaderActionsEl && pageHeaderActionsEl.querySelector('.page-action-wrap');
+    return wrap ? { wrap, btn: wrap.querySelector('[data-lkw-menu]'), menu: wrap.querySelector('.page-action-menu') } : null;
+}
+function setLkwActionMenu(open) {
+    const els = lkwActionMenuEls();
+    if (!els) return;
+    els.menu.classList.toggle('hidden', !open);
+    els.btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+function isLkwActionMenuOpen() { const els = lkwActionMenuEls(); return !!(els && !els.menu.classList.contains('hidden')); }
 async function setLkwActiveFromPage(truckId, active) {
     const status = loadLkwStatus();
     status[truckId] = active;
@@ -4764,7 +4805,7 @@ const PAGE_RENDERERS = {
                 pageContentEl.innerHTML = '<p class="page-empty">Zu diesem LKW gibt es keine Sendungen mehr.</p>';
                 return;
             }
-            setPageHeader(truckLabel(t), pluralize(t.bases.length, 'Auftrag', 'Aufträge'), truckLabelHtml(t));
+            setPageHeader(truckLabel(t), pluralize(t.bases.length, 'Auftrag', 'Aufträge'), truckLabelHtml(t), lkwActionMenuHtml(t));
             const rows = t.bases.map(b => ({ b, s: shipments[b], p: shipmentProgress(shipments[b]) }));
             rows.sort((x, y) => (Number(y.p.open) - Number(x.p.open)) || String(x.b).localeCompare(String(y.b), 'de', { numeric: true }));
             const open = rows.filter(r => r.p.open), rest = rows.filter(r => !r.p.open);
@@ -4777,7 +4818,6 @@ const PAGE_RENDERERS = {
                 ${t.dunkel ? `<span class="over">${t.dunkel} Dunkelalarm</span>` : ''}
                 ${t.openOrders ? `<span class="mismatch">${t.openOrders} offen</span>` : '<span class="ok">alles erfasst</span>'}
                 ${t.active && isDesktopLayout() && String(t.truckId).startsWith('MAN') ? `<button type="button" class="page-summary-btn page-summary-add" data-order-add="${escapeHtml(t.truckId)}" title="Weiteren Auftrag (Rechnung) zu diesem LKW aufnehmen">+ Auftrag</button>` : ''}
-                ${t.active ? `<button type="button" class="page-summary-btn" data-lkw-deactivate="${escapeHtml(t.truckId)}">LKW deaktivieren</button>` : ''}
             </div>`;
             pageContentEl.innerHTML = html;
             appendShipmentGroups(pageContentEl, [
@@ -5047,25 +5087,42 @@ function handleAdminPageClick(event) {
             adminRun('adminSetActive', { userId: u.id, active: to }, to ? `${u.name} freigegeben` : `${u.name} gesperrt`);
     }
 }
+// LKW-Aktionen – aus den Zeilenwerkzeugen der Anlieferung, dem Banner „LKW aktivieren“ und dem ⋮-Menü in der Kopfzeile.
+// Liefert true, wenn der Klick verarbeitet wurde.
+function handleLkwActionClick(target) {
+    // ⋮-Menü: auf/zu; ein gewählter Eintrag schließt es und läuft dann in die bekannten Handler darunter
+    if (target.closest('[data-lkw-menu]')) { setLkwActionMenu(!isLkwActionMenuOpen()); return true; }
+    if (target.closest('.page-action-item')) setLkwActionMenu(false);
+    const rename = target.closest('[data-lkw-rename]');
+    if (rename) { if (!isBatchModeActive) openLkwRenameModal(rename.dataset.lkwRename); return true; }
+    const delTruck = target.closest('[data-lkw-delete]');
+    if (delTruck) {
+        // aus dem ⋮-Menü der LKW-Seite heraus gelöscht → die nun leere Seite schließen (zurück zur Anlieferung / Startseite)
+        const id = delTruck.dataset.lkwDelete;
+        if (!isBatchModeActive && deleteTruckFromPage(id) && currentPage && currentPage.id === 'lkw' && currentPage.truckId === id) closePage();
+        return true;
+    }
+    const act = target.closest('[data-lkw-activate]');
+    if (act) { setLkwActiveFromPage(act.dataset.lkwActivate, true); return true; }
+    const addOrder = target.closest('[data-order-add]');
+    if (addOrder) { if (!isBatchModeActive) openOrderAddModal(addOrder.dataset.orderAdd); return true; }
+    const deact = target.closest('[data-lkw-deactivate]');
+    if (deact) {
+        if (confirm('LKW deaktivieren?\n\nSeine Sendungen werden in der Liste ausgeblendet; nach 7 Tagen wandern sie ins Archiv (bleiben suchbar).')) setLkwActiveFromPage(deact.dataset.lkwDeactivate, false);
+        return true;
+    }
+    return false;
+}
+if (pageHeaderActionsEl) pageHeaderActionsEl.addEventListener('click', (e) => { handleLkwActionClick(e.target); });
+document.addEventListener('click', (e) => { if (isLkwActionMenuOpen() && !e.target.closest('.page-action-wrap')) setLkwActionMenu(false); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && isLkwActionMenuOpen()) { setLkwActionMenu(false); const els = lkwActionMenuEls(); if (els) els.btn.focus(); } });
 if (pageContentEl) pageContentEl.addEventListener('click', (event) => {
     const target = event.target;
     if (currentPage && currentPage.id === 'mitarbeiter') { handleAdminPageClick(event); return; }
     if (currentPage && currentPage.id === 'erfassen') { handleErfassenPageClick(event); return; }
     const truckBtn = target.closest('.page-row[data-truckid]');
     if (truckBtn) { openPage({ id: 'lkw', truckId: truckBtn.dataset.truckid }); return; }
-    const rename = target.closest('[data-lkw-rename]');
-    if (rename) { if (!isBatchModeActive) openLkwRenameModal(rename.dataset.lkwRename); return; }
-    const delTruck = target.closest('[data-lkw-delete]');
-    if (delTruck) { if (!isBatchModeActive) deleteTruckFromPage(delTruck.dataset.lkwDelete); return; }
-    const act = target.closest('[data-lkw-activate]');
-    if (act) { setLkwActiveFromPage(act.dataset.lkwActivate, true); return; }
-    const addOrder = target.closest('[data-order-add]');
-    if (addOrder) { if (!isBatchModeActive) openOrderAddModal(addOrder.dataset.orderAdd); return; }
-    const deact = target.closest('[data-lkw-deactivate]');
-    if (deact) {
-        if (confirm('LKW deaktivieren?\n\nSeine Sendungen werden in der Liste ausgeblendet; nach 7 Tagen wandern sie ins Archiv (bleiben suchbar).')) setLkwActiveFromPage(deact.dataset.lkwDeactivate, false);
-        return;
-    }
+    if (handleLkwActionClick(target)) return;
     if (target.closest('.page-more-btn')) { pageLimit += PAGE_LIST_STEP; renderCurrentPage(false); return; }
     if (target.closest('[data-open-hus-modal]')) { showOpenHusSummary(); return; }
     const row = target.closest('tr[data-basenumber]');

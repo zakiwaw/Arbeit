@@ -80,7 +80,7 @@ function makeBackend(initial, lkwStatus) {
       const b = body.payload && body.payload.baseNumber; if (b) delete state.store[b]; state.version++; resp = { status: 'success', version: state.version };
     }
     else if (action === 'loadLkwStatus') resp = { status: 'success', data: state.lkwStatus };
-    else if (action === 'saveLkwStatus') { state.lkwStatus = (body.payload && body.payload.lkwStatus) || body.lkwStatus || {}; resp = { status: 'success' }; }
+    else if (action === 'saveLkwStatus') { const pl = body.payload; state.lkwStatus = (pl && pl.lkwStatus) || pl || body.lkwStatus || {}; resp = { status: 'success' }; } // App schickt die Status-Map direkt als payload
     else if (action === 'searchArchive') resp = { status: 'success', results: {}, order: [], total: 0, truncated: false };
     await req.respond({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(resp) });
   };

@@ -245,5 +245,55 @@ const wait = (ms) => new Promise(r => setTimeout(r, ms));
       assert(p3.__errors.length === 0, `Keine JS-Fehler (Manifest/Hochformat-Sperre im Tab ist still) (${p3.__errors.join(' | ')})`);
       await p3.close();
     }
+
+    // ---- LKW-Seite: ⋮-Menü in der Kopfzeile (Umbenennen · Deaktivieren/Aktivieren · Löschen) statt Knopf „LKW deaktivieren“ ----
+    {
+      const bm = makeBackend(sampleData(), {});
+      const pm = await openApp(browser, bm, { query: '?seite=anlieferung&lkw=MAN 1' }); await wait(500);
+      const menuState = () => pm.evaluate(() => {
+        const btn = document.querySelector('#pageHeaderActions .page-menu-btn[data-lkw-menu]');
+        const menu = document.querySelector('#pageHeaderActions .page-action-menu');
+        return { title: document.getElementById('pageTitle').textContent.trim(), btn: !!btn, expanded: btn && btn.getAttribute('aria-expanded'),
+          open: !!menu && !menu.classList.contains('hidden'), items: [...document.querySelectorAll('.page-action-item')].map(b => b.textContent.trim()),
+          dangerLast: !!document.querySelector('.page-action-item:last-child.is-danger[data-lkw-delete]'),
+          summaryBtn: !!document.querySelector('.page-summary [data-lkw-deactivate]'), banner: !!document.querySelector('.page-banner') };
+      });
+      const m0 = await menuState();
+      assert(m0.title.endsWith('MAN 1') && m0.btn && m0.expanded === 'false' && !m0.open && !m0.summaryBtn && m0.items.join('|') === 'LKW umbenennen|LKW deaktivieren|LKW löschen' && m0.dangerLast,
+        `LKW-Seite: ⋮ in der Kopfzeile, kein „LKW deaktivieren“-Knopf mehr in der Zeile, Menü zu, Reihenfolge Umbenennen · Deaktivieren · Löschen (rot, zuletzt) (${JSON.stringify(m0)})`);
+      await pm.evaluate(() => document.querySelector('.page-menu-btn').click()); await wait(250);
+      const m1 = await menuState();
+      const m1Rect = await pm.evaluate(() => { const b = document.querySelector('.page-menu-btn').getBoundingClientRect(); const m = document.querySelector('.page-action-menu').getBoundingClientRect(); return { below: m.top >= b.bottom, rightAligned: Math.abs(m.right - b.right) < 2, inView: m.right <= innerWidth && m.left >= 0 }; });
+      assert(m1.open && m1.expanded === 'true' && m1Rect.below && m1Rect.rightAligned && m1Rect.inView, `⋮ antippen: Menü klappt direkt unter dem Knopf auf, rechtsbündig, im Bild (${JSON.stringify(m1Rect)})`);
+      await pm.evaluate(() => document.getElementById('pageTitle').click()); await wait(150);
+      assert(!(await menuState()).open, 'Tippen außerhalb schließt das Menü');
+      await pm.evaluate(() => document.querySelector('.page-menu-btn').click()); await wait(150);
+      await pm.keyboard.press('Escape'); await wait(150);
+      assert(!(await menuState()).open && await pm.evaluate(() => document.activeElement.classList.contains('page-menu-btn')), 'Escape schließt das Menü, Fokus zurück auf ⋮');
+      // Deaktivieren (Rückfrage wird bestätigt) → Banner + Menü sagt jetzt „LKW aktivieren“; Aktivieren → wieder normal
+      await pm.evaluate(() => document.querySelector('.page-menu-btn').click()); await wait(150);
+      await pm.evaluate(() => document.querySelector('.page-action-item[data-lkw-deactivate]').click()); await wait(700);
+      const m2 = await menuState();
+      assert(!m2.open && m2.banner && m2.items.join('|') === 'LKW umbenennen|LKW aktivieren|LKW löschen' && bm.lkwStatus['MAN 1'] === false, `„LKW deaktivieren“: Menü zu, Hinweis-Banner, Eintrag wird zu „LKW aktivieren“, Status am Server (${JSON.stringify(m2)} ${JSON.stringify(bm.lkwStatus)})`);
+      await pm.evaluate(() => document.querySelector('.page-menu-btn').click()); await wait(150);
+      await pm.evaluate(() => document.querySelector('.page-action-item[data-lkw-activate]').click()); await wait(700);
+      const m3 = await menuState();
+      assert(!m3.open && !m3.banner && m3.items[1] === 'LKW deaktivieren' && bm.lkwStatus['MAN 1'] === true, `„LKW aktivieren“ aus dem Menü: Banner weg, Eintrag wieder „LKW deaktivieren“ (${JSON.stringify(m3)})`);
+      // Umbenennen → bekanntes Modal, Menü zu
+      await pm.evaluate(() => document.querySelector('.page-menu-btn').click()); await wait(150);
+      await pm.evaluate(() => document.querySelector('.page-action-item[data-lkw-rename]').click()); await wait(300);
+      const ren = await pm.evaluate(() => ({ modal: document.getElementById('lkwRenameModal').classList.contains('visible'), id: document.getElementById('lkwRenameTruckId').value, open: !document.querySelector('.page-action-menu').classList.contains('hidden') }));
+      assert(ren.modal && ren.id === 'MAN 1' && !ren.open, `„LKW umbenennen“ öffnet das Umbenennen-Fenster für MAN 1, Menü zu (${JSON.stringify(ren)})`);
+      await pm.evaluate(() => document.getElementById('lkwRenameModal').querySelector('button[type="button"]').click()); await wait(200);
+      // Löschen (Rückfrage bestätigt) → Aufträge des LKW weg, leere LKW-Seite wird geschlossen (zurück zur Anlieferung)
+      const before = Object.keys(bm.store).length;
+      await pm.evaluate(() => document.querySelector('.page-menu-btn').click()); await wait(150);
+      await pm.evaluate(() => document.querySelector('.page-action-item[data-lkw-delete]').click()); await wait(900);
+      // (Seite kam hier direkt per Adresse → „zurück“ führt zur Startseite; aus der Anlieferung geöffnet ginge es dorthin zurück)
+      const del = await pm.evaluate(() => ({ pageHidden: document.getElementById('pageView').classList.contains('hidden'), home: !document.getElementById('mainView').classList.contains('hidden'), menu: !!document.querySelector('#pageHeaderActions .page-menu-btn') }));
+      assert(before === 3 && Object.keys(bm.store).length === 1 && !bm.store['9007000001'] && !bm.store['9007000002'] && del.pageHidden && del.home && !del.menu, `„LKW löschen“: beide Aufträge des LKW entfernt, die leere LKW-Seite schließt sich (zurück) (${JSON.stringify(del)})`);
+      assert(pm.__errors.length === 0, `Keine JS-Fehler im ⋮-Menü (${pm.__errors.join(' | ')})`);
+      await pm.close();
+    }
   } finally { await browser.close(); finish(); }
 })().catch(e => { console.error('ERR', e); process.exit(1); });
