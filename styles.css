@@ -1929,7 +1929,6 @@ th.qr-code-header, td.qr-code-cell { display: none; }
 .side-menu .menu-action-item:hover, .side-menu .menu-action-item:active { background-color: var(--surface-3); }
 .side-menu .menu-action-item svg { width: 22px; height: 22px; flex-shrink: 0; fill: currentColor; color: var(--text-muted); }
 .side-menu .menu-action-item:hover svg { color: inherit; }
-.side-menu .menu-action-item.action-primary:hover { color: var(--accent-text); background-color: var(--accent-soft); }
 .side-menu .menu-action-item.action-warning:hover { color: var(--warning-text); background-color: var(--warning-soft); }
 .side-menu .menu-action-item.action-reset { color: var(--danger-text); margin-top: var(--sp-2); }
 .side-menu .menu-action-item.action-reset svg { color: var(--danger); }

@@ -86,7 +86,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const newTotalInputEl = document.getElementById('newTotalInput');
     const confirmNewTotalBtnEl = document.getElementById('confirmNewTotalBtn');
     const skipNewTotalBtnEl = document.getElementById('skipNewTotalBtn');
-    const sendToSheetButtonEl = document.getElementById('sendToSheetButton');
     const sheetStatusEl = document.getElementById('sheetStatus');
     const menuToggleBtnEl = document.getElementById('menu-toggle-btn');
     const sideMenuEl = document.getElementById('side-menu');
@@ -6684,42 +6683,8 @@ function openSecurityReport(base, shipmentsPool, preopenedTab) {
 
 // ... (Rest des bestehenden Codes) ...
         // --- Google Sheet & E-Mail Integration ---
-        async function sendDataToSheet() {
-            removeActiveInlineNoteEditor();
-            if (!WEB_APP_URL || WEB_APP_URL.includes('YOUR_DEPLOYED_WEB_APP_URL_HERE')) {
-                sheetStatusEl.textContent = 'Fehler: Web App URL fehlt.'; sheetStatusEl.style.color = 'red';
-                alert("Fehler: Die Web App URL wurde nicht im Skript konfiguriert."); return;
-            }
-            showLoader(); 
-            sheetStatusEl.textContent = 'Sende Daten an Google Sheet...'; sheetStatusEl.style.color = '#f0ad4e';
-            sendToSheetButtonEl.disabled = true; clearError();
-            try {
-                const shipmentsData = loadShipments();
-                if (Object.keys(shipmentsData).length === 0) {
-                    sheetStatusEl.textContent = 'Keine Daten zum Senden.'; sheetStatusEl.style.color = 'blue'; return;
-                }
-                // Alle Sendungen vormerken und über den Server-Merge senden (überschreibt nichts von anderen Geräten)
-                const pending = readPending();
-                Object.keys(shipmentsData).forEach(b => { pending.changed[b] = true; });
-                writePending(pending);
-                await waitForSyncIdle();
-                await flushPendingChanges();
-                await waitForSyncIdle();
-                if (hasPending()) throw new Error('Server nicht erreichbar – Daten bleiben lokal vorgemerkt.');
-                await pullRemoteChanges();
-                sheetStatusEl.textContent = 'Erfolg: Daten mit dem Server abgeglichen.'; sheetStatusEl.style.color = 'green';
-                setTimeout(closeSideMenu, 1500);
-            } catch (error) {
-                console.error("Fehler beim Senden an Google Sheet:", error);
-                sheetStatusEl.textContent = `Fehler: ${error.message}`; sheetStatusEl.style.color = 'red';
-                alert(`Fehler beim Senden:\n${error.message}`);
-            } finally {
-                sendToSheetButtonEl.disabled = false;
-                hideLoader();
-                setTimeout(() => { if (sheetStatusEl.textContent && !sheetStatusEl.textContent.startsWith('Erfolg')) sheetStatusEl.textContent = ''; }, 7000);
-            }
-        }
-
+        // (Der manuelle Menüpunkt „An Google Sheet senden“ ist entfallen: jede Änderung geht sofort über die Sync-Vormerkung
+        //  an den Server, Ausstehendes wird beim nächsten Abgleich/Start automatisch nachgeschickt – s. flushPendingChanges.)
         async function notifyShipmentCompletion(shipmentObject) {
             const baseNumber = shipmentObject.hawb;
             if (!baseNumber) { console.error("Konnte HAWB für Benachrichtigung nicht ermitteln."); return; }
@@ -7345,7 +7310,6 @@ if (huEditFormEl) {
     menuToggleBtnEl.addEventListener('click', (e) => { e.stopPropagation(); sideMenuEl.classList.contains('open') ? closeSideMenu() : openSideMenu(); });
     
     menuOverlayEl.addEventListener('click', closeSideMenu);
-    sendToSheetButtonEl.addEventListener('click', sendDataToSheet);
     resetDataButtonEl.addEventListener('click', async () => {
         removeActiveInlineNoteEditor();
         if (confirm("WARNUNG!\n\n M\u00F6schtest du wirklich ALLE erfassten Sendungsdaten auf diesem Ger\u00E4t UND auf dem Server unwiderruflich L\u00F6schen?")) {
