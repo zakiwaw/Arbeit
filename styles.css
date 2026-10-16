@@ -2021,6 +2021,8 @@ body.modal-open { overflow: hidden; }
     margin: 0;
     padding: var(--sp-5) var(--sp-4) calc(var(--sp-4) + env(safe-area-inset-bottom, 0px));
     overflow-y: auto; /* passt das Sheet nicht, scrollt es innen statt hinter der Tastatur zu verschwinden */
+    overflow-x: hidden;           /* nie seitlich – iOS ließ das Sheet sonst waagerecht mitschieben (Reiterleiste der „Offenen HUs“) */
+    overscroll-behavior-x: none;
     background-color: var(--surface);
     border: none;
     border-radius: var(--r-xl) var(--r-xl) 0 0;
@@ -2120,28 +2122,33 @@ body.modal-open { overflow: hidden; }
 /* ===================================================================
    11. OFFENE HUs, HU-DETAILS, KORREKTURVORSCHLAG
    =================================================================== */
+/* Reiter im Sheet „Offene HUs“: auf dem Handy teilen sich die vier Reiter die Breite und brechen zweizeilig um – die Leiste
+   scrollt nicht mehr (iOS schob sonst beim Wischen das ganze Sheet mit). Der Zähler sitzt oben rechts in der Ecke. */
 .modal-tabs {
     display: flex;
     flex-wrap: nowrap;
+    align-items: stretch;
     gap: var(--sp-1);
     margin: 0 calc(-1 * var(--sp-4)) var(--sp-3);
     padding: 0 var(--sp-4);
-    overflow-x: auto;
+    overflow: hidden;
     border-bottom: 1px solid var(--border);
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
 }
-.modal-tabs::-webkit-scrollbar { display: none; }
 .modal-tabs-wrap { position: relative; }
 .modal-tab-btn {
     position: relative;
-    flex: 1 0 auto;
-    padding: var(--sp-3) var(--sp-2);
-    padding-right: 26px;
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px 4px 10px;
     font-size: var(--fs-xs);
     font-weight: 600;
+    line-height: 1.2;
+    text-align: center;
     color: var(--text-muted);
-    white-space: nowrap;
+    white-space: normal;
     background: transparent;
     border: none;
     border-bottom: 3px solid transparent;
@@ -2152,21 +2159,20 @@ body.modal-open { overflow: hidden; }
 .modal-tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
 .tab-badge {
     position: absolute;
-    top: 50%;
-    right: 6px;
-    min-width: 20px;
-    padding: 2px 6px;
-    font-size: var(--fs-xs);
+    top: 0;
+    right: 0;
+    min-width: 18px;
+    padding: 1px 5px;
+    font-size: 11px;
     font-weight: 700;
-    line-height: 1.2;
+    line-height: 1.3;
     text-align: center;
     color: #fff;
     background-color: var(--danger);
     border-radius: var(--r-full);
-    transform: translateY(-50%);
     transition: transform var(--dur) var(--ease), opacity var(--dur) var(--ease);
 }
-.tab-badge.hidden { display: inline-block !important; transform: translateY(-50%) scale(0); opacity: 0; }
+.tab-badge.hidden { display: inline-block !important; transform: scale(0); opacity: 0; }
 
 .hu-tab-panel { flex: 1; min-height: 0; max-height: 60vh; overflow-y: auto; padding-right: var(--sp-1); }
 #openHusModal .modal-content { min-height: 70vh; min-height: 70dvh; }
@@ -2637,6 +2643,10 @@ body.auth-open { overflow: hidden; }
     .modal-content::before { display: none; }
     #openHusModal .modal-content, #importHuModal .modal-content { max-width: 640px; }
     .modal-tabs { margin: 0 calc(-1 * var(--sp-6)) var(--sp-3); padding: 0 var(--sp-6); }
+    /* Desktop wie bisher: Reiter so breit wie ihr Text, einzeilig, Zähler rechts neben dem Text */
+    .modal-tab-btn { flex: 0 1 auto; padding: var(--sp-3) 26px var(--sp-3) var(--sp-2); white-space: nowrap; }
+    .tab-badge { top: 50%; right: 6px; min-width: 20px; padding: 2px 6px; font-size: var(--fs-xs); line-height: 1.2; transform: translateY(-50%); }
+    .tab-badge.hidden { transform: translateY(-50%) scale(0); }
 
     #detailView { padding: 0 var(--sp-6) var(--sp-8); }
     .detail-view-header { margin: 0 calc(-1 * var(--sp-6)) var(--sp-4); padding: var(--sp-2) var(--sp-6); }

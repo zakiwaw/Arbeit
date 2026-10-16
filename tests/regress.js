@@ -295,5 +295,25 @@ const wait = (ms) => new Promise(r => setTimeout(r, ms));
       assert(pm.__errors.length === 0, `Keine JS-Fehler im ⋮-Menü (${pm.__errors.join(' | ')})`);
       await pm.close();
     }
+
+    // ---- Sheet „Offene HUs“: vier Reiter nebeneinander ohne seitliches Scrollen (iOS schob sonst das ganze Sheet mit) ----
+    {
+      const bh = makeBackend(sampleData(), {});
+      const ph = await openApp(browser, bh, {}); await wait(400);
+      await ph.evaluate(() => document.getElementById('menu-toggle-btn').click()); await wait(200);
+      await ph.evaluate(() => document.getElementById('showOpenHusButton').click()); await wait(500);
+      const hs = await ph.evaluate(() => {
+        const mc = document.querySelector('#openHusModal .modal-content'); const tabs = mc.querySelector('.modal-tabs'); const r = [...tabs.children].map(b => b.getBoundingClientRect());
+        return { visible: document.getElementById('openHusModal').classList.contains('visible'), n: r.length, inView: r.every(x => x.left >= 0 && x.right <= innerWidth + 0.5),
+          tabsNoScroll: tabs.scrollWidth <= tabs.clientWidth && getComputedStyle(tabs).overflowX === 'hidden', sheetNoX: mc.scrollWidth <= mc.clientWidth && getComputedStyle(mc).overflowX === 'hidden',
+          sameH: r.every(x => Math.abs(x.height - r[0].height) < 1), h: Math.round(r[0].height),
+          labels: [...tabs.children].map(b => b.firstChild.textContent.replace(/\u00AD/g, '')), badgeIn: [...tabs.querySelectorAll('.tab-badge:not(.hidden)')].every(bd => { const b = bd.getBoundingClientRect(), p = bd.parentElement.getBoundingClientRect(); return b.right <= p.right + 0.5 && b.top >= p.top - 0.5; }) };
+      });
+      assert(hs.visible && hs.n === 4 && hs.inView && hs.tabsNoScroll && hs.sheetNoX && hs.sameH && hs.h <= 70 && hs.labels.join('|') === 'Offene Sicherung|Fehlende Eingänge|Dunkelalarm|Überzählig' && hs.badgeIn,
+        `„Offene HUs“ 390 px: alle vier Reiter im Bild, Leiste und Sheet ohne waagerechten Überlauf, Zähler innerhalb des Reiters (${JSON.stringify(hs)})`);
+      await ph.evaluate(() => document.getElementById('closeOpenHusModalButton').click()); await wait(200);
+      assert(ph.__errors.length === 0, `Keine JS-Fehler im Sheet „Offene HUs“ (${ph.__errors.join(' | ')})`);
+      await ph.close();
+    }
   } finally { await browser.close(); finish(); }
 })().catch(e => { console.error('ERR', e); process.exit(1); });
