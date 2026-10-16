@@ -66,9 +66,14 @@ async function referencePayload(page, mode, text) {
     assert(!(await page.$('#sendSummaryEmailButton')) && !!(await page.$('#erfassenButton')), 'Menü: „Zusammenfassung per E-Mail“ ersetzt durch „Aufträge erfassen“');
     await page.evaluate(() => document.getElementById('menu-toggle-btn').click()); await wait(200);
     await page.evaluate(() => document.getElementById('erfassenButton').click()); await wait(400);
-    const st1 = await page.evaluate(() => ({ page: getComputedStyle(document.getElementById('pageView')).display !== 'none', title: document.getElementById('pageTitle').textContent, url: location.search, modal: !!document.querySelector('.modal.visible'), menu: document.getElementById('side-menu').classList.contains('open'), tabs: [...document.querySelectorAll('.erf-tab')].map(b => b.textContent), active: document.querySelector('.erf-tab.is-active')?.dataset.erfMode, ta: !!document.getElementById('erfInput') }));
+    const st1 = await page.evaluate(() => ({ page: getComputedStyle(document.getElementById('pageView')).display !== 'none', title: document.getElementById('pageTitle').textContent, url: location.search, modal: !!document.querySelector('.modal.visible'), menu: document.getElementById('side-menu').classList.contains('open'), tabs: [...document.querySelectorAll('.erf-tab')].map(b => b.textContent.replace(/\u00AD/g, '')), active: document.querySelector('.erf-tab.is-active')?.dataset.erfMode, ta: !!document.getElementById('erfInput') }));
     assert(st1.page && st1.title === 'Aufträge erfassen' && st1.url === '?seite=erfassen' && !st1.modal && !st1.menu, `Eigene Seite mit Adresse ?seite=erfassen, kein Modal (${JSON.stringify(st1)})`);
     assert(st1.tabs.join('|') === 'MAN Fracht|Vorverladeliste (VW)|Standard (Leerzeilen)' && st1.active === 'man' && st1.ta, 'Drei Modi wie im Generator, MAN vorausgewählt, Textfeld vorhanden');
+    // Reiterleiste auf dem Handy: scrollt in keine Richtung (iOS zeigte sonst Scrollbalken, Reiter waren abgeschnitten),
+    // alle drei Reiter voll im Bild, bei Bedarf zweizeilig (weiches Trennzeichen „Vorverlade-liste“)
+    const tabGeo = await page.evaluate(() => { const t = document.querySelector('.erf-tabs'); const r = [...t.children].map(b => b.getBoundingClientRect());
+      return { sw: t.scrollWidth, cw: t.clientWidth, sh: t.scrollHeight, ch: t.clientHeight, oy: getComputedStyle(t).overflowY, inView: r.every(x => x.left >= 0 && x.right <= innerWidth + 0.5), h: Math.round(r[0].height), sameH: r.every(x => Math.abs(x.height - r[0].height) < 1), n: r.length }; });
+    assert(tabGeo.n === 3 && tabGeo.sw <= tabGeo.cw && tabGeo.sh <= tabGeo.ch && tabGeo.oy === 'hidden' && tabGeo.inView && tabGeo.sameH && tabGeo.h <= 60, `Reiterleiste 390 px: kein Überlauf (waagerecht/senkrecht), alle Reiter im Bild, gleich hoch, max. zwei Zeilen (${JSON.stringify(tabGeo)})`);
     // leer → Hinweis
     await page.evaluate(() => document.getElementById('erfAnalyzeBtn').click()); await wait(200);
     assert(/Bitte zuerst den Text einfügen/.test(await page.$eval('#pageContent', e => e.textContent)), 'Ohne Text: Hinweis statt Fehler');

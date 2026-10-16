@@ -4627,7 +4627,8 @@ const manTruckId = 'MAN ' + newManNumber;
 // ---- Seite „Aufträge erfassen“ (ehem. externer „Multi-Auftrag QR-Code Generator“) ----------------------------------
 // Text aus dem MAN-Dokument / der Vorverladeliste einfügen → Aufträge werden erkannt (Parser 1:1 aus dem Generator) →
 // wahlweise als QR-Code anzeigen (für ein anderes Gerät) oder direkt in der App anlegen (gleicher Import wie beim Scan).
-const ERF_MODES = { man: 'MAN Fracht', vvl: 'Vorverladeliste (VW)', standard: 'Standard (Leerzeilen)' };
+// \u00AD = weiches Trennzeichen: unsichtbar, erlaubt auf schmalen Handys den Zeilenumbruch „Vorverlade-liste“ im Reiter
+const ERF_MODES = { man: 'MAN Fracht', vvl: 'Vorverlade\u00ADliste (VW)', standard: 'Standard (Leer\u00ADzeilen)' };
 const ERF_PLACEHOLDERS = {
     vvl: 'Daten aus der Vorverladeliste hier einfügen …\nErkannt werden Vorverladeliste-Nr., Kundennr. und die Positionen.\n\nBeispiel:\nVorverladeliste-Nr.: 100004049786\n\nKundennr: 9974021\n873227447 8255014\n…',
     man: 'Daten vom MAN-Dokument hier einfügen …\nErkannt werden Spediteur, Rechnung, PLSO und HUs – auch das „Nachlieferung“-Format.\n\nBeispiel:\nMaersk Logistics & Services/Senator, Südafrika\n9007988206\n3181 0128115\n1 0925102219E2|Einwegpalette B03|120x80x60 CM|42 KG\n\nBeispiel Nachlieferung:\nLogwin, Singapur\nNachlieferung\n3181 0128082\n1 9251021068F\n2 92510210CB3',
@@ -7233,6 +7234,13 @@ if (huEditFormEl) {
                     el.style.top = Math.max(0, vv.offsetTop) + 'px'; el.style.height = Math.round(vv.height) + 'px'; el.style.bottom = 'auto';
                 } else if (el.style.height) { el.style.top = ''; el.style.height = ''; el.style.bottom = ''; }
             });
+            // Unterseite (z. B. „Aufträge erfassen“): iOS als installierte App verkleinert bei offener Tastatur die ganze
+            // Ansicht und scrollt sie zum Textfeld; nach dem Schließen blieb der Inhalt teils unter der Kopfzeile stehen
+            // (Reiter oben abgeschnitten). Scroll-Stand wieder auf das tatsächlich Mögliche begrenzen.
+            if (!keyboardOpen && pageViewEl && !pageViewEl.classList.contains('hidden')) {
+                const max = Math.max(0, pageViewEl.scrollHeight - pageViewEl.clientHeight);
+                if (pageViewEl.scrollTop > max) pageViewEl.scrollTop = max;
+            }
         };
         const schedule = () => { if (!raf) raf = requestAnimationFrame(apply); };
         vv.addEventListener('resize', schedule);

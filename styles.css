@@ -2965,8 +2965,11 @@ body.auth-open { overflow: hidden; }
 .lkw-menu-item { width: 100%; overflow: hidden; -webkit-user-select: none; user-select: none; }
 
 /* ---- Seite „Aufträge erfassen“ (Text einfügen → Aufträge erkennen → QR-Code oder direkt anlegen) ---- */
-.erf-tabs { display: flex; gap: var(--sp-1); margin-bottom: var(--sp-3); border-bottom: 2px solid var(--border); overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.erf-tab { flex: 0 0 auto; padding: 10px 14px; margin-bottom: -2px; font-size: var(--fs-sm); font-weight: 600; color: var(--text-muted); background: transparent; border: 0; border-bottom: 3px solid transparent; border-radius: 0; white-space: nowrap; }
+/* Reiter: Grundlinie als Innenschatten statt Rahmen + negativem Rand → die Reiter ragen nicht mehr unten über die Leiste
+   hinaus (iOS zeigte dafür einen senkrechten Scrollbalken). Auf dem Handy teilen sich die drei Reiter die Breite und
+   dürfen zweizeilig umbrechen – die Leiste scrollt nicht, nichts wird abgeschnitten; am Desktop bleiben sie kompakt. */
+.erf-tabs { display: flex; align-items: stretch; gap: var(--sp-1); margin-bottom: var(--sp-3); box-shadow: inset 0 -2px 0 var(--border); overflow: hidden; }
+.erf-tab { flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: center; padding: 8px 6px; font-size: var(--fs-sm); font-weight: 600; line-height: 1.2; text-align: center; color: var(--text-muted); background: transparent; border: 0; border-bottom: 3px solid transparent; border-radius: 0; }
 .erf-tab.is-active { color: var(--accent-text); border-bottom-color: var(--accent); }
 .erf-input { display: block; min-height: 220px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: var(--fs-sm); line-height: 1.4; resize: vertical; }
 .erf-actions { display: flex; flex-direction: column; gap: var(--sp-2); margin: var(--sp-3) 0 var(--sp-4); }
@@ -2990,6 +2993,7 @@ body.auth-open { overflow: hidden; }
 @media (min-width: 992px) {
     /* Seite „Aufträge erfassen“ am Schreibtisch: eine Spalte (max. 900 px) wie „Mitarbeiter“, Knöpfe nebeneinander */
     #pageContent:has(.erf-tabs) > * { max-width: 900px; margin-left: auto; margin-right: auto; }
+    .erf-tab { flex: 0 0 auto; padding: 10px 14px; white-space: nowrap; }
     .erf-input { min-height: 300px; }
     .erf-actions, .erf-buttons { flex-direction: row; align-items: center; }
     .erf-actions .main-action-button, .erf-buttons .main-action-button { width: auto; flex: 1 1 auto; }
