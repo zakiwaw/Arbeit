@@ -95,6 +95,21 @@ async function referencePayload(page, mode, text) {
     await page.evaluate(() => document.getElementById('erfPasteBtn').click()); await wait(300);
     assert(/Zwischenablage ist leer/.test(await page.evaluate(() => document.querySelector('.erf-notice')?.textContent || '')), 'Leere Zwischenablage: verständlicher Hinweis');
     await page.evaluate(() => document.getElementById('erfClearBtn').click()); await wait(200);
+    // iPhone: Apple verlangt das Antippen der System-Blase „Einsetzen“ – solange sie offen ist, steht der Hinweis über dem
+    // Knopf; wird daneben getippt (Zugriff verweigert), erklärt die Meldung die Blase statt „nicht erlaubt“
+    {
+      const bi = makeBackend(sampleData(), {});
+      const pi = await openApp(browser, bi, { query: '?seite=erfassen', userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1' }); await wait(400);
+      await pi.evaluate(() => { let resolveLater; window.__pasteGate = new Promise((_, rej) => { resolveLater = rej; }); window.__rejectPaste = resolveLater; Object.defineProperty(navigator.clipboard, 'readText', { configurable: true, value: () => window.__pasteGate }); });
+      await pi.evaluate(() => document.getElementById('erfPasteBtn').click()); await wait(150);
+      const waiting = await pi.evaluate(() => { const h = document.getElementById('erfPasteHint'), b = document.getElementById('erfPasteBtn'); const hr = h.getBoundingClientRect(), br = b.getBoundingClientRect(); return { hintShown: !h.classList.contains('hidden'), text: h.textContent, leftOfBtn: hr.right <= br.left + 1 && hr.bottom <= br.bottom + 1, busy: b.classList.contains('is-busy') }; });
+      assert(waiting.hintShown && /„Einsetzen“ tippen/.test(waiting.text) && waiting.leftOfBtn && waiting.busy, `iPhone: während die Blase offen ist, steht „Jetzt oben auf „Einsetzen“ tippen“ links neben dem Knopf (${JSON.stringify(waiting)})`);
+      await pi.evaluate(() => window.__rejectPaste(new DOMException('denied', 'NotAllowedError'))); await wait(300);
+      const iosDenied = await pi.evaluate(() => ({ notice: document.querySelector('.erf-notice')?.textContent.trim() || '', hint: !!document.getElementById('erfPasteHint') && document.getElementById('erfPasteHint').classList.contains('hidden'), focus: document.activeElement.id }));
+      assert(/Blase „Einsetzen“/.test(iosDenied.notice) && !/nicht erlaubt/.test(iosDenied.notice) && iosDenied.hint && iosDenied.focus === 'erfInput', `iPhone, daneben getippt: Meldung erklärt die Blase „Einsetzen“, Hinweis wieder weg, Feld fokussiert (${JSON.stringify(iosDenied)})`);
+      assert(pi.__errors.length === 0, `Keine JS-Fehler (iPhone-Pfad) (${pi.__errors.join(' | ')})`);
+      await pi.close();
+    }
     // leer → Hinweis
     await page.evaluate(() => document.getElementById('erfAnalyzeBtn').click()); await wait(200);
     assert(/Bitte zuerst den Text einfügen/.test(await page.$eval('#pageContent', e => e.textContent)), 'Ohne Text: Hinweis statt Fehler');

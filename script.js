@@ -4718,6 +4718,7 @@ function renderErfassenPage() {
     let html = `<div class="erf-tabs" role="tablist">${Object.keys(ERF_MODES).map(m => `<button type="button" class="erf-tab ${st.mode === m ? 'is-active' : ''}" data-erf-mode="${m}" role="tab" aria-selected="${st.mode === m}">${ERF_MODES[m]}</button>`).join('')}</div>`;
     // Textfeld mit schwebendem „Einfügen“-Knopf (Zwischenablage) – nur solange das Feld leer ist, der Beispieltext bleibt sichtbar
     html += `<div class="erf-input-wrap"><textarea id="erfInput" class="erf-input" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="${escapeHtml(ERF_PLACEHOLDERS[st.mode])}">${escapeHtml(st.text)}</textarea>`
+        + `<div class="erf-paste-hint hidden" id="erfPasteHint" role="status">Jetzt oben auf „Einsetzen“ tippen</div>`
         + `<button type="button" class="erf-paste-btn ${st.text.trim() ? 'hidden' : ''}" id="erfPasteBtn" title="Text aus der Zwischenablage einfügen"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19,20H5V4H7V7H17V4H19M12,2A1,1 0 0,1 13,3A1,1 0 0,1 12,4A1,1 0 0,1 11,3A1,1 0 0,1 12,2M19,2H14.82C14.4,0.84 13.3,0 12,0C10.7,0 9.6,0.84 9.18,2H5A2,2 0 0,0 3,4V20A2,2 0 0,0 5,22H19A2,2 0 0,0 21,20V4A2,2 0 0,0 19,2Z"/></svg><span>Einfügen</span></button></div>`;
     html += `<div class="erf-actions"><button type="button" class="main-action-button" id="erfAnalyzeBtn">Aufträge erkennen</button><button type="button" class="page-link-btn" id="erfClearBtn">Leeren</button></div>`;
     if (st.notice) html += `<div class="page-banner erf-notice is-${st.notice.kind}"><span>${escapeHtml(st.notice.text)}</span><button type="button" class="page-link-btn" data-erf-notice-close>OK</button></div>`;
@@ -4743,15 +4744,25 @@ function renderErfassenPage() {
     const ta = document.getElementById('erfInput');
     if (ta) ta.addEventListener('input', () => { erfState.text = ta.value; document.getElementById('erfPasteBtn')?.classList.toggle('hidden', !!ta.value.trim()); });
 }
-// „Einfügen“: Zwischenablage lesen (Browser fragt ggf. einmal nach bzw. iOS zeigt die „Einfügen“-Blase) und sofort erkennen –
-// spart das Langdrücken im Feld und den Extra-Tipp auf „Aufträge erkennen“. Geht es nicht (verweigert, kein HTTPS, Firefox),
-// bleibt der normale Weg: ins Feld tippen und „Einfügen“ wählen.
+// „Einfügen“: Zwischenablage lesen und sofort erkennen – spart das Langdrücken im Feld und den Extra-Tipp auf „Aufträge
+// erkennen“. iPhone/iPad: Apple lässt das Lesen nur zu, wenn der Nutzer die kleine System-Blase „Einsetzen“ antippt, die
+// beim Antippen des Knopfs erscheint (Datenschutz; keine Ausnahme möglich) – darum der Hinweis über dem Knopf. Tippt man
+// daneben, meldet WebKit „nicht erlaubt“ → verständliche Meldung mit dem Blasen-Tipp. Android/Chrome fragt höchstens
+// einmal nach der Berechtigung; Firefox/kein HTTPS: es bleibt der Handweg (ins Feld tippen, gedrückt halten, Einfügen).
+const IS_IOS_WEBKIT = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 async function erfPasteFromClipboard(btn) {
-    if (!navigator.clipboard || !navigator.clipboard.readText) { erfPasteFallback('Dieser Browser erlaubt das Einfügen per Knopf nicht'); return; }
+    if (!navigator.clipboard || !navigator.clipboard.readText) { erfPasteFallback('Dieser Browser erlaubt das Einfügen per Knopf nicht – bitte ins Feld tippen, gedrückt halten und „Einfügen“ wählen.'); return; }
     btn.classList.add('is-busy');
+    if (IS_IOS_WEBKIT) document.getElementById('erfPasteHint')?.classList.remove('hidden');
     let text;
     try { text = await navigator.clipboard.readText(); }
-    catch (e) { btn.classList.remove('is-busy'); erfPasteFallback('Zugriff auf die Zwischenablage nicht erlaubt'); return; }
+    catch (e) {
+        btn.classList.remove('is-busy');
+        erfPasteFallback(IS_IOS_WEBKIT
+            ? 'Nicht eingefügt: Nach dem Antippen von „Einfügen“ erscheint die kleine Blase „Einsetzen“ – bitte diese antippen. Alternativ ins Feld tippen, gedrückt halten und „Einsetzen“ wählen.'
+            : 'Zugriff auf die Zwischenablage nicht erlaubt – bitte ins Feld tippen, gedrückt halten und „Einfügen“ wählen.');
+        return;
+    }
     btn.classList.remove('is-busy');
     if (!text || !text.trim()) { erfState.notice = { kind: 'error', text: 'Die Zwischenablage ist leer – bitte zuerst den Text im Dokument kopieren.' }; renderErfassenPage(); return; }
     erfState.text = text; erfState.result = null; erfState.showQr = false; erfState.notice = null;
@@ -4759,8 +4770,8 @@ async function erfPasteFromClipboard(btn) {
     renderErfassenPage();
     document.querySelector('.erf-result, .page-banner.is-error')?.scrollIntoView({ block: 'nearest' });
 }
-function erfPasteFallback(why) {
-    erfState.notice = { kind: 'error', text: `${why} – bitte ins Feld tippen, gedrückt halten und „Einfügen“ wählen.` };
+function erfPasteFallback(text) {
+    erfState.notice = { kind: 'error', text };
     renderErfassenPage();
     document.getElementById('erfInput')?.focus({ preventScroll: true });
 }
