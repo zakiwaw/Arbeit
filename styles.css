@@ -2985,6 +2985,7 @@ body.auth-open { overflow: hidden; }
 .erf-actions { display: flex; flex-direction: column; gap: var(--sp-2); margin: var(--sp-3) 0 var(--sp-4); }
 .erf-actions .main-action-button { margin: 0; }
 .erf-notice { align-items: flex-start; }
+.erf-notice .page-link-btn { width: auto; flex: 0 0 auto; }
 .erf-notice.is-ok { color: var(--success-text); background-color: var(--success-soft); }
 .erf-notice.is-error, .page-banner.is-error { color: var(--danger-text); background-color: var(--danger-soft); }
 .erf-result { margin-top: var(--sp-2); }
