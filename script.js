@@ -4716,7 +4716,9 @@ function renderErfassenPage() {
     const st = erfState, r = st.result;
     setPageHeader('Aufträge erfassen', r && r.orders ? pluralize(r.orders.length, 'Auftrag', 'Aufträge') : '');
     let html = `<div class="erf-tabs" role="tablist">${Object.keys(ERF_MODES).map(m => `<button type="button" class="erf-tab ${st.mode === m ? 'is-active' : ''}" data-erf-mode="${m}" role="tab" aria-selected="${st.mode === m}">${ERF_MODES[m]}</button>`).join('')}</div>`;
-    html += `<textarea id="erfInput" class="erf-input" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="${escapeHtml(ERF_PLACEHOLDERS[st.mode])}">${escapeHtml(st.text)}</textarea>`;
+    // Textfeld mit schwebendem „Einfügen“-Knopf (Zwischenablage) – nur solange das Feld leer ist, der Beispieltext bleibt sichtbar
+    html += `<div class="erf-input-wrap"><textarea id="erfInput" class="erf-input" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="${escapeHtml(ERF_PLACEHOLDERS[st.mode])}">${escapeHtml(st.text)}</textarea>`
+        + `<button type="button" class="erf-paste-btn ${st.text.trim() ? 'hidden' : ''}" id="erfPasteBtn" title="Text aus der Zwischenablage einfügen"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19,20H5V4H7V7H17V4H19M12,2A1,1 0 0,1 13,3A1,1 0 0,1 12,4A1,1 0 0,1 11,3A1,1 0 0,1 12,2M19,2H14.82C14.4,0.84 13.3,0 12,0C10.7,0 9.6,0.84 9.18,2H5A2,2 0 0,0 3,4V20A2,2 0 0,0 5,22H19A2,2 0 0,0 21,20V4A2,2 0 0,0 19,2Z"/></svg><span>Einfügen</span></button></div>`;
     html += `<div class="erf-actions"><button type="button" class="main-action-button" id="erfAnalyzeBtn">Aufträge erkennen</button><button type="button" class="page-link-btn" id="erfClearBtn">Leeren</button></div>`;
     if (st.notice) html += `<div class="page-banner erf-notice is-${st.notice.kind}"><span>${escapeHtml(st.notice.text)}</span><button type="button" class="page-link-btn" data-erf-notice-close>OK</button></div>`;
     if (r && r.error) html += `<div class="page-banner is-error"><span>${escapeHtml(r.error)}</span></div>`;
@@ -4739,10 +4741,33 @@ function renderErfassenPage() {
         new QRCode(document.getElementById('erfQrCode'), { text: r.payload, width: 300, height: 300, correctLevel: QRCode.CorrectLevel.M });
     }
     const ta = document.getElementById('erfInput');
-    if (ta) ta.addEventListener('input', () => { erfState.text = ta.value; });
+    if (ta) ta.addEventListener('input', () => { erfState.text = ta.value; document.getElementById('erfPasteBtn')?.classList.toggle('hidden', !!ta.value.trim()); });
+}
+// „Einfügen“: Zwischenablage lesen (Browser fragt ggf. einmal nach bzw. iOS zeigt die „Einfügen“-Blase) und sofort erkennen –
+// spart das Langdrücken im Feld und den Extra-Tipp auf „Aufträge erkennen“. Geht es nicht (verweigert, kein HTTPS, Firefox),
+// bleibt der normale Weg: ins Feld tippen und „Einfügen“ wählen.
+async function erfPasteFromClipboard(btn) {
+    if (!navigator.clipboard || !navigator.clipboard.readText) { erfPasteFallback('Dieser Browser erlaubt das Einfügen per Knopf nicht'); return; }
+    btn.classList.add('is-busy');
+    let text;
+    try { text = await navigator.clipboard.readText(); }
+    catch (e) { btn.classList.remove('is-busy'); erfPasteFallback('Zugriff auf die Zwischenablage nicht erlaubt'); return; }
+    btn.classList.remove('is-busy');
+    if (!text || !text.trim()) { erfState.notice = { kind: 'error', text: 'Die Zwischenablage ist leer – bitte zuerst den Text im Dokument kopieren.' }; renderErfassenPage(); return; }
+    erfState.text = text; erfState.result = null; erfState.showQr = false; erfState.notice = null;
+    erfAnalyze();
+    renderErfassenPage();
+    document.querySelector('.erf-result, .page-banner.is-error')?.scrollIntoView({ block: 'nearest' });
+}
+function erfPasteFallback(why) {
+    erfState.notice = { kind: 'error', text: `${why} – bitte ins Feld tippen, gedrückt halten und „Einfügen“ wählen.` };
+    renderErfassenPage();
+    document.getElementById('erfInput')?.focus({ preventScroll: true });
 }
 function handleErfassenPageClick(event) {
     const t = event.target;
+    const paste = t.closest('#erfPasteBtn');
+    if (paste) { erfPasteFromClipboard(paste); return; }
     const tab = t.closest('[data-erf-mode]');
     if (tab) { erfState.mode = tab.dataset.erfMode; erfState.result = null; erfState.showQr = false; renderErfassenPage(); return; }
     if (t.closest('[data-erf-notice-close]')) { erfState.notice = null; renderErfassenPage(); return; }
