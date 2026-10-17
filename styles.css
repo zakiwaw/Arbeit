@@ -2982,30 +2982,6 @@ body.auth-open { overflow: hidden; }
 .erf-tab { flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: center; padding: 8px 6px; font-size: var(--fs-sm); font-weight: 600; line-height: 1.2; text-align: center; color: var(--text-muted); background: transparent; border: 0; border-bottom: 3px solid transparent; border-radius: 0; }
 .erf-tab.is-active { color: var(--accent-text); border-bottom-color: var(--accent); }
 .erf-input { display: block; min-height: 220px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: var(--fs-sm); line-height: 1.4; resize: vertical; }
-/* Schwebender „Einfügen“-Knopf unten rechts im (leeren) Textfeld – der Beispieltext bleibt dahinter lesbar */
-.erf-input-wrap { position: relative; }
-.erf-paste-btn {
-    position: absolute;
-    right: 10px;
-    bottom: 10px;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    min-height: 40px;
-    padding: 0 16px 0 14px;
-    font-size: var(--fs-sm);
-    font-weight: 700;
-    color: #fff;
-    background-color: var(--accent);
-    border: none;
-    border-radius: var(--r-full);
-    box-shadow: var(--shadow-lg);
-    transition: transform var(--dur) var(--ease), opacity var(--dur) var(--ease);
-}
-.erf-paste-btn svg { width: 18px; height: 18px; }
-.erf-paste-btn:hover { background-color: var(--accent-hover); }
-.erf-paste-btn:active { transform: scale(.96); }
-.erf-paste-btn.is-busy { opacity: .6; pointer-events: none; }
 .erf-actions { display: flex; flex-direction: column; gap: var(--sp-2); margin: var(--sp-3) 0 var(--sp-4); }
 .erf-actions .main-action-button { margin: 0; }
 .erf-notice { align-items: flex-start; }

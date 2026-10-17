@@ -74,27 +74,6 @@ async function referencePayload(page, mode, text) {
     const tabGeo = await page.evaluate(() => { const t = document.querySelector('.erf-tabs'); const r = [...t.children].map(b => b.getBoundingClientRect());
       return { sw: t.scrollWidth, cw: t.clientWidth, sh: t.scrollHeight, ch: t.clientHeight, oy: getComputedStyle(t).overflowY, inView: r.every(x => x.left >= 0 && x.right <= innerWidth + 0.5), h: Math.round(r[0].height), sameH: r.every(x => Math.abs(x.height - r[0].height) < 1), n: r.length }; });
     assert(tabGeo.n === 3 && tabGeo.sw <= tabGeo.cw && tabGeo.sh <= tabGeo.ch && tabGeo.oy === 'hidden' && tabGeo.inView && tabGeo.sameH && tabGeo.h <= 60, `Reiterleiste 390 px: kein Überlauf (waagerecht/senkrecht), alle Reiter im Bild, gleich hoch, max. zwei Zeilen (${JSON.stringify(tabGeo)})`);
-    // „Einfügen“-Knopf: schwebt unten rechts im leeren Feld (Beispieltext bleibt), liest die Zwischenablage und erkennt sofort
-    const pg = await page.evaluate(() => { const b = document.getElementById('erfPasteBtn'), r = b.getBoundingClientRect(), t = document.getElementById('erfInput').getBoundingClientRect(); return { hidden: b.classList.contains('hidden'), inside: r.right <= t.right && r.bottom <= t.bottom && r.left > t.left + t.width / 2 && r.top > t.top + t.height / 2, placeholder: !!document.getElementById('erfInput').placeholder, label: b.textContent.trim() }; });
-    assert(!pg.hidden && pg.inside && pg.placeholder && pg.label === 'Einfügen', `„Einfügen“-Knopf sichtbar, unten rechts im leeren Textfeld, Beispieltext bleibt (${JSON.stringify(pg)})`);
-    await page.evaluate((t) => { Object.defineProperty(navigator.clipboard, 'readText', { configurable: true, value: async () => t }); }, MAN_TEXT);
-    await page.evaluate(() => document.getElementById('erfPasteBtn').click()); await wait(500);
-    const pasted = await page.evaluate(() => ({ ta: document.getElementById('erfInput').value, hidden: document.getElementById('erfPasteBtn').classList.contains('hidden'), res: document.querySelector('.erf-result h3')?.textContent.trim(), badge: document.getElementById('pageBadge').textContent }));
-    assert(pasted.ta === MAN_TEXT && pasted.hidden && pasted.res === 'Erkannt: 2 Aufträge, 4 Packstücke' && pasted.badge === '2 Aufträge', `Einfügen: Text im Feld, Knopf weg, Aufträge sofort erkannt (${JSON.stringify({ ...pasted, ta: pasted.ta.length })})`);
-    await page.evaluate(() => document.getElementById('erfClearBtn').click()); await wait(200);
-    await page.evaluate(() => { const ta = document.getElementById('erfInput'); ta.value = 'x'; ta.dispatchEvent(new Event('input', { bubbles: true })); });
-    const typed = await page.evaluate(() => document.getElementById('erfPasteBtn').classList.contains('hidden'));
-    await page.evaluate(() => document.getElementById('erfClearBtn').click()); await wait(200);
-    const cleared = await page.evaluate(() => document.getElementById('erfPasteBtn').classList.contains('hidden'));
-    assert(typed && !cleared, `Knopf verschwindet beim Tippen und kommt nach „Leeren“ zurück (tippen→${typed}, leeren→${!cleared})`);
-    await page.evaluate(() => { Object.defineProperty(navigator.clipboard, 'readText', { configurable: true, value: async () => { throw new DOMException('denied', 'NotAllowedError'); } }); });
-    await page.evaluate(() => document.getElementById('erfPasteBtn').click()); await wait(300);
-    const denied = await page.evaluate(() => ({ notice: document.querySelector('.erf-notice')?.textContent.trim() || '', focus: document.activeElement.id, ta: document.getElementById('erfInput').value }));
-    assert(/nicht erlaubt/.test(denied.notice) && /gedrückt halten/.test(denied.notice) && denied.focus === 'erfInput' && denied.ta === '', `Zugriff verweigert: Hinweis mit dem Handweg, Feld fokussiert, nichts verändert (${JSON.stringify(denied)})`);
-    await page.evaluate(() => { Object.defineProperty(navigator.clipboard, 'readText', { configurable: true, value: async () => '   ' }); });
-    await page.evaluate(() => document.getElementById('erfPasteBtn').click()); await wait(300);
-    assert(/Zwischenablage ist leer/.test(await page.evaluate(() => document.querySelector('.erf-notice')?.textContent || '')), 'Leere Zwischenablage: verständlicher Hinweis');
-    await page.evaluate(() => document.getElementById('erfClearBtn').click()); await wait(200);
     // leer → Hinweis
     await page.evaluate(() => document.getElementById('erfAnalyzeBtn').click()); await wait(200);
     assert(/Bitte zuerst den Text einfügen/.test(await page.$eval('#pageContent', e => e.textContent)), 'Ohne Text: Hinweis statt Fehler');
