@@ -102,6 +102,9 @@ async function referencePayload(page, mode, text) {
     await page.evaluate(() => document.getElementById('erfCreateBtn').click()); await wait(1500);
     const after = await page.evaluate(() => ({ notice: document.querySelector('.erf-notice')?.textContent.trim(), title: document.getElementById('pageTitle').textContent, ta: document.getElementById('erfInput')?.value, rows: document.querySelectorAll('.erf-row').length, url: location.search }));
     assert(after.title === 'Aufträge erfassen' && after.url === '?seite=erfassen' && /MAN \d+ angelegt: 2 Aufträge, 4 Packstücke/.test(after.notice) && after.ta === '' && after.rows === 0, `Direkt anlegen: Meldung, Seite bleibt offen, Feld geleert (${JSON.stringify(after)})`);
+    // lange Meldung (390 px): Text nimmt die Breite, OK-Knopf bleibt schmal (vorher: Wort-pro-Zeile-Turm neben riesigem OK)
+    const noticeGeo = await page.evaluate(() => { const n = document.querySelector('.erf-notice'); if (!n) return null; const sp = n.querySelector('span'), b = n.querySelector('[data-erf-notice-close]'); const orig = sp.textContent; sp.textContent = 'Nicht eingefügt: Dies ist eine absichtlich sehr lange Meldung, um zu prüfen, dass der Text die Breite bekommt und der OK-Knopf schmal bleibt.'; const sr = sp.getBoundingClientRect(), br = b.getBoundingClientRect(), nr = n.getBoundingClientRect(); sp.textContent = orig; return { spanW: Math.round(sr.width), btnW: Math.round(br.width), noticeW: Math.round(nr.width), spanH: Math.round(sr.height) }; });
+    assert(noticeGeo && noticeGeo.btnW < 80 && noticeGeo.spanW > noticeGeo.noticeW * 0.6 && noticeGeo.spanH < 120, `Lange Meldung: Text breit, OK-Knopf schmal, kein Wort-pro-Zeile-Turm (${JSON.stringify(noticeGeo)})`);
     const saved = be.requests.filter(r => r.action === 'saveShipments').slice(beforeActions >= 0 ? 0 : 0);
     const s1 = be.store['9007988206'], s2 = be.store['NACHLIEFERUNG'];
     assert(s1 && s2 && s1.truckId === s2.truckId && /^MAN \d+$/.test(s1.truckId) && typeof s1.originalManNumber === 'number', `Beide Aufträge am Server auf demselben neuen MAN-LKW (${s1 && s1.truckId})`);
@@ -172,6 +175,14 @@ async function referencePayload(page, mode, text) {
     await page.evaluate(() => { const ta = document.getElementById('erfInput'); ta.value = 'bleibt stehen'; ta.dispatchEvent(new Event('input', { bubbles: true })); });
     await wait(3500);
     assert((await page.$eval('#erfInput', t => t.value)) === 'bleibt stehen', 'Eingabe überlebt den Sync-Abruf (3 s)');
+    // Einsetzen (Strg+V / Gedrückthalten → Einsetzen) erkennt sofort; Tippen nicht
+    await page.evaluate(() => document.getElementById('erfClearBtn').click()); await wait(200);
+    await page.evaluate(() => { const b = [...document.querySelectorAll('[data-erf-mode]')].find(x => x.dataset.erfMode === 'man'); b.click(); }); await wait(200);
+    await page.evaluate((t) => { const ta = document.getElementById('erfInput'); ta.value = t; ta.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: 'x' })); }, MAN_TEXT); await wait(300);
+    assert(!(await page.$('.erf-result')) && (await page.$eval('#erfInput', t => t.value)).length > 50, 'Getippter/geänderter Text löst keine Erkennung aus');
+    await page.evaluate((t) => { const ta = document.getElementById('erfInput'); ta.value = t; ta.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertFromPaste' })); }, MAN_TEXT); await wait(400);
+    const pasted = await page.evaluate(() => ({ head: document.querySelector('.erf-result h3')?.textContent, ta: document.getElementById('erfInput').value.length, create: document.getElementById('erfCreateBtn')?.textContent }));
+    assert(pasted.head === 'Erkannt: 2 Aufträge, 4 Packstücke' && pasted.ta > 50 && /Direkt anlegen/.test(pasted.create || ''), `Eingesetzter Text wird sofort erkannt, Text bleibt im Feld (${JSON.stringify(pasted)})`);
     assert(page.__errors.length === 0, `Keine JS-Fehler (Desktop) (${page.__errors.join(' | ')})`);
     await page.close();
 

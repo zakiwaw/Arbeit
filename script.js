@@ -4739,7 +4739,11 @@ function renderErfassenPage() {
         new QRCode(document.getElementById('erfQrCode'), { text: r.payload, width: 300, height: 300, correctLevel: QRCode.CorrectLevel.M });
     }
     const ta = document.getElementById('erfInput');
-    if (ta) ta.addEventListener('input', () => { erfState.text = ta.value; });
+    if (ta) ta.addEventListener('input', (e) => {
+        erfState.text = ta.value;
+        // Eingesetzter Text (Gedrückthalten → Einsetzen, Strg+V) wird sofort erkannt – „Aufträge erkennen“ entfällt
+        if (e.inputType === 'insertFromPaste' && ta.value.trim()) { erfState.showQr = false; erfState.notice = null; erfAnalyze(); renderErfassenPage(); }
+    });
 }
 function handleErfassenPageClick(event) {
     const t = event.target;
