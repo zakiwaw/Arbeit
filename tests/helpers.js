@@ -99,7 +99,6 @@ async function openApp(browser, backend, opts = {}) {
   const lastActivity = opts.idleMs ? Date.now() - opts.idleMs : Date.now();
   if (!opts.keepStorage) await page.evaluateOnNewDocument((seed, lastActivity) => { if (!window.__storageCleared) { window.__storageCleared = true; try { localStorage.clear(); sessionStorage.clear(); if (seed) { localStorage.setItem('frachtTracker_session', seed); localStorage.setItem('frachtTracker_lastActivity', String(lastActivity)); } } catch (e) {} } }, seed, lastActivity);
   await page.setViewport(opts.viewport || { width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
-  if (opts.userAgent) await page.setUserAgent(opts.userAgent); // z. B. iPhone-Kennung für iOS-spezifische Pfade
   page.__errors = [];
   page.on('pageerror', e => page.__errors.push(String(e)));
   page.on('dialog', d => d.accept());

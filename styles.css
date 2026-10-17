@@ -3003,24 +3003,6 @@ body.auth-open { overflow: hidden; }
     transition: transform var(--dur) var(--ease), opacity var(--dur) var(--ease);
 }
 .erf-paste-btn svg { width: 18px; height: 18px; }
-/* iPhone/iPad: solange die System-Blase „Einsetzen“ (erscheint über dem Knopf) offen ist, sagt ein kleiner Zettel links
-   neben dem Knopf, was zu tun ist – links, damit die Blase ihn nicht verdeckt */
-.erf-paste-hint {
-    position: absolute;
-    left: 10px;
-    bottom: 10px;
-    max-width: calc(100% - 160px);
-    padding: 8px 12px;
-    font-size: var(--fs-sm);
-    font-weight: 600;
-    line-height: 1.3;
-    color: var(--text);
-    background-color: var(--surface);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--r-md);
-    box-shadow: var(--shadow-lg);
-    animation: overlay-in .15s var(--ease);
-}
 .erf-paste-btn:hover { background-color: var(--accent-hover); }
 .erf-paste-btn:active { transform: scale(.96); }
 .erf-paste-btn.is-busy { opacity: .6; pointer-events: none; }
