@@ -2351,6 +2351,10 @@ body.modal-open { overflow: hidden; }
     transition: opacity var(--dur) var(--ease), visibility var(--dur) var(--ease);
 }
 .loading-overlay.visible { visibility: visible; opacity: 1; }
+.loading-overlay { flex-direction: column; gap: var(--sp-4); }
+.loading-overlay:not(.visible) { pointer-events: none; }   /* beim Ausblenden nicht mehr im Weg */
+.loading-text { max-width: calc(100% - 2 * var(--sp-5)); padding: var(--sp-2) var(--sp-4); font-size: var(--fs-md); font-weight: 700; color: var(--text); text-align: center; background-color: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--r-md); box-shadow: var(--shadow-lg); }
+.loading-text:empty { display: none; }
 
 /* --- Anmeldung (PIN) / Einladung: liegt über allem – auch über dem Lade-Spinner --- */
 .auth-view {

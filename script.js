@@ -151,13 +151,12 @@ const suspicionDeclineBtnEl = document.getElementById('suspicionDeclineBtn');
         // (oder die Einladungsseite bei ?einladung=…) und kehrt erst nach erfolgreicher Anmeldung zurück.
         await ensureLoggedIn();
         const initialShipments = await loadDataFromServer();
-// LKW-Status vom Server laden und lokal cachen
-    try {
-        const lkwResult = await postToServer('loadLkwStatus');
-        localStorage.setItem(LKWSTATUSKEY, JSON.stringify(lkwResult.data));
-    } catch(e) {
-        console.warn('LKW-Status vom Server konnte nicht geladen werden. Nutze lokalen Cache.', e);
-    }
+        // LKW-Status: kommt normalerweise schon mit loadChanges (loadDataFromServer). Nur falls nicht (altes Server-Skript), extra laden –
+        // über applyServerLkwStatus, damit eine noch unbestätigte eigene Änderung (z. B. offline deaktiviert) nicht überschrieben wird.
+        if (!lkwStatusFetched) {
+            try { applyServerLkwStatus((await postToServer('loadLkwStatus')).data); }
+            catch (e) { console.warn('LKW-Status vom Server konnte nicht geladen werden. Nutze lokalen Cache.', e); }
+        }
 
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(initialShipments));
     
@@ -178,6 +177,7 @@ const suspicionDeclineBtnEl = document.getElementById('suspicionDeclineBtn');
         startSyncPolling();
         if (serverIsLegacy) displayError(SYNC_LEGACY_MESSAGE, 'orange'); // (toggleBatchMode oben hat Meldungen gelöscht)
         flushPendingChanges(); // offline erfasste Änderungen vom letzten Mal nachschicken
+        flushLkwStatus();      // … ebenso eine noch unbestätigte LKW-Statusänderung
         focusShipmentInput();
         console.log(`Fracht Tracker ${document.title.split('(')[1].split(')')[0]} initialized.`);
         hideLoader(); // <<<< NEU: Lade-Spinner verstecken, wenn alles fertig ist
@@ -460,16 +460,33 @@ function loadLkwStatus() {
     const data = localStorage.getItem(LKWSTATUSKEY);
     return data ? JSON.parse(data) : {};
 }
-async function saveLkwStatus(status) {
+// Schreibt sofort lokal und schickt den Stand an den Server – nie zwei Sendungen gleichzeitig, immer der jeweils neueste Stand.
+// Bis der Server bestätigt hat, bleibt die Änderung vorgemerkt (überlebt Neuladen) und Abruf-Antworten überschreiben sie nicht;
+// schlägt das Senden fehl, wird es beim nächsten Abruf erneut versucht (wie bei den Sendungen).
+function saveLkwStatus(status) {
     localStorage.setItem(LKWSTATUSKEY, JSON.stringify(status));
-    lkwStatusSaveInFlight++;
-    try {
-        await postToServer('saveLkwStatus', status);
-    } catch(e) {
-        console.warn('LKW-Status Server-Sync fehlgeschlagen:', e);
-    } finally {
-        lkwStatusSaveInFlight--;
-    }
+    localStorage.setItem(LKW_PENDING_KEY, '1');
+    lkwStatusRev++;
+    return flushLkwStatus();
+}
+function flushLkwStatus() {
+    if (!lkwStatusPending() || lkwStatusQueued) return lkwStatusChain;   // nichts offen – oder ein Senden mit dem aktuellen Stand steht schon an
+    lkwStatusQueued = true;
+    lkwStatusChain = lkwStatusChain.then(async () => {
+        lkwStatusQueued = false;
+        if (!lkwStatusPending() || isAuthViewOpen()) return;              // nach der Anmeldung holt der Abruf es nach
+        const rev = lkwStatusRev;
+        lkwStatusSaveInFlight++;
+        try {
+            await postToServer('saveLkwStatus', loadLkwStatus());
+            lkwStatusLastAckAt = Date.now();
+            if (lkwStatusRev === rev) localStorage.removeItem(LKW_PENDING_KEY);   // seitdem nichts Neues → bestätigt
+        } catch (e) {
+            syncLastErrorAt = Date.now();
+            console.warn('LKW-Status Server-Sync fehlgeschlagen (bleibt vorgemerkt):', e.message);
+        } finally { lkwStatusSaveInFlight--; }
+    });
+    return lkwStatusChain;
 }
 
 function isLkwActive(truckId) {
@@ -486,8 +503,10 @@ function calculateGoodsReceiptCount(scannedItems) {
 }
 
 // --- NEUE HILFSFUNKTIONEN FÜR DEN LADE-SPINNER ---
-function showLoader() {
+function showLoader(text) {
     if (loadingOverlayEl) {
+        const t = document.getElementById('loadingText');
+        if (t) t.textContent = text || '';
         loadingOverlayEl.classList.add('visible');
     }
 }
@@ -495,7 +514,25 @@ function showLoader() {
 function hideLoader() {
     if (loadingOverlayEl) {
         loadingOverlayEl.classList.remove('visible');
+        const t = document.getElementById('loadingText');
+        if (t) t.textContent = '';
     }
+}
+// Löschen / Deaktivieren / Umbenennen: Spinner mit Text, bis der Server bestätigt hat (höchstens maxMs) – so kann nichts
+// dazwischenkommen, und man sieht, dass es durch ist. Ohne Verbindung bleibt die Änderung vorgemerkt (Sync-Anzeige) und geht später raus.
+async function runBlocking(text, fn, maxMs = 12000) {
+    showLoader(text);
+    try { await fn(); await waitUntilSynced(maxMs); }
+    finally { hideLoader(); }
+}
+function waitUntilSynced(maxMs = 12000) {
+    return new Promise(resolve => {
+        const t0 = Date.now();
+        (function check() {
+            const idle = !syncInFlight && !hasPending() && !lkwStatusPending() && lkwStatusSaveInFlight === 0;
+            if (idle || syncLastErrorAt >= t0 || isAuthViewOpen() || Date.now() - t0 > maxMs) resolve(); else setTimeout(check, 80);
+        })();
+    });
 }
 // ERSETZEN SIE DIE ALTE FUNKTION MIT DIESER NEUEN VERSION
 
@@ -947,6 +984,15 @@ let syncPollDelay = SYNC_POLL_INTERVAL_MS;
 let syncPollFailures = 0;
 let serverIsLegacy = false; // Backend noch V1 (kennt loadChanges/saveShipments nicht) → altes Verhalten
 let lkwStatusSaveInFlight = 0;
+const LKW_PENDING_KEY = LOCAL_STORAGE_KEY + '_lkwStatusPending'; // '1' = lokale LKW-Statusänderung noch nicht vom Server bestätigt (überlebt Neuladen)
+let lkwStatusRev = 0;              // zählt lokale Statusänderungen (Senden bestätigt nur den Stand, der auch geschickt wurde)
+let lkwStatusLastAckAt = 0;        // Zeitpunkt der letzten Server-Bestätigung; Abrufe, die davor gestartet wurden, können einen älteren Stand tragen
+let lkwStatusChain = Promise.resolve();
+let lkwStatusQueued = false;
+let syncLastErrorAt = 0;           // Zeitpunkt des letzten fehlgeschlagenen Sendens (runBlocking wartet dann nicht bis zum Zeitlimit)
+let serverHasBatchDelete = true;   // Server-Skript ab 2.4 kennt deleteShipments (alle Löschvermerke in EINEM Aufruf); sonst einzeln wie bisher
+let lkwStatusFetched = false;      // LKW-Status kam beim Start mit loadChanges (sonst holt initializeApp ihn einzeln)
+function lkwStatusPending() { return localStorage.getItem(LKW_PENDING_KEY) === '1'; }
 
 function getSyncVersion() { return Number(localStorage.getItem(SYNC_VERSION_KEY)) || 0; }
 function setSyncVersion(v) { if (typeof v === 'number' && !isNaN(v)) localStorage.setItem(SYNC_VERSION_KEY, String(v)); }
@@ -1407,7 +1453,9 @@ async function saveShipments(shipments) {
     Object.keys(shipments).forEach(b => {
         if (snap[b] !== JSON.stringify(shipments[b])) pending.changed[b] = true;
     });
-    Object.keys(pending.changed).forEach(b => { if (!(b in shipments)) delete pending.changed[b]; });
+    // Verschwundene Sendungen bekommen einen Löschvermerk, wenn der Server sie kennt (Ausgangsstand) ODER kennen könnte (Änderung
+    // vorgemerkt bzw. gerade unterwegs) – sonst käme eine eben erst angelegte und sofort wieder gelöschte Sendung beim nächsten Abruf zurück.
+    Object.keys(pending.changed).forEach(b => { if (!(b in shipments)) { delete pending.changed[b]; pending.deleted[b] = true; } });
     Object.keys(snap).forEach(b => { if (!(b in shipments)) pending.deleted[b] = true; });
     writePending(pending);
 
@@ -1431,8 +1479,22 @@ async function flushPendingChanges() {
         } else {
             const pending = readPending();
 
-            // Löschungen zuerst (Tombstones), damit kein anderes Gerät die Sendung wiederbelebt
-            for (const b of Object.keys(pending.deleted)) {
+            // Löschungen zuerst (Tombstones), damit kein anderes Gerät die Sendung wiederbelebt –
+            // möglichst alle in EINEM Aufruf (Server-Skript ab 2.4), sonst einzeln wie bisher
+            let delBases = Object.keys(pending.deleted);
+            if (delBases.length > 1 && serverHasBatchDelete) {
+                try {
+                    await postToServer('deleteShipments', { baseNumbers: delBases });
+                    const p = readPending(); const s = readSnapshot();
+                    delBases.forEach(b => { delete p.deleted[b]; delete s[b]; });
+                    writePending(p); writeSnapshot(s);
+                    delBases = [];
+                } catch (e) {
+                    if (!isUnknownActionError(e)) throw e;
+                    serverHasBatchDelete = false;   // älteres Server-Skript → einzeln
+                }
+            }
+            for (const b of delBases) {
                 await postToServer('deleteShipment', { baseNumber: b });
                 const p = readPending(); delete p.deleted[b]; writePending(p);
                 const s = readSnapshot(); delete s[b]; writeSnapshot(s);
@@ -1475,6 +1537,7 @@ async function flushPendingChanges() {
         }
         if (!hasPending()) showSyncOk();
     } catch (error) {
+        syncLastErrorAt = Date.now();
         console.warn("Server-Synchronisierung fehlgeschlagen:", error.message);
         if (isAuthError(error)) {
             setSyncIndicator('error', 'Anmeldung erforderlich – Daten sind lokal gespeichert'); // Anmeldeseite ist bereits offen (postToServer)
@@ -1487,6 +1550,7 @@ async function flushPendingChanges() {
     } finally {
         syncInFlight = false;
         if (syncQueued) { syncQueued = false; flushPendingChanges(); }
+        if (lkwStatusPending()) flushLkwStatus();
     }
 }
 
@@ -1533,8 +1597,11 @@ function applyServerShipments(changed, deleted, fullSet, archived) {
     return { touched, skipped };
 }
 
-function applyServerLkwStatus(status) {
-    if (!status || typeof status !== 'object' || lkwStatusSaveInFlight > 0) return;
+function applyServerLkwStatus(status, requestedAt) {
+    if (!status || typeof status !== 'object') return;
+    // Eigene Änderung noch unbestätigt oder gerade unterwegs → unser Stand ist neuer. Ebenso ein Abruf, der VOR der letzten Bestätigung
+    // gestartet wurde: der Server kann ihn vor unserem Speichern beantwortet haben (Abruf läuft ohne Sperre), die Antwort käme dann zu spät an.
+    if (lkwStatusPending() || lkwStatusSaveInFlight > 0 || (requestedAt !== undefined && requestedAt < lkwStatusLastAckAt)) return;
     const json = JSON.stringify(status);
     if (json === JSON.stringify(loadLkwStatus())) return;
     localStorage.setItem(LKWSTATUSKEY, json);
@@ -1569,10 +1636,11 @@ async function pullRemoteChanges() {
             const r = await postToServer('loadAllData');
             applyServerShipments(r.data || {}, [], true);
         } else {
+            const requestedAt = Date.now();
             const r = await postToServer('loadChanges', { sinceVersion: getSyncVersion() });
             if (r.full && Array.isArray(r.archivedBases)) setArchiveKnownBases(r.archivedBases);
             const skipped = applyServerShipments(r.changed || {}, r.deleted || [], !!r.full, r.archived || []).skipped;
-            applyServerLkwStatus(r.lkwStatus);
+            applyServerLkwStatus(r.lkwStatus, requestedAt);
             // Wurde eine Fremdänderung wegen lokal wartender Änderungen übersprungen, Version NICHT weiterschalten –
             // sie wird beim nächsten Abruf erneut geliefert (und ist dann nach dem Server-Merge längst enthalten).
             if (!skipped) setSyncVersion(r.version);
@@ -1589,6 +1657,7 @@ async function pullRemoteChanges() {
     } finally {
         syncInFlight = false;
         if (syncQueued || hasPending()) { syncQueued = false; flushPendingChanges(); }
+        if (lkwStatusPending()) flushLkwStatus();   // z. B. nach Verbindungsfehler oder Anmeldung nachsenden
     }
 }
 
@@ -1628,6 +1697,7 @@ async function loadDataFromServer() {
             serverData = r.changed || {}; version = r.version;
             Object.values(serverData).forEach(ensureItemIds);
             applyServerLkwStatus(r.lkwStatus);
+            lkwStatusFetched = !!(r.lkwStatus && typeof r.lkwStatus === 'object');
             setArchiveKnownBases(r.archivedBases || []); // Server ohne Archiv-Funktion → leere Liste
         } catch (e) {
             if (!isUnknownActionError(e)) throw e;
@@ -3715,11 +3785,15 @@ Object.values(shipments).forEach(s => {
     
     // Toggle Switch Event Listener (wie vorher)
     container.querySelectorAll('.lkw-toggle').forEach(toggle => {
-        toggle.addEventListener('change', async (e) => {
+        toggle.addEventListener('change', (e) => {
             const status = loadLkwStatus();
-            status[e.target.dataset.truckid] = e.target.checked;
-            await saveLkwStatus(status);
-            renderTable();
+            const on = e.target.checked;
+            status[e.target.dataset.truckid] = on;
+            runBlocking(on ? 'LKW wird aktiviert …' : 'LKW wird deaktiviert …', async () => {
+                const saving = saveLkwStatus(status);
+                renderTable();
+                await saving;
+            });
         });
     });
 
@@ -3750,10 +3824,12 @@ Object.values(shipments).forEach(s => {
                                 delete currentShipments[baseNumber];
                             }
                         }
-                        saveShipments(currentShipments);
-                        renderTable();
-                        renderLkwMenu();
-                        displayError('LKW gelöscht.', 'green', 2000);
+                        runBlocking('LKW wird gelöscht …', async () => {
+                            const saving = saveShipments(currentShipments);
+                            renderTable();
+                            renderLkwMenu();
+                            await saving;
+                        }).then(() => displayError('LKW gelöscht.', 'green', 2000));
                     }
                 } else {
                     // UMBENENNEN
@@ -3772,10 +3848,12 @@ Object.values(shipments).forEach(s => {
                             saveLkwStatus(status);
                         }
                         
-                        saveShipments(currentShipments);
-                        renderTable();
-                        renderLkwMenu();
-                        displayError('LKW umbenannt.', 'green', 2000);
+                        runBlocking('LKW wird umbenannt …', async () => {
+                            const saving = saveShipments(currentShipments);
+                            renderTable();
+                            renderLkwMenu();
+                            await saving;
+                        }).then(() => displayError('LKW umbenannt.', 'green', 2000));
                     }
                 }
             }, 800); // 800 Millisekunden = 0.8 Sekunden gedrückt halten
@@ -4131,10 +4209,12 @@ function saveLkwRenameFromModal() {
     // Kein doppelter Name – sonst wären zwei LKW in Listen und Auswahlfeldern nicht mehr zu unterscheiden
     if (custom && trucks.some(x => x.truckId !== truckId && x.name === custom)) return fail(`„${custom}“ gibt es schon – bitte einen anderen Namen wählen.`);
     t.bases.forEach(b => { const s = shipments[b]; if (!s) return; if (custom) s.truckName = custom; else delete s.truckName; });
-    saveShipments(shipments);   // nur tatsächlich geänderte Sendungen gehen an den Server; lastModified bleibt (kein „zuletzt bearbeitet“-Sprung)
-    closeLkwRenameModal();
-    renderTable(); renderLkwMenu();
-    displayError(custom ? `LKW heißt jetzt „${custom}“.` : `LKW heißt wieder „${t.defaultName}“.`, 'green', 3000);
+    runBlocking('LKW wird umbenannt …', async () => {
+        const saving = saveShipments(shipments);   // nur tatsächlich geänderte Sendungen gehen an den Server; lastModified bleibt (kein „zuletzt bearbeitet“-Sprung)
+        closeLkwRenameModal();
+        renderTable(); renderLkwMenu();
+        await saving;
+    }).then(() => displayError(custom ? `LKW heißt jetzt „${custom}“.` : `LKW heißt wieder „${t.defaultName}“.`, 'green', 3000));
 }
 // LKW löschen = alle seine Aufträge löschen (wie das Papierkorb-Symbol je Sendung, nur für den ganzen LKW) – mit Rückfrage.
 // Läuft über saveShipments → Löschvermerke → auf allen Geräten weg. Bereits archivierte Aufträge bleiben im Archiv suchbar.
@@ -4147,9 +4227,11 @@ function deleteTruckFromPage(truckId) {
     t.bases.forEach(b => { delete shipments[b]; });
     const status = loadLkwStatus();
     if (truckId in status) { delete status[truckId]; saveLkwStatus(status); }   // sonst gälte ein später neu importierter LKW gleicher Kennung als deaktiviert
-    saveShipments(shipments);
-    renderTable(); renderLkwMenu();
-    displayError(`LKW „${t.name}“ gelöscht (${what}).`, 'green', 3000);
+    runBlocking(`LKW „${t.name}“ wird gelöscht …`, async () => {
+        const saving = saveShipments(shipments);
+        renderTable(); renderLkwMenu();
+        await saving;
+    }).then(() => displayError(`LKW „${t.name}“ gelöscht (${what}).`, 'green', 3000));
     return true;
 }
 // ⋮-Menü rechts in der Kopfzeile der LKW-Seite: Umbenennen · Deaktivieren/Aktivieren · Löschen. Die Einträge tragen dieselben
@@ -4189,9 +4271,11 @@ function isLkwActionMenuOpen() { const els = lkwActionMenuEls(); return !!(els &
 async function setLkwActiveFromPage(truckId, active) {
     const status = loadLkwStatus();
     status[truckId] = active;
-    const saving = saveLkwStatus(status); // schreibt sofort lokal, dann Server (wie der Schalter im Menü)
-    renderTable(); renderLkwMenu();
-    await saving;
+    await runBlocking(active ? 'LKW wird aktiviert …' : 'LKW wird deaktiviert …', async () => {
+        const saving = saveLkwStatus(status); // schreibt sofort lokal, dann Server (wie der Schalter im Menü)
+        renderTable(); renderLkwMenu();
+        await saving;
+    });
 }
 function infoPeriodStart(period) {
     const now = new Date();
@@ -6204,9 +6288,10 @@ function saveBatch() {
         // --- Sonstige Aktionen (Löschen, PDF, Edit Modal) ---
         function deleteShipment(baseNumber) {
             const shipments = loadShipments();
-            if (shipments[baseNumber]) {
-                delete shipments[baseNumber];
-                saveShipments(shipments);
+            if (!shipments[baseNumber]) { focusShipmentInput(); return; }
+            delete shipments[baseNumber];
+            runBlocking(`Sendung ${baseNumber} wird gelöscht …`, async () => {
+                const saving = saveShipments(shipments);
                 renderTable();
                 const currentInputBase = processShipmentNumber(shipmentNumberInputEl.value).baseNumber;
                 if (currentInputBase === baseNumber) { // Wenn gelöschte Sendung angezeigt wurde
@@ -6215,8 +6300,8 @@ function saveBatch() {
                     displayCurrentShipmentDetails(currentInputBase);
                 }
                 clearError();
-            }
-            focusShipmentInput();
+                await saving;
+            }).then(focusShipmentInput);
         }
         // --- START: NEUE HILFSFUNKTION FÜR DUNKELALARM ---
         function calculateDunkelalarmCount(scannedItems) {

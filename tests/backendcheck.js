@@ -51,6 +51,18 @@ r = call('authAccept', { invite: inv, pin: '482913' }); ok(r.code === 'INVITE_IN
 ok(call('loadChanges', { sinceVersion: 0 }, adminTok).status === 'success', 'loadChanges mit Token ok');
 ok(call('authCheck', {}, adminTok).user.id, 'authCheck ok');
 ok(call('authCheck', {}, adminTok + 'x').code === 'AUTH_REQUIRED', 'Manipuliertes Token abgelehnt');
+// 3b) Sammel-Löschung (2.4): mehrere Löschvermerke in einem Aufruf, unbekannte Nummern toleriert, Abruf liefert sie als gelöscht
+r = call('saveShipments', { shipments: { 'D1': { hawb: 'D1', scannedItems: [] }, 'D2': { hawb: 'D2', scannedItems: [] }, 'D3': { hawb: 'D3', scannedItems: [] } }, bases: {} }, adminTok);
+ok(r.status === 'success' && Object.keys(r.merged).length === 3, 'Drei Sendungen angelegt');
+const vBefore = r.version;
+r = call('deleteShipments', { baseNumbers: ['D1', 'D2', 'D2', 'NIE-DA', ''] }, adminTok);
+ok(r.status === 'success' && r.deleted === 3 && r.version === vBefore + 3, `deleteShipments: 3 Löschvermerke (D1, D2, NIE-DA – doppelt/leer ignoriert), Version +3 (${JSON.stringify(r)})`);
+r = call('loadChanges', { sinceVersion: vBefore }, adminTok);
+ok(r.status === 'success' && r.deleted.sort().join(',') === 'D1,D2,NIE-DA' && !r.changed.D1 && !r.changed.D2, `loadChanges seit vorher: D1, D2, NIE-DA gelöscht (${JSON.stringify(r.deleted)})`);
+r = call('loadChanges', { sinceVersion: 0 }, adminTok);
+ok(r.status === 'success' && !r.changed.D1 && !r.changed.D2 && r.changed.D3, 'Komplettabruf: D1/D2 weg, D3 bleibt');
+ok(call('deleteShipments', { baseNumbers: [] }, adminTok).status === 'error', 'deleteShipments ohne Nummern → Fehler');
+ok(call('deleteShipment', { baseNumber: 'D3' }, adminTok).status === 'success' && !call('loadChanges', { sinceVersion: 0 }, adminTok).changed.D3, 'Einzel-Löschung wie bisher');
 // 4) Login
 r = call('authUsers'); ok(r.users.length === 1 && r.users[0].name === 'Zakaria Bisbiss' && !r.users[0].email, 'authUsers liefert nur id+Name');
 const uid = r.users[0].id;

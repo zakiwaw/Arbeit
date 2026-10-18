@@ -26,6 +26,9 @@ function sampleData() {
 // Nachgestelltes Backend. Antwortformate wie backend/Code.gs:
 //  loadChanges → { status, version, changed:{base:shipment}, deleted:[], archived:[], full, lkwStatus, archivedBases }
 //  loadLkwStatus → { status, data:{truckId:bool} }
+// Zeitverhalten/Fehler (für Sync-Prüfungen): state.delay = { action: ms } verzögert die Antwort; state.failNext = { action: n } beantwortet
+// die nächsten n Aufrufe mit einem Serverfehler (Sperre); state.noBatchDelete = true → „deleteShipments“ unbekannt (Server-Skript < 2.4).
+// state.inFlight[action] zählt gerade laufende Anfragen.
 // Anmeldung (Backend 2.2): Der Stub kennt einen Administrator (Token TEST_TOKEN, PIN 482913) und einen Mitarbeiter (PIN 778812).
 // Öffentliche Aktionen: authUsers/authLogin/authAccept/authInviteInfo; alles andere verlangt body.auth = gültiges Token,
 // sonst { status:'error', code:'AUTH_REQUIRED' } – wie das echte Skript. state.authDisabled = true → alles ohne Anmeldung (Skript 2.1).
@@ -34,6 +37,7 @@ const TEST_USER = { id: 'u-admin', name: 'Zakaria Bisbiss', role: 'admin' };
 function makeBackend(initial, lkwStatus) {
   const state = { store: JSON.parse(JSON.stringify(initial || {})), lkwStatus: lkwStatus || {}, version: 1, actions: [], requests: [],
     authDisabled: false, tokens: { [TEST_TOKEN]: 'u-admin' }, invites: { 'inv-max': 'u-max' }, mails: [], failed: 0,
+    delay: {}, failNext: {}, noBatchDelete: false, inFlight: {},
     users: [ { id: 'u-admin', name: 'Zakaria Bisbiss', email: 'bisbiss-92@hotmail.de', role: 'admin', pin: '482913', active: true, hasPin: true },
              { id: 'u-max', name: 'Max Muster', email: 'max@example.com', role: 'user', pin: '778812', active: true, hasPin: true } ] };
   const pub = u => ({ id: u.id, name: u.name, role: u.role });
@@ -42,10 +46,18 @@ function makeBackend(initial, lkwStatus) {
     if (!/script\.google\.com/.test(req.url())) return req.continue();
     let body = {}; try { body = JSON.parse(req.postData() || '{}'); } catch (e) {}
     const action = body.action || ''; state.actions.push(action); state.requests.push(body);
+    state.inFlight[action] = (state.inFlight[action] || 0) + 1;
+    if (state.delay[action]) await new Promise(r => setTimeout(r, state.delay[action]));
+    state.inFlight[action]--;
     let resp = { status: 'success' };
     const isPublic = ['authUsers', 'authLogin', 'authAccept', 'authInviteInfo'].includes(action);
     const me = state.authDisabled ? null : state.users.find(u => u.id === state.tokens[body.auth] && u.active);
     if (!state.authDisabled && !isPublic && !me) resp = { status: 'error', code: 'AUTH_REQUIRED', message: 'Anmeldung erforderlich.' };
+    else if (state.failNext[action] > 0) { state.failNext[action]--; resp = { status: 'error', message: 'Verarbeitung serverseitig fehlgeschlagen: Server ist gerade beschäftigt (Sperre). Bitte erneut versuchen.' }; }
+    else if (action === 'deleteShipments') { // Backend 2.4: alle Löschvermerke in einem Aufruf; älteres Skript kennt die Aktion nicht
+      if (state.noBatchDelete) resp = { status: 'error', message: 'Verarbeitung serverseitig fehlgeschlagen: Unbekannte Aktion empfangen: deleteShipments' };
+      else { const bs = (body.payload && body.payload.baseNumbers) || []; bs.forEach(b => { delete state.store[b]; }); state.version += bs.length; resp = { status: 'success', version: state.version, deleted: bs.length }; }
+    }
     else if (action === 'authUsers') resp = state.authDisabled ? { status: 'success', users: [], authDisabled: true } : { status: 'success', users: state.users.filter(u => u.active && u.hasPin).map(u => ({ id: u.id, name: u.name })), setupPending: false };
     else if (action === 'authCheck') resp = state.authDisabled ? { status: 'success', user: null, authDisabled: true } : { status: 'success', user: pub(me) };
     else if (action === 'authLogin') {

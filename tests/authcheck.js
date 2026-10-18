@@ -33,7 +33,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     assert(!(await authOpen(page)), 'Richtige PIN: Anmeldeseite geschlossen');
     const loginReq = be.requests.filter(r => r.action === 'authLogin').pop();
     assert(loginReq && loginReq.payload.userId === 'u-max' && loginReq.payload.pin === '778812' && loginReq.payload.deviceId, 'authLogin mit userId, PIN und Gerätekennung');
-    assert(be.actions.includes('loadChanges') && be.actions.includes('loadLkwStatus'), 'Nach der Anmeldung werden die Daten geladen');
+    assert(be.actions.includes('loadChanges') && !be.actions.includes('loadLkwStatus'), 'Nach der Anmeldung werden die Daten geladen (LKW-Status kommt mit loadChanges – kein Extra-Aufruf)');
     const rows = await page.evaluate(() => document.querySelectorAll('#shipmentTableBody tr[data-basenumber]').length);
     assert(rows > 0, `Sendungen sichtbar (${rows})`);
     const dataReqs = be.requests.filter(r => !['authUsers', 'authLogin', 'authInviteInfo', 'authAccept'].includes(r.action));

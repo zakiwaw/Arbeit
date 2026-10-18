@@ -1,6 +1,7 @@
 // ===================================================
 // FRACHT TRACKER – Google Apps Script Backend
-// Version 2.3: mehrgeräte-sicher + Archiv + Anmeldung (PIN; Sitzung verlängert sich bei Bedienung).
+// Version 2.4: mehrgeräte-sicher + Archiv + Anmeldung (PIN; Sitzung verlängert sich bei Bedienung) + Sammel-Löschung.
+//   2.4: "deleteShipments" – alle Löschvermerke eines LKW-Löschens in EINEM Aufruf (eine Sperre, ein Index-Lesen).
 //   - Jedes Gerät schickt nur die Sendungen, die es geändert hat (+ den Stand, von dem es ausging).
 //   - Der Server führt zusammen (3-Wege-Merge) statt zu überschreiben; Schreibzugriffe laufen unter Sperre.
 //   - Geräte holen regelmäßig nur die Änderungen ab ("loadChanges" seit Version X).
@@ -64,7 +65,7 @@ const NON_COUNTING_STATUSES_ = ['Dunkelalarm', 'Anstehend', 'NichtSichern', 'Abg
 // ===================================================
 // HAUPTFUNKTION
 // ===================================================
-const KNOWN_ACTIONS_ = ['saveShipments', 'deleteShipment', 'loadChanges', 'searchArchive', 'loadAllData', 'saveAllData', 'sendPdfEmail',
+const KNOWN_ACTIONS_ = ['saveShipments', 'deleteShipment', 'deleteShipments', 'loadChanges', 'searchArchive', 'loadAllData', 'saveAllData', 'sendPdfEmail',
   'clearAllData', 'saveLkwStatus', 'loadLkwStatus', 'authUsers', 'authLogin', 'authAccept', 'authInviteInfo', 'authCheck', 'authLogout',
   'authRefresh', 'adminListUsers', 'adminInvite', 'adminSetActive', 'adminResetPin'];
 
@@ -86,6 +87,7 @@ function doPost(e) {
       // ---- Neu (V2) ----
       case "saveShipments":   result = saveShipmentsMerged(payload); break;
       case "deleteShipment":  result = deleteShipmentRow(payload); break;
+      case "deleteShipments": result = deleteShipmentRows(payload); break;
       case "loadChanges":     result = loadChangesSince(payload); break;
       case "searchArchive":   result = searchArchive(payload); break;
 
@@ -471,6 +473,31 @@ function deleteShipmentRow(payload) {
     writeRows_(sheet, index[base] ? index[base].row : sheet.getLastRow() + 1, [row]);
     setGlobalVersion_(version);
     return { status: 'success', version: version };
+  });
+}
+
+// V2.4: mehrere Löschvermerke in EINEM Aufruf (LKW löschen = alle seine Aufträge; schnell hintereinander gelöschte Sendungen).
+// payload: { baseNumbers: [base, …] } – unbekannte Nummern bekommen ebenfalls einen Löschvermerk (schadet nicht, verhindert Wiederbelebung).
+function deleteShipmentRows(payload) {
+  const raw = (payload && payload.baseNumbers) || [];
+  const bases = [];
+  (Array.isArray(raw) ? raw : []).forEach(function (b) { b = String(b || '').trim(); if (b && bases.indexOf(b) === -1) bases.push(b); });
+  if (!bases.length) throw new Error("deleteShipments: baseNumbers fehlen.");
+  return withLock_(function () {
+    const sheet = getShipmentSheet_();
+    const index = readIndex_(sheet);
+    const now = new Date().toISOString();
+    const width = dataWidth_(sheet);
+    const appendRows = [];
+    let version = getGlobalVersion_();
+    bases.forEach(function (base) {
+      version += 1;
+      const row = buildRow_(base, '', version, now, true, width);
+      if (index[base]) writeRows_(sheet, index[base].row, [row]); else appendRows.push(row);
+    });
+    if (appendRows.length > 0) writeRows_(sheet, sheet.getLastRow() + 1, appendRows);
+    setGlobalVersion_(version);
+    return { status: 'success', version: version, deleted: bases.length };
   });
 }
 

@@ -22,6 +22,7 @@ node tests/authcheck.js       # Anmeldung (PIN): Anmeldeseite, Einladungslink, T
 node tests/backendcheck.js    # Server-Skript offline (ohne Chrome/Server): Anmelde-Logik in backend/Code.gs Schritt für Schritt
 node tests/erfassencheck.js   # Seite „Aufträge erfassen“: Parser = Original-Generator (tests/reference), QR-Inhalt, Direkt anlegen, Scan-Weg
 node tests/regress.js         # Grundfunktionen: Scan, Batch, Startseite, Unterseiten, Info-Filter
+node tests/synccheck.js       # Sync: Löschen/Deaktivieren bei schnellem Bedienen, langsamen/gestörten Antworten – nichts kommt zurück; Spinner mit Text
 ```
 Jeder Test endet mit `ALL GOOD` (Exit-Code 0) oder `SOME FAILED` (Exit-Code 1) – Ketten wie `node tests/x.js && git push` brechen bei Fehlern ab.
 

@@ -808,8 +808,9 @@ function bigData() {
       await page.evaluate(() => document.querySelector('[data-lkw-delete="VVL-4711"]').click()); await wait(800);
       const del = await page.evaluate(() => { const st = JSON.parse(localStorage.getItem('frachtSicherungMobile_V8_18_Refactored')); return { left: Object.values(st).filter(s => s.truckId === 'VVL-4711').length, man: Object.values(st).filter(s => s.truckId === 'MAN 1').length, single: !!st['123'],
         rows: [...document.querySelectorAll('.page-row[data-truckid]')].map(r => r.dataset.truckid).join(), status: 'VVL-4711' in JSON.parse(localStorage.getItem('frachtLkwStatusV1') || '{}') }; });
-      const delActions = be.actions.slice(beforeDel).filter(a => a === 'deleteShipment').length;
-      assert(del.left === 0 && del.man === 8 && del.single && del.rows === 'MAN 1' && !del.status && delActions === 6, `LKW löschen: 6 VW-Aufträge weg (MAN 1 und Einzelsendung bleiben), Status-Eintrag entfernt, 6 Löschvermerke an den Server (${JSON.stringify(del)}, deleteShipment ×${delActions})`);
+      // Löschvermerke: ab Server-Skript 2.4 gebündelt (deleteShipments mit allen Nummern), sonst einzeln – gezählt werden die Nummern
+      const delActions = be.actions.slice(beforeDel).reduce((n, a, i) => n + (a === 'deleteShipment' ? 1 : a === 'deleteShipments' ? ((be.requests[beforeDel + i].payload || {}).baseNumbers || []).length : 0), 0);
+      assert(del.left === 0 && del.man === 8 && del.single && del.rows === 'MAN 1' && !del.status && delActions === 6, `LKW löschen: 6 VW-Aufträge weg (MAN 1 und Einzelsendung bleiben), Status-Eintrag entfernt, 6 Löschvermerke an den Server (${JSON.stringify(del)}, Löschvermerke ×${delActions})`);
       assert(page.__errors.length === 0, `LKW umbenennen/löschen: keine JS-Fehler (${page.__errors.join('; ')})`);
       await page.close();
       // Handy: Anlieferung ohne Stift/Papierkorb, Karte unverändert
