@@ -3961,6 +3961,15 @@ function collectTrucks(shipments, lkwStatus) {
     });
     return Object.values(trucks);
 }
+// Hinweiszeile für LKWs, die der Server automatisch aus einer Textdatei in Google Drive angelegt hat (backend/Code.gs 2.5):
+// Datei + Zeitpunkt, damit erkennbar ist, woher die Aufträge stammen. Für von Hand erfasste LKWs leer.
+function importOriginNoteHtml(shipmentList) {
+    const src = (shipmentList || []).find(s => s && s.importFile);
+    if (!src) return '';
+    const when = Date.parse(src.importedAt || src.lastModified || '');
+    const whenText = isNaN(when) ? '' : ` · ${new Date(when).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`;
+    return `<p class="page-import-note" title="Automatisch aus Google Drive übernommen">Automatisch übernommen aus „${escapeHtml(src.importFile)}“${whenText}</p>`;
+}
 function truckLabel(t) { return `${t.icon} ${t.name}`; }
 function truckLabelHtml(t) { return `<span class="emoji">${t.icon}</span> ${escapeHtml(t.name)}`; }
 function chipClass(count, expected) { return expected > 0 ? getStatusClass(count, expected) : ''; }
@@ -4907,6 +4916,7 @@ const PAGE_RENDERERS = {
                 ${t.openOrders ? `<span class="mismatch">${t.openOrders} offen</span>` : '<span class="ok">alles erfasst</span>'}
                 ${t.active && isDesktopLayout() && String(t.truckId).startsWith('MAN') ? `<button type="button" class="page-summary-btn page-summary-add" data-order-add="${escapeHtml(t.truckId)}" title="Weiteren Auftrag (Rechnung) zu diesem LKW aufnehmen">+ Auftrag</button>` : ''}
             </div>`;
+            html += importOriginNoteHtml(t.bases.map(b => shipments[b]));
             pageContentEl.innerHTML = html;
             appendShipmentGroups(pageContentEl, [
                 { title: `Offen (${open.length})`, rows: open },

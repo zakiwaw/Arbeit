@@ -1,6 +1,9 @@
 // ===================================================
 // FRACHT TRACKER – Google Apps Script Backend
-// Version 2.4: mehrgeräte-sicher + Archiv + Anmeldung (PIN; Sitzung verlängert sich bei Bedienung) + Sammel-Löschung.
+// Version 2.5: mehrgeräte-sicher + Archiv + Anmeldung (PIN; Sitzung verlängert sich bei Bedienung) + Sammel-Löschung
+//   + automatischer Import von Textdateien aus Google Drive.
+//   2.5: Abschnitt „AUTOMATISCHER IMPORT AUS GOOGLE DRIVE“ – Zeit-Trigger liest Textdateien (Format „Standard (Leerzeilen)“)
+//        aus dem Drive-Ordner und legt daraus Aufträge an. Einmalig setupDriveImport() im Editor ausführen.
 //   2.4: "deleteShipments" – alle Löschvermerke eines LKW-Löschens in EINEM Aufruf (eine Sperre, ein Index-Lesen).
 //   - Jedes Gerät schickt nur die Sendungen, die es geändert hat (+ den Stand, von dem es ausging).
 //   - Der Server führt zusammen (3-Wege-Merge) statt zu überschreiben; Schreibzugriffe laufen unter Sperre.
@@ -12,6 +15,7 @@
 //    Sehr große Sendungen werden über mehrere Zellen verteilt, weil eine Zelle max. 50.000 Zeichen fasst.)
 // Sheet "lkw_status": A1 = JSON (unverändert), B1 = JSON { truckId: Zeitpunkt der Deaktivierung } (neu, automatisch gepflegt)
 // Sheet "_meta":      A1 = globaler Versionszähler, B1 = Zeitpunkt des letzten Archiv-Durchlaufs (automatisch angelegt, ausgeblendet)
+// Sheet "_import":    Protokoll des Drive-Imports (2.5): Zeitpunkt | Datei | Ergebnis | Details (automatisch angelegt, ausgeblendet)
 //
 // ARCHIV (2.1): Fertige, alte Sendungen bekommen in Spalte E die Markierung ARCHIV (siehe shouldArchive_). Sie bleiben
 //   vollständig im Sheet, werden aber nicht mehr an die Geräte ausgeliefert – die App hält nur noch den laufenden
@@ -834,6 +838,240 @@ function sendPdfEmail(payload) {
   const body = "Im Anhang finden Sie das angeforderte Sicherheitsprotokoll.";
   Logger.log("PDF-E-Mail-Anfrage für Betreff '" + subject + "' erhalten.");
   return { status: 'success', message: 'E-Mail-Anfrage wurde erfolgreich verarbeitet.' };
+}
+
+// ===================================================
+// AUTOMATISCHER IMPORT AUS GOOGLE DRIVE (2.5)
+// Ein getrenntes Skript legt je Kunden-PDF eine Textdatei im Drive-Ordner IMPORT_FOLDER_NAME ab. Aufbau wie auf der Seite
+// „Aufträge erfassen → Standard (Leerzeilen)“ der App: Aufträge durch Leerzeilen getrennt, erste Zeile = Auftragsnummer
+// (bei HYDAC das Zielland), jede weitere Zeile ein Packstück. runDriveImport() läuft per Zeit-Trigger (dazu EINMAL
+// setupDriveImport() im Skript-Editor ausführen – das fragt auch die Drive-Berechtigung ab), legt je Datei einen LKW
+// „<Kunde> <TT.MM.JJJJ>“ mit allen Aufträgen an – dieselben Datensätze, die „Direkt anlegen“ in der App erzeugt – und
+// verschiebt die Datei in den Unterordner „Verarbeitet“ (nicht lesbar → „Fehler“). Jede Datei wird genau einmal
+// verarbeitet; Protokoll im ausgeblendeten Blatt „_import“. Die Geräte holen die Aufträge über die normale Synchronisation
+// ab (wie jede andere Änderung). Es werden keine E-Mails verschickt. Trigger wieder entfernen: removeDriveImport().
+// ===================================================
+const IMPORT_FOLDER_NAME = 'HYDAC TXT';       // Drive-Ordner, in dem das andere Skript die Textdateien ablegt
+const IMPORT_FOLDER_ID = '';                  // optional: Ordner-ID statt Name (aus der Drive-Adresse), falls es den Namen mehrfach gibt
+const IMPORT_DONE_FOLDER = 'Verarbeitet';     // Unterordner für erledigte Dateien
+const IMPORT_FAIL_FOLDER = 'Fehler';          // Unterordner für Dateien ohne verwertbaren Inhalt
+const IMPORT_EVERY_MINUTES = 5;               // Abstand des Zeit-Triggers (erlaubt: 1, 5, 10, 15, 30)
+const IMPORT_MAX_FILES_PER_RUN = 20;          // Schutz vor dem 6-Minuten-Limit eines Skriptlaufs; der Rest folgt im nächsten Lauf
+const IMPORT_SHEET_NAME = '_import';          // Protokollblatt: Zeitpunkt | Datei | Ergebnis | Details
+const IMPORT_MITARBEITER = 'Automatik';       // steht als Ersteller in den Aufträgen
+const IMPORT_LOCK_KEY = 'fracht_import_run';  // verhindert zwei gleichzeitige Durchläufe
+const IMPORT_MAX_RETRIES = 3;                 // Versuche bei vorübergehenden Störungen (Sperre belegt o. Ä.), danach „Fehler“
+
+// Einmal im Skript-Editor ausführen: Zeit-Trigger anlegen (ein vorhandener wird ersetzt) und sofort einen Durchlauf starten.
+function setupDriveImport() {
+  removeDriveImport();
+  ScriptApp.newTrigger('runDriveImport').timeBased().everyMinutes(IMPORT_EVERY_MINUTES).create();
+  Logger.log('Drive-Import eingerichtet: alle ' + IMPORT_EVERY_MINUTES + ' Minuten, Ordner „' + (IMPORT_FOLDER_ID || IMPORT_FOLDER_NAME) + '“.');
+  return runDriveImport();
+}
+
+// Zeit-Trigger wieder entfernen (Import aus; Dateien bleiben liegen).
+function removeDriveImport() {
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'runDriveImport') ScriptApp.deleteTrigger(t);
+  });
+}
+
+// Ein Durchlauf: alle Textdateien direkt im Ordner (älteste zuerst) der Reihe nach verarbeiten.
+// Antwort { files, ok, failed, retry } (für den Aufruf von Hand im Editor; Details stehen im Blatt _import).
+function runDriveImport() {
+  const cache = CacheService.getScriptCache();
+  if (cache.get(IMPORT_LOCK_KEY)) { Logger.log('Drive-Import: läuft bereits – übersprungen.'); return { files: 0, ok: 0, failed: 0, busy: true }; }
+  cache.put(IMPORT_LOCK_KEY, '1', 330);
+  try {
+    const folder = findImportFolder_();
+    if (!folder) {
+      importLog_('', 'fehler', 'Ordner „' + (IMPORT_FOLDER_ID || IMPORT_FOLDER_NAME) + '“ in Google Drive nicht gefunden.');
+      return { files: 0, ok: 0, failed: 1 };
+    }
+    const files = listImportFiles_(folder);
+    const out = { files: files.length, ok: 0, failed: 0, retry: 0 };
+    files.forEach(function (f) {
+      const name = f.getName();
+      try {
+        const r = importTextFile_(name, f.getBlob().getDataAsString('UTF-8'), f.getDateCreated());
+        f.moveTo(subFolder_(folder, IMPORT_DONE_FOLDER));
+        importLog_(name, 'ok', r.summary);
+        out.ok++;
+      } catch (e) {
+        const msg = String((e && e.message) || e);
+        // Vorübergehende Störung (Sperre belegt, Sheet/Drive kurz nicht erreichbar): Datei liegen lassen und beim nächsten
+        // Lauf erneut versuchen – erst nach IMPORT_MAX_RETRIES Fehlversuchen in „Fehler“. Inhaltliche Fehler sofort nach „Fehler“.
+        if (!(e && e.permanent) && importRetry_(f) < IMPORT_MAX_RETRIES) {
+          out.retry++;
+          importLog_(name, 'später', msg + ' – nächster Versuch beim nächsten Lauf.');
+          return;
+        }
+        out.failed++;
+        try { f.moveTo(subFolder_(folder, IMPORT_FAIL_FOLDER)); } catch (e2) { Logger.log('Drive-Import: Verschieben fehlgeschlagen: ' + e2); }
+        importLog_(name, 'fehler', msg);
+      }
+    });
+    Logger.log('Drive-Import: ' + out.files + ' Datei(en), ' + out.ok + ' ok, ' + out.failed + ' fehlerhaft.');
+    return out;
+  } finally {
+    cache.remove(IMPORT_LOCK_KEY);
+  }
+}
+
+function findImportFolder_() {
+  if (IMPORT_FOLDER_ID) { try { return DriveApp.getFolderById(IMPORT_FOLDER_ID); } catch (e) { return null; } }
+  const it = DriveApp.getFoldersByName(IMPORT_FOLDER_NAME);
+  return it.hasNext() ? it.next() : null;
+}
+function subFolder_(folder, name) {
+  const it = folder.getFoldersByName(name);
+  return it.hasNext() ? it.next() : folder.createFolder(name);
+}
+// Textdateien (Endung .txt oder Typ text/plain) direkt im Ordner, nach Erstellzeit aufsteigend
+function listImportFiles_(folder) {
+  const files = [];
+  const it = folder.getFiles();
+  while (it.hasNext()) {
+    const f = it.next();
+    if (/\.txt$/i.test(f.getName()) || f.getMimeType() === 'text/plain') files.push(f);
+  }
+  files.sort(function (a, b) { return a.getDateCreated().getTime() - b.getDateCreated().getTime(); });
+  return files.slice(0, IMPORT_MAX_FILES_PER_RUN);
+}
+
+// Eine Datei → Aufträge im Sheet. Wirft einen Fehler, wenn kein Auftrag erkannt wurde (Datei landet dann in „Fehler“).
+// LKW-Kennung: „<Kunde> <TT.MM.JJJJ>“ (Kunde = Wortanfang des Dateinamens bis zum ersten „_“, sonst des Ordnernamens;
+// Datum aus dem Dateinamen JJJJ-MM-TT, sonst das Erstelldatum). Auftragsnummer: „<erste Zeile> <TT.MM.>“ – so bleiben die
+// Länder von Tag zu Tag unterscheidbar; ist ein Name schon vergeben (aktiv, archiviert oder gelöscht), folgt „ (2)“, „ (3)“ …
+function importTextFile_(fileName, text, createdAt) {
+  const parsed = parseStandardText_(text);
+  if (parsed.orders.length === 0) {
+    const err = new Error('Keine Aufträge erkannt – erwartet: Blöcke aus Auftragsnummer + Packstücknummern, durch Leerzeilen getrennt.');
+    err.permanent = true;
+    throw err;
+  }
+  const customer = customerFromFileName_(fileName);
+  const date = dateFromFileName_(fileName) || (createdAt instanceof Date ? createdAt : new Date());
+  const dayLong = formatDay_(date, true), dayShort = formatDay_(date, false);
+
+  return withLock_(function () {
+    const sheet = getShipmentSheet_();
+    const rows = readAllRows_(sheet);
+    const takenBases = {}, takenTrucks = {};
+    Object.keys(rows).forEach(function (base) {
+      takenBases[base.toUpperCase()] = true;
+      if (rows[base].deleted) return;
+      const s = parseJsonSafe_(rows[base].json);
+      if (s && s.truckId) takenTrucks[String(s.truckId).toUpperCase()] = true;
+    });
+    const truckId = uniqueName_(customer + ' ' + dayLong, takenTrucks);
+    const now = new Date().toISOString();
+    const width = dataWidth_(sheet);
+    let version = getGlobalVersion_();
+    const newRows = [];
+    let huCount = 0;
+    const names = [];
+    parsed.orders.forEach(function (o) {
+      const base = uniqueName_(o.orderId + ' ' + dayShort, takenBases);
+      const shipment = {
+        hawb: base, lastModified: now, totalPiecesExpected: o.hus.length,
+        scannedItems: o.hus.map(function (hu, i) {
+          return { rawInput: hu, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false,
+                   cancelledTimestamp: null, position: i + 1, packaging: null, dimensions: null, grossWeight: null };
+        }),
+        mitarbeiter: IMPORT_MITARBEITER, isHuListOrder: true, truckId: truckId,
+        freightForwarder: 'N/A', destinationCountry: 'N/A', plsoNumber: 'N/A',
+        importFile: fileName, importedAt: now
+      };
+      ensureItemIds_(shipment);
+      version += 1;
+      newRows.push(buildRow_(base, JSON.stringify(shipment), version, now, false, width));
+      huCount += o.hus.length;
+      names.push(base + ' (' + o.hus.length + ' Pk.)');
+    });
+    writeRows_(sheet, sheet.getLastRow() + 1, newRows);
+    setGlobalVersion_(version); // zuletzt, damit Leser nie eine Version ohne die zugehörigen Zeilen sehen
+    let summary = truckId + ': ' + parsed.orders.length + ' Auftrag/Aufträge, ' + huCount + ' Packstücke – ' + names.join(', ');
+    if (parsed.ignored.length) summary += ' | ignoriert: ' + parsed.ignored.slice(0, 5).join(' / ') + (parsed.ignored.length > 5 ? ' …' : '');
+    return { truckId: truckId, orders: parsed.orders.length, hus: huCount, version: version, summary: summary };
+  });
+}
+
+// Text wie „Standard (Leerzeilen)“ zerlegen: { orders: [{ orderId, hus[] }], ignored: [Zeilen, die kein Packstück sind] }
+//   • Blöcke durch Leerzeilen getrennt; erste Zeile = Auftragsnummer (Umlaute wie in der App ersetzt, Großschreibung)
+//   • Packstück = Zeile nur aus Ziffern/Buchstaben/Bindestrich (Leerzeichen innerhalb werden entfernt); Dubletten einmal
+//   • Blöcke mit nur einer Zeile (Überschrift) werden übersprungen; gleiche Auftragsnummer in zwei Blöcken wird zusammengelegt
+function parseStandardText_(text) {
+  const norm = String(text == null ? '' : text).replace(/\uFEFF/g, '').replace(/\r\n?/g, '\n');
+  const byId = {}, orders = [], ignored = [];
+  norm.split(/\n\s*\n/).forEach(function (block) {
+    const lines = block.split('\n').map(function (l) { return l.trim(); }).filter(function (l) { return l.length > 0; });
+    if (lines.length < 2) return;
+    const orderId = normalizeOrderId_(lines[0]);
+    if (!orderId) return;
+    let order = byId[orderId];
+    if (!order) { order = byId[orderId] = { orderId: orderId, hus: [], seen: {} }; orders.push(order); }
+    lines.slice(1).forEach(function (l) {
+      const hu = l.replace(/\s+/g, '').toUpperCase();
+      if (!/^[0-9A-Z][0-9A-Z\-]*$/.test(hu)) { ignored.push(l); return; }
+      if (order.seen[hu]) return;
+      order.seen[hu] = true;
+      order.hus.push(hu);
+    });
+  });
+  const result = orders.filter(function (o) { return o.hus.length > 0; })
+    .map(function (o) { return { orderId: o.orderId, hus: o.hus }; });
+  return { orders: result, ignored: ignored };
+}
+function normalizeOrderId_(s) {
+  return String(s).replace(/ä/g, 'ae').replace(/Ä/g, 'Ae').replace(/ö/g, 'oe').replace(/Ö/g, 'Oe').replace(/ü/g, 'ue').replace(/Ü/g, 'Ue')
+    .replace(/ß/g, 'ss').replace(/[:;,]+$/, '').replace(/\s+/g, ' ').trim().toUpperCase();
+}
+function customerFromFileName_(fileName) {
+  const m = /^\s*([^_]+?)\s*[_]/.exec(String(fileName || ''));
+  const raw = (m ? m[1] : '').replace(/[^0-9A-Za-zÄÖÜäöüß&. -]/g, '').trim();
+  const fallback = (IMPORT_FOLDER_NAME.split(/\s+/)[0] || 'IMPORT');
+  return (raw || fallback).toUpperCase();
+}
+function dateFromFileName_(fileName) {
+  const m = /(\d{4})-(\d{2})-(\d{2})/.exec(String(fileName || ''));
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return isNaN(d.getTime()) ? null : d;
+}
+function formatDay_(d, withYear) {
+  const p = function (n) { return (n < 10 ? '0' : '') + n; };
+  return p(d.getDate()) + '.' + p(d.getMonth() + 1) + '.' + (withYear ? d.getFullYear() : '');
+}
+function uniqueName_(wanted, taken) {
+  let name = wanted, n = 2;
+  while (taken[name.toUpperCase()]) { name = wanted + ' (' + n + ')'; n++; }
+  taken[name.toUpperCase()] = true;
+  return name;
+}
+// Fehlversuche je Datei zählen (Script-Properties, Schlüssel je Datei-ID); liefert die Anzahl NACH diesem Versuch.
+function importRetry_(file) {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const key = 'import_retry_' + file.getId();
+    const n = (Number(props.getProperty(key)) || 0) + 1;
+    props.setProperty(key, String(n));
+    return n;
+  } catch (e) { return IMPORT_MAX_RETRIES; }
+}
+function importLog_(fileName, result, details) {
+  try {
+    const ss = ss_();
+    let sheet = ss.getSheetByName(IMPORT_SHEET_NAME);
+    if (!sheet) {
+      sheet = ss.insertSheet(IMPORT_SHEET_NAME);
+      sheet.getRange(1, 1, 1, 4).setValues([['Zeitpunkt', 'Datei', 'Ergebnis', 'Details']]);
+      sheet.setFrozenRows(1);
+      sheet.hideSheet();
+    }
+    sheet.appendRow([new Date().toISOString(), fileName, result, String(details || '').slice(0, 45000)]);
+  } catch (e) { Logger.log('Drive-Import: Protokoll fehlgeschlagen: ' + e); }
 }
 
 // ===================================================

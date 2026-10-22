@@ -958,6 +958,7 @@ body.batch-mode-active .home-hub { display: none; } /* im Batch-Modus zählt nur
     font-size: var(--fs-sm);
     font-weight: 700;
 }
+.page-import-note { margin: -4px 0 10px; font-size: 12.5px; color: var(--text-muted); overflow-wrap: anywhere; }
 .page-summary > span {
     padding: 4px 10px;
     color: var(--text-muted);

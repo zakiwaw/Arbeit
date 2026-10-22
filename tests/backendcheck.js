@@ -1,30 +1,8 @@
-// Server-Skript (backend/Code.gs) offline durchspielen: kleine Nachbildung der Apps-Script-Dienste (Sheet, Cache, Lock,
-// Properties, Utilities, MailApp), dann die Anmelde-Logik Schritt für Schritt prüfen. Start: node tests/backendcheck.js
-const fs = require('fs'), crypto = require('crypto'), path = require('path');
-const src = fs.readFileSync(path.join(__dirname, '..', 'backend', 'Code.gs'), 'utf8');
-const mails = [], log = [];
-class Range { constructor(sh, r, c, nr, nc) { Object.assign(this, { sh, r, c, nr, nc }); }
-  setNumberFormat() { return this; }
-  getValues() { const out = []; for (let i = 0; i < this.nr; i++) { const row = []; for (let j = 0; j < this.nc; j++) row.push((this.sh.rows[this.r - 1 + i] || [])[this.c - 1 + j] ?? ''); out.push(row); } return out; }
-  setValues(v) { for (let i = 0; i < v.length; i++) { const ri = this.r - 1 + i; while (this.sh.rows.length <= ri) this.sh.rows.push([]); for (let j = 0; j < v[i].length; j++) this.sh.rows[ri][this.c - 1 + j] = v[i][j]; } return this; }
-  getValue() { return this.getValues()[0][0]; } setValue(v) { return this.setValues([[v]]); } clearContent() { return this; } }
-class Sheet { constructor(n) { this.name = n; this.rows = []; } getName() { return this.name; } getLastRow() { return this.rows.length; } getMaxRows() { return Math.max(this.rows.length, 1000); } getMaxColumns() { return 26; }
-  getRange(r, c, nr = 1, nc = 1) { if (typeof r === 'string') { const m = /^([A-Z]+)(\d+)$/.exec(r); return new Range(this, Number(m[2]), m[1].charCodeAt(0) - 64, 1, 1); } return new Range(this, r, c, nr, nc); }
-  setFrozenRows() {} hideSheet() { this.hidden = true; } getLastColumn() { return 26; } deleteRows() {} insertRowsAfter() {} }
-const sheets = { shipments: new Sheet('shipments'), lkw_status: new Sheet('lkw_status') };
-const SpreadsheetApp = { openById: () => ({ getSheetByName: n => sheets[n] || null, insertSheet: n => (sheets[n] = new Sheet(n)) }), flush() {} };
-const cache = {}; const CacheService = { getScriptCache: () => ({ get: k => cache[k] ?? null, put: (k, v) => { cache[k] = v; }, remove: k => { delete cache[k]; }, getAll: ks => { const o = {}; ks.forEach(k => { if (cache[k] != null) o[k] = cache[k]; }); return o; }, putAll: o => Object.assign(cache, o), removeAll: ks => ks.forEach(k => delete cache[k]) }) };
-const LockService = { getScriptLock: () => ({ tryLock: () => true, waitLock() {}, releaseLock() {} }) };
-const props = {}; const PropertiesService = { getScriptProperties: () => ({ getProperty: k => props[k] ?? null, setProperty: (k, v) => { props[k] = v; } }) };
-const Utilities = { getUuid: () => crypto.randomUUID(), computeHmacSha256Signature: (d, k) => Array.from(crypto.createHmac('sha256', k).update(d, 'utf8').digest()).map(b => b > 127 ? b - 256 : b),
-  base64EncodeWebSafe: s => Buffer.from(s, 'utf8').toString('base64url'), base64DecodeWebSafe: s => Buffer.from(s, 'base64url'), newBlob: b => ({ getDataAsString: () => Buffer.from(b).toString('utf8') }) };
-let mailFail = false;
-const MailApp = { sendEmail: o => { if (mailFail) throw new Error('Mail-Quota'); mails.push(o); } };
-const ContentService = { createTextOutput: t => ({ text: t, setMimeType() { return this; } }), MimeType: { JSON: 'json' } };
-const Logger = { log: m => log.push(String(m)) };
-const ctx = { SpreadsheetApp, CacheService, LockService, PropertiesService, Utilities, MailApp, ContentService, Logger };
-const api = new Function(...Object.keys(ctx), src + '\n;return { doPost };')(...Object.values(ctx));
-const call = (action, payload, auth) => JSON.parse(api.doPost({ postData: { contents: JSON.stringify({ action, payload, auth }) } }).text);
+// Server-Skript (backend/Code.gs) offline durchspielen (Nachbildung der Apps-Script-Dienste in tests/gas-env.js), dann die
+// Anmelde-Logik, Sammel-Löschung und den Drive-Import Schritt für Schritt prüfen. Start: node tests/backendcheck.js
+const env = require('./gas-env')();
+const { api, call, sheets, cache, props, mails, log, drive, triggers, lockState, shipmentRows } = env;
+const crypto = require('crypto');
 let fails = 0, oks = 0; const ok = (c, m) => { console.log((c ? 'ok  : ' : 'FAIL: ') + m); if (c) oks++; else fails++; };
 const tokenExp = t => JSON.parse(Buffer.from(t.split('.')[0], 'base64url').toString()).e;
 const usersSheet = () => sheets['_users'];
@@ -109,9 +87,9 @@ ok(call('adminSetActive', { userId: maxId, active: true }, adminTok).status === 
 r = call('authLogin', { userId: maxId, pin: '778812' }); ok(r.status === 'success', 'Nach Freigabe Anmeldung ok (alte PIN)');
 const tokMax2 = r.token;
 // 8) PIN-Reset (Mail schlägt fehl → Link zum Weitergeben)
-mailFail = true;
+env.mailFail = true;
 r = call('adminResetPin', { userId: maxId }, adminTok); ok(r.status === 'success' && r.invited.mailSent === false && /einladung=/.test(r.invited.link), 'Reset ohne Mail liefert Link zum Weitergeben');
-mailFail = false;
+env.mailFail = false;
 ok(call('loadChanges', { sinceVersion: 0 }, tokMax2).status === 'success', 'Alte PIN/Sitzung gilt bis zum Setzen der neuen');
 const invR = /einladung=([0-9a-f]+)/.exec(r.invited.link)[1];
 ok(call('authInviteInfo', { invite: invR }).isReset === true, 'Reset-Einladung erkannt');
@@ -126,4 +104,90 @@ ok(call('loadChanges', { sinceVersion: 0 }, nb + '.' + sig).code === 'AUTH_REQUI
 const flat = JSON.stringify(usersSheet().rows);
 ok(!/482913|778812|901276/.test(flat), 'Keine PIN im Klartext im Sheet');
 ok(usersSheet().hidden === true, 'Sheet _users ausgeblendet');
+// 7) Drive-Import (2.5): Textdatei im Ordner → LKW „HYDAC <Datum>“ + Aufträge wie „Standard (Leerzeilen)“, Datei nach
+//    „Verarbeitet“, Protokoll im Blatt _import, zweiter Durchlauf importiert nichts doppelt
+const HYDAC_TXT = ['USA', '8118740144', '8118749096', '8118746244', '8118749072', '8118749073', '8118750973', '8118702767', '8118727982', '',
+  'South Korea', '8118742798', '8118714422', '8118738692', '8118739783', '', 'Australien', '8118746213', '8118720897', '',
+  'Kanada', '8118736972', '', 'China', '8118742479', '8118743550', '8118743961', '8118714956', '8118740155', ''].join('\n');
+const FILE1 = 'HYDAC_2026-10-22_18-34_Scan_2026-10-22_18-55.txt';
+const folder = drive.createFolder('HYDAC TXT');
+folder.addFile(FILE1, HYDAC_TXT, new Date(2026, 9, 22, 18, 56));
+folder.addFile('Scan.pdf', '%PDF-1.4', new Date(2026, 9, 22, 18, 50), 'application/pdf');   // kein Text → bleibt unangetastet
+const vImp0 = call('loadChanges', { sinceVersion: 0 }, adminTok).version;
+r = api.setupDriveImport();
+ok(triggers.length === 1 && triggers[0].fn === 'runDriveImport' && triggers[0].every === 5, 'setupDriveImport: Zeit-Trigger runDriveImport alle 5 Minuten');
+ok(r && r.files === 1 && r.ok === 1 && r.failed === 0, `Erster Durchlauf: 1 Datei verarbeitet (${JSON.stringify(r)})`);
+let rows = shipmentRows();
+const hydBases = Object.keys(rows).filter(b => rows[b].shipment && rows[b].shipment.truckId === 'HYDAC 22.10.2026');
+ok(hydBases.join('|') === 'USA 22.10.|SOUTH KOREA 22.10.|AUSTRALIEN 22.10.|KANADA 22.10.|CHINA 22.10.', `LKW „HYDAC 22.10.2026“ mit 5 Aufträgen „<Land> 22.10.“ (${hydBases.join('|')})`);
+const usa = rows['USA 22.10.'] && rows['USA 22.10.'].shipment;
+ok(usa && usa.totalPiecesExpected === 8 && usa.scannedItems.length === 8 && usa.scannedItems[0].rawInput === '8118740144' && usa.scannedItems[7].rawInput === '8118727982' && usa.scannedItems[7].position === 8
+  && usa.scannedItems.every(i => i.status === 'Anstehend' && i.id && i.isCancelled === false && Array.isArray(i.notes) && i.isCombination === false), 'USA: 8 Packstücke „Anstehend“ in Dateireihenfolge, mit id/position');
+ok(usa && usa.hawb === 'USA 22.10.' && usa.isHuListOrder === true && usa.mitarbeiter === 'Automatik' && usa.freightForwarder === 'N/A' && usa.destinationCountry === 'N/A' && usa.plsoNumber === 'N/A'
+  && usa.importFile === FILE1 && usa.importedAt && usa.lastModified && usa.originalManNumber === undefined, 'Felder wie „Direkt anlegen (Standard)“ + Herkunftsdatei, keine MAN-Nummer verbraucht');
+ok(hydBases.reduce((n, b) => n + rows[b].shipment.scannedItems.length, 0) === 20, '20 Packstücke insgesamt (8+4+2+1+5)');
+ok(folder.fileNames().join() === 'Scan.pdf' && folder.sub('Verarbeitet') && folder.sub('Verarbeitet').fileNames().join() === FILE1 && !folder.sub('Fehler'), 'Datei nach „Verarbeitet“ verschoben; PDF bleibt liegen; kein Ordner „Fehler“ nötig');
+const impLog = () => (sheets['_import'] ? sheets['_import'].rows.slice(1) : []);
+ok(sheets['_import'] && sheets['_import'].hidden && sheets['_import'].rows[0][0] === 'Zeitpunkt' && impLog().length === 1 && impLog()[0][1] === FILE1 && impLog()[0][2] === 'ok' && /HYDAC 22\.10\.2026: 5 Auftrag\/Aufträge, 20 Packstücke – USA 22\.10\. \(8 Pk\.\), SOUTH KOREA 22\.10\. \(4 Pk\.\)/.test(impLog()[0][3]),
+  `Protokoll „_import“ (ausgeblendet): ok-Zeile mit Zusammenfassung (${impLog().length ? impLog()[0][3] : '–'})`);
+r = call('loadChanges', { sinceVersion: vImp0 }, adminTok);
+ok(r.status === 'success' && r.version === vImp0 + 5 && Object.keys(r.changed).sort().join('|') === hydBases.slice().sort().join('|') && r.lkwStatus['HYDAC 22.10.2026'] === undefined, 'Geräte bekommen die 5 Aufträge über loadChanges (Version +5), LKW gilt als aktiv');
+ok(lockState.nested === 0, 'Import nimmt die Script-Sperre nie doppelt (kein Hänger in Apps Script)');
+r = api.runDriveImport();
+ok(r.files === 0 && Object.keys(shipmentRows()).length === Object.keys(rows).length && impLog().length === 1, 'Zweiter Durchlauf: nichts zu tun, nichts doppelt, kein Protokolleintrag');
+// 7b) Zweite Datei am selben Tag (Korrektur): CRLF, Dublette, Leerzeichen in der Nummer, Kleinbuchstaben, Störzeile, Block ohne Packstücke
+folder.addFile('HYDAC_2026-10-22_19-10_Scan.txt', 'USA\r\n8118740144\r\n8118740144\r\n81187 40199\r\nab12cd\r\nGesamt: 3 Stück\r\n\r\n\r\nMexiko\r\n', new Date(2026, 9, 22, 19, 12));
+r = api.runDriveImport();
+rows = shipmentRows();
+const usa2 = rows['USA 22.10. (2)'] && rows['USA 22.10. (2)'].shipment;
+ok(r.ok === 1 && usa2 && usa2.truckId === 'HYDAC 22.10.2026 (2)' && usa2.scannedItems.map(i => i.rawInput).join(',') === '8118740144,8118740199,AB12CD' && usa2.totalPiecesExpected === 3,
+  `Selber Tag: LKW „HYDAC 22.10.2026 (2)“, Auftrag „USA 22.10. (2)“; Dublette einmal, Leerzeichen entfernt, Großschreibung (${usa2 ? usa2.scannedItems.map(i => i.rawInput).join(',') : '–'})`);
+ok(!rows['MEXIKO 22.10.'] && impLog().length === 2 && /ignoriert: Gesamt: 3 Stück/.test(impLog()[1][3]) && /1 Auftrag/.test(impLog()[1][3]), 'Block ohne Packstücke übersprungen; Störzeile im Protokoll als „ignoriert“');
+// 7c) Unbrauchbare Datei → Ordner „Fehler“ + Protokoll, keine Zeile im Sheet
+const nRows = Object.keys(rows).length;
+folder.addFile('HYDAC_2026-10-22_20-00_leer.txt', 'Keine Daten gefunden\n', new Date(2026, 9, 22, 20, 0));
+r = api.runDriveImport();
+ok(r.failed === 1 && Object.keys(shipmentRows()).length === nRows && folder.sub('Fehler') && folder.sub('Fehler').fileNames().join() === 'HYDAC_2026-10-22_20-00_leer.txt' && impLog()[2][2] === 'fehler' && /Keine Aufträge erkannt/.test(impLog()[2][3]),
+  'Datei ohne Aufträge → „Fehler“-Ordner + Protokollzeile, Sheet unverändert');
+// 7d) Dateiname ohne Kunde/Datum → Kunde aus dem Ordnernamen, Datum = Erstelldatum; Umlaute + Doppelpunkt in der Auftragsnummer; gleiche Nummer in zwei Blöcken wird zusammengelegt
+folder.addFile('liste.txt', 'Südkorea:\n1001\n\nÖsterreich\n2001\n\nSüdkorea\n1002\n', new Date(2026, 10, 3, 8, 0));
+r = api.runDriveImport();
+rows = shipmentRows();
+ok(r.ok === 1 && rows['SUEDKOREA 03.11.'] && rows['SUEDKOREA 03.11.'].shipment.truckId === 'HYDAC 03.11.2026' && rows['SUEDKOREA 03.11.'].shipment.scannedItems.map(i => i.rawInput).join(',') === '1001,1002' && rows['OESTERREICH 03.11.'],
+  'Ohne Präfix/Datum: LKW „HYDAC 03.11.2026“ (Ordnername + Erstelldatum), Umlaute wie in der App ersetzt, Doppelpunkt entfernt, doppelter Block zusammengelegt');
+// 7e) Nummer schon vergeben (auch gelöscht/archiviert zählt) → „ (2)“; Archiv-Durchlauf lässt aktive LKW-Aufträge in Ruhe
+call('saveShipments', { shipments: { 'USA 23.10.': { hawb: 'USA 23.10.', scannedItems: [] } }, bases: {} }, adminTok);
+call('deleteShipment', { baseNumber: 'USA 23.10.' }, adminTok);
+folder.addFile('HYDAC_2026-10-23_07-00_Scan.txt', 'USA\n5001\n', new Date(2026, 9, 23, 7, 0));
+r = api.runDriveImport();
+rows = shipmentRows();
+ok(r.ok === 1 && rows['USA 23.10. (2)'] && rows['USA 23.10. (2)'].shipment.truckId === 'HYDAC 23.10.2026' && rows['USA 23.10.'].flag === true, 'Gelöschte Nummer wird nicht wiederverwendet → „USA 23.10. (2)“');
+api.runArchiveSweep();
+rows = shipmentRows();
+ok(hydBases.every(b => rows[b].flag === '' || rows[b].flag === false), 'Archiv-Durchlauf: importierte LKW-Aufträge bleiben aktiv (erst nach Deaktivieren + Frist)');
+// 7e2) Vorübergehende Störung (Sperre belegt): Datei bleibt liegen und wird beim nächsten Lauf importiert; erst nach 3 Fehlversuchen „Fehler“
+folder.addFile('HYDAC_2026-10-24_07-00_Scan.txt', 'USA\n6001\n', new Date(2026, 9, 24, 7, 0));
+lockState.held = 1;
+r = api.runDriveImport();
+ok(r.retry === 1 && r.failed === 0 && folder.fileNames().includes('HYDAC_2026-10-24_07-00_Scan.txt') && impLog()[impLog().length - 1][2] === 'später', 'Sperre belegt → Datei bleibt liegen, Protokoll „später“');
+lockState.held = 0; lockState.nested = 0;
+r = api.runDriveImport();
+ok(r.ok === 1 && shipmentRows()['USA 24.10.'] && folder.sub('Verarbeitet').fileNames().includes('HYDAC_2026-10-24_07-00_Scan.txt'), 'Nächster Lauf importiert die Datei normal');
+folder.addFile('HYDAC_2026-10-25_07-00_Scan.txt', 'USA\n7001\n', new Date(2026, 9, 25, 7, 0));
+lockState.held = 1;
+api.runDriveImport(); api.runDriveImport(); r = api.runDriveImport();
+lockState.held = 0; lockState.nested = 0;
+ok(r.failed === 1 && folder.sub('Fehler').fileNames().includes('HYDAC_2026-10-25_07-00_Scan.txt') && !shipmentRows()['USA 25.10.'], 'Nach 3 Fehlversuchen → „Fehler“-Ordner, nichts angelegt');
+// 7f) Ordner fehlt → Protokoll „fehler“, kein Absturz; Trigger entfernen
+folder.name = 'anders';
+r = api.runDriveImport();
+ok(r.failed === 1 && /nicht gefunden/.test(impLog()[impLog().length - 1][3]), 'Ordner nicht gefunden → Protokollzeile statt Absturz');
+folder.name = 'HYDAC TXT';
+api.removeDriveImport();
+ok(triggers.length === 0, 'removeDriveImport entfernt den Zeit-Trigger');
+// 7g) Parser direkt
+let p = api.parseStandardText_('\uFEFFTitelzeile\n\nUSA\n 123 \n\n\n\nChina\n456\n789\n');
+ok(p.orders.length === 2 && p.orders[0].orderId === 'USA' && p.orders[0].hus.join() === '123' && p.orders[1].hus.join() === '456,789' && p.ignored.length === 0, 'parseStandardText_: BOM, Titelzeile ohne Packstücke, mehrere Leerzeilen');
+p = api.parseStandardText_('');
+ok(p.orders.length === 0, 'parseStandardText_: leer → keine Aufträge');
 console.log(fails ? `SOME FAILED (${fails} von ${oks + fails})` : `ALL GOOD (${oks})`); process.exit(fails ? 1 : 0);
