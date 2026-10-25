@@ -848,7 +848,8 @@ function sendPdfEmail(payload) {
 // setupDriveImport() im Skript-Editor ausführen – das fragt auch die Drive-Berechtigung ab), legt je Datei einen LKW
 // „<Kunde> <TT.MM.JJJJ>“ mit allen Aufträgen an – dieselben Datensätze, die „Direkt anlegen“ in der App erzeugt – und
 // verschiebt die Datei in den Unterordner „Verarbeitet“ (nicht lesbar → „Fehler“). Jede Datei wird genau einmal
-// verarbeitet; Protokoll im ausgeblendeten Blatt „_import“. Die Geräte holen die Aufträge über die normale Synchronisation
+// verarbeitet (Merker je Datei-ID in den Script-Properties, falls das Verschieben scheitert; erneuter Import nur über eine
+// KOPIE der Datei); Protokoll im ausgeblendeten Blatt „_import“. Die Geräte holen die Aufträge über die normale Synchronisation
 // ab (wie jede andere Änderung). Es werden keine E-Mails verschickt. Trigger wieder entfernen: removeDriveImport().
 // ===================================================
 const IMPORT_FOLDER_NAME = 'HYDAC TXT';       // Drive-Ordner, in dem das andere Skript die Textdateien ablegt
@@ -861,6 +862,7 @@ const IMPORT_SHEET_NAME = '_import';          // Protokollblatt: Zeitpunkt | Dat
 const IMPORT_MITARBEITER = 'Automatik';       // steht als Ersteller in den Aufträgen
 const IMPORT_LOCK_KEY = 'fracht_import_run';  // verhindert zwei gleichzeitige Durchläufe
 const IMPORT_MAX_RETRIES = 3;                 // Versuche bei vorübergehenden Störungen (Sperre belegt o. Ä.), danach „Fehler“
+const IMPORT_MIN_AGE_MINUTES = 2;             // Datei muss so lange unverändert sein (das andere Skript könnte noch schreiben)
 
 // Einmal im Skript-Editor ausführen: Zeit-Trigger anlegen (ein vorhandener wird ersetzt) und sofort einen Durchlauf starten.
 function setupDriveImport() {
@@ -878,7 +880,7 @@ function removeDriveImport() {
 }
 
 // Ein Durchlauf: alle Textdateien direkt im Ordner (älteste zuerst) der Reihe nach verarbeiten.
-// Antwort { files, ok, failed, retry } (für den Aufruf von Hand im Editor; Details stehen im Blatt _import).
+// Antwort { files, ok, failed, retry, skipped } (für den Aufruf von Hand im Editor; Details stehen im Blatt _import).
 function runDriveImport() {
   const cache = CacheService.getScriptCache();
   if (cache.get(IMPORT_LOCK_KEY)) { Logger.log('Drive-Import: läuft bereits – übersprungen.'); return { files: 0, ok: 0, failed: 0, busy: true }; }
@@ -890,29 +892,46 @@ function runDriveImport() {
       return { files: 0, ok: 0, failed: 1 };
     }
     const files = listImportFiles_(folder);
-    const out = { files: files.length, ok: 0, failed: 0, retry: 0 };
+    const props = PropertiesService.getScriptProperties();
+    const out = { files: files.length, ok: 0, failed: 0, retry: 0, skipped: 0 };
     files.forEach(function (f) {
       const name = f.getName();
+      const doneKey = 'import_done_' + f.getId();
+      // Schon importiert, konnte aber nicht verschoben werden (z. B. fehlende Berechtigung): NIE ein zweites Mal anlegen –
+      // nur erneut versuchen, die Datei wegzuräumen.
+      if (props.getProperty(doneKey)) {
+        out.skipped++;
+        try { f.moveTo(subFolder_(folder, IMPORT_DONE_FOLDER)); props.deleteProperty(doneKey); } catch (e0) {}
+        return;
+      }
       try {
-        const r = importTextFile_(name, f.getBlob().getDataAsString('UTF-8'), f.getDateCreated());
-        f.moveTo(subFolder_(folder, IMPORT_DONE_FOLDER));
-        importLog_(name, 'ok', r.summary);
+        const r = importTextFile_(name, readImportText_(f), f.getDateCreated());
+        props.setProperty(doneKey, new Date().toISOString());   // ab hier gilt die Datei als verarbeitet – egal, was das Verschieben macht
+        props.deleteProperty('import_retry_' + f.getId());
         out.ok++;
+        try {
+          f.moveTo(subFolder_(folder, IMPORT_DONE_FOLDER));
+          props.deleteProperty(doneKey);
+          importLog_(name, 'ok', r.summary);
+        } catch (eMove) {
+          importLog_(name, 'ok', r.summary + ' | Datei konnte nicht nach „' + IMPORT_DONE_FOLDER + '“ verschoben werden (' + String((eMove && eMove.message) || eMove) + ') – sie wird nicht erneut importiert.');
+        }
       } catch (e) {
         const msg = String((e && e.message) || e);
-        // Vorübergehende Störung (Sperre belegt, Sheet/Drive kurz nicht erreichbar): Datei liegen lassen und beim nächsten
-        // Lauf erneut versuchen – erst nach IMPORT_MAX_RETRIES Fehlversuchen in „Fehler“. Inhaltliche Fehler sofort nach „Fehler“.
+        // Vorübergehende Störung (Sperre belegt, Datei noch leer, Sheet/Drive kurz nicht erreichbar): Datei liegen lassen und
+        // beim nächsten Lauf erneut versuchen – erst nach IMPORT_MAX_RETRIES Fehlversuchen in „Fehler“. Inhaltliche Fehler sofort.
         if (!(e && e.permanent) && importRetry_(f) < IMPORT_MAX_RETRIES) {
           out.retry++;
           importLog_(name, 'später', msg + ' – nächster Versuch beim nächsten Lauf.');
           return;
         }
         out.failed++;
+        props.deleteProperty('import_retry_' + f.getId());
         try { f.moveTo(subFolder_(folder, IMPORT_FAIL_FOLDER)); } catch (e2) { Logger.log('Drive-Import: Verschieben fehlgeschlagen: ' + e2); }
         importLog_(name, 'fehler', msg);
       }
     });
-    Logger.log('Drive-Import: ' + out.files + ' Datei(en), ' + out.ok + ' ok, ' + out.failed + ' fehlerhaft.');
+    Logger.log('Drive-Import: ' + out.files + ' Datei(en), ' + out.ok + ' ok, ' + out.failed + ' fehlerhaft, ' + out.retry + ' später.');
     return out;
   } finally {
     cache.remove(IMPORT_LOCK_KEY);
@@ -928,16 +947,34 @@ function subFolder_(folder, name) {
   const it = folder.getFoldersByName(name);
   return it.hasNext() ? it.next() : folder.createFolder(name);
 }
-// Textdateien (Endung .txt oder Typ text/plain) direkt im Ordner, nach Erstellzeit aufsteigend
+// Kandidaten direkt im Ordner, nach Erstellzeit aufsteigend: Textdateien (text/*, .txt/.csv/.md, unbekannter Typ) und
+// Google-Docs-Dokumente. PDFs, Bilder, Tabellen usw. bleiben unangetastet. Dateien, die in den letzten IMPORT_MIN_AGE_MINUTES
+// noch geändert wurden, werden erst beim nächsten Lauf angefasst (das andere Skript könnte noch schreiben).
 function listImportFiles_(folder) {
   const files = [];
   const it = folder.getFiles();
+  const cutoff = Date.now() - IMPORT_MIN_AGE_MINUTES * 60000;
   while (it.hasNext()) {
     const f = it.next();
-    if (/\.txt$/i.test(f.getName()) || f.getMimeType() === 'text/plain') files.push(f);
+    if (!isImportCandidate_(f)) continue;
+    const updated = f.getLastUpdated();
+    if (updated && updated.getTime() > cutoff) continue;
+    files.push(f);
   }
   files.sort(function (a, b) { return a.getDateCreated().getTime() - b.getDateCreated().getTime(); });
   return files.slice(0, IMPORT_MAX_FILES_PER_RUN);
+}
+const GOOGLE_DOC_MIME_ = 'application/vnd.google-apps.document';
+function isImportCandidate_(f) {
+  const mime = String(f.getMimeType() || '').toLowerCase();
+  if (mime === GOOGLE_DOC_MIME_) return true;
+  if (mime.indexOf('application/vnd.google-apps.') === 0) return false;         // Tabellen, Formulare, Verknüpfungen …
+  if (mime.indexOf('text/') === 0 || mime === '' || mime === 'application/octet-stream') return true;
+  return /\.(txt|csv|md)$/i.test(f.getName());
+}
+function readImportText_(f) {
+  if (f.getMimeType() === GOOGLE_DOC_MIME_) return DocumentApp.openById(f.getId()).getBody().getText();
+  return f.getBlob().getDataAsString('UTF-8');
 }
 
 // Eine Datei → Aufträge im Sheet. Wirft einen Fehler, wenn kein Auftrag erkannt wurde (Datei landet dann in „Fehler“).
@@ -945,6 +982,9 @@ function listImportFiles_(folder) {
 // Datum aus dem Dateinamen JJJJ-MM-TT, sonst das Erstelldatum). Auftragsnummer: „<erste Zeile> <TT.MM.>“ – so bleiben die
 // Länder von Tag zu Tag unterscheidbar; ist ein Name schon vergeben (aktiv, archiviert oder gelöscht), folgt „ (2)“, „ (3)“ …
 function importTextFile_(fileName, text, createdAt) {
+  if (!String(text == null ? '' : text).replace(/\uFEFF/g, '').trim()) {
+    throw new Error('Datei ist leer (wird vielleicht noch geschrieben).');       // nicht endgültig → später erneut
+  }
   const parsed = parseStandardText_(text);
   if (parsed.orders.length === 0) {
     const err = new Error('Keine Aufträge erkannt – erwartet: Blöcke aus Auftragsnummer + Packstücknummern, durch Leerzeilen getrennt.');

@@ -1,5 +1,5 @@
 // Nachbildung der Apps-Script-Dienste, um backend/Code.gs offline (in Node) auszuführen: Sheet, Cache, Lock, Properties,
-// Utilities, MailApp, ContentService, Logger – und seit 2.5 DriveApp (Ordner/Dateien/Verschieben) + ScriptApp (Trigger).
+// Utilities, MailApp, ContentService, Logger – und seit 2.5 DriveApp (Ordner/Dateien/Verschieben), DocumentApp (Text eines Docs) + ScriptApp (Trigger).
 // Verwendung: const env = require('./gas-env')(); env.call('loadChanges', { sinceVersion: 0 }, token); env.api.runDriveImport();
 const fs = require('fs'), crypto = require('crypto'), path = require('path');
 
@@ -21,7 +21,7 @@ module.exports = function createGasEnv() {
   const cache = {}; const CacheService = { getScriptCache: () => ({ get: k => cache[k] ?? null, put: (k, v) => { cache[k] = v; }, remove: k => { delete cache[k]; }, getAll: ks => { const o = {}; ks.forEach(k => { if (cache[k] != null) o[k] = cache[k]; }); return o; }, putAll: o => Object.assign(cache, o), removeAll: ks => ks.forEach(k => delete cache[k]) }) };
   const lockState = { held: 0, nested: 0 }; // nested = Versuch, die Sperre erneut zu nehmen, während sie gehalten wird (in Apps Script ein Hänger)
   const LockService = { getScriptLock: () => ({ tryLock: () => { if (lockState.held) { lockState.nested++; return false; } lockState.held = 1; return true; }, waitLock() {}, releaseLock() { lockState.held = 0; } }) };
-  const props = {}; const PropertiesService = { getScriptProperties: () => ({ getProperty: k => props[k] ?? null, setProperty: (k, v) => { props[k] = v; } }) };
+  const props = {}; const PropertiesService = { getScriptProperties: () => ({ getProperty: k => props[k] ?? null, setProperty: (k, v) => { props[k] = v; }, deleteProperty: k => { delete props[k]; }, getKeys: () => Object.keys(props) }) };
   const Utilities = { getUuid: () => crypto.randomUUID(), computeHmacSha256Signature: (d, k) => Array.from(crypto.createHmac('sha256', k).update(d, 'utf8').digest()).map(b => b > 127 ? b - 256 : b),
     base64EncodeWebSafe: s => Buffer.from(s, 'utf8').toString('base64url'), base64DecodeWebSafe: s => Buffer.from(s, 'base64url'), newBlob: b => ({ getDataAsString: () => Buffer.from(b).toString('utf8') }) };
   const env = { mailFail: false };
@@ -33,10 +33,12 @@ module.exports = function createGasEnv() {
   const iter = arr => { let i = 0; return { hasNext: () => i < arr.length, next: () => arr[i++] }; };
   let driveSeq = 0;
   class DriveFile {
-    constructor(name, content, created, mime) { Object.assign(this, { id: 'f' + (++driveSeq), name, content, created: created || new Date(), mime: mime || 'text/plain', parent: null }); }
+    // updated: Zeitpunkt der letzten Änderung (Standard: vor 1 h, damit die Ruhefrist des Imports erfüllt ist); failMove: Verschieben scheitert (Berechtigung)
+    constructor(name, content, created, mime) { Object.assign(this, { id: 'f' + (++driveSeq), name, content, created: created || new Date(), updated: null, mime: mime || 'text/plain', parent: null, failMove: false }); }
     getId() { return this.id; } getName() { return this.name; } getMimeType() { return this.mime; } getDateCreated() { return this.created; }
+    getLastUpdated() { return this.updated || new Date(Date.now() - 3600e3); }
     getBlob() { return { getDataAsString: () => this.content }; }
-    moveTo(folder) { if (this.parent) this.parent.files = this.parent.files.filter(f => f !== this); this.parent = folder; folder.files.push(this); return this; }
+    moveTo(folder) { if (this.failMove) throw new Error('Access denied: file'); if (this.parent) this.parent.files = this.parent.files.filter(f => f !== this); this.parent = folder; folder.files.push(this); return this; }
   }
   class DriveFolder {
     constructor(name) { Object.assign(this, { id: 'd' + (++driveSeq), name, files: [], folders: [] }); }
@@ -51,6 +53,8 @@ module.exports = function createGasEnv() {
   const drive = { root: [] };
   drive.createFolder = n => { const f = new DriveFolder(n); drive.root.push(f); return f; };
   const allFolders = () => { const out = []; const walk = f => { out.push(f); f.folders.forEach(walk); }; drive.root.forEach(walk); return out; };
+  const allFiles = () => allFolders().reduce((a, f) => a.concat(f.files), []);
+  const DocumentApp = { openById: id => { const f = allFiles().find(x => x.id === id); if (!f) throw new Error('not found'); return { getBody: () => ({ getText: () => f.content }) }; } };
   const DriveApp = { getFoldersByName: n => iter(allFolders().filter(f => f.name === n)), getFolderById: id => { const f = allFolders().find(x => x.id === id); if (!f) throw new Error('not found'); return f; } };
 
   // ---- ScriptApp: Trigger-Liste ----
@@ -61,7 +65,7 @@ module.exports = function createGasEnv() {
     newTrigger: fn => { const t = { fn, every: null, getHandlerFunction: () => fn }; return { timeBased: () => ({ everyMinutes: m => { t.every = m; return { create: () => { triggers.push(t); return t; } }; } }) }; }
   };
 
-  const ctx = { SpreadsheetApp, CacheService, LockService, PropertiesService, Utilities, MailApp, ContentService, Logger, DriveApp, ScriptApp };
+  const ctx = { SpreadsheetApp, CacheService, LockService, PropertiesService, Utilities, MailApp, ContentService, Logger, DriveApp, ScriptApp, DocumentApp };
   const api = new Function(...Object.keys(ctx), src + '\n;return { doPost, runDriveImport, setupDriveImport, removeDriveImport, parseStandardText_, runArchiveSweep };')(...Object.values(ctx));
   const call = (action, payload, auth) => JSON.parse(api.doPost({ postData: { contents: JSON.stringify({ action, payload, auth }) } }).text);
   // Zeilen des shipments-Blatts als { base: { shipment, version, flag } } (JSON ggf. über mehrere Zellen verteilt)

@@ -178,6 +178,38 @@ lockState.held = 1;
 api.runDriveImport(); api.runDriveImport(); r = api.runDriveImport();
 lockState.held = 0; lockState.nested = 0;
 ok(r.failed === 1 && folder.sub('Fehler').fileNames().includes('HYDAC_2026-10-25_07-00_Scan.txt') && !shipmentRows()['USA 25.10.'], 'Nach 3 Fehlversuchen → „Fehler“-Ordner, nichts angelegt');
+// 7e3) Ruhefrist: eine gerade geänderte Datei wird erst beim nächsten Lauf angefasst (das andere Skript könnte noch schreiben)
+const fresh = folder.addFile('HYDAC_2026-10-26_07-00_Scan.txt', 'USA\n8001\n', new Date(2026, 9, 26, 7, 0));
+fresh.updated = new Date();
+r = api.runDriveImport();
+ok(r.files === 0 && !shipmentRows()['USA 26.10.'] && folder.fileNames().includes('HYDAC_2026-10-26_07-00_Scan.txt'), 'Vor < 2 Minuten geänderte Datei wird noch nicht importiert');
+fresh.updated = new Date(Date.now() - 10 * 60000);
+r = api.runDriveImport();
+ok(r.ok === 1 && shipmentRows()['USA 26.10.'], 'Nach der Ruhefrist importiert');
+// 7e4) Leere Datei (noch im Schreiben) → „später“, nicht „Fehler“; mit Inhalt beim nächsten Lauf importiert
+const empty = folder.addFile('HYDAC_2026-10-27_07-00_Scan.txt', '', new Date(2026, 9, 27, 7, 0));
+r = api.runDriveImport();
+ok(r.retry === 1 && folder.fileNames().includes('HYDAC_2026-10-27_07-00_Scan.txt') && /leer/.test(impLog()[impLog().length - 1][3]), 'Leere Datei → „später“, bleibt liegen');
+empty.content = 'USA\n9001\n';
+r = api.runDriveImport();
+ok(r.ok === 1 && shipmentRows()['USA 27.10.'] && Object.keys(props).filter(k => /^import_/.test(k)).length === 0, 'Gefüllt → importiert; Zähler/Merker aufgeräumt');
+// 7e5) Verschieben scheitert (fehlende Berechtigung): trotzdem genau EIN Import, Datei bleibt, nächste Läufe legen nichts doppelt an
+const stuck = folder.addFile('HYDAC_2026-10-28_07-00_Scan.txt', 'USA\n9101\n9102\n', new Date(2026, 9, 28, 7, 0));
+stuck.failMove = true;
+r = api.runDriveImport();
+ok(r.ok === 1 && shipmentRows()['USA 28.10.'] && folder.fileNames().includes('HYDAC_2026-10-28_07-00_Scan.txt') && /nicht nach „Verarbeitet“ verschoben/.test(impLog()[impLog().length - 1][3]) && props['import_done_' + stuck.id],
+  'Verschieben scheitert → Import trotzdem ok, Hinweis im Protokoll, Merker gesetzt');
+const nLog = impLog().length, nRows2 = Object.keys(shipmentRows()).length;
+r = api.runDriveImport(); r = api.runDriveImport();
+ok(r.skipped === 1 && r.ok === 0 && Object.keys(shipmentRows()).length === nRows2 && impLog().length === nLog, 'Folgeläufe: Datei übersprungen – nichts doppelt, kein Protokoll-Spam');
+stuck.failMove = false;
+r = api.runDriveImport();
+ok(r.skipped === 1 && folder.sub('Verarbeitet').fileNames().includes('HYDAC_2026-10-28_07-00_Scan.txt') && !props['import_done_' + stuck.id], 'Sobald das Verschieben klappt: Datei in „Verarbeitet“, Merker gelöscht');
+// 7e6) Google-Docs-Dokument statt .txt wird ebenfalls gelesen; Bild/PDF bleiben unangetastet
+folder.addFile('HYDAC_2026-10-29_07-00_Scan', 'Kanada\n9201\n', new Date(2026, 9, 29, 7, 0), 'application/vnd.google-apps.document');
+folder.addFile('foto.jpg', 'JFIF', new Date(2026, 9, 29, 7, 1), 'image/jpeg');
+r = api.runDriveImport();
+ok(r.files === 1 && r.ok === 1 && shipmentRows()['KANADA 29.10.'] && folder.fileNames().join() === 'Scan.pdf,foto.jpg', 'Google Doc importiert; PDF und Bild bleiben im Ordner liegen');
 // 7f) Ordner fehlt → Protokoll „fehler“, kein Absturz; Trigger entfernen
 folder.name = 'anders';
 r = api.runDriveImport();
