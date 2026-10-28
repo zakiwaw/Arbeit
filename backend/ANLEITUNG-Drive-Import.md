@@ -21,6 +21,38 @@ neuen Datei die Aufträge in der App an. Verarbeitete Dateien wandern in den Unt
 Ein am Ende angehängter Prüfbericht der KI (ab der Zeile „Abgleichprotokoll“) wird ignoriert.
 Weitere Ordner/Formate lassen sich in Code.gs in der Liste `IMPORT_FOLDERS` ergänzen.
 
+### Regel für MAN-Dateien: ein Block je Rechnung
+
+Ein Transportauftrag (PLSO) kann **mehrere Rechnungen** umfassen, z. B. „RECHNUNG: 9008633618, 9008633662“. In der App ist
+jede Rechnung ein eigener Auftrag mit eigener Positionsnummerierung. Welches Packstück zu welcher Rechnung gehört, steht nur
+auf den Rechnungs-/Packlistenseiten des PDFs – aus einem zusammengefassten Block (eine Zeile mit zwei Rechnungsnummern,
+Packstücke 1–20 durchnummeriert) kann die App das nicht mehr trennen; sie legt dann einen Auftrag „9008633618, 9008633662“ an.
+Deshalb muss das Skript, das die Textdatei erzeugt (KI-Schritt), je Rechnung einen eigenen Block schreiben. Regel für den
+Prompt des erzeugenden Skripts:
+
+> **Transportauftrag mit mehreren Rechnungen:** Ein Transportauftrag kann mehrere Rechnungsnummern nennen. Erstellen Sie dann
+> **je Rechnung einen eigenen Auftragsblock**: Zeile 1 (Spediteur, Land) und Zeile 3 (PLSO-Nummer) sind in allen Blöcken dieses
+> Transportauftrags identisch; Zeile 2 enthält **genau eine** Rechnungsnummer (niemals zwei in einer Zeile); jeder Block
+> enthält **ausschließlich die HU-Zeilen der Packliste dieser Rechnung** (Zuordnung nur über die Rechnungsseite, nie nach
+> Reihenfolge oder Stückzahl); die Position ist die Spalte „No.“ dieser Packliste und **beginnt in jedem Block wieder bei 1**.
+> Blöcke durch eine Leerzeile trennen.
+
+Beispiel (ein PLSO, zwei Rechnungen) – ergibt in der App zwei Rechnungen mit Positionen 1–2 und 1–2:
+
+```
+CLASQUIN GERMANY GMBH, SOUTH AFRICA
+9008633662
+3181 0137309
+1 092610121539|Carton|60 x 40 x 30 CM|12,500 KG
+2 092610121985|Carton|60 x 40 x 30 CM|11,200 KG
+
+CLASQUIN GERMANY GMBH, SOUTH AFRICA
+9008633618
+3181 0137309
+1 092610100065|Einwegpalette P102|120 x 80 x 95 CM|210 KG
+2 092610100193|Einwegpalette P102|120 x 80 x 95 CM|198 KG
+```
+
 ## Das brauchst du
 
 - Zugang zum Google-Konto, in dem das **Fracht-Tracker-Skript** liegt (Apps-Script-Projekt mit dem Google Sheet).
