@@ -111,6 +111,7 @@ const HYDAC_TXT = ['USA', '8118740144', '8118749096', '8118746244', '8118749072'
   'Kanada', '8118736972', '', 'China', '8118742479', '8118743550', '8118743961', '8118714956', '8118740155', ''].join('\n');
 const FILE1 = 'HYDAC_2026-10-22_18-34_Scan_2026-10-22_18-55.txt';
 const folder = drive.createFolder('HYDAC TXT');
+const manFolder = drive.createFolder('MAN Ladelisten TXT');   // zweiter Ordner (Format „MAN Fracht“), siehe 8)
 folder.addFile(FILE1, HYDAC_TXT, new Date(2026, 9, 22, 18, 56));
 folder.addFile('Scan.pdf', '%PDF-1.4', new Date(2026, 9, 22, 18, 50), 'application/pdf');   // kein Text → bleibt unangetastet
 const vImp0 = call('loadChanges', { sinceVersion: 0 }, adminTok).version;
@@ -217,8 +218,63 @@ ok(r.failed === 1 && /nicht gefunden/.test(impLog()[impLog().length - 1][3]), 'O
 folder.name = 'HYDAC TXT';
 api.removeDriveImport();
 ok(triggers.length === 0, 'removeDriveImport entfernt den Zeit-Trigger');
+// 8) MAN-Ladelisten (2.6): Datei im Ordner „MAN Ladelisten TXT“ → neuer LKW „MAN <n>“ wie beim QR-Scan; Prüfbericht ab „Abgleichprotokoll“ ignoriert
+const MAN_TXT = ['DB SCHENKER, USA', '9008635201', '3181 0137310',
+  '1 0926101212B2|Carton|91 x 20 x 42,500 CM|5,900 KG', '2 092610100800|Einwegpalette P102|120 x 40 x 49 CM|43 KG', '3 0926101007AE|Einwegpalette P102|120 x 40 x 49 CM|43 KG', '',
+  'DHL GLOBAL FORWARDING, AUSTRALIEN', '9008635214', '3181 0137319', '1 0926101207FB|Carton M 371|38 x 18.500 x 25 CM|2.600 KG', '',
+  'DHL GLOBAL FORWARDING, AUSTRALIEN', 'NACHLIEFERUNG', '3181 0137320', '1 0926101299AA|Carton|20 x 14 x 11 CM|0,900 KG', '',
+  'Abgleichprotokoll', '', 'Gesamtzahl extrahierte HUs (laut Detailseiten + Nachlieferungen): 53', '',
+  'Aufträge, die verarbeitet wurden, aber NICHT in der Übersicht stehen:', 'Keine. Alle verarbeiteten Aufträge sind in der Übersicht enthalten.', 'Zeile 3', 'Zeile 4', ''].join('\n');
+call('saveShipments', { shipments: { '9000000004': { hawb: '9000000004', truckId: 'MAN 4', originalManNumber: 4, scannedItems: [], isHuListOrder: true } }, bases: {} }, adminTok); // höchste MAN-Nummer bisher: 4
+manFolder.addFile('MAN-Ladeliste_2026-10-19_22-47_Scan.txt', MAN_TXT, new Date(2026, 9, 19, 22, 50));
+r = api.runDriveImport();
+rows = shipmentRows();
+const man5 = Object.keys(rows).filter(b => rows[b].shipment && rows[b].shipment.truckId === 'MAN 5').sort();
+ok(r.ok === 1 && man5.join('|') === '9008635201|9008635214|NACHLIEFERUNG', `MAN-Datei → LKW „MAN 5“ (höchste Nummer + 1) mit 3 Rechnungen, Prüfbericht erzeugt keine Aufträge (${man5.join('|')})`);
+const m1 = rows['9008635201'] && rows['9008635201'].shipment;
+ok(m1 && m1.originalManNumber === 5 && m1.freightForwarder === 'DB SCHENKER' && m1.destinationCountry === 'USA' && m1.plsoNumber === '3181 0137310' && m1.isHuListOrder === true && m1.mitarbeiter === 'Automatik' && m1.totalPiecesExpected === 3,
+  'Kopf wie in der App: Spediteur, Land, PLSO, feste MAN-Nummer, 3 Packstücke erwartet');
+const it1 = m1 && m1.scannedItems[0];
+ok(it1 && it1.rawInput === '0926101212B2' && it1.position === 1 && it1.packaging === 'Carton' && it1.dimensions === '91 x 20 x 42,500 CM' && it1.grossWeight === '5,900 KG' && it1.status === 'Anstehend' && it1.id && m1.scannedItems[2].position === 3,
+  'Packstück: Pos/HU/Verpackung/Maße/Gewicht wie parseComplexHuString');
+const m2 = rows['9008635214'].shipment;
+ok(m2.freightForwarder === 'DHL GLOBAL FORWARDING' && m2.destinationCountry === 'AUSTRALIEN' && m2.scannedItems.length === 1 && m2.scannedItems[0].grossWeight === '2.600 KG', 'Zweite Rechnung korrekt');
+ok(/MAN 5: 3 Auftrag\/Aufträge, 5 Packstücke/.test(impLog()[impLog().length - 1][3]) && manFolder.sub('Verarbeitet').fileNames().length === 1, 'Protokoll + Datei nach „Verarbeitet“ (im MAN-Ordner)');
+// 8b) Zweite Datei: vorhandene Rechnung wird übersprungen (wie die App), neue kommt auf „MAN 6“; NACHLIEFERUNG wird durchnummeriert
+manFolder.addFile('MAN-Ladeliste_2026-10-20_08-00_Scan.txt', ['DHL GLOBAL FORWARDING, AUSTRALIEN', '9008635214', '3181 0137319', '1 0926101207FB|Carton|1 x 1 x 1 CM|1 KG', '',
+  'KÜHNE + NAGEL, SÜDAFRIKA', '9008635299', '3181 0137399', '0926101300aa|Carton|1 x 1 x 1 CM|1 KG', '0926101300aa|Carton|1 x 1 x 1 CM|1 KG', 'Summe: 2', '',
+  'DHL GLOBAL FORWARDING, AUSTRALIEN', 'NACHLIEFERUNG', '3181 0137321', '1 0926101299BB|Carton|20 x 14 x 11 CM|0,900 KG', ''].join('\n'), new Date(2026, 9, 20, 8, 0));
+r = api.runDriveImport();
+rows = shipmentRows();
+const man6 = Object.keys(rows).filter(b => rows[b].shipment && rows[b].shipment.truckId === 'MAN 6').sort();
+ok(r.ok === 1 && man6.join('|') === '9008635299|NACHLIEFERUNG 1' && rows['9008635214'].shipment.truckId === 'MAN 5' && rows['9008635214'].shipment.scannedItems[0].grossWeight === '2.600 KG',
+  `Vorhandene Rechnung bleibt unverändert auf MAN 5; neue → „MAN 6“; NACHLIEFERUNG → „NACHLIEFERUNG 1“ (${man6.join('|')})`);
+const m3 = rows['9008635299'].shipment;
+ok(m3.freightForwarder === 'KUEHNE + NAGEL' && m3.destinationCountry === 'SUEDAFRIKA' && m3.scannedItems.length === 1 && m3.scannedItems[0].rawInput === '0926101300AA' && m3.scannedItems[0].position === 1,
+  'Umlaute/Großschreibung wie erfBuildPayload; HU ohne Pos → Pos 1, Dublette einmal, Kleinbuchstaben groß');
+ok(/übersprungen: 9008635214/.test(impLog()[impLog().length - 1][3]) && /ignoriert: Summe: 2/.test(impLog()[impLog().length - 1][3]), 'Protokoll nennt übersprungene Rechnung und ignorierte Zeile');
+// 8c) Nur bereits vorhandene Rechnungen → nichts angelegt, kein leerer LKW; archivierte Nummer → „(2)“; gelöschte Nummer wird wiederbelebt
+manFolder.addFile('MAN-Ladeliste_2026-10-21_08-00_Scan.txt', ['DHL GLOBAL FORWARDING, AUSTRALIEN', '9008635214', '3181 0137319', '1 0926101207FB|Carton|1 x 1 x 1 CM|1 KG', ''].join('\n'), new Date(2026, 9, 21, 8, 0));
+r = api.runDriveImport();
+rows = shipmentRows();
+ok(r.ok === 1 && !Object.keys(rows).some(b => rows[b].shipment && rows[b].shipment.truckId === 'MAN 7') && /nichts angelegt – alle 1 Rechnung/.test(impLog()[impLog().length - 1][3]), 'Nur Vorhandenes → kein LKW „MAN 7“, Protokoll „nichts angelegt“');
+sheets.shipments.rows[rows['9008635201'].row ? rows['9008635201'].row - 1 : sheets.shipments.rows.findIndex(x => x[0] === '9008635201')][4] = 'ARCHIV';   // 9008635201 ins Archiv
+call('deleteShipment', { baseNumber: 'NACHLIEFERUNG' }, adminTok);
+const rowCountBefore = sheets.shipments.rows.length;
+manFolder.addFile('MAN-Ladeliste_2026-10-22_08-00_Scan.txt', ['DB SCHENKER, USA', '9008635201', '3181 0137310', '1 0926101212B2|Carton|91 x 20 x 42,500 CM|5,900 KG', '',
+  'DHL GLOBAL FORWARDING, AUSTRALIEN', 'NACHLIEFERUNG', '3181 0137320', '1 0926101299CC|Carton|20 x 14 x 11 CM|0,900 KG', ''].join('\n'), new Date(2026, 9, 22, 8, 0));
+r = api.runDriveImport();
+rows = shipmentRows();
+ok(r.ok === 1 && rows['9008635201 (2)'] && rows['9008635201 (2)'].shipment.truckId === 'MAN 7' && rows['NACHLIEFERUNG'] && rows['NACHLIEFERUNG'].shipment.truckId === 'MAN 7' && rows['NACHLIEFERUNG'].flag !== true && sheets.shipments.rows.length === rowCountBefore + 1,
+  'Archivierte Rechnung → „9008635201 (2)“; gelöschte „NACHLIEFERUNG“ wieder frei und in ihrer alten Zeile angelegt (keine doppelte Zeile)');
+// 8d) Parser direkt: Stop-Marker, MAN-Zerlegung
+ok(api.cutAtStopMarker_('a\nb\n  ABGLEICHPROTOKOLL der KI\nc') === 'a\nb' && api.cutAtStopMarker_('a\nb') === 'a\nb', 'cutAtStopMarker_: schneidet ab „Abgleichprotokoll“ (Groß/Klein egal), sonst unverändert');
+let p = api.parseManText_('X, Y\n1\n2\n'); ok(p.orders.length === 0, 'parseManText_: Block ohne Packstück → kein Auftrag');
+p = api.parseManText_('Spedition Müller, Österreich\n4711\nPLSO 1\n5 ABC-1|Kiste||\nkaputt zeile mit leerzeichen|x\n');
+ok(p.orders.length === 1 && p.orders[0].spediteur === 'SPEDITION MUELLER' && p.orders[0].land === 'OESTERREICH' && p.orders[0].hus.length === 1 && p.orders[0].hus[0].rawInput === 'ABC-1' && p.orders[0].hus[0].position === 5 && p.orders[0].hus[0].packaging === 'Kiste' && p.orders[0].hus[0].dimensions === null && p.ignored.length === 1,
+  'parseManText_: Kopf normalisiert, HU mit Bindestrich/Pos, leere Felder → null, Störzeile ignoriert');
 // 7g) Parser direkt
-let p = api.parseStandardText_('\uFEFFTitelzeile\n\nUSA\n 123 \n\n\n\nChina\n456\n789\n');
+p = api.parseStandardText_('\uFEFFTitelzeile\n\nUSA\n 123 \n\n\n\nChina\n456\n789\n');
 ok(p.orders.length === 2 && p.orders[0].orderId === 'USA' && p.orders[0].hus.join() === '123' && p.orders[1].hus.join() === '456,789' && p.ignored.length === 0, 'parseStandardText_: BOM, Titelzeile ohne Packstücke, mehrere Leerzeilen');
 p = api.parseStandardText_('');
 ok(p.orders.length === 0, 'parseStandardText_: leer → keine Aufträge');

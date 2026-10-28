@@ -85,6 +85,14 @@ async function referencePayload(page, mode, text) {
     assert(/9007988206 · Maersk Logistics & Services\/Senator · Südafrika · PLSO 3181 0128115 · 2 Packstücke/.test(man.rows[0]) && /1 0925102219E2 · 2 0925102219E3/.test(man.rows[0]), `MAN-Zeile 1: Rechnung, Spediteur, Land, PLSO, HUs (${man.rows[0]})`);
     assert(/Nachlieferung · Logwin · Singapur/.test(man.rows[1]), 'MAN-Zeile 2: Nachlieferung erkannt');
     assert(man.create === 'Direkt anlegen (neuer MAN-LKW)' && man.qr && man.qrHidden, 'Knöpfe: „Direkt anlegen (neuer MAN-LKW)“ + „QR-Code anzeigen“ (QR zunächst zu)');
+    // 2b) Prüfbericht der KI am Textende („Abgleichprotokoll …“) erzeugt keine Aufträge – Ergebnis identisch zum reinen Text
+    await page.evaluate((t) => { const ta = document.getElementById('erfInput'); ta.value = t; ta.dispatchEvent(new Event('input', { bubbles: true })); },
+      MAN_TEXT + '\n\nAbgleichprotokoll\n\nGesamtzahl extrahierte HUs (laut Detailseiten + Nachlieferungen): 53\n\nAufträge, die verarbeitet wurden, aber NICHT in der Übersicht stehen:\nKeine. Alle verarbeiteten Aufträge sind in der Übersicht enthalten.\nZeile 3\nZeile 4\n');
+    await page.evaluate(() => document.getElementById('erfAnalyzeBtn').click()); await wait(300);
+    const manRep = await page.evaluate(() => ({ badge: document.getElementById('pageBadge').textContent, head: document.querySelector('.erf-result h3')?.textContent.trim(), rows: document.querySelectorAll('.erf-row').length }));
+    assert(manRep.badge === '2 Aufträge' && manRep.head === 'Erkannt: 2 Aufträge, 4 Packstücke' && manRep.rows === 2, `MAN mit „Abgleichprotokoll“-Anhang: weiterhin 2 Aufträge / 4 Packstücke (${JSON.stringify(manRep)})`);
+    await page.evaluate((t) => { const ta = document.getElementById('erfInput'); ta.value = t; ta.dispatchEvent(new Event('input', { bubbles: true })); }, MAN_TEXT);
+    await page.evaluate(() => document.getElementById('erfAnalyzeBtn').click()); await wait(300);
     const refMan = await referencePayload(page, 'man', MAN_TEXT);
     // QR anzeigen → Inhalt aus dem Bild-Title/Canvas nicht lesbar, daher über „Inhalt kopieren“ (prompt-Fallback ohne Clipboard) prüfen
     await page.evaluate(() => { window.__copied = null; navigator.clipboard.writeText = t => { window.__copied = t; return Promise.resolve(); }; });

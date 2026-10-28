@@ -14,11 +14,20 @@ const HYDAC_TXT = ['USA', '8118740144', '8118749096', '8118746244', '8118749072'
 const FILE1 = 'HYDAC_2026-10-22_18-34_Scan.txt';
 const folder = env.drive.createFolder('HYDAC TXT');
 folder.addFile(FILE1, HYDAC_TXT, new Date(2026, 9, 22, 18, 56));
+// MAN-Ladeliste (Format „MAN Fracht“) mit dem Prüfbericht der KI am Ende – wie in der Datei des Anwenders
+const MAN_TXT = ['DB SCHENKER, USA', '9008635201', '3181 0137310',
+  '1 0926101212B2|Carton|91 x 20 x 42,500 CM|5,900 KG', '2 092610100800|Einwegpalette P102|120 x 40 x 49 CM|43 KG', '',
+  'DHL GLOBAL FORWARDING, AUSTRALIEN', '9008635214', '3181 0137319', '1 0926101207FB|Carton M 371|38 x 18.500 x 25 CM|2.600 KG', '',
+  'Abgleichprotokoll', '', 'Gesamtzahl extrahierte HUs (laut Detailseiten + Nachlieferungen): 53', '',
+  'Aufträge, die verarbeitet wurden, aber NICHT in der Übersicht stehen:', 'Keine. Alle verarbeiteten Aufträge sind in der Übersicht enthalten.', 'Zeile 3', 'Zeile 4', ''].join('\n');
+const manFolder = env.drive.createFolder('MAN Ladelisten TXT');
+manFolder.addFile('MAN-Ladeliste_2026-10-19_22-47_Scan.txt', MAN_TXT, new Date(2026, 9, 19, 22, 50));
 const run = env.api.runDriveImport();
-assert(run.ok === 1, 'Server: HYDAC-Datei importiert');
+assert(run.ok === 2 && run.failed === 0, `Server: HYDAC-Datei + MAN-Ladeliste importiert (${JSON.stringify(run)})`);
 const served = env.call('loadChanges', { sinceVersion: 0 }, adminTok);          // das, was ein Gerät beim Start bekommt
 const data = served.changed;
-assert(Object.keys(data).length === 5 && data['USA 22.10.'] && data['USA 22.10.'].truckId === 'HYDAC 22.10.2026', 'Server liefert die 5 Aufträge des LKW „HYDAC 22.10.2026“ an die Geräte');
+assert(Object.keys(data).length === 7 && data['USA 22.10.'] && data['USA 22.10.'].truckId === 'HYDAC 22.10.2026', 'Server liefert die 5 Aufträge des LKW „HYDAC 22.10.2026“ an die Geräte');
+assert(data['9008635201'] && data['9008635201'].truckId === 'MAN 1' && data['9008635214'] && data['9008635214'].originalManNumber === 1 && Object.keys(data).filter(b => data[b].truckId === 'MAN 1').length === 2, 'MAN-Ladeliste → LKW „MAN 1“ mit 2 Rechnungen, Prüfbericht ergibt keine Aufträge');
 
 (async () => {
   const browser = await launch();
@@ -56,6 +65,19 @@ assert(Object.keys(data).length === 5 && data['USA 22.10.'] && data['USA 22.10.'
     assert(menu && menu.toggle && /HYDAC 22\.10\.2026/.test(menu.text), `Seitenmenü: LKW-Eintrag mit Schalter (${menu && menu.text})`);
     await page.close();
 
+    // 2b) MAN-LKW aus der Datei: Anlieferung + LKW-Seite mit Spediteur/Land/PLSO wie beim QR-Import; „+ Auftrag“ (Desktop) nur bei MAN
+    be = makeBackend(data, {});
+    page = await openApp(browser, be, { query: '?seite=anlieferung&lkw=' + encodeURIComponent('MAN 1') }); await wait(700);
+    const manPage = await page.evaluate(() => ({
+      title: document.getElementById('pageTitle').textContent.trim(), badge: document.getElementById('pageBadge').textContent.trim(),
+      rows: Array.from(document.querySelectorAll('#pageContent table.page-shipments tr[data-basenumber]')).map(r => r.textContent.replace(/\s+/g, ' ').trim()),
+      sum: (document.querySelector('.page-summary') || {}).textContent || '', note: (document.querySelector('.page-import-note') || {}).textContent || ''
+    }));
+    assert(/MAN 1/.test(manPage.title) && manPage.badge === '2 Aufträge' && /3 HUs/.test(manPage.sum), `MAN-LKW-Seite: „${manPage.title}“ / ${manPage.badge} / ${manPage.sum.replace(/\s+/g, ' ').trim()}`);
+    assert(manPage.rows.length === 2 && manPage.rows.some(r => /^9008635214/.test(r) && /MAN 1/.test(r) && /0\/1/.test(r) && /2,6 kg/.test(r)) && manPage.rows.some(r => /^9008635201/.test(r) && /0\/2/.test(r) && /48,9 kg/.test(r)), `MAN-Auftragszeilen wie beim QR-Import: Rechnung, LKW, Zähler, Gewicht aus den Packstücken (${manPage.rows.join(' || ')})`);
+    assert(/MAN-Ladeliste_2026-10-19_22-47_Scan\.txt/.test(manPage.note), 'Herkunftszeile nennt die MAN-Datei');
+    await page.close();
+
     // 3) Direktlink zur Sendung + Desktop-Tabelle
     be = makeBackend(data, {});
     page = await openApp(browser, be, { viewport: { width: 1400, height: 900, deviceScaleFactor: 1 }, query: '?sendung=' + encodeURIComponent('USA 22.10.') }); await wait(1200);
@@ -69,6 +91,17 @@ assert(Object.keys(data).length === 5 && data['USA 22.10.'] && data['USA 22.10.'
     assert(det.rows === 8 && /8118740144/.test(det.first), `Desktop: Packstück-Tabelle mit 8 Zeilen, erste 8118740144 (${det.rows})`);
     const errs2 = await page.evaluate(() => (window.__errors || []).length);
     assert(errs2 === 0, 'Keine JS-Fehler am Desktop');
+    await page.close();
+    // 3b) MAN-Rechnung am Desktop: Kopf mit Spediteur/Land/PLSO, Packstück-Tabelle mit Pos/Verpackung/Maße/Gewicht, Einheit CM
+    be = makeBackend(data, {});
+    page = await openApp(browser, be, { viewport: { width: 1400, height: 900, deviceScaleFactor: 1 }, query: '?sendung=9008635201' }); await wait(1200);
+    const detMan = await page.evaluate(() => {
+      const d = document.getElementById('currentShipmentDetails');
+      const rows = Array.from(document.querySelectorAll('#detailView .pack-table tbody tr')).map(r => r.textContent.replace(/\s+/g, ' ').trim());
+      return { head: d.textContent.replace(/\s+/g, ' ').trim(), all: document.getElementById('detailView').textContent.replace(/\s+/g, ' ').trim(), rows, base: d.dataset.base };
+    });
+    assert(detMan.base === '9008635201' && /DB SCHENKER/i.test(detMan.all) && /Land: USA/.test(detMan.all) && /3181 0137310/.test(detMan.all) && /MAN 1/.test(detMan.head) && /Automatik/.test(detMan.head), `Desktop MAN-Details: Spediteur, Land, PLSO, LKW, Ersteller „Automatik“ (${detMan.all.slice(0, 220)})`);
+    assert(detMan.rows.length === 2 && /0926101212B2/.test(detMan.rows[0]) && /Carton/.test(detMan.rows[0]) && /91 x 20 x 42,500/.test(detMan.rows[0]) && /5,900/.test(detMan.rows[0]), `Desktop MAN-Packstücke: HU, Verpackung, Maße, Gewicht (${detMan.rows[0]})`);
     await page.close();
   } catch (e) {
     console.log('ERR', e);

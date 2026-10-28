@@ -4792,7 +4792,15 @@ function erfBuildPayload(mode, orders) {
     }
     return (mode === 'vvl' ? 'FRT_VVL_V1' : 'FRT_MULTI_V1') + allData;
 }
-function erfParse(mode, text) { return mode === 'vvl' ? erfParseVvl(text) : (mode === 'man' ? erfParseMan(text) : erfParseStandard(text)); }
+// Prüfbericht der KI am Textende („Abgleichprotokoll …“) gehört nicht zu den Aufträgen – ab dieser Zeile wird nichts mehr gelesen
+// (dieselbe Regel wie beim automatischen Drive-Import im Server-Skript).
+const ERF_STOP_MARKERS = ['abgleichprotokoll'];
+function erfStripReport(text) {
+    const lines = String(text || '').split('\n');
+    const i = lines.findIndex(l => { const t = l.trim().toLowerCase(); return ERF_STOP_MARKERS.some(m => t.startsWith(m)); });
+    return i < 0 ? String(text || '') : lines.slice(0, i).join('\n');
+}
+function erfParse(mode, text) { text = erfStripReport(text); return mode === 'vvl' ? erfParseVvl(text) : (mode === 'man' ? erfParseMan(text) : erfParseStandard(text)); }
 function erfAnalyze() {
     const text = erfState.text.trim();
     if (!text) { erfState.result = { error: 'Bitte zuerst den Text einfügen.' }; return; }

@@ -1,7 +1,9 @@
 // ===================================================
 // FRACHT TRACKER – Google Apps Script Backend
-// Version 2.5: mehrgeräte-sicher + Archiv + Anmeldung (PIN; Sitzung verlängert sich bei Bedienung) + Sammel-Löschung
+// Version 2.6: mehrgeräte-sicher + Archiv + Anmeldung (PIN; Sitzung verlängert sich bei Bedienung) + Sammel-Löschung
 //   + automatischer Import von Textdateien aus Google Drive.
+//   2.6: Import auch für „MAN Fracht“-Dateien (Ordner „MAN Ladelisten TXT“ → neuer LKW „MAN <n>“ wie beim QR-Scan); mehrere
+//        Ordner mit je eigenem Format (IMPORT_FOLDERS); Prüfbericht der KI ab „Abgleichprotokoll“ wird ignoriert.
 //   2.5: Abschnitt „AUTOMATISCHER IMPORT AUS GOOGLE DRIVE“ – Zeit-Trigger liest Textdateien (Format „Standard (Leerzeilen)“)
 //        aus dem Drive-Ordner und legt daraus Aufträge an. Einmalig setupDriveImport() im Editor ausführen.
 //   2.4: "deleteShipments" – alle Löschvermerke eines LKW-Löschens in EINEM Aufruf (eine Sperre, ein Index-Lesen).
@@ -841,19 +843,28 @@ function sendPdfEmail(payload) {
 }
 
 // ===================================================
-// AUTOMATISCHER IMPORT AUS GOOGLE DRIVE (2.5)
-// Ein getrenntes Skript legt je Kunden-PDF eine Textdatei im Drive-Ordner IMPORT_FOLDER_NAME ab. Aufbau wie auf der Seite
-// „Aufträge erfassen → Standard (Leerzeilen)“ der App: Aufträge durch Leerzeilen getrennt, erste Zeile = Auftragsnummer
-// (bei HYDAC das Zielland), jede weitere Zeile ein Packstück. runDriveImport() läuft per Zeit-Trigger (dazu EINMAL
-// setupDriveImport() im Skript-Editor ausführen – das fragt auch die Drive-Berechtigung ab), legt je Datei einen LKW
-// „<Kunde> <TT.MM.JJJJ>“ mit allen Aufträgen an – dieselben Datensätze, die „Direkt anlegen“ in der App erzeugt – und
-// verschiebt die Datei in den Unterordner „Verarbeitet“ (nicht lesbar → „Fehler“). Jede Datei wird genau einmal
-// verarbeitet (Merker je Datei-ID in den Script-Properties, falls das Verschieben scheitert; erneuter Import nur über eine
-// KOPIE der Datei); Protokoll im ausgeblendeten Blatt „_import“. Die Geräte holen die Aufträge über die normale Synchronisation
-// ab (wie jede andere Änderung). Es werden keine E-Mails verschickt. Trigger wieder entfernen: removeDriveImport().
+// AUTOMATISCHER IMPORT AUS GOOGLE DRIVE (2.5 / 2.6)
+// Ein getrenntes Skript legt je Kunden-PDF eine Textdatei in einem Drive-Ordner ab. Je Ordner ist festgelegt, in welchem
+// Format die Dateien aufgebaut sind (IMPORT_FOLDERS) – die Formate sind dieselben wie auf der Seite „Aufträge erfassen“:
+//   'standard' = „Standard (Leerzeilen)“: Aufträge durch Leerzeilen getrennt, erste Zeile Auftragsnummer (bei HYDAC das
+//                Zielland), jede weitere Zeile ein Packstück. Je Datei ein LKW „<Kunde> <TT.MM.JJJJ>“, Aufträge „<Nummer> <TT.MM.>“.
+//   'man'      = „MAN Fracht“: je Auftrag Zeile 1 „Spediteur, Land“, Zeile 2 Rechnungsnummer, Zeile 3 PLSO, danach je Zeile
+//                „Pos HU|Verpackung|Maße|Gewicht“. Je Datei ein neuer LKW „MAN <n>“ mit fester MAN-Nummer – genau wie der
+//                QR-Scan bzw. „Direkt anlegen“ in der App (schon vorhandene Rechnungen werden übersprungen, NACHLIEFERUNG wird
+//                durchnummeriert, archivierte Nummern bekommen „ (2)“).
+// Ab einer Zeile, die mit einem Eintrag aus IMPORT_STOP_MARKERS beginnt (z. B. „Abgleichprotokoll“), wird der Rest der Datei
+// ignoriert – dort hängt die KI ihren Prüfbericht an.
+// runDriveImport() läuft per Zeit-Trigger (dazu EINMAL setupDriveImport() im Skript-Editor ausführen – das fragt auch die
+// Drive-Berechtigung ab) und verschiebt jede Datei nach der Verarbeitung in den Unterordner „Verarbeitet“ (nicht lesbar →
+// „Fehler“). Jede Datei wird genau einmal verarbeitet (Merker je Datei-ID in den Script-Properties, falls das Verschieben
+// scheitert; erneuter Import nur über eine KOPIE der Datei); Protokoll im ausgeblendeten Blatt „_import“. Die Geräte holen
+// die Aufträge über die normale Synchronisation ab. Es werden keine E-Mails verschickt. Trigger entfernen: removeDriveImport().
 // ===================================================
-const IMPORT_FOLDER_NAME = 'HYDAC TXT';       // Drive-Ordner, in dem das andere Skript die Textdateien ablegt
-const IMPORT_FOLDER_ID = '';                  // optional: Ordner-ID statt Name (aus der Drive-Adresse), falls es den Namen mehrfach gibt
+const IMPORT_FOLDERS = [                      // Drive-Ordner (direkt darin liegende Dateien) und ihr Format; id optional statt Name
+  { name: 'HYDAC TXT', id: '', format: 'standard' },
+  { name: 'MAN Ladelisten TXT', id: '', format: 'man' }
+];
+const IMPORT_STOP_MARKERS = ['Abgleichprotokoll']; // ab einer Zeile, die so beginnt, wird nichts mehr gelesen
 const IMPORT_DONE_FOLDER = 'Verarbeitet';     // Unterordner für erledigte Dateien
 const IMPORT_FAIL_FOLDER = 'Fehler';          // Unterordner für Dateien ohne verwertbaren Inhalt
 const IMPORT_EVERY_MINUTES = 5;               // Abstand des Zeit-Triggers (erlaubt: 1, 5, 10, 15, 30)
@@ -868,7 +879,7 @@ const IMPORT_MIN_AGE_MINUTES = 2;             // Datei muss so lange unveränder
 function setupDriveImport() {
   removeDriveImport();
   ScriptApp.newTrigger('runDriveImport').timeBased().everyMinutes(IMPORT_EVERY_MINUTES).create();
-  Logger.log('Drive-Import eingerichtet: alle ' + IMPORT_EVERY_MINUTES + ' Minuten, Ordner „' + (IMPORT_FOLDER_ID || IMPORT_FOLDER_NAME) + '“.');
+  Logger.log('Drive-Import eingerichtet: alle ' + IMPORT_EVERY_MINUTES + ' Minuten, Ordner: ' + IMPORT_FOLDERS.map(function (c) { return '„' + (c.id || c.name) + '“ (' + c.format + ')'; }).join(', ') + '.');
   return runDriveImport();
 }
 
@@ -879,58 +890,15 @@ function removeDriveImport() {
   });
 }
 
-// Ein Durchlauf: alle Textdateien direkt im Ordner (älteste zuerst) der Reihe nach verarbeiten.
+// Ein Durchlauf über alle Ordner: Dateien (älteste zuerst) der Reihe nach verarbeiten.
 // Antwort { files, ok, failed, retry, skipped } (für den Aufruf von Hand im Editor; Details stehen im Blatt _import).
 function runDriveImport() {
   const cache = CacheService.getScriptCache();
-  if (cache.get(IMPORT_LOCK_KEY)) { Logger.log('Drive-Import: läuft bereits – übersprungen.'); return { files: 0, ok: 0, failed: 0, busy: true }; }
+  if (cache.get(IMPORT_LOCK_KEY)) { Logger.log('Drive-Import: läuft bereits – übersprungen.'); return { files: 0, ok: 0, failed: 0, retry: 0, skipped: 0, busy: true }; }
   cache.put(IMPORT_LOCK_KEY, '1', 330);
   try {
-    const folder = findImportFolder_();
-    if (!folder) {
-      importLog_('', 'fehler', 'Ordner „' + (IMPORT_FOLDER_ID || IMPORT_FOLDER_NAME) + '“ in Google Drive nicht gefunden.');
-      return { files: 0, ok: 0, failed: 1 };
-    }
-    const files = listImportFiles_(folder);
-    const props = PropertiesService.getScriptProperties();
-    const out = { files: files.length, ok: 0, failed: 0, retry: 0, skipped: 0 };
-    files.forEach(function (f) {
-      const name = f.getName();
-      const doneKey = 'import_done_' + f.getId();
-      // Schon importiert, konnte aber nicht verschoben werden (z. B. fehlende Berechtigung): NIE ein zweites Mal anlegen –
-      // nur erneut versuchen, die Datei wegzuräumen.
-      if (props.getProperty(doneKey)) {
-        out.skipped++;
-        try { f.moveTo(subFolder_(folder, IMPORT_DONE_FOLDER)); props.deleteProperty(doneKey); } catch (e0) {}
-        return;
-      }
-      try {
-        const r = importTextFile_(name, readImportText_(f), f.getDateCreated());
-        props.setProperty(doneKey, new Date().toISOString());   // ab hier gilt die Datei als verarbeitet – egal, was das Verschieben macht
-        props.deleteProperty('import_retry_' + f.getId());
-        out.ok++;
-        try {
-          f.moveTo(subFolder_(folder, IMPORT_DONE_FOLDER));
-          props.deleteProperty(doneKey);
-          importLog_(name, 'ok', r.summary);
-        } catch (eMove) {
-          importLog_(name, 'ok', r.summary + ' | Datei konnte nicht nach „' + IMPORT_DONE_FOLDER + '“ verschoben werden (' + String((eMove && eMove.message) || eMove) + ') – sie wird nicht erneut importiert.');
-        }
-      } catch (e) {
-        const msg = String((e && e.message) || e);
-        // Vorübergehende Störung (Sperre belegt, Datei noch leer, Sheet/Drive kurz nicht erreichbar): Datei liegen lassen und
-        // beim nächsten Lauf erneut versuchen – erst nach IMPORT_MAX_RETRIES Fehlversuchen in „Fehler“. Inhaltliche Fehler sofort.
-        if (!(e && e.permanent) && importRetry_(f) < IMPORT_MAX_RETRIES) {
-          out.retry++;
-          importLog_(name, 'später', msg + ' – nächster Versuch beim nächsten Lauf.');
-          return;
-        }
-        out.failed++;
-        props.deleteProperty('import_retry_' + f.getId());
-        try { f.moveTo(subFolder_(folder, IMPORT_FAIL_FOLDER)); } catch (e2) { Logger.log('Drive-Import: Verschieben fehlgeschlagen: ' + e2); }
-        importLog_(name, 'fehler', msg);
-      }
-    });
+    const out = { files: 0, ok: 0, failed: 0, retry: 0, skipped: 0 };
+    IMPORT_FOLDERS.forEach(function (cfg) { importFolder_(cfg, out); });
     Logger.log('Drive-Import: ' + out.files + ' Datei(en), ' + out.ok + ' ok, ' + out.failed + ' fehlerhaft, ' + out.retry + ' später.');
     return out;
   } finally {
@@ -938,9 +906,58 @@ function runDriveImport() {
   }
 }
 
-function findImportFolder_() {
-  if (IMPORT_FOLDER_ID) { try { return DriveApp.getFolderById(IMPORT_FOLDER_ID); } catch (e) { return null; } }
-  const it = DriveApp.getFoldersByName(IMPORT_FOLDER_NAME);
+function importFolder_(cfg, out) {
+  const folder = findImportFolder_(cfg);
+  if (!folder) {
+    importLog_('', 'fehler', 'Ordner „' + (cfg.id || cfg.name) + '“ in Google Drive nicht gefunden.');
+    out.failed++;
+    return;
+  }
+  const files = listImportFiles_(folder);
+  const props = PropertiesService.getScriptProperties();
+  out.files += files.length;
+  files.forEach(function (f) {
+    const name = f.getName();
+    const doneKey = 'import_done_' + f.getId();
+    // Schon importiert, konnte aber nicht verschoben werden (z. B. fehlende Berechtigung): NIE ein zweites Mal anlegen –
+    // nur erneut versuchen, die Datei wegzuräumen.
+    if (props.getProperty(doneKey)) {
+      out.skipped++;
+      try { f.moveTo(subFolder_(folder, IMPORT_DONE_FOLDER)); props.deleteProperty(doneKey); } catch (e0) {}
+      return;
+    }
+    try {
+      const r = importTextFile_(cfg, name, readImportText_(f), f.getDateCreated());
+      props.setProperty(doneKey, new Date().toISOString());   // ab hier gilt die Datei als verarbeitet – egal, was das Verschieben macht
+      props.deleteProperty('import_retry_' + f.getId());
+      out.ok++;
+      try {
+        f.moveTo(subFolder_(folder, IMPORT_DONE_FOLDER));
+        props.deleteProperty(doneKey);
+        importLog_(name, 'ok', r.summary);
+      } catch (eMove) {
+        importLog_(name, 'ok', r.summary + ' | Datei konnte nicht nach „' + IMPORT_DONE_FOLDER + '“ verschoben werden (' + String((eMove && eMove.message) || eMove) + ') – sie wird nicht erneut importiert.');
+      }
+    } catch (e) {
+      const msg = String((e && e.message) || e);
+      // Vorübergehende Störung (Sperre belegt, Datei noch leer, Sheet/Drive kurz nicht erreichbar): Datei liegen lassen und
+      // beim nächsten Lauf erneut versuchen – erst nach IMPORT_MAX_RETRIES Fehlversuchen in „Fehler“. Inhaltliche Fehler sofort.
+      if (!(e && e.permanent) && importRetry_(f) < IMPORT_MAX_RETRIES) {
+        out.retry++;
+        importLog_(name, 'später', msg + ' – nächster Versuch beim nächsten Lauf.');
+        return;
+      }
+      out.failed++;
+      props.deleteProperty('import_retry_' + f.getId());
+      try { f.moveTo(subFolder_(folder, IMPORT_FAIL_FOLDER)); } catch (e2) { Logger.log('Drive-Import: Verschieben fehlgeschlagen: ' + e2); }
+      importLog_(name, 'fehler', msg);
+    }
+  });
+}
+
+function findImportFolder_(cfg) {
+  if (cfg.id) { try { return DriveApp.getFolderById(cfg.id); } catch (e) { return null; } }
+  const it = DriveApp.getFoldersByName(cfg.name);
   return it.hasNext() ? it.next() : null;
 }
 function subFolder_(folder, name) {
@@ -977,65 +994,156 @@ function readImportText_(f) {
   return f.getBlob().getDataAsString('UTF-8');
 }
 
-// Eine Datei → Aufträge im Sheet. Wirft einen Fehler, wenn kein Auftrag erkannt wurde (Datei landet dann in „Fehler“).
-// LKW-Kennung: „<Kunde> <TT.MM.JJJJ>“ (Kunde = Wortanfang des Dateinamens bis zum ersten „_“, sonst des Ordnernamens;
-// Datum aus dem Dateinamen JJJJ-MM-TT, sonst das Erstelldatum). Auftragsnummer: „<erste Zeile> <TT.MM.>“ – so bleiben die
-// Länder von Tag zu Tag unterscheidbar; ist ein Name schon vergeben (aktiv, archiviert oder gelöscht), folgt „ (2)“, „ (3)“ …
-function importTextFile_(fileName, text, createdAt) {
-  if (!String(text == null ? '' : text).replace(/\uFEFF/g, '').trim()) {
-    throw new Error('Datei ist leer (wird vielleicht noch geschrieben).');       // nicht endgültig → später erneut
-  }
-  const parsed = parseStandardText_(text);
+// Eine Datei → Aufträge im Sheet. Wirft einen Fehler, wenn kein Auftrag erkannt wurde (Datei landet dann in „Fehler“);
+// eine leere Datei gilt als „noch nicht fertig“ (späterer Versuch). Schreibt unter Sperre, eine Version je Auftrag – wie beim
+// Speichern aus der App; Nummern, die nur als gelöscht im Sheet stehen, werden in ihrer Zeile wiederbelebt.
+function importTextFile_(cfg, fileName, text, createdAt) {
+  const clean = cutAtStopMarker_(text);
+  if (!clean.trim()) throw new Error('Datei ist leer (wird vielleicht noch geschrieben).');   // nicht endgültig → später erneut
+  const isMan = cfg.format === 'man';
+  const parsed = isMan ? parseManText_(clean) : parseStandardText_(clean);
   if (parsed.orders.length === 0) {
-    const err = new Error('Keine Aufträge erkannt – erwartet: Blöcke aus Auftragsnummer + Packstücknummern, durch Leerzeilen getrennt.');
+    const err = new Error(isMan
+      ? 'Keine Aufträge erkannt – erwartet (MAN Fracht): je Auftrag Zeile 1 „Spediteur, Land“, Zeile 2 Rechnung, Zeile 3 PLSO, danach „Pos HU|Verpackung|Maße|Gewicht“, Aufträge durch Leerzeilen getrennt.'
+      : 'Keine Aufträge erkannt – erwartet: Blöcke aus Auftragsnummer + Packstücknummern, durch Leerzeilen getrennt.');
     err.permanent = true;
     throw err;
   }
-  const customer = customerFromFileName_(fileName);
-  const date = dateFromFileName_(fileName) || (createdAt instanceof Date ? createdAt : new Date());
-  const dayLong = formatDay_(date, true), dayShort = formatDay_(date, false);
-
   return withLock_(function () {
     const sheet = getShipmentSheet_();
-    const rows = readAllRows_(sheet);
-    const takenBases = {}, takenTrucks = {};
-    Object.keys(rows).forEach(function (base) {
-      takenBases[base.toUpperCase()] = true;
-      if (rows[base].deleted) return;
-      const s = parseJsonSafe_(rows[base].json);
-      if (s && s.truckId) takenTrucks[String(s.truckId).toUpperCase()] = true;
-    });
-    const truckId = uniqueName_(customer + ' ' + dayLong, takenTrucks);
+    const known = scanRowsForImport_(readAllRows_(sheet));
+    const plan = isMan ? planManImport_(parsed, known, fileName) : planStandardImport_(parsed, known, cfg, fileName, createdAt);
     const now = new Date().toISOString();
     const width = dataWidth_(sheet);
     let version = getGlobalVersion_();
-    const newRows = [];
-    let huCount = 0;
-    const names = [];
-    parsed.orders.forEach(function (o) {
-      const base = uniqueName_(o.orderId + ' ' + dayShort, takenBases);
-      const shipment = {
-        hawb: base, lastModified: now, totalPiecesExpected: o.hus.length,
-        scannedItems: o.hus.map(function (hu, i) {
-          return { rawInput: hu, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false,
-                   cancelledTimestamp: null, position: i + 1, packaging: null, dimensions: null, grossWeight: null };
-        }),
-        mitarbeiter: IMPORT_MITARBEITER, isHuListOrder: true, truckId: truckId,
-        freightForwarder: 'N/A', destinationCountry: 'N/A', plsoNumber: 'N/A',
-        importFile: fileName, importedAt: now
-      };
-      ensureItemIds_(shipment);
+    const appendRows = [];
+    Object.keys(plan.shipments).forEach(function (base) {
       version += 1;
-      newRows.push(buildRow_(base, JSON.stringify(shipment), version, now, false, width));
-      huCount += o.hus.length;
-      names.push(base + ' (' + o.hus.length + ' Pk.)');
+      const row = buildRow_(base, JSON.stringify(plan.shipments[base]), version, now, false, width);
+      const deletedRow = known.deletedRow[base.toUpperCase()];
+      if (deletedRow) writeRows_(sheet, deletedRow, [row]); else appendRows.push(row);
     });
-    writeRows_(sheet, sheet.getLastRow() + 1, newRows);
-    setGlobalVersion_(version); // zuletzt, damit Leser nie eine Version ohne die zugehörigen Zeilen sehen
-    let summary = truckId + ': ' + parsed.orders.length + ' Auftrag/Aufträge, ' + huCount + ' Packstücke – ' + names.join(', ');
+    if (appendRows.length > 0) writeRows_(sheet, sheet.getLastRow() + 1, appendRows);
+    if (Object.keys(plan.shipments).length > 0) setGlobalVersion_(version); // zuletzt, damit Leser nie eine Version ohne die zugehörigen Zeilen sehen
+    let summary = plan.summary;
     if (parsed.ignored.length) summary += ' | ignoriert: ' + parsed.ignored.slice(0, 5).join(' / ') + (parsed.ignored.length > 5 ? ' …' : '');
-    return { truckId: truckId, orders: parsed.orders.length, hus: huCount, version: version, summary: summary };
+    return { truckId: plan.truckId, orders: Object.keys(plan.shipments).length, hus: plan.hus, version: version, summary: summary };
   });
+}
+
+// Bestand aus dem Sheet für die Namensvergabe: takenActive = aktive + archivierte Nummern, deletedRow = Zeile je gelöschter
+// Nummer (wird wiederverwendet), trucks = vergebene LKW-Kennungen, maxMan = höchste feste MAN-Nummer (auch archivierte –
+// anders als die App, die nur den laufenden Bestand kennt – damit ein wiederhergestellter LKW nie mit einem neuen verschmilzt).
+function scanRowsForImport_(rows) {
+  const known = { takenActive: {}, active: {}, archived: {}, deletedRow: {}, trucks: {}, maxMan: 0 };
+  Object.keys(rows).forEach(function (base) {
+    const r = rows[base], key = base.toUpperCase();
+    if (r.deleted) { known.deletedRow[key] = r.row; return; }
+    known.takenActive[key] = true;
+    if (r.archived) known.archived[key] = true; else known.active[key] = true;
+    const s = parseJsonSafe_(r.json);
+    if (!s) return;
+    if (s.truckId) known.trucks[String(s.truckId).toUpperCase()] = true;
+    if (typeof s.originalManNumber === 'number' && s.originalManNumber > known.maxMan) known.maxMan = s.originalManNumber;
+    else if (typeof s.originalManNumber !== 'number' && typeof s.truckId === 'string' && /^MAN (\d+)$/.test(s.truckId)) {
+      const n = parseInt(s.truckId.slice(4), 10);
+      if (n > known.maxMan) known.maxMan = n;
+    }
+  });
+  return known;
+}
+function newItem_(hu, position, now) {
+  return { rawInput: hu.rawInput, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false,
+           cancelledTimestamp: null, position: position, packaging: hu.packaging, dimensions: hu.dimensions, grossWeight: hu.grossWeight };
+}
+
+// 'standard': LKW „<Kunde> <TT.MM.JJJJ>“ (Kunde = Wortanfang des Dateinamens bis zum ersten „_“, sonst des Ordnernamens; Datum
+// aus dem Dateinamen JJJJ-MM-TT, sonst das Erstelldatum). Auftragsnummer „<erste Zeile> <TT.MM.>“ – so bleiben die Länder von
+// Tag zu Tag unterscheidbar; ist ein Name schon vergeben (aktiv, archiviert oder gelöscht), folgt „ (2)“, „ (3)“ …
+function planStandardImport_(parsed, known, cfg, fileName, createdAt) {
+  const customer = customerFromFileName_(fileName, cfg.name);
+  const date = dateFromFileName_(fileName) || (createdAt instanceof Date ? createdAt : new Date());
+  const dayLong = formatDay_(date, true), dayShort = formatDay_(date, false);
+  const taken = {};
+  Object.keys(known.takenActive).forEach(function (k) { taken[k] = true; });
+  Object.keys(known.deletedRow).forEach(function (k) { taken[k] = true; });
+  const truckId = uniqueName_(customer + ' ' + dayLong, known.trucks);
+  const now = new Date().toISOString();
+  const shipments = {}, names = [];
+  let hus = 0;
+  parsed.orders.forEach(function (o) {
+    const base = uniqueName_(o.orderId + ' ' + dayShort, taken);
+    const shipment = {
+      hawb: base, lastModified: now, totalPiecesExpected: o.hus.length,
+      scannedItems: o.hus.map(function (hu, i) { return newItem_({ rawInput: hu, packaging: null, dimensions: null, grossWeight: null }, i + 1, now); }),
+      mitarbeiter: IMPORT_MITARBEITER, isHuListOrder: true, truckId: truckId,
+      freightForwarder: 'N/A', destinationCountry: 'N/A', plsoNumber: 'N/A',
+      importFile: fileName, importedAt: now
+    };
+    shipments[base] = ensureItemIds_(shipment);
+    hus += o.hus.length;
+    names.push(base + ' (' + o.hus.length + ' Pk.)');
+  });
+  return { truckId: truckId, shipments: shipments, hus: hus,
+           summary: truckId + ': ' + parsed.orders.length + ' Auftrag/Aufträge, ' + hus + ' Packstücke – ' + names.join(', ') };
+}
+
+// 'man': neuer LKW „MAN <n>“ (feste Nummer = höchste bekannte + 1) mit den Rechnungen der Datei – dieselben Regeln wie
+// importMultiOrdersPayload in der App: vorhandene aktive Rechnung → übersprungen (bleibt, wie sie ist); „NACHLIEFERUNG“ →
+// freie Nummer „NACHLIEFERUNG 1/2/…“; archivierte Nummer → „NUMMER (2)“; nur gelöschte Nummer → wieder frei.
+// Ergibt die Datei keinen einzigen neuen Auftrag, wird auch kein LKW angelegt.
+function planManImport_(parsed, known, fileName) {
+  const taken = {};
+  Object.keys(known.takenActive).forEach(function (k) { taken[k] = true; });
+  const manNumber = known.maxMan + 1;
+  const truckId = 'MAN ' + manNumber;
+  const now = new Date().toISOString();
+  const shipments = {}, names = [], skipped = [];
+  let hus = 0;
+  const planned = {};
+  parsed.orders.forEach(function (o) {
+    let base = o.orderId;
+    const key = base.toUpperCase();
+    if (base.indexOf('NACHLIEFERUNG') >= 0) {
+      let n = 1;
+      while (taken[base.toUpperCase()]) { base = 'NACHLIEFERUNG ' + n; n++; }
+    } else if (known.active[key] || planned[key]) {
+      skipped.push(base);                                            // aktiv vorhanden (oder doppelt in der Datei) → wie die App: überspringen
+      return;
+    } else if (known.archived[key]) {
+      let n = 2;
+      while (taken[(base + ' (' + n + ')').toUpperCase()]) n++;      // archivierter Altauftrag → neuer unter „NUMMER (2)“
+      base = base + ' (' + n + ')';
+    }
+    taken[base.toUpperCase()] = true;
+    planned[base.toUpperCase()] = true;
+    const shipment = {
+      hawb: base, lastModified: now, totalPiecesExpected: o.hus.length,
+      scannedItems: o.hus.map(function (hu, i) { return newItem_(hu, hu.position || (i + 1), now); }),
+      mitarbeiter: IMPORT_MITARBEITER, isHuListOrder: true, truckId: truckId, originalManNumber: manNumber,
+      freightForwarder: o.spediteur, destinationCountry: o.land, plsoNumber: o.plso,
+      importFile: fileName, importedAt: now
+    };
+    shipments[base] = ensureItemIds_(shipment);
+    hus += o.hus.length;
+    names.push(base + ' (' + o.hus.length + ' Pk.)');
+  });
+  const created = Object.keys(shipments).length;
+  let summary = created ? truckId + ': ' + created + ' Auftrag/Aufträge, ' + hus + ' Packstücke – ' + names.join(', ')
+                        : 'nichts angelegt – alle ' + parsed.orders.length + ' Rechnung(en) sind bereits vorhanden';
+  if (skipped.length && created) summary += ' | bereits vorhanden, übersprungen: ' + skipped.join(', ');
+  return { truckId: created ? truckId : '', shipments: shipments, hus: hus, summary: summary };
+}
+
+// Alles ab der ersten Zeile, die mit einem Stop-Marker beginnt, abschneiden (Prüfbericht der KI am Dateiende).
+function cutAtStopMarker_(text) {
+  const norm = String(text == null ? '' : text).replace(/\uFEFF/g, '').replace(/\r\n?/g, '\n');
+  const lines = norm.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i].trim().toLowerCase();
+    if (IMPORT_STOP_MARKERS.some(function (m) { return l.indexOf(String(m).toLowerCase()) === 0; })) return lines.slice(0, i).join('\n');
+  }
+  return norm;
 }
 
 // Text wie „Standard (Leerzeilen)“ zerlegen: { orders: [{ orderId, hus[] }], ignored: [Zeilen, die kein Packstück sind] }
@@ -1064,14 +1172,52 @@ function parseStandardText_(text) {
     .map(function (o) { return { orderId: o.orderId, hus: o.hus }; });
   return { orders: result, ignored: ignored };
 }
+
+// Text wie „MAN Fracht“ zerlegen (wie erfParseMan + Umlaute/Großschreibung wie erfBuildPayload in der App):
+//   { orders: [{ orderId, spediteur, land, plso, hus: [{ rawInput, position, packaging, dimensions, grossWeight }] }], ignored }
+//   • Block = Zeile 1 „Spediteur, Land“, Zeile 2 Rechnung, Zeile 3 PLSO, danach Packstücke „Pos HU|Verpackung|Maße|Gewicht“
+//   • Blöcke mit weniger als 3 Zeilen oder ohne Packstücke werden übersprungen; Zeilen ohne erkennbare HU landen in ignored;
+//     dieselbe HU zweimal im selben Auftrag zählt einmal
+function parseManText_(text) {
+  const norm = String(text == null ? '' : text).replace(/\uFEFF/g, '').replace(/\r\n?/g, '\n');
+  const orders = [], ignored = [];
+  norm.trim().split(/\n\s*\n/).forEach(function (block) {
+    const lines = block.split('\n').map(function (l) { return l.trim(); }).filter(function (l) { return l.length > 0; });
+    if (lines.length < 4) return;                                   // Spediteur, Rechnung, PLSO + mindestens ein Packstück
+    const head = lines[0].split(',');
+    const orderId = normalizeOrderId_(lines[1]);
+    if (!orderId) return;
+    const order = { orderId: orderId, spediteur: normalizeOrderId_(head[0] || '') || 'UNBEKANNT', land: normalizeOrderId_(head.slice(1).join(',') || '') || 'UNBEKANNT',
+                    plso: normalizeOrderId_(lines[2]) || 'N/A', hus: [] };
+    const seen = {};
+    lines.slice(3).forEach(function (l) {
+      const hu = parseHuLine_(l);
+      if (!hu) { ignored.push(l); return; }
+      if (seen[hu.rawInput]) return;
+      seen[hu.rawInput] = true;
+      order.hus.push(hu);
+    });
+    if (order.hus.length) orders.push(order);
+  });
+  return { orders: orders, ignored: ignored };
+}
+// „Pos HU|Verpackung|Maße|Gewicht“ → wie parseComplexHuString in der App (Pos optional; HU in Großschreibung)
+function parseHuLine_(line) {
+  const parts = String(line).split('|');
+  const main = parts[0].trim().toUpperCase();
+  const m = /^(?:(\d+)\s+)?([0-9A-Z][0-9A-Z\-]*)$/.exec(main);
+  if (!m) return null;
+  const clean = function (v) { v = v == null ? '' : String(v).trim(); return v ? v : null; };
+  return { position: m[1] ? parseInt(m[1], 10) : null, rawInput: m[2], packaging: clean(parts[1]), dimensions: clean(parts[2]), grossWeight: clean(parts[3]) };
+}
 function normalizeOrderId_(s) {
   return String(s).replace(/ä/g, 'ae').replace(/Ä/g, 'Ae').replace(/ö/g, 'oe').replace(/Ö/g, 'Oe').replace(/ü/g, 'ue').replace(/Ü/g, 'Ue')
     .replace(/ß/g, 'ss').replace(/[:;,]+$/, '').replace(/\s+/g, ' ').trim().toUpperCase();
 }
-function customerFromFileName_(fileName) {
+function customerFromFileName_(fileName, folderName) {
   const m = /^\s*([^_]+?)\s*[_]/.exec(String(fileName || ''));
   const raw = (m ? m[1] : '').replace(/[^0-9A-Za-zÄÖÜäöüß&. -]/g, '').trim();
-  const fallback = (IMPORT_FOLDER_NAME.split(/\s+/)[0] || 'IMPORT');
+  const fallback = (String(folderName || '').split(/\s+/)[0] || 'IMPORT');
   return (raw || fallback).toUpperCase();
 }
 function dateFromFileName_(fileName) {

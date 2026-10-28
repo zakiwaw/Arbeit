@@ -66,7 +66,7 @@ module.exports = function createGasEnv() {
   };
 
   const ctx = { SpreadsheetApp, CacheService, LockService, PropertiesService, Utilities, MailApp, ContentService, Logger, DriveApp, ScriptApp, DocumentApp };
-  const api = new Function(...Object.keys(ctx), src + '\n;return { doPost, runDriveImport, setupDriveImport, removeDriveImport, parseStandardText_, runArchiveSweep };')(...Object.values(ctx));
+  const api = new Function(...Object.keys(ctx), src + '\n;return { doPost, runDriveImport, setupDriveImport, removeDriveImport, parseStandardText_, parseManText_, cutAtStopMarker_, runArchiveSweep };')(...Object.values(ctx));
   const call = (action, payload, auth) => JSON.parse(api.doPost({ postData: { contents: JSON.stringify({ action, payload, auth }) } }).text);
   // Zeilen des shipments-Blatts als { base: { shipment, version, flag } } (JSON ggf. über mehrere Zellen verteilt)
   const shipmentRows = () => { const out = {}; sheets.shipments.rows.slice(1).forEach(r => { const base = String(r[0] || '').trim(); if (!base) return; const json = [r[1]].concat(r.slice(5)).filter(x => x != null && x !== '').join(''); out[base] = { shipment: json ? JSON.parse(json) : null, version: Number(r[2]) || 0, flag: r[4] ?? '' }; }); return out; };

@@ -20,7 +20,7 @@ node tests/soundcheck.js      # Töne: wann Fehler-/Nachlieferungs-Ton, parallel
 node tests/zoomcheck.js       # Browser-Zoom ist unterbunden, Scrollen/Tippen weiterhin möglich
 node tests/authcheck.js       # Anmeldung (PIN): Anmeldeseite, Einladungslink, Token je Anfrage, Seite „Mitarbeiter“, Abmelden, 30-Min-Abmeldung
 node tests/backendcheck.js    # Server-Skript offline (ohne Chrome/Server; Dienste nachgebildet in tests/gas-env.js): Anmeldung, Sammel-Löschung, Drive-Import
-node tests/importcheck.js     # Drive-Import Ende-zu-Ende: Code.gs legt aus der HYDAC-Textdatei Aufträge an → LKW-Seite, Scan, Herkunftszeile, Desktop-Tabelle
+node tests/importcheck.js     # Drive-Import Ende-zu-Ende: Code.gs legt aus HYDAC-Textdatei + MAN-Ladeliste Aufträge an → LKW-Seiten, Scan, Herkunftszeile, Desktop-Tabellen
 node tests/erfassencheck.js   # Seite „Aufträge erfassen“: Parser = Original-Generator (tests/reference), QR-Inhalt, Direkt anlegen, Scan-Weg
 node tests/regress.js         # Grundfunktionen: Scan, Batch, Startseite, Unterseiten, Info-Filter
 node tests/synccheck.js       # Sync: Löschen/Deaktivieren bei schnellem Bedienen, langsamen/gestörten Antworten – nichts kommt zurück; Spinner mit Text
