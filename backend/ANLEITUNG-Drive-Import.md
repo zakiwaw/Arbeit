@@ -27,8 +27,8 @@ Ein Transportauftrag (PLSO) kann **mehrere Rechnungen** umfassen, z. B. „RECHN
 jede Rechnung ein eigener Auftrag mit eigener Positionsnummerierung. Welches Packstück zu welcher Rechnung gehört, steht nur
 auf den Rechnungs-/Packlistenseiten des PDFs – aus einem zusammengefassten Block (eine Zeile mit zwei Rechnungsnummern,
 Packstücke 1–20 durchnummeriert) kann die App das nicht mehr trennen; sie legt dann einen Auftrag „9008633618, 9008633662“ an.
-Deshalb muss das Skript, das die Textdatei erzeugt (KI-Schritt), je Rechnung einen eigenen Block schreiben. Regel für den
-Prompt des erzeugenden Skripts:
+Deshalb muss das Skript, das die Textdatei erzeugt (KI-Schritt), je Rechnung einen eigenen Block schreiben. Der vollständige
+Prompt dafür steht in `backend/PROMPT-MAN-Ladeliste.md`; die Kernregel:
 
 > **Transportauftrag mit mehreren Rechnungen:** Ein Transportauftrag kann mehrere Rechnungsnummern nennen. Erstellen Sie dann
 > **je Rechnung einen eigenen Auftragsblock**: Zeile 1 (Spediteur, Land) und Zeile 3 (PLSO-Nummer) sind in allen Blöcken dieses
