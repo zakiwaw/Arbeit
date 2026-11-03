@@ -35,7 +35,7 @@ Aufträge übernommen.
 ## Versionen
 
 Die App-Version steht zentral in `js/01-start.js` (`APP_VERSION`, `APP_VERSION_DATE`, `APP_BACKEND_VERSION`) und wird in der
-App angezeigt: auf der Anmeldeseite, unten im Seitenmenü und am Desktop klein neben dem Titel („Version 9.0 · Stand … ·
+App angezeigt: auf der Anmeldeseite, unten im Seitenmenü und am Desktop klein neben dem Titel („Version 9.1 · Stand … ·
 Server-Skript 2.7“). So sieht man auf jedem Gerät sofort, ob noch eine alte Version offen ist. Bei jeder veröffentlichten
 Änderung: Version hochzählen und in `index.html` (`<title>`), `CHANGELOG.md` und `backend/README.md` nachziehen –
 `node tests/versioncheck.js` prüft, dass alle Stellen zusammenpassen. Das Server-Skript hat eine eigene Versionszählung

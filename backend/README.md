@@ -5,7 +5,7 @@ Es liest und schreibt das Google Sheet mit der ID `<SPREADSHEET_ID>` (steht nich
 Skript-Eigenschaften des Apps-Script-Projekts, Schlüssel `SPREADSHEET_ID`; solange die Eigenschaft fehlt, gilt der feste
 Wert `SPREADSHEET_ID_FALLBACK` oben in `Code.gs`).
 
-Zusammengehörige Versionen: **App 9.0 ↔ Code.gs 2.7** (2.6 funktioniert mit App 9.0 ebenfalls) (die App zeigt beides unten im Seitenmenü). Bereitstellen siehe
+Zusammengehörige Versionen: **App 9.1 ↔ Code.gs 2.7** (2.6 funktioniert mit App 9.0/9.1 ebenfalls) (die App zeigt beides unten im Seitenmenü). Bereitstellen siehe
 `README.md` im Hauptordner (bestehende Web-App → neue Version, keine neue Bereitstellung).
 
 ## Version 2 – Mehrgeräte-Sync

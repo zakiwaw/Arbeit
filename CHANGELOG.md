@@ -1,9 +1,11 @@
 # Änderungen
 
-Neueste zuerst. Datum = Veröffentlichung auf dem Live-Branch `arena/01a06f82-arbeit`. App-Version siehe `script.js`
+Neueste zuerst. Datum = Veröffentlichung auf dem Live-Branch `arena/01a06f82-arbeit`. App-Version siehe `js/01-start.js`
 (`APP_VERSION`), Server-Skript siehe Kopf von `backend/Code.gs`.
 
-## 2026-11-03 – App 9.0, Code.gs 2.7
+## 2026-11-03 – App 9.1, Code.gs 2.7
+
+Langfristige Nutzbarkeit (Phasen 2–4 des Auftrags vom 3.11.2026); Server-Skript unverändert 2.7 (nur Kommentare).
 
 - `script.js` (488 KB, eine Datei) in 10 Teile `js/01-start.js` … `js/10-menue-events-start.js` aufgeteilt – reine
   Aufteilung in Originalreihenfolge, kein Code verschoben oder geändert; die bisherige `DOMContentLoaded`-Klammer
@@ -26,8 +28,15 @@ Neueste zuerst. Datum = Veröffentlichung auf dem Live-Branch `arena/01a06f82-ar
   vor; online „Netz zuerst“ (Zeitlimit 6 s), ohne Netz aus dem Cache; alter Cache wird bei neuer Version gelöscht; Aufrufe
   zum Apps-Script bleiben unberührt (Offline-Puffer für Scans arbeitet wie bisher). Prüfung `tests/offlinecheck.js`
   (eigener Server auf :8011); Chrome-Tests schalten den Service Worker sonst ab (`openApp`).
+- `tests/synccheck.js`: Zwischenstand „Server lehnt ab“ nicht mehr von der Abruf-Phase abhängig (Test war gelegentlich rot,
+  die App nicht).
+
+## 2026-11-03 – App 9.0, Code.gs 2.7
+
+Bestandsaufnahme (Phase 1 des Auftrags).
+
 - README im Hauptordner (Zweck, Live-Branch, Dateien, Backend bereitstellen, Tests) und dieses Änderungsprotokoll.
-- Version sichtbar: `APP_VERSION` / `APP_VERSION_DATE` / `APP_BACKEND_VERSION` in `script.js`; Anzeige auf der
+- Version sichtbar: `APP_VERSION` / `APP_VERSION_DATE` / `APP_BACKEND_VERSION` (damals `script.js`, heute `js/01-start.js`); Anzeige auf der
   Anmeldeseite, unten im Seitenmenü („Version 9.0 · Stand … · Server-Skript 2.7“) und am Desktop klein neben dem Titel
   (auf dem Handy fehlt neben dem Titel der Platz); `<title>` von „V8.18 - Refactored“ auf „Fracht Tracker 9.0“.
   Prüfung `tests/versioncheck.js`.
