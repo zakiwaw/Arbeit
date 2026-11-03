@@ -4,11 +4,14 @@
 const path = require('path');
 const puppeteer = require(process.env.PUPPETEER_MODULE || '/tmp/chrome/package/node_modules/puppeteer-core');
 
+// Ohne CHROMIUM: das entpackte @sparticuz/chromium aus tests/README.md (braucht seine mitgelieferten Bibliotheken und
+// --single-process). Mit CHROMIUM (z. B. /usr/bin/google-chrome in GitHub Actions): normaler Chrome, normale Prozesse.
 async function launch() {
-  process.env.LD_LIBRARY_PATH = '/tmp/chromelibs/lib:/tmp';
+  const bundled = !process.env.CHROMIUM;
+  if (bundled) process.env.LD_LIBRARY_PATH = '/tmp/chromelibs/lib:/tmp';
   return puppeteer.launch({
     executablePath: process.env.CHROMIUM || '/tmp/chromium', headless: true,
-    args: ['--no-sandbox', '--disable-gpu', '--single-process', '--no-zygote', '--autoplay-policy=no-user-gesture-required'],
+    args: ['--no-sandbox', '--disable-gpu', '--autoplay-policy=no-user-gesture-required'].concat(bundled ? ['--single-process', '--no-zygote'] : ['--disable-dev-shm-usage']),
   });
 }
 

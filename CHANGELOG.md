@@ -18,6 +18,10 @@ Neueste zuerst. Datum = Veröffentlichung auf dem Live-Branch `arena/01a06f82-ar
   geändert – bleibt Code.gs 2.7). Hinweis im Abschnitt 10: `sendPdfEmail` wird von der App nicht mehr aufgerufen.
 - Neuer Test `tests/aufbaucheck.js` (ohne Chrome): Teile vollständig und in Reihenfolge eingebunden, Skripte am Ende
   von `index.html`, Kopfkommentare, `sw.js` lädt alle lokalen Dateien vor, Code.gs-Abschnitte und Aktionen.
+- GitHub Actions `.github/workflows/test.yml`: bei jedem Push auf `arena/01a06f82-arbeit` laufen alle Prüfskripte
+  (ohne Chrome: versioncheck, aufbaucheck, backendcheck; im Chrome des Runners: alle übrigen Suiten). Kein
+  `package.json` nötig – puppeteer-core wird außerhalb des Repos installiert. `tests/helpers.js`: mit `CHROMIUM`
+  (normaler Chrome) ohne `--single-process`.
 - Offline startbar: Service Worker `sw.js` (registriert in `index.html`) lädt alle App-Dateien in einen Cache je Version
   vor; online „Netz zuerst“ (Zeitlimit 6 s), ohne Netz aus dem Cache; alter Cache wird bei neuer Version gelöscht; Aufrufe
   zum Apps-Script bleiben unberührt (Offline-Puffer für Scans arbeitet wie bisher). Prüfung `tests/offlinecheck.js`

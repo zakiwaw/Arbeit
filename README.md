@@ -76,4 +76,8 @@ node tests/regress.js           # App im Chrome (weitere Suiten siehe tests/READ
 node tests/offlinecheck.js      # Offline-Start, Scan ohne Netz, Nachschicken (eigener Server auf :8011)
 ```
 
+GitHub Actions führt bei jedem Push auf `arena/01a06f82-arbeit` (und bei Pull Requests nach `main`) alle Prüfskripte aus
+(`.github/workflows/test.yml`, Reiter „Actions“ im Repository): die drei Suiten ohne Chrome und parallel die
+Chrome-Suiten mit dem auf dem Runner vorinstallierten Google Chrome. Ein roter Lauf heißt: diesen Stand nicht ausrollen.
+
 Nach jeder Änderung: betroffene Suiten laufen lassen, erst bei „ALL GOOD“ veröffentlichen.
