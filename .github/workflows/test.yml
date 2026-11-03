@@ -53,28 +53,28 @@ jobs:
           sleep 1
           curl -sf -o /dev/null http://127.0.0.1:8000/index.html
       - name: regress (Scan, Batch, Startseite, Unterseiten, Info-Filter)
-        run: node tests/regress.js
+        run: bash tests/tools/ci-suite.sh regress
       - name: synccheck (Löschen/Deaktivieren bei gestörtem Netz)
         if: ${{ !cancelled() }}
-        run: node tests/synccheck.js
+        run: bash tests/tools/ci-suite.sh synccheck
       - name: authcheck (Anmeldung, PIN, 30-Minuten-Abmeldung)
         if: ${{ !cancelled() }}
-        run: node tests/authcheck.js
+        run: bash tests/tools/ci-suite.sh authcheck
       - name: desktopcheck (Desktop-Layout ab 992 px)
         if: ${{ !cancelled() }}
-        run: node tests/desktopcheck.js
+        run: bash tests/tools/ci-suite.sh desktopcheck
       - name: erfassencheck (Seite „Aufträge erfassen“)
         if: ${{ !cancelled() }}
-        run: node tests/erfassencheck.js
+        run: bash tests/tools/ci-suite.sh erfassencheck
       - name: importcheck (Drive-Import Ende-zu-Ende)
         if: ${{ !cancelled() }}
-        run: node tests/importcheck.js
+        run: bash tests/tools/ci-suite.sh importcheck
       - name: soundcheck (Töne)
         if: ${{ !cancelled() }}
-        run: node tests/soundcheck.js
+        run: bash tests/tools/ci-suite.sh soundcheck
       - name: zoomcheck (Browser-Zoom gesperrt)
         if: ${{ !cancelled() }}
-        run: node tests/zoomcheck.js
+        run: bash tests/tools/ci-suite.sh zoomcheck
       - name: offlinecheck (Service Worker, Offline-Scan)
         if: ${{ !cancelled() }}
-        run: node tests/offlinecheck.js
+        run: bash tests/tools/ci-suite.sh offlinecheck
