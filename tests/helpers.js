@@ -7,6 +7,8 @@ const puppeteer = require(process.env.PUPPETEER_MODULE || '/tmp/chrome/package/n
 // Ohne CHROMIUM: das entpackte @sparticuz/chromium aus tests/README.md (braucht seine mitgelieferten Bibliotheken und
 // --single-process). Mit CHROMIUM (z. B. /usr/bin/google-chrome in GitHub Actions): normaler Chrome, normale Prozesse.
 async function launch() {
+  // Bildschirmfotos der Tests landen in .arena-shots/ (gitignored) – Ordner anlegen, sonst scheitert page.screenshot (z. B. in GitHub Actions)
+  try { require('fs').mkdirSync(path.join(__dirname, '..', '.arena-shots'), { recursive: true }); } catch (e) { /* nur Komfort */ }
   const bundled = !process.env.CHROMIUM;
   if (bundled) process.env.LD_LIBRARY_PATH = '/tmp/chromelibs/lib:/tmp';
   return puppeteer.launch({

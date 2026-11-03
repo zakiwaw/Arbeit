@@ -8,4 +8,5 @@ suite="$1"
 node "tests/${suite}.js" 2>&1 | sed -u \
   -e "s/^FAIL: \(.*\)$/FAIL: \1\n::error title=${suite}::\1/" \
   -e "s/^Testlauf abgebrochen: \(.*\)$/Testlauf abgebrochen: \1\n::error title=${suite}::Testlauf abgebrochen: \1/" \
-  -e "s/^SOME FAILED\(.*\)$/SOME FAILED\1\n::error title=${suite}::SOME FAILED\1/"
+  -e "s/^SOME FAILED\(.*\)$/SOME FAILED\1\n::error title=${suite}::SOME FAILED\1/" \
+  -e "s/^ERR \(.*\)$/ERR \1\n::error title=${suite}::Abbruch: \1/"
