@@ -19,8 +19,8 @@ Aufträge übernommen.
 
 | Datei / Ordner | Inhalt |
 |---|---|
-| `index.html` | Oberfläche (Ansichten, Modals, Seitenmenü), bindet Stylesheet, Bibliotheken und `script.js` ein |
-| `script.js` | Gesamte App-Logik: Scannen, Sendungen, LKW/Seiten, Sync, Anmeldung, „Aufträge erfassen“, PDF |
+| `index.html` | Oberfläche (Ansichten, Modals, Seitenmenü), bindet Stylesheet, Bibliotheken und die Skripte aus `js/` ein |
+| `js/01-start.js` … `js/10-menue-events-start.js` | App-Logik in 10 Teilen (früher eine Datei `script.js`). Klassische Skripte mit gemeinsamem Geltungsbereich, `index.html` lädt sie in Nummern-Reihenfolge; jeder Teil beginnt mit einer Inhaltsangabe. Teil 01: Version, Einstellungen (`WEB_APP_URL`, `LOCAL_STORAGE_KEY`), DOM-Elemente, Start · 02: Sync + Anmeldung · 03: Töne/Helfer · 04: Sendungsdetails · 05: Liste/Archiv · 06: Seiten/LKW · 07: Import + „Aufträge erfassen“ · 08: Scan/Batch · 09: PDF · 10: Menü, alle Bedienelemente, Start |
 | `styles.css` | Gestaltung (Handy zuerst, Desktop-Ergänzungen ab 992 px, automatischer Dunkelmodus) |
 | `manifest.webmanifest`, `assets/icons/` | Installierbar als App (Startbildschirm, Hochformat) |
 | `sw.js` | Service Worker: App-Dateien im Cache, Start ohne Netz (siehe „Offline“) |
@@ -34,7 +34,7 @@ Aufträge übernommen.
 
 ## Versionen
 
-Die App-Version steht zentral in `script.js` (`APP_VERSION`, `APP_VERSION_DATE`, `APP_BACKEND_VERSION`) und wird in der
+Die App-Version steht zentral in `js/01-start.js` (`APP_VERSION`, `APP_VERSION_DATE`, `APP_BACKEND_VERSION`) und wird in der
 App angezeigt: auf der Anmeldeseite, unten im Seitenmenü und am Desktop klein neben dem Titel („Version 9.0 · Stand … ·
 Server-Skript 2.7“). So sieht man auf jedem Gerät sofort, ob noch eine alte Version offen ist. Bei jeder veröffentlichten
 Änderung: Version hochzählen und in `index.html` (`<title>`), `CHANGELOG.md` und `backend/README.md` nachziehen –
@@ -55,7 +55,7 @@ automatisch gelöscht. Prüfung: `node tests/offlinecheck.js`; Handprobe siehe `
 1. Apps-Script-Projekt öffnen (das Projekt, das zum Google Sheet der App gehört).
 2. Datei `Code.gs` öffnen, **gesamten Inhalt ersetzen** durch den Inhalt von `backend/Code.gs` aus diesem Repo, speichern.
 3. **Bereitstellen → Bereitstellungen verwalten → aktive Web-App bearbeiten (Stift) → Version: „Neue Version“ → Bereitstellen.**
-   **Keine neue Bereitstellung anlegen** – sonst ändert sich die Web-App-URL und die App (`WEB_APP_URL` in `script.js`)
+   **Keine neue Bereitstellung anlegen** – sonst ändert sich die Web-App-URL und die App (`WEB_APP_URL` in `js/01-start.js`)
    würde ins Leere laufen.
 4. Die App zeigt im Seitenmenü, zu welcher Skript-Version sie gehört; eine ältere Skript-Version meldet bei neuen
    Aktionen „Unbekannte Aktion“ (die App fängt das ab und weist auf die Bereitstellung hin).

@@ -17,7 +17,7 @@ const { launch, makeBackend, openApp, sampleData, scan, assert, finish } = requi
     assert(gest.every(Boolean), 'Safari-Gestenereignisse (Pinch) geblockt');
     const wk = await page.evaluate(async () => {
       window.GestureEvent = function () {};
-      const src = await (await fetch('script.js')).text(); const m = src.match(/\(function preventBrowserZoom\(\) \{[\s\S]*?\n\}\)\(\);/); if (!m) return { found: false };
+      const src = await (await fetch('js/01-start.js')).text(); const m = src.match(/\(function preventBrowserZoom\(\) \{[\s\S]*?\n\}\)\(\);/); if (!m) return { found: false };
       new Function(m[0])();
       const mkTouch = (id, x) => new Touch({ identifier: id, target: document.body, clientX: x, clientY: 200 });
       const mk = (touches) => { const e = new TouchEvent('touchmove', { bubbles: true, cancelable: true, touches, targetTouches: touches, changedTouches: touches }); document.body.dispatchEvent(e); return e.defaultPrevented; };

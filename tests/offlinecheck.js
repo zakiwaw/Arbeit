@@ -32,7 +32,7 @@ const listen = srv => new Promise(r => srv.listen(PORT, '127.0.0.1', r));
 const close = srv => new Promise(r => srv.close(() => r()));
 
 const swSrc = fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8');
-const appVersion = /const APP_VERSION = '([^']+)';/.exec(fs.readFileSync(path.join(ROOT, 'script.js'), 'utf8'))[1];
+const appVersion = /const APP_VERSION = '([^']+)';/.exec(fs.readFileSync(path.join(ROOT, 'js', '01-start.js'), 'utf8'))[1];
 const precacheBlock = /const PRECACHE = \[([\s\S]*?)\];/.exec(swSrc)[1];
 const precache = Array.from(precacheBlock.matchAll(/'([^']+)'/g)).map(m => m[1]);
 // Alle in index.html eingebundenen Dateien müssen vorgeladen werden (sonst fehlt offline etwas)
@@ -42,7 +42,7 @@ const missing = referenced.filter(u => !precache.includes(u));
 assert(missing.length === 0, `sw.js PRECACHE enthält alle in index.html eingebundenen Dateien (${missing.join(', ') || 'vollständig'})`);
 const notOnDisk = precache.filter(u => u !== './' && !fs.existsSync(path.join(ROOT, u)));
 assert(notOnDisk.length === 0, `Alle PRECACHE-Dateien existieren (${notOnDisk.join(', ') || 'ja'})`);
-assert(/const APP_VERSION = '([^']+)';/.exec(swSrc)[1] === appVersion, `sw.js APP_VERSION = script.js APP_VERSION (${appVersion})`);
+assert(/const APP_VERSION = '([^']+)';/.exec(swSrc)[1] === appVersion, `sw.js APP_VERSION = js/01-start.js APP_VERSION (${appVersion})`);
 
 (async () => {
   let server = makeServer(); await listen(server);
@@ -122,7 +122,7 @@ assert(/const APP_VERSION = '([^']+)';/.exec(swSrc)[1] === appVersion, `sw.js AP
     // Online: Dateien kommen vom Server (Netz zuerst), nicht aus dem Cache
     serverState.hits.length = 0;
     await page.reload({ waitUntil: 'networkidle0' }); await wait(400);
-    assert(serverState.hits.includes('/script.js') && serverState.hits.includes('/index.html'), `Online: App-Dateien werden vom Server geholt, nicht aus dem Cache (${serverState.hits.filter(h => /index|script/.test(h)).join(', ')})`);
+    assert(serverState.hits.includes('/js/01-start.js') && serverState.hits.includes('/index.html'), `Online: App-Dateien werden vom Server geholt, nicht aus dem Cache (${serverState.hits.filter(h => /index|script/.test(h)).join(', ')})`);
     await page.close();
   } catch (e) {
     console.log('ERR', e);

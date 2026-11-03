@@ -25,7 +25,7 @@ node tests/erfassencheck.js   # Seite „Aufträge erfassen“: Parser = Origina
 node tests/regress.js         # Grundfunktionen: Scan, Batch, Startseite, Unterseiten, Info-Filter
 node tests/synccheck.js       # Sync: Löschen/Deaktivieren bei schnellem Bedienen, langsamen/gestörten Antworten – nichts kommt zurück; Spinner mit Text
 node tests/desktopcheck.js    # Desktop-Layout (≥ 992 px): Tabellen, Sendungsdetails, Packstück-Tabelle, Auswahl-Leiste
-node tests/versioncheck.js    # Versionsangaben passen zusammen (script.js, sw.js, index.html, Code.gs, READMEs, CHANGELOG) – ohne Chrome
+node tests/versioncheck.js    # Versionsangaben passen zusammen (js/01-start.js, sw.js, index.html, Code.gs, READMEs, CHANGELOG) – ohne Chrome
 node tests/offlinecheck.js    # Offline (Service Worker): Vorladen, Start ohne Netz, Scan offline → Nachschicken, Cache-Wechsel bei neuer Version – eigener Server auf :8011
 ```
 Jeder Test endet mit `ALL GOOD` (Exit-Code 0) oder `SOME FAILED` (Exit-Code 1) – Ketten wie `node tests/x.js && git push` brechen bei Fehlern ab.

@@ -5,6 +5,12 @@ Neueste zuerst. Datum = Veröffentlichung auf dem Live-Branch `arena/01a06f82-ar
 
 ## 2026-11-03 – App 9.0, Code.gs 2.7
 
+- `script.js` (488 KB, eine Datei) in 10 Teile `js/01-start.js` … `js/10-menue-events-start.js` aufgeteilt – reine
+  Aufteilung in Originalreihenfolge, kein Code verschoben oder geändert; die bisherige `DOMContentLoaded`-Klammer
+  entfällt (die Skripte stehen jetzt ganz am Ende von `index.html`, nach allen Elementen). Statische Prüfung: kein Teil
+  greift beim Laden auf Funktionen eines späteren Teils zu, keine Namenskollision mit `window`. Alter auskommentierter
+  Block „Screen Orientation Lock“ am Dateiende entfernt. `tests/zoomcheck.js`, `versioncheck.js`, `offlinecheck.js`
+  lesen jetzt `js/01-start.js`; `sw.js` lädt alle Teile vor.
 - Offline startbar: Service Worker `sw.js` (registriert in `index.html`) lädt alle App-Dateien in einen Cache je Version
   vor; online „Netz zuerst“ (Zeitlimit 6 s), ohne Netz aus dem Cache; alter Cache wird bei neuer Version gelöscht; Aufrufe
   zum Apps-Script bleiben unberührt (Offline-Puffer für Scans arbeitet wie bisher). Prüfung `tests/offlinecheck.js`

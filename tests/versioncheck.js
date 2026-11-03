@@ -1,4 +1,4 @@
-// Versionsangaben passen zusammen (kein Chrome/Server nötig): script.js (APP_VERSION, APP_BACKEND_VERSION), index.html
+// Versionsangaben passen zusammen (kein Chrome/Server nötig): js/01-start.js (APP_VERSION, APP_BACKEND_VERSION), index.html
 // (<title>), sw.js (Cache-Name), backend/Code.gs (Kopfzeile), backend/README.md und der oberste CHANGELOG-Eintrag.
 // Start: node tests/versioncheck.js
 const fs = require('fs'), path = require('path');
@@ -8,10 +8,10 @@ let oks = 0, fails = 0;
 const ok = (cond, msg) => { if (cond) { oks++; console.log('ok  : ' + msg); } else { fails++; console.log('FAIL: ' + msg); } };
 const grab = (text, re, what) => { const m = re.exec(text); if (!m) { ok(false, `${what}: Angabe nicht gefunden (${re})`); return null; } return m[1]; };
 
-const js = read('script.js');
-const appVersion = grab(js, /const APP_VERSION = '([^']+)';/, 'script.js APP_VERSION');
-const appDate = grab(js, /const APP_VERSION_DATE = '(\d{4}-\d{2}-\d{2})';/, 'script.js APP_VERSION_DATE');
-const backendVersion = grab(js, /const APP_BACKEND_VERSION = '([^']+)';/, 'script.js APP_BACKEND_VERSION');
+const js = read('js/01-start.js');
+const appVersion = grab(js, /const APP_VERSION = '([^']+)';/, 'js/01-start.js APP_VERSION');
+const appDate = grab(js, /const APP_VERSION_DATE = '(\d{4}-\d{2}-\d{2})';/, 'js/01-start.js APP_VERSION_DATE');
+const backendVersion = grab(js, /const APP_BACKEND_VERSION = '([^']+)';/, 'js/01-start.js APP_BACKEND_VERSION');
 ok(appVersion && /^\d+\.\d+(\.\d+)?$/.test(appVersion), `APP_VERSION ist eine Versionsnummer (${appVersion})`);
 ok(appDate && !isNaN(Date.parse(appDate)), `APP_VERSION_DATE ist ein Datum (${appDate})`);
 
@@ -34,7 +34,7 @@ ok(topM && topM[1] === appDate, `CHANGELOG-Datum ${topM && topM[1]} = APP_VERSIO
 if (fs.existsSync(path.join(root, 'sw.js'))) {
   const sw = read('sw.js');
   const swVersion = grab(sw, /const APP_VERSION = '([^']+)';/, 'sw.js APP_VERSION');
-  ok(swVersion === appVersion, `sw.js APP_VERSION ${swVersion} = script.js ${appVersion} (neuer Cache je Version)`);
+  ok(swVersion === appVersion, `sw.js APP_VERSION ${swVersion} = js/01-start.js ${appVersion} (neuer Cache je Version)`);
 } else {
   ok(false, 'sw.js fehlt (Service Worker – App offline startbar)');
 }

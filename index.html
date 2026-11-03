@@ -41,7 +41,7 @@
 </div>
 
 <!-- Unterseiten der Startseite (Anlieferung, LKW, Dunkelalarm, Offene Sendungen, Info) – Vollbild wie die
-     Detailansicht, Inhalt zeichnet script.js. Sie liegen im Browser-Verlauf (?seite=…): Zurück-Geste/-Taste schließt sie. -->
+     Detailansicht, Inhalt zeichnet js/06-seiten.js + js/07-import-erfassen.js. Sie liegen im Browser-Verlauf (?seite=…): Zurück-Geste/-Taste schließt sie. -->
 <div id="pageView" class="hidden" role="region" aria-labelledby="pageTitle">
     <div class="detail-view-header page-view-header">
         <button type="button" id="pageBackBtn" class="view-back-btn" title="Zurück" aria-label="Zurück">
@@ -433,7 +433,32 @@
 </div>
 <!-- =============================================================== -->
 
-<script src="script.js"></script>
+<audio id="errorSound" src="assets/error-sound.mp3" preload="auto"></audio>
+<audio id="nachlieferungSound" src="assets/nachlieferung-sound.mp3" preload="auto"></audio>
+<!-- Anmeldung (PIN) / Einladung – liegt über allem, solange keine gültige Sitzung besteht (js/02-sync-anmeldung.js) -->
+<div id="authView" class="auth-view hidden" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+    <div class="auth-card">
+        <div class="auth-brand"><span class="auth-logo" aria-hidden="true">FT</span><h1>Fracht Tracker</h1><span id="authVersionTag" class="auth-version"></span></div>
+        <div id="authContent"></div>
+    </div>
+</div>
+<div id="loadingOverlay" class="loading-overlay">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loadingText" role="status" aria-live="polite"></div>
+</div>
+
+<!-- App-Logik in 10 Teilen (klassische Skripte, gemeinsamer Geltungsbereich) – Reihenfolge ist Pflicht, Inhalt siehe Kopf jeder Datei.
+     Die Skripte stehen ganz am Ende: Sie greifen beim Laden direkt auf alle Elemente oben zu (kein DOMContentLoaded mehr). -->
+<script src="js/01-start.js"></script>
+<script src="js/02-sync-anmeldung.js"></script>
+<script src="js/03-toene-helfer.js"></script>
+<script src="js/04-sendungsdetails.js"></script>
+<script src="js/05-liste-archiv.js"></script>
+<script src="js/06-seiten.js"></script>
+<script src="js/07-import-erfassen.js"></script>
+<script src="js/08-scan-batch.js"></script>
+<script src="js/09-pdf.js"></script>
+<script src="js/10-menue-events-start.js"></script>
 <!-- Offline: der Service Worker (sw.js) hält die App-Dateien vor, damit die App auch ohne Netz startet (Details in sw.js).
      Nur über http(s) möglich – beim Öffnen als Datei (file://) wird er übersprungen. -->
 <script>
@@ -446,19 +471,6 @@ if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
     });
 }
 </script>
-<audio id="errorSound" src="assets/error-sound.mp3" preload="auto"></audio>
-<audio id="nachlieferungSound" src="assets/nachlieferung-sound.mp3" preload="auto"></audio>
-<!-- Anmeldung (PIN) / Einladung – liegt über allem, solange keine gültige Sitzung besteht (script.js, Abschnitt ANMELDUNG) -->
-<div id="authView" class="auth-view hidden" role="dialog" aria-modal="true" aria-labelledby="authTitle">
-    <div class="auth-card">
-        <div class="auth-brand"><span class="auth-logo" aria-hidden="true">FT</span><h1>Fracht Tracker</h1><span id="authVersionTag" class="auth-version"></span></div>
-        <div id="authContent"></div>
-    </div>
-</div>
-<div id="loadingOverlay" class="loading-overlay">
-    <div class="spinner"></div>
-    <div class="loading-text" id="loadingText" role="status" aria-live="polite"></div>
-</div>
 
 </body>
 </html>

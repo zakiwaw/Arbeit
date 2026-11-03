@@ -1,6 +1,6 @@
 # Backend (Google Apps Script)
 
-`Code.gs` ist das Server-Skript, das die App unter `WEB_APP_URL` (in `script.js`) anspricht.
+`Code.gs` ist das Server-Skript, das die App unter `WEB_APP_URL` (in `js/01-start.js`) anspricht.
 Es liest und schreibt das Google Sheet mit der ID `<SPREADSHEET_ID>` (steht nicht in dieser Datei: bevorzugt in den
 Skript-Eigenschaften des Apps-Script-Projekts, Schlüssel `SPREADSHEET_ID`; solange die Eigenschaft fehlt, gilt der feste
 Wert `SPREADSHEET_ID_FALLBACK` oben in `Code.gs`).
@@ -99,9 +99,9 @@ die **Zurück-Geste/-Taste** schließt sie, Neuladen öffnet sie wieder. Sync l�
 3. Oben rechts **Bereitstellen → Bereitstellungen verwalten**.
 4. Bei der aktiven Web-App auf ✏️ **Bearbeiten**, unter „Version“ **Neue Version** wählen → **Bereitstellen**.
    (Nicht „Neue Bereitstellung“ – das würde eine neue URL erzeugen.)
-5. Fertig. Die URL in `script.js` bleibt unverändert.
+5. Fertig. Die URL in `js/01-start.js` bleibt unverändert.
 
-Falls doch eine **neue Bereitstellung** entstanden ist (neue ID), die neue Web-App-URL in `script.js` bei
+Falls doch eine **neue Bereitstellung** entstanden ist (neue ID), die neue Web-App-URL in `js/01-start.js` bei
 `const WEB_APP_URL = …` eintragen. Die zweite Konstante `WEB_APP_URL_BACKEND` (PDF-Mail-Versand) ist eine
 andere Bereitstellung und bleibt unberührt.
 
@@ -121,7 +121,7 @@ wurde, wird das Sheet gelesen. Der Cache wird bei jedem Schreibvorgang unter Spe
 
 Auf dem Gerät: im Hintergrund kein Abruf; beim Zurückkehren/„online" sofort; bei Verbindungsfehlern
 verlangsamt sich der Takt schrittweise (3 → 6 → 12 → 24 → 30 s) und springt beim nächsten Erfolg zurück.
-Bei deutlich mehr Geräten `SYNC_POLL_INTERVAL_MS` in `script.js` erhöhen.
+Bei deutlich mehr Geräten `SYNC_POLL_INTERVAL_MS` in `js/02-sync-anmeldung.js` erhöhen.
 
 ## Optional: Aufräumen
 

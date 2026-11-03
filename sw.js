@@ -10,13 +10,17 @@
 //    fasst er NICHT an. Der Offline-Puffer der App (unbestätigte Änderungen im localStorage, Nachschicken beim nächsten
 //    Abruf/„online“) arbeitet also unverändert.
 //
-// APP_VERSION hier und in script.js müssen gleich sein (tests/versioncheck.js prüft das). Registriert wird er in index.html.
+// APP_VERSION hier und in js/01-start.js müssen gleich sein (tests/versioncheck.js prüft das). Registriert wird er in index.html.
 const APP_VERSION = '9.0';
 const CACHE_PREFIX = 'fracht-tracker-';
 const CACHE_NAME = CACHE_PREFIX + APP_VERSION;
 const NETWORK_TIMEOUT_MS = 6000;                 // „verbunden, aber kein Internet“ darf den Start nicht endlos blockieren
 const PRECACHE = [
-  './', 'index.html', 'styles.css', 'script.js', 'manifest.webmanifest',
+  './', 'index.html', 'styles.css', 'manifest.webmanifest',
+  'js/01-start.js', 'js/02-sync-anmeldung.js', 'js/03-toene-helfer.js',
+  'js/04-sendungsdetails.js', 'js/05-liste-archiv.js', 'js/06-seiten.js',
+  'js/07-import-erfassen.js', 'js/08-scan-batch.js', 'js/09-pdf.js',
+  'js/10-menue-events-start.js',
   'assets/vendor/jspdf.umd.min.js', 'assets/vendor/jspdf.plugin.autotable.min.js', 'assets/vendor/qrcode.min.js',
   'assets/icons/icon-192.png', 'assets/icons/icon-512.png', 'assets/icons/icon-maskable-512.png', 'assets/icons/apple-touch-icon.png',
   'assets/error-sound.mp3', 'assets/nachlieferung-sound.mp3'
