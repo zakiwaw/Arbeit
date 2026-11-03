@@ -1,0 +1,834 @@
+/* Fracht Tracker – Stylesheet Teil 4/6: 04-details-menue-modals.css
+   Abschnitte 8–11: Detailansicht, Seitenmenü, Modals, Offene HUs / HU-Details / Korrekturvorschlag
+   Alle Teile zusammen = ein Stylesheet; index.html bindet sie in dieser Reihenfolge ein (Reihenfolge ist Pflicht: Kaskade). */
+
+/* ===================================================================
+   8. DETAILANSICHT
+   =================================================================== */
+#detailView {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    padding: 0 var(--sp-3) var(--sp-6);
+    overflow-y: auto;
+    background-color: var(--bg);
+}
+.detail-view-header {
+    position: sticky;
+    top: 0;
+    z-index: 101;
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-height: 56px;
+    margin: 0 calc(-1 * var(--sp-3)) var(--sp-3);
+    padding: var(--sp-2) var(--sp-3);
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+}
+.detail-view-header h2 { flex: 1; margin: 0; font-size: var(--fs-lg); text-align: center; padding-right: var(--touch-min); }
+#backToMainViewBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--touch-min);
+    height: var(--touch-min);
+    padding: 0;
+    background: none;
+    border: none;
+    border-radius: var(--r-md);
+    color: var(--text);
+    transition: background-color var(--dur) var(--ease);
+}
+#backToMainViewBtn:hover { background-color: var(--surface-3); }
+#backToMainViewBtn svg { width: 28px; height: 28px; fill: currentColor; }
+
+#currentShipmentDetails {
+    padding: var(--sp-4);
+    font-size: var(--fs-sm);
+    line-height: 1.5;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--border-strong); /* Farbe wird per JS gesetzt (rot/orange/grün) */
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-md);
+}
+/* Titel = HAWB. Tippen kopiert. -------------------------------------- */
+#currentShipmentDetails > strong {
+    display: block;
+    margin: 0 0 var(--sp-2);
+    font-family: var(--font-mono);
+    font-size: var(--fs-xl);
+    font-weight: 700;
+    letter-spacing: .01em;
+    color: var(--text);
+    overflow-wrap: anywhere;
+}
+#currentShipmentDetails #shipmentDetailTitle {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: var(--touch-min);
+    padding: 0 88px 0 0;
+    cursor: pointer;
+}
+#shipmentDetailTitle::after {
+    content: "Kopieren";
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 6px 10px;
+    font-family: var(--font-sans);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: .02em;
+    color: var(--accent);
+    background-color: var(--accent-soft);
+    border-radius: var(--r-full);
+}
+#currentShipmentDetails #shipmentDetailTitle:active { color: var(--accent); }
+#currentShipmentDetails #shipmentDetailTitle.copied::after { content: "Kopiert!"; color: #fff; background-color: var(--success); }
+
+/* Zusammenfassung – direkt unter dem Titel, zwei große Zahlen ---------- */
+#currentShipmentDetails .summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-3);
+}
+#currentShipmentDetails .summary > span {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: var(--sp-2) var(--sp-3);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    background-color: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+}
+.summary .ok, .summary .mismatch, .summary .over {
+    font-family: var(--font-mono);
+    font-size: var(--fs-2xl);
+    font-weight: 800;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0;
+    text-transform: none;
+}
+.summary .ok small, .summary .mismatch small, .summary .over small { font-size: var(--fs-md); font-weight: 600; opacity: .7; }
+.summary .ok       { color: var(--success-text); }
+.summary .mismatch { color: var(--warning-text); }
+.summary .over     { color: var(--danger-text); }
+/* Kachel färbt sich mit: fertig grün, überzählig rot */
+#currentShipmentDetails .summary > span:has(.ok)   { background-color: var(--success-soft); border-color: color-mix(in srgb, var(--success) 35%, transparent); }
+#currentShipmentDetails .summary > span:has(.over) { background-color: var(--danger-soft);  border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
+
+/* Scan-Liste = Zeitleiste, kompakt ------------------------------------- */
+#currentShipmentDetails ul { list-style: none; margin: 0; padding: 0; }
+#currentShipmentDetails > ul { position: relative; padding-left: 14px; }
+#currentShipmentDetails > ul::before { /* durchgehende Linie */
+    content: "";
+    position: absolute;
+    left: 4px;
+    top: 10px;
+    bottom: 10px;
+    width: 2px;
+    background-color: var(--border);
+}
+#currentShipmentDetails > ul > li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    position: relative;
+    margin: 0 0 var(--sp-1);
+    padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3);
+    font-family: var(--font-sans);
+    font-size: var(--fs-md);
+    line-height: 1.35;
+    white-space: normal;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+}
+#currentShipmentDetails > ul > li:last-child { margin-bottom: 0; }
+#currentShipmentDetails > ul > li::before { /* Punkt auf der Linie */
+    content: "";
+    position: absolute;
+    left: -14px;
+    top: 18px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: var(--accent);
+    border: 2px solid var(--surface);
+    box-sizing: border-box;
+}
+#currentShipmentDetails > ul > li.cancelled-item::before { background-color: var(--text-faint); }
+
+#currentShipmentDetails .scan-main-info {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px var(--sp-2);
+    white-space: normal;
+    overflow: visible;
+    overflow-wrap: anywhere;
+}
+#currentShipmentDetails li .timestamp {
+    flex: 0 0 100%;
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+}
+/* HU-Nummer: eigene Tippfläche (kopieren) */
+#currentShipmentDetails .scan-main-info .hu-value {
+    display: inline-flex;
+    align-items: center;
+    position: relative;
+    z-index: 1; /* liegt über der (per Minus-Rand hochgezogenen) Tippfläche von Storno/Notiz darunter */
+    min-height: 36px;
+    padding: 0 var(--sp-2);
+    font-family: var(--font-mono);
+    font-size: var(--fs-md);
+    font-weight: 700;
+    color: var(--text);
+    background-color: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+}
+#currentShipmentDetails .scan-main-info .hu-value:active { background-color: var(--accent-soft); border-color: var(--accent); }
+#currentShipmentDetails .scan-main-info .position-number { min-width: 2em; padding-right: 0; font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-faint); } /* enger als in der Offen-Liste: Platz für die Methode daneben */
+#currentShipmentDetails li .status {
+    display: inline-block;
+    padding: 3px 8px;
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: .01em;
+    color: var(--accent-text);
+    background-color: var(--accent-soft);
+    border-radius: var(--r-full);
+}
+#currentShipmentDetails li .combo { font-size: var(--fs-xs); font-style: italic; color: var(--info-text); }
+#currentShipmentDetails li .cancelled-info { flex: 0 0 100%; font-size: var(--fs-xs); color: var(--text-faint); text-decoration: none !important; }
+#currentShipmentDetails li.cancelled-item { color: var(--cancelled-color); background-color: var(--surface-2); text-decoration: none; }
+#currentShipmentDetails li.cancelled-item .hu-value,
+#currentShipmentDetails li.cancelled-item .status { text-decoration: line-through; opacity: .65; }
+#currentShipmentDetails li.cancelled-item .status { color: var(--text-muted); background-color: var(--surface-3); }
+#currentShipmentDetails li.cancelled-item .timestamp,
+#currentShipmentDetails li.cancelled-item .combo,
+#currentShipmentDetails li.cancelled-item .note-display,
+#currentShipmentDetails li.cancelled-item .editable-note,
+#currentShipmentDetails li.cancelled-item .add-note-link { color: var(--cancelled-color) !important; cursor: default; text-decoration: none; }
+#currentShipmentDetails li.cancelled-item .add-note-link { display: none; }
+
+/* Pfeil zwischen Nummer und Kontrollmethode: auf dem Handy ausgeblendet (Platz), am Desktop sichtbar */
+#currentShipmentDetails .scan-main-info .scan-arrow { display: none; color: var(--text-faint); }
+@media (min-width: 992px) { #currentShipmentDetails .scan-main-info .scan-arrow { display: inline; } }
+/* Handy: Sendungs-Nr. (VW) und „(Kombi)“ hinter die Kontrollmethode – so bleibt die Methode neben der Nummer, wenn
+   es eng wird (Zebra 360 px), und die Zusätze rutschen in die nächste Zeile statt der Methode */
+@media (max-width: 991px) {
+    #currentShipmentDetails .scan-main-info .sendnr-display,
+    #currentShipmentDetails .scan-main-info .combo { order: 1; }
+}
+/* Storno: dezenter Text-Button in der Aktionszeile unten links (Notiz rechts), 44 px Tippfläche ohne Höhenzuwachs */
+.cancel-button {
+    min-height: var(--touch-min);
+    min-width: var(--touch-min);
+    margin: calc(-1 * var(--sp-2)) auto calc(-1 * var(--sp-2)) calc(-1 * var(--sp-2));
+    padding: 0 var(--sp-2);
+    font-family: var(--font-sans);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+    color: var(--warning-text);
+    background: none;
+    border: none;
+    border-radius: var(--r-md);
+    transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.cancel-button:hover, .cancel-button:active { color: var(--warning-text); background-color: var(--warning-soft); }
+
+.hu-value.has-dunkelalarm, .pending-vse.has-dunkelalarm { color: var(--danger); font-weight: 700; }
+#currentShipmentDetails .scan-main-info .hu-value.has-dunkelalarm { color: var(--danger-text); background-color: var(--danger-soft); border-color: var(--danger); }
+.sendnr-display { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-muted); }
+
+/* Notizen & Aktionen unter dem Scan -------------------------------- */
+#currentShipmentDetails .scan-actions-and-notes {
+    flex-basis: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--sp-1);
+    padding: 0;
+}
+#currentShipmentDetails .scan-actions-and-notes:has(.notes-container) { padding-top: var(--sp-1); }
+#currentShipmentDetails .notes-container { flex: 1 1 100%; display: flex; flex-direction: column; gap: var(--sp-1); }
+#currentShipmentDetails .note-item {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-height: 40px;
+    padding: 0 0 0 var(--sp-3);
+    font-family: var(--font-sans);
+    background-color: var(--warning-soft);
+    border-left: 3px solid var(--warning);
+    border-radius: var(--r-sm);
+}
+#currentShipmentDetails .note-item .note-prefix { display: none; } /* Farbstreifen ersetzt das Wort "Notiz:" */
+#currentShipmentDetails .note-item .note-readonly { flex: 1; font-family: var(--font-sans); font-size: var(--fs-sm); color: var(--text); overflow-wrap: anywhere; } /* Archiv: nur lesen */
+#currentShipmentDetails li .editable-note {
+    flex: 1;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    min-height: 40px;
+    padding: var(--sp-1) 0;
+    font-family: var(--font-sans);
+    font-size: var(--fs-sm);
+    font-style: normal;
+    color: var(--text);
+    cursor: pointer;
+    text-decoration: none;
+    overflow-wrap: anywhere;
+}
+#currentShipmentDetails .note-item .delete-note-btn {
+    position: relative;
+    flex-shrink: 0;
+    align-self: stretch;
+    width: var(--touch-min);
+    min-height: 40px;
+    padding: 0;
+    font-size: 0;           /* Emoji-Glyphe ausblenden – nicht jede Geräteschrift hat sie */
+    line-height: 1;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    border-radius: 0 var(--r-sm) var(--r-sm) 0;
+    transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+#currentShipmentDetails .note-item .delete-note-btn::before { content: "×"; font-size: 22px; line-height: 1; }
+#currentShipmentDetails .note-item .delete-note-btn:hover,
+#currentShipmentDetails .note-item .delete-note-btn:active { color: #fff; background-color: var(--danger); }
+
+/* "Notiz hinzufügen": klein sichtbar, aber 44 px hohe Tippfläche */
+#currentShipmentDetails li .add-note-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: var(--touch-min);
+    margin: calc(-1 * var(--sp-2)) 0; /* Tippfläche ragt in die Karten-Polsterung, ohne Höhe zu kosten */
+    padding: 0 var(--sp-2);
+    font-family: var(--font-sans);
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    color: var(--text-muted);
+    text-decoration: none;
+    border-radius: var(--r-md);
+    cursor: pointer;
+    transition: color var(--dur) var(--ease), background-color var(--dur) var(--ease);
+}
+#currentShipmentDetails li .add-note-link::before { content: "+"; font-size: var(--fs-sm); font-weight: 700; line-height: 1; }
+#currentShipmentDetails li .add-note-link { font-weight: 500; }
+#currentShipmentDetails li .add-note-link:hover,
+#currentShipmentDetails li .add-note-link:active { color: var(--accent); background-color: var(--accent-soft); text-decoration: none; }
+#currentShipmentDetails li .editable-note:hover { color: var(--accent-hover); }
+/* Wenn Notizen da sind, sitzt der Link unter der letzten Notiz und darf nicht nach oben ragen */
+#currentShipmentDetails .scan-actions-and-notes:has(.notes-container) .add-note-link,
+#currentShipmentDetails .scan-actions-and-notes:has(.notes-container) .cancel-button { margin-top: 0; }
+
+/* Offene Positionen (HU-Liste in den Details) */
+#pendingHuList {
+    margin: var(--sp-2) 0 var(--sp-3);
+    padding: var(--sp-3);
+    background-color: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+}
+#pendingHuList.partial { border-color: var(--warning); background-color: var(--warning-soft); }
+#pendingHuList h4 { margin: 0 0 var(--sp-2); font-size: var(--fs-sm); font-weight: 700; color: var(--text); }
+#pendingHuList ul { margin: 0; padding: 0; max-height: 240px; overflow-y: auto; font-family: var(--font-mono); font-size: var(--fs-sm); }
+#pendingHuList li { min-height: 40px; padding: var(--sp-1) var(--sp-2); border-bottom: 1px solid var(--border); }
+#pendingHuList li:last-child { border-bottom: none; }
+#pendingHuList .hu-list li { display: flex; align-items: center; min-height: 40px; padding: var(--sp-1) var(--sp-2); }
+.position-number { min-width: 2.5em; padding-right: 1em; flex-shrink: 0; text-align: right; color: var(--text-faint); }
+
+.pending-list-header, .hu-list-header {
+    display: flex;
+    margin-bottom: var(--sp-1);
+    padding: var(--sp-1) var(--sp-2);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border-bottom: 2px solid var(--border-strong);
+}
+.pending-list-header span:first-child, .hu-list-header span:first-child { flex-basis: 55%; text-align: left; }
+.pending-list-header span:last-child,  .hu-list-header span:last-child  { flex-basis: 45%; text-align: left; }
+.pending-item-details, .vvl-item-row { display: flex; justify-content: space-between; width: 100%; }
+.pending-item-details .pending-vse, .vvl-item-row .vvl-vse { flex-basis: 55%; text-align: left; font-family: var(--font-mono); font-weight: 700; }
+.pending-item-details .pending-sendnr, .vvl-item-row .vvl-sendnr { flex-basis: 45%; text-align: left; font-family: var(--font-mono); font-size: var(--fs-xs); font-style: italic; color: var(--text-muted); }
+
+#currentShipmentDetails .hu-value.copied::after,
+#huDetailsContent #huDetailsNumber.copied::after {
+    content: 'Kopiert!';
+    position: absolute;
+    top: 50%;
+    left: 105%;
+    transform: translateY(-50%);
+    padding: 2px 8px;
+    font-family: var(--font-sans);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    color: #fff;
+    white-space: nowrap;
+    background-color: var(--success);
+    border-radius: var(--r-sm);
+    opacity: 0;
+    animation: fade-in-out 1.5s ease-in-out;
+}
+#huDetailsContent #huDetailsNumber.copied::after { left: auto; right: 10px; }
+#currentShipmentDetails .scan-main-info .hu-value.copied::after { left: 0; top: auto; bottom: 100%; transform: none; margin-bottom: 4px; }
+
+
+/* ===================================================================
+   9. SEITENMENÜ
+   =================================================================== */
+.side-menu {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1010;
+    display: flex;
+    flex-direction: column;
+    width: 300px;
+    max-width: 85%;
+    height: 100vh;
+    height: 100dvh;
+    padding: var(--sp-5) var(--sp-4);
+    overflow-y: auto;
+    background-color: var(--surface);
+    box-shadow: var(--shadow-lg);
+    transform: translateX(-100%);
+    transition: transform .28s var(--ease);
+}
+.side-menu.open { transform: translateX(0); }
+.side-menu h3 {
+    margin: 0 0 var(--sp-4);
+    padding: 0 var(--sp-2);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+.side-menu .side-menu-list { list-style: none; margin: 0 0 var(--sp-4); padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.side-menu .menu-action-item {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    min-height: 48px;
+    padding: var(--sp-2) var(--sp-3);
+    font-size: var(--fs-md);
+    font-weight: 500;
+    color: var(--text);
+    text-decoration: none;
+    background-color: transparent;
+    border-radius: var(--r-md);
+    cursor: pointer;
+    transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.side-menu .menu-action-item:hover, .side-menu .menu-action-item:active { background-color: var(--surface-3); }
+.side-menu .menu-action-item svg { width: 22px; height: 22px; flex-shrink: 0; fill: currentColor; color: var(--text-muted); }
+.side-menu .menu-action-item:hover svg { color: inherit; }
+.side-menu .menu-action-item.action-warning:hover { color: var(--warning-text); background-color: var(--warning-soft); }
+.side-menu .menu-action-item.action-reset { color: var(--danger-text); margin-top: var(--sp-2); }
+.side-menu .menu-action-item.action-reset svg { color: var(--danger); }
+.side-menu .menu-action-item.action-reset:hover { background-color: var(--danger-soft); }
+.side-menu .main-action-button { display: none; }
+
+#lkw-section { margin-top: var(--sp-2); padding-top: var(--sp-3); border-top: 1px solid var(--border); }
+.lkw-section-title {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-2);
+    padding: 0 var(--sp-2);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+.lkw-total-count { font-size: var(--fs-xs); font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+.lkw-list, #lkw-menu-container { list-style: none; margin: 0; padding: 0; }
+.lkw-menu-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--sp-3);
+    min-height: 44px;
+    padding: var(--sp-2) var(--sp-3);
+    font-size: var(--fs-sm);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: nowrap;
+}
+.lkw-menu-item:last-child { border-bottom: none; }
+.lkw-menu-item small { color: var(--text-faint); }
+.lkw-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lkw-label small { font-size: var(--fs-xs); color: var(--text-faint); }
+
+.side-menu #sheetStatus {
+    margin-top: auto;
+    padding: var(--sp-3);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    text-align: center;
+    background-color: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+}
+.side-menu #sheetStatus:empty { display: none; }
+
+.menu-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background-color: var(--overlay);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity .28s var(--ease), visibility .28s var(--ease);
+}
+.menu-overlay.visible { opacity: 1; visibility: visible; }
+
+
+/* ===================================================================
+   10. MODALS – Bottom-Sheet auf Mobil
+   =================================================================== */
+body.modal-open { overflow: hidden; }
+
+.modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9000;
+    justify-content: center;
+    align-items: flex-end;
+    padding: 0;
+    overflow: hidden;
+    background-color: var(--overlay);
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
+}
+.modal-overlay.visible { display: flex; animation: overlay-in .2s var(--ease); }
+
+.modal-content {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+    max-height: 92vh;
+    max-height: min(92dvh, 100%); /* 100 % = Overlay – bei offener Tastatur auf den sichtbaren Ausschnitt begrenzt (script.js) */
+    margin: 0;
+    padding: var(--sp-5) var(--sp-4) calc(var(--sp-4) + env(safe-area-inset-bottom, 0px));
+    overflow-y: auto; /* passt das Sheet nicht, scrollt es innen statt hinter der Tastatur zu verschwinden */
+    overflow-x: hidden;           /* nie seitlich – iOS ließ das Sheet sonst waagerecht mitschieben (Reiterleiste der „Offenen HUs“) */
+    overscroll-behavior-x: none;
+    background-color: var(--surface);
+    border: none;
+    border-radius: var(--r-xl) var(--r-xl) 0 0;
+    box-shadow: var(--shadow-lg);
+    animation: sheet-up .28s var(--ease);
+}
+/* Griff oben am Sheet */
+.modal-content::before {
+    content: "";
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    width: 40px;
+    height: 4px;
+    margin-left: -20px;
+    background-color: var(--border-strong);
+    border-radius: var(--r-full);
+}
+.modal-content h3 { margin: var(--sp-1) 0 var(--sp-4); font-size: var(--fs-lg); text-align: center; }
+.modal-content .form-group { margin-bottom: var(--sp-4); }
+.modal-content label { margin-bottom: var(--sp-1); }
+.modal-content input[type="number"], .modal-content input[type="text"] { font-size: var(--fs-md); }
+#huListTextarea, #noteEditTextarea { font-family: var(--font-mono); font-size: var(--fs-sm); }
+/* Notiz-Sheet: Textfeld gibt bei wenig Platz (Tastatur offen, kleines Display) nach, damit Speichern/Abbrechen sichtbar bleiben */
+#note-edit-form .form-group { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+#noteEditTextarea { flex: 1 1 auto; min-height: 64px; }
+
+.modal-actions {
+    display: flex;
+    flex-shrink: 0;
+    gap: var(--sp-2);
+    margin-top: var(--sp-3);
+}
+.modal-actions:empty { display: none; }
+.modal-actions button {
+    flex: 1;
+    height: var(--control-h);
+    padding: 0 var(--sp-3);
+    font-size: var(--fs-md);
+    font-weight: 650;
+    border: none;
+    border-radius: var(--r-md);
+    transition: background-color var(--dur) var(--ease);
+}
+.modal-actions.hu-add-actions { flex-wrap: wrap; }
+.hu-add-footer-info { flex: 1 0 100%; }
+.modal-actions-center { justify-content: center; }
+.modal-actions-center button { flex: 0 1 60%; }
+
+/* Primär / Sekundär in Modal-Aktionen (IDs kommen aus dem Markup) */
+#saveEditButton, #saveHuListButton, #confirmBatchNoteButton, #saveNoteEditButton, #suspicionConfirmBtn, #closeOpenHusModalButton {
+    color: #fff;
+    background-color: var(--accent);
+}
+#saveEditButton:hover, #saveHuListButton:hover, #confirmBatchNoteButton:hover, #saveNoteEditButton:hover, #suspicionConfirmBtn:hover, #closeOpenHusModalButton:hover { background-color: var(--accent-hover); }
+
+#cancelEditButton, #cancelHuImportButton, #skipBatchNoteButton, #cancelNoteEditButton {
+    color: var(--text) !important;
+    background-color: var(--surface) !important;
+    border: 1.5px solid var(--border-strong) !important;
+    box-shadow: none;
+}
+#cancelEditButton:hover, #cancelHuImportButton:hover, #skipBatchNoteButton:hover, #cancelNoteEditButton:hover { background-color: var(--surface-3) !important; }
+
+#suspicionDeclineBtn { color: var(--danger-text); background-color: var(--danger-soft); box-shadow: none; }
+#suspicionDeclineBtn:hover { color: #fff; background-color: var(--danger); }
+
+.close-modal-icon-btn {
+    position: absolute;
+    top: var(--sp-3);
+    right: var(--sp-3);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    color: var(--text-muted);
+    background: var(--surface-3);
+    border: none;
+    border-radius: var(--r-full);
+    transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.close-modal-icon-btn:hover { color: var(--text); background: var(--border-strong); }
+.close-modal-icon-btn svg { width: 22px; height: 22px; fill: currentColor; }
+
+/* Import-Modal: Textarea füllt den verfügbaren Platz */
+#importHuModal .form-group:nth-of-type(2) { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+#huListTextarea { flex: 1; min-height: 160px; resize: none; }
+
+/* Notiz-Bearbeitung */
+#noteEditContext { margin-bottom: var(--sp-3); font-size: var(--fs-sm); color: var(--text-muted); text-align: center; }
+#noteEditContext:empty { display: none; }
+
+
+/* ===================================================================
+   11. OFFENE HUs, HU-DETAILS, KORREKTURVORSCHLAG
+   =================================================================== */
+/* Reiter im Sheet „Offene HUs“: auf dem Handy teilen sich die vier Reiter die Breite und brechen zweizeilig um – die Leiste
+   scrollt nicht mehr (iOS schob sonst beim Wischen das ganze Sheet mit). Der Zähler sitzt oben rechts in der Ecke. */
+.modal-tabs {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: var(--sp-1);
+    margin: 0 calc(-1 * var(--sp-4)) var(--sp-3);
+    padding: 0 var(--sp-4);
+    overflow: hidden;
+    border-bottom: 1px solid var(--border);
+}
+.modal-tabs-wrap { position: relative; }
+.modal-tab-btn {
+    position: relative;
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px 4px 10px;
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    line-height: 1.2;
+    text-align: center;
+    color: var(--text-muted);
+    white-space: normal;
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    border-radius: 0;
+    transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.modal-tab-btn:hover { color: var(--text); }
+.modal-tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-badge {
+    position: absolute;
+    top: 0;
+    right: 0;
+    min-width: 18px;
+    padding: 1px 5px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.3;
+    text-align: center;
+    color: #fff;
+    background-color: var(--danger);
+    border-radius: var(--r-full);
+    transition: transform var(--dur) var(--ease), opacity var(--dur) var(--ease);
+}
+.tab-badge.hidden { display: inline-block !important; transform: scale(0); opacity: 0; }
+
+.hu-tab-panel { flex: 1; min-height: 0; max-height: 60vh; overflow-y: auto; padding-right: var(--sp-1); }
+#openHusModal .modal-content { min-height: 70vh; min-height: 70dvh; }
+
+.hu-order-group {
+    margin-bottom: var(--sp-3);
+    padding: var(--sp-3);
+    background-color: var(--surface-2);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
+    border-radius: var(--r-md);
+}
+.hu-order-title {
+    margin-bottom: var(--sp-2);
+    padding-bottom: var(--sp-2);
+    font-family: var(--font-mono);
+    font-size: var(--fs-md);
+    font-weight: 700;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+}
+.hu-order-group .hu-order-title small { font-family: var(--font-sans); font-size: var(--fs-xs); font-weight: 500; color: var(--text-muted); }
+.hu-list { list-style: none; margin: 0; padding: 0; font-family: var(--font-mono); font-size: var(--fs-sm); }
+.hu-list li { display: flex; align-items: flex-start; padding: var(--sp-1) var(--sp-2); border-bottom: 1px solid var(--border); }
+.hu-list li:last-child { border-bottom: none; }
+.hu-list .hu-value { cursor: pointer; }
+.hu-list .hu-value:hover { color: var(--accent); }
+.no-open-hus-message {
+    padding: var(--sp-8) var(--sp-4);
+    font-size: var(--fs-sm);
+    font-style: italic;
+    text-align: center;
+    color: var(--text-muted);
+}
+
+/* HU-Details */
+#huDetailsModal { align-items: flex-end; }
+#huDetailsContent dl { margin: var(--sp-2) 0 0; padding: 0; }
+#huDetailsContent dt {
+    margin-top: var(--sp-3);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+#huDetailsContent dd {
+    margin: var(--sp-1) 0 0;
+    padding: var(--sp-2) var(--sp-3);
+    font-family: var(--font-mono);
+    font-size: var(--fs-md);
+    word-break: break-all;
+    background-color: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+}
+#huDetailsContent #huDetailsNumber { position: relative; cursor: pointer; transition: background-color var(--dur) var(--ease); }
+#huDetailsContent #huDetailsNumber:hover { background-color: var(--surface-3); }
+
+/* Korrekturvorschlag */
+.suspicion-details { font-size: var(--fs-md); line-height: 1.6; text-align: center; }
+.suspicion-details p { margin: var(--sp-1) 0; }
+.suspicion-details code {
+    display: inline-block;
+    padding: 4px 10px;
+    font-family: var(--font-mono);
+    font-size: var(--fs-lg);
+    font-weight: 700;
+    background-color: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+}
+.suspicion-details hr { margin: var(--sp-3) 0; border: none; border-top: 1px dashed var(--border-strong); }
+.suspicion-question { font-weight: 700; color: var(--accent-text); }
+.blinking-char {
+    padding: 0 2px;
+    font-weight: 800;
+    color: var(--danger);
+    background-color: var(--danger-soft);
+    border-radius: 3px;
+    animation: blink 1.5s infinite;
+}
+
+/* Scan-Feedback im Batch-Modus: großflächig, aus der Distanz lesbar */
+#batchScanFeedbackModal { align-items: center; }
+#batchScanFeedbackModal .modal-content {
+    width: 92%;
+    max-width: 520px;
+    padding: var(--sp-6) var(--sp-4);
+    text-align: center;
+    background-color: var(--n-900);
+    border-radius: var(--r-xl);
+    box-shadow: 0 0 0 4px var(--success), var(--shadow-lg);
+    animation: pop-in .2s var(--ease);
+}
+#batchScanFeedbackModal .modal-content::before { display: none; }
+#batchScanFeedbackModal .modal-content.unexpected { box-shadow: 0 0 0 4px var(--danger), var(--shadow-lg); }
+#batchScanFeedbackModal h3 {
+    margin: 0 0 var(--sp-3);
+    padding-right: 44px;
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--n-400);
+}
+#batchScanFeedbackModal .close-modal-icon-btn { color: var(--n-400); background: rgba(255, 255, 255, .08); }
+#batchScanFeedbackModal .close-modal-icon-btn:hover { color: #fff; background: rgba(255, 255, 255, .16); }
+#feedbackScanNumber {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-width: 80%;
+    margin-bottom: var(--sp-3);
+    padding: var(--sp-3) 0;
+    font-family: var(--font-mono);
+    font-size: clamp(2.5em, 8vw, 3.5em);
+    font-weight: 800;
+    line-height: 1.2;
+    word-break: break-all;
+    color: #4ade80; /* Standard: grün – JS setzt lime/red per style, beide bleiben gut lesbar */
+    background-color: transparent;
+    border-radius: var(--r-md);
+}
+#feedbackScanNumber.unexpected { color: #f87171; }
+#feedbackCarrier {
+    width: 100%;
+    margin-top: var(--sp-1);
+    padding: 0 var(--sp-2);
+    font-size: var(--fs-md);
+    font-style: italic;
+    text-align: left;
+    word-break: break-all;
+    color: var(--n-300);
+}

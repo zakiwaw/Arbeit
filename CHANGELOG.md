@@ -11,6 +11,9 @@ Neueste zuerst. Datum = Veröffentlichung auf dem Live-Branch `arena/01a06f82-ar
   greift beim Laden auf Funktionen eines späteren Teils zu, keine Namenskollision mit `window`. Alter auskommentierter
   Block „Screen Orientation Lock“ am Dateiende entfernt. `tests/zoomcheck.js`, `versioncheck.js`, `offlinecheck.js`
   lesen jetzt `js/01-start.js`; `sw.js` lädt alle Teile vor.
+- `styles.css` (145 KB) an den vorhandenen Abschnittsgrenzen in 6 Teile `css/01-grundlagen.css` …
+  `css/06-darkmode-js-klassen.css` aufgeteilt (Regeln und Reihenfolge unverändert, nur Kopfkommentare ergänzt);
+  `index.html` bindet sie nacheinander ein, `sw.js` lädt sie vor.
 - Offline startbar: Service Worker `sw.js` (registriert in `index.html`) lädt alle App-Dateien in einen Cache je Version
   vor; online „Netz zuerst“ (Zeitlimit 6 s), ohne Netz aus dem Cache; alter Cache wird bei neuer Version gelöscht; Aufrufe
   zum Apps-Script bleiben unberührt (Offline-Puffer für Scans arbeitet wie bisher). Prüfung `tests/offlinecheck.js`

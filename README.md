@@ -21,7 +21,7 @@ Aufträge übernommen.
 |---|---|
 | `index.html` | Oberfläche (Ansichten, Modals, Seitenmenü), bindet Stylesheet, Bibliotheken und die Skripte aus `js/` ein |
 | `js/01-start.js` … `js/10-menue-events-start.js` | App-Logik in 10 Teilen (früher eine Datei `script.js`). Klassische Skripte mit gemeinsamem Geltungsbereich, `index.html` lädt sie in Nummern-Reihenfolge; jeder Teil beginnt mit einer Inhaltsangabe. Teil 01: Version, Einstellungen (`WEB_APP_URL`, `LOCAL_STORAGE_KEY`), DOM-Elemente, Start · 02: Sync + Anmeldung · 03: Töne/Helfer · 04: Sendungsdetails · 05: Liste/Archiv · 06: Seiten/LKW · 07: Import + „Aufträge erfassen“ · 08: Scan/Batch · 09: PDF · 10: Menü, alle Bedienelemente, Start |
-| `styles.css` | Gestaltung (Handy zuerst, Desktop-Ergänzungen ab 992 px, automatischer Dunkelmodus) |
+| `css/01-grundlagen.css` … `css/06-darkmode-js-klassen.css` | Gestaltung in 6 Teilen (früher `styles.css`; Handy zuerst, Desktop-Ergänzungen ab 992 px in Teil 05, automatischer Dunkelmodus in Teil 06). `index.html` bindet sie in Nummern-Reihenfolge ein |
 | `manifest.webmanifest`, `assets/icons/` | Installierbar als App (Startbildschirm, Hochformat) |
 | `sw.js` | Service Worker: App-Dateien im Cache, Start ohne Netz (siehe „Offline“) |
 | `assets/vendor/` | Lokale Bibliotheken: jsPDF, jsPDF-AutoTable, qrcode.js |

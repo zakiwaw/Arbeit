@@ -16,7 +16,9 @@ const CACHE_PREFIX = 'fracht-tracker-';
 const CACHE_NAME = CACHE_PREFIX + APP_VERSION;
 const NETWORK_TIMEOUT_MS = 6000;                 // „verbunden, aber kein Internet“ darf den Start nicht endlos blockieren
 const PRECACHE = [
-  './', 'index.html', 'styles.css', 'manifest.webmanifest',
+  './', 'index.html', 'manifest.webmanifest',
+  'css/01-grundlagen.css', 'css/02-scan-batch.css', 'css/03-liste-seiten.css',
+  'css/04-details-menue-modals.css', 'css/05-feedback-anmeldung-desktop.css', 'css/06-darkmode-js-klassen.css',
   'js/01-start.js', 'js/02-sync-anmeldung.js', 'js/03-toene-helfer.js',
   'js/04-sendungsdetails.js', 'js/05-liste-archiv.js', 'js/06-seiten.js',
   'js/07-import-erfassen.js', 'js/08-scan-batch.js', 'js/09-pdf.js',
