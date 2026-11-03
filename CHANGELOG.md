@@ -14,6 +14,10 @@ Neueste zuerst. Datum = Veröffentlichung auf dem Live-Branch `arena/01a06f82-ar
 - `styles.css` (145 KB) an den vorhandenen Abschnittsgrenzen in 6 Teile `css/01-grundlagen.css` …
   `css/06-darkmode-js-klassen.css` aufgeteilt (Regeln und Reihenfolge unverändert, nur Kopfkommentare ergänzt);
   `index.html` bindet sie nacheinander ein, `sw.js` lädt sie vor.
+- `backend/Code.gs`: Inhaltsverzeichnis im Kopf und durchnummerierte Abschnitte 1–12 (nur Kommentare, kein Code
+  geändert – bleibt Code.gs 2.7). Hinweis im Abschnitt 10: `sendPdfEmail` wird von der App nicht mehr aufgerufen.
+- Neuer Test `tests/aufbaucheck.js` (ohne Chrome): Teile vollständig und in Reihenfolge eingebunden, Skripte am Ende
+  von `index.html`, Kopfkommentare, `sw.js` lädt alle lokalen Dateien vor, Code.gs-Abschnitte und Aktionen.
 - Offline startbar: Service Worker `sw.js` (registriert in `index.html`) lädt alle App-Dateien in einen Cache je Version
   vor; online „Netz zuerst“ (Zeitlimit 6 s), ohne Netz aus dem Cache; alter Cache wird bei neuer Version gelöscht; Aufrufe
   zum Apps-Script bleiben unberührt (Offline-Puffer für Scans arbeitet wie bisher). Prüfung `tests/offlinecheck.js`

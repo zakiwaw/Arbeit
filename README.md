@@ -70,6 +70,7 @@ Alle Befehle stehen in `tests/README.md`. Kurzfassung:
 ```
 node tests/backendcheck.js      # Server-Skript offline (kein Chrome nötig)
 node tests/versioncheck.js      # Versionsangaben passen zusammen (kein Chrome nötig)
+node tests/aufbaucheck.js       # js/- und css/-Teile vollständig und in Reihenfolge eingebunden, sw.js lädt alles vor (kein Chrome nötig)
 python3 -m http.server 8000     # App lokal ausliefern (für die Chrome-Tests)
 node tests/regress.js           # App im Chrome (weitere Suiten siehe tests/README.md)
 node tests/offlinecheck.js      # Offline-Start, Scan ohne Netz, Nachschicken (eigener Server auf :8011)

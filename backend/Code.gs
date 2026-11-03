@@ -32,9 +32,25 @@
 //   Anfragekörper), sonst antwortet der Server mit { status: 'error', code: 'AUTH_REQUIRED' }. Mitarbeiter stehen im
 //   Sheet "users"; der Administrator lädt sie per E-Mail ein, jeder wählt seine PIN selbst (Abschnitt ANMELDUNG unten).
 //   Notschalter: AUTH_ENABLED = false → alles wieder ohne Anmeldung wie in 2.1.
+//
+// AUFBAU DIESER DATEI (eine Datei, Abschnitte mit „// ===“-Kopf; im Editor mit Strg+F nach „// N.“ springen):
+//    1. EINSTELLUNGEN            Tabellen-ID (Skript-Eigenschaft / Rückfall), Blattnamen, Spalten, Sperre, Cache, Archiv-Regeln
+//    2. HAUPTFUNKTION doPost      Einstieg jeder Anfrage: bekannte Aktion? Token prüfen (verifySession_), verteilen
+//    3. HILFSFUNKTIONEN           Blätter öffnen, Versionszähler, Script-Cache, Sperre, Zeilen lesen/schreiben (JSON über mehrere Zellen)
+//    4. SPEICHERN MIT MERGE       saveShipments: 3-Wege-Merge je Sendung/Packstück/Notiz
+//    5. LÖSCHEN                   deleteShipment / deleteShipments (Löschvermerk statt Zeile entfernen)
+//    6. ÄNDERUNGEN SEIT VERSION   loadChanges: Schnellpfad über Cache, sonst Diff seit Version X (+ LKW-Status, Archiv-Nummern)
+//    7. ARCHIV                    Archiv-Regeln, Durchlauf (höchstens alle 6 h), searchArchive
+//    8. ÄLTERE AKTIONEN (V1)      loadAllData / saveAllData (alte App-Versionen), clearAllData (Menü „Alle Daten löschen“), purgeDeletedRows (Wartung)
+//    9. LKW-STATUS                Blatt lkw_status: aktiv/inaktiv je LKW + Zeitpunkt der Deaktivierung
+//   10. E-MAIL (ungenutzt)        sendPdfEmail – die App ruft es seit Sicherungsnachweis v3 (PDF im Browser) nicht mehr auf
+//   11. DRIVE-IMPORT              Zeit-Trigger liest Textdateien (HYDAC Standard / MAN) aus Drive-Ordnern und legt Aufträge an
+//   12. ANMELDUNG                 Mitarbeiter (Blatt _users), PIN, Einladung per E-Mail, Sitzungs-Token, Administrator-Aktionen
 // ===================================================
 
-// EINSTELLUNGEN
+// ===================================================
+// 1. EINSTELLUNGEN
+// ===================================================
 // Tabellen-ID: bevorzugt aus den Skript-Eigenschaften (Projekteinstellungen → Skript-Eigenschaften → SPREADSHEET_ID),
 // sonst der feste Wert darunter. Sobald die Eigenschaft gesetzt ist, kann der feste Wert in einer späteren Version entfallen.
 const SPREADSHEET_ID_FALLBACK = "1uQJ2nHXyTP5Qen7jMW2UkRitKkqHto0ANg5NrBD1SOs";
@@ -77,7 +93,8 @@ const CACHE_KEY_SWEEP = 'fracht_sweep';        // „Durchlauf kürzlich geprüf
 const NON_COUNTING_STATUSES_ = ['Dunkelalarm', 'Anstehend', 'NichtSichern', 'Abgelehnt', 'Wareneingang']; // wie in der App
 
 // ===================================================
-// HAUPTFUNKTION
+// 2. HAUPTFUNKTION doPost – Einstieg jeder Anfrage { action, payload, auth }
+//    Reihenfolge: bekannte Aktion? → Sitzungs-Token prüfen (außer PUBLIC_ACTIONS_) → Administrator-Rechte → verteilen
 // ===================================================
 const KNOWN_ACTIONS_ = ['saveShipments', 'deleteShipment', 'deleteShipments', 'loadChanges', 'searchArchive', 'loadAllData', 'saveAllData', 'sendPdfEmail',
   'clearAllData', 'saveLkwStatus', 'loadLkwStatus', 'authUsers', 'authLogin', 'authAccept', 'authInviteInfo', 'authCheck', 'authLogout',
@@ -138,7 +155,7 @@ function doPost(e) {
 }
 
 // ===================================================
-// HILFSFUNKTIONEN: Sheets, Versionen, Sperre
+// 3. HILFSFUNKTIONEN: Blätter, Versionszähler, Script-Cache, Sperre, Zeilen lesen/schreiben
 // ===================================================
 // Tabelle nur einmal je Aufruf öffnen (spart je ~100 ms pro weiterem Zugriff)
 function ss_() {
@@ -320,7 +337,7 @@ function ensureItemIds_(shipment) {
 function deepEqual_(a, b) { return JSON.stringify(a === undefined ? null : a) === JSON.stringify(b === undefined ? null : b); }
 
 // ===================================================
-// V2: SENDUNGSWEISES SPEICHERN MIT MERGE
+// 4. SPEICHERN MIT MERGE (Aktion saveShipments)
 // payload: { shipments: { base: shipmentObj }, bases: { base: shipmentObjOderNull }, deviceId }
 //   bases = der Serverstand, von dem das Gerät ausging (für den 3-Wege-Merge; darf fehlen).
 // Antwort: { status, version, merged: { base: shipmentObj } }  → zusammengeführter Stand, den das Gerät übernimmt
@@ -472,7 +489,7 @@ function mergeNotes_(t, o, b) {
 }
 
 // ===================================================
-// V2: LÖSCHEN (Tombstone – damit andere Geräte die Sendung nicht wiederbeleben)
+// 5. LÖSCHEN (Aktionen deleteShipment / deleteShipments) – Löschvermerk statt Zeile entfernen, damit andere Geräte die Sendung nicht wiederbeleben
 // payload: { baseNumber }
 // ===================================================
 function deleteShipmentRow(payload) {
@@ -516,7 +533,7 @@ function deleteShipmentRows(payload) {
 }
 
 // ===================================================
-// V2: ÄNDERUNGEN SEIT VERSION X
+// 6. ÄNDERUNGEN SEIT VERSION X (Aktion loadChanges – der 3-Sekunden-Abruf der Geräte)
 // payload: { sinceVersion: 123 }   (0/fehlend → kompletter Bestand, full = true)
 // Antwort: { status, version, changed: { base: shipmentObj }, deleted: [base, …], full, lkwStatus }
 // ===================================================
@@ -568,7 +585,7 @@ function loadChangesSince(payload) {
 }
 
 // ===================================================
-// ARCHIV
+// 7. ARCHIV: Regeln (shouldArchive_), Durchlauf (archiveSweep_, höchstens alle ARCHIVE_SWEEP_INTERVAL_MS), Suche (searchArchive)
 // ===================================================
 function lastChangeMs_(s, updatedAt) {
   let last = Date.parse(s.lastModified || '') || 0;
@@ -746,7 +763,8 @@ function archiveMatches_(B, s, q, head, mode) {
 }
 
 // ===================================================
-// BESTEHENDE FUNKTIONEN (V1 – kompatibel gehalten)
+// 8. ÄLTERE AKTIONEN (V1 – kompatibel gehalten): loadAllData / saveAllData (alte App-Versionen), clearAllData (Menü „Alle Daten löschen“),
+//    purgeDeletedRows nur von Hand im Editor
 // ===================================================
 function loadAllDataFromSheet() {
   const rows = readAllRows_(getShipmentSheet_());
@@ -796,7 +814,7 @@ function purgeDeletedRows() {
 }
 
 // ===================================================
-// LKW-STATUS-FUNKTIONEN (unverändert)
+// 9. LKW-STATUS (Aktionen saveLkwStatus / loadLkwStatus) – Blatt lkw_status
 // ===================================================
 function getOrCreateLkwSheet() {
   const ss = ss_();
@@ -840,7 +858,8 @@ function loadLkwStatusFromSheet() {
 }
 
 // ===================================================
-// E-MAIL-FUNKTION (unverändert)
+// 10. E-MAIL (Aktion sendPdfEmail) – von der App seit Sicherungsnachweis v3 nicht mehr aufgerufen (PDF öffnet im Browser);
+//     bleibt nur für ältere App-Versionen stehen und kann in einer späteren Version entfallen
 // ===================================================
 function sendPdfEmail(payload) {
   const recipient = "bisbiss1992@gmail.com";
@@ -851,7 +870,7 @@ function sendPdfEmail(payload) {
 }
 
 // ===================================================
-// AUTOMATISCHER IMPORT AUS GOOGLE DRIVE (2.5 / 2.6)
+// 11. AUTOMATISCHER IMPORT AUS GOOGLE DRIVE (2.5 / 2.6) – läuft per Zeit-Trigger (setupDriveImport), nicht über doPost
 // Ein getrenntes Skript legt je Kunden-PDF eine Textdatei in einem Drive-Ordner ab. Je Ordner ist festgelegt, in welchem
 // Format die Dateien aufgebaut sind (IMPORT_FOLDERS) – die Formate sind dieselben wie auf der Seite „Aufträge erfassen“:
 //   'standard' = „Standard (Leerzeilen)“: Aufträge durch Leerzeilen getrennt, erste Zeile Auftragsnummer (bei HYDAC das
@@ -1269,7 +1288,7 @@ function importLog_(fileName, result, details) {
 }
 
 // ===================================================
-// ANMELDUNG (V2.2) – PIN-Login, Einladung per E-Mail, Sitzungs-Token
+// 12. ANMELDUNG (V2.2) – PIN-Login, Einladung per E-Mail, Sitzungs-Token, Administrator-Aktionen
 //
 // Sheet "_users" (ausgeblendet, wird automatisch angelegt, alle Zellen als Text):
 //   id | name | email | role (admin/user) | pinHash | salt | active | createdAt | invite | inviteExpires | failed | lockedUntil | lastLogin | gen | sessions

@@ -26,12 +26,13 @@ node tests/regress.js         # Grundfunktionen: Scan, Batch, Startseite, Unters
 node tests/synccheck.js       # Sync: Löschen/Deaktivieren bei schnellem Bedienen, langsamen/gestörten Antworten – nichts kommt zurück; Spinner mit Text
 node tests/desktopcheck.js    # Desktop-Layout (≥ 992 px): Tabellen, Sendungsdetails, Packstück-Tabelle, Auswahl-Leiste
 node tests/versioncheck.js    # Versionsangaben passen zusammen (js/01-start.js, sw.js, index.html, Code.gs, READMEs, CHANGELOG) – ohne Chrome
+node tests/aufbaucheck.js     # Aufteilung passt: js/- und css/-Teile vollständig + in Reihenfolge in index.html, Skripte am Ende, sw.js lädt alles vor, Code.gs-Abschnitte – ohne Chrome
 node tests/offlinecheck.js    # Offline (Service Worker): Vorladen, Start ohne Netz, Scan offline → Nachschicken, Cache-Wechsel bei neuer Version – eigener Server auf :8011
 ```
 Jeder Test endet mit `ALL GOOD` (Exit-Code 0) oder `SOME FAILED` (Exit-Code 1) – Ketten wie `node tests/x.js && git push` brechen bei Fehlern ab.
 
 Umgebungsvariablen: `APP_URL` (Standard `http://127.0.0.1:8000/index.html`), `CHROMIUM` (Pfad zur Chrome/Chromium-Datei),
-`PUPPETEER_MODULE` (Pfad zu `puppeteer-core`). Ohne Chrome laufen `backendcheck.js` und `versioncheck.js`.
+`PUPPETEER_MODULE` (Pfad zu `puppeteer-core`). Ohne Chrome laufen `backendcheck.js`, `versioncheck.js` und `aufbaucheck.js`.
 In GitHub Actions (`.github/workflows/test.yml`) laufen alle Suiten mit dem auf dem Runner vorinstallierten Chrome.
 
 Service Worker in Tests: `openApp()` entfernt `navigator.serviceWorker` (sonst würde eine Testseite ihn registrieren und
