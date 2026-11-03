@@ -1,7 +1,12 @@
 # Backend (Google Apps Script)
 
 `Code.gs` ist das Server-Skript, das die App unter `WEB_APP_URL` (in `script.js`) anspricht.
-Es liest und schreibt das Google Sheet `1uQJ2nHXyTP5Qen7jMW2UkRitKkqHto0ANg5NrBD1SOs`.
+Es liest und schreibt das Google Sheet mit der ID `<SPREADSHEET_ID>` (steht nicht in dieser Datei: bevorzugt in den
+Skript-Eigenschaften des Apps-Script-Projekts, Schlüssel `SPREADSHEET_ID`; solange die Eigenschaft fehlt, gilt der feste
+Wert `SPREADSHEET_ID_FALLBACK` oben in `Code.gs`).
+
+Zusammengehörige Versionen: **App 9.0 ↔ Code.gs 2.7** (2.6 funktioniert mit App 9.0 ebenfalls) (die App zeigt beides unten im Seitenmenü). Bereitstellen siehe
+`README.md` im Hauptordner (bestehende Web-App → neue Version, keine neue Bereitstellung).
 
 ## Version 2 – Mehrgeräte-Sync
 

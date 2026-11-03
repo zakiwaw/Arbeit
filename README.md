@@ -1,0 +1,67 @@
+# Fracht Tracker
+
+Web-App für die Luftfracht-Sicherheitskontrolle im Lager (reglementierter Beauftragter): HAWB-/HU-Nummern scannen,
+Kontrollmethode erfassen (XRY, ETD, EDD, PHS, VCK) oder Wareneingang buchen, Batch-Modus für viele Scans hintereinander,
+LKW-Anlieferungen (Vorverladelisten VW, MAN-Ladelisten), Dunkelalarm-Übersicht, Sicherungsnachweis als PDF, Anmeldung
+mit PIN. Bis zu drei Geräte (Zebra-Scanner, iPhone, PC) arbeiten gleichzeitig auf demselben Datenbestand – gespeichert
+in einem Google Sheet über ein Google-Apps-Script. Textdateien aus Google Drive (HYDAC, MAN) werden automatisch als
+Aufträge übernommen.
+
+## Live-Stand und Branches
+
+- **Live-Branch: `arena/01a06f82-arbeit`** – GitHub Pages liefert die App aus diesem Branch (https://zakiwaw.github.io/Arbeit/).
+  Alle Änderungen kommen hierhin.
+- `main` ist **alt** (Stand Juli 2026). Der offene Pull Request #1 (`arena/01a06f82-arbeit` → `main`) bleibt offen,
+  bis Zakaria das Zusammenführen freigibt. Nicht selbst mergen.
+- Die App braucht **keinen Build-Schritt**: `index.html` öffnen bzw. ausliefern genügt.
+
+## Dateien
+
+| Datei / Ordner | Inhalt |
+|---|---|
+| `index.html` | Oberfläche (Ansichten, Modals, Seitenmenü), bindet Stylesheet, Bibliotheken und `script.js` ein |
+| `script.js` | Gesamte App-Logik: Scannen, Sendungen, LKW/Seiten, Sync, Anmeldung, „Aufträge erfassen“, PDF |
+| `styles.css` | Gestaltung (Handy zuerst, Desktop-Ergänzungen ab 992 px, automatischer Dunkelmodus) |
+| `manifest.webmanifest`, `assets/icons/` | Installierbar als App (Startbildschirm, Hochformat) |
+| `assets/vendor/` | Lokale Bibliotheken: jsPDF, jsPDF-AutoTable, qrcode.js |
+| `assets/*.mp3` | Hinweistöne |
+| `backend/Code.gs` | Google-Apps-Script (Server): Sync, Archiv, Anmeldung, Drive-Import – siehe `backend/README.md` |
+| `backend/ANLEITUNG-Drive-Import.md` | Einrichtung des automatischen Drive-Imports |
+| `backend/PROMPT-MAN-Ladeliste.md` | Prompt für den KI-Schritt „MAN-PDF → Textdatei“ |
+| `tests/` | Prüfskripte (Node + Chrome), siehe `tests/README.md` |
+| `CHANGELOG.md` | Änderungen mit Datum |
+
+## Versionen
+
+Die App-Version steht zentral in `script.js` (`APP_VERSION`, `APP_VERSION_DATE`, `APP_BACKEND_VERSION`) und wird in der
+App angezeigt: auf der Anmeldeseite, unten im Seitenmenü und am Desktop klein neben dem Titel („Version 9.0 · Stand … ·
+Server-Skript 2.7“). So sieht man auf jedem Gerät sofort, ob noch eine alte Version offen ist. Bei jeder veröffentlichten
+Änderung: Version hochzählen und in `index.html` (`<title>`), `CHANGELOG.md` und `backend/README.md` nachziehen –
+`node tests/versioncheck.js` prüft, dass alle Stellen zusammenpassen. Das Server-Skript hat eine eigene Versionszählung
+(oben in `backend/Code.gs`).
+
+## Backend bereitstellen (Google Apps Script)
+
+1. Apps-Script-Projekt öffnen (das Projekt, das zum Google Sheet der App gehört).
+2. Datei `Code.gs` öffnen, **gesamten Inhalt ersetzen** durch den Inhalt von `backend/Code.gs` aus diesem Repo, speichern.
+3. **Bereitstellen → Bereitstellungen verwalten → aktive Web-App bearbeiten (Stift) → Version: „Neue Version“ → Bereitstellen.**
+   **Keine neue Bereitstellung anlegen** – sonst ändert sich die Web-App-URL und die App (`WEB_APP_URL` in `script.js`)
+   würde ins Leere laufen.
+4. Die App zeigt im Seitenmenü, zu welcher Skript-Version sie gehört; eine ältere Skript-Version meldet bei neuen
+   Aktionen „Unbekannte Aktion“ (die App fängt das ab und weist auf die Bereitstellung hin).
+
+Die Tabellen-ID liest das Skript bevorzugt aus den **Skript-Eigenschaften** (Projekteinstellungen → Skript-Eigenschaften →
+`SPREADSHEET_ID`); ohne Eigenschaft gilt der feste Wert in `Code.gs`. IDs, PINs oder Tokens gehören nicht in dieses Repo.
+
+## Tests
+
+Alle Befehle stehen in `tests/README.md`. Kurzfassung:
+
+```
+node tests/backendcheck.js      # Server-Skript offline (kein Chrome nötig)
+node tests/versioncheck.js      # Versionsangaben passen zusammen (kein Chrome nötig)
+python3 -m http.server 8000     # App lokal ausliefern (für die Chrome-Tests)
+node tests/regress.js           # App im Chrome (weitere Suiten siehe tests/README.md)
+```
+
+Nach jeder Änderung: betroffene Suiten laufen lassen, erst bei „ALL GOOD“ veröffentlichen.

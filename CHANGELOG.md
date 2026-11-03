@@ -1,0 +1,28 @@
+# Änderungen
+
+Neueste zuerst. Datum = Veröffentlichung auf dem Live-Branch `arena/01a06f82-arbeit`. App-Version siehe `script.js`
+(`APP_VERSION`), Server-Skript siehe Kopf von `backend/Code.gs`.
+
+## 2026-11-03 – App 9.0, Code.gs 2.7
+
+- README im Hauptordner (Zweck, Live-Branch, Dateien, Backend bereitstellen, Tests) und dieses Änderungsprotokoll.
+- Version sichtbar: `APP_VERSION` / `APP_VERSION_DATE` / `APP_BACKEND_VERSION` in `script.js`; Anzeige auf der
+  Anmeldeseite, unten im Seitenmenü („Version 9.0 · Stand … · Server-Skript 2.7“) und am Desktop klein neben dem Titel
+  (auf dem Handy fehlt neben dem Titel der Platz); `<title>` von „V8.18 - Refactored“ auf „Fracht Tracker 9.0“.
+  Prüfung `tests/versioncheck.js`.
+- Sync-Intervall geprüft: Code und `backend/README.md` sagen 3 s (Abruf pausiert, solange die App nicht sichtbar ist);
+  die Angabe „15 s“ im Text von PR #1 war veraltet und wurde korrigiert. Code unverändert.
+- Sicherheit geprüft: jede Daten-Aktion verlangt ein Sitzungs-Token (`verifySession_`), öffentlich sind nur
+  `authUsers`/`authLogin`/`authAccept`/`authInviteInfo`; kein `doGet`. Sheet-ID aus `backend/README.md` entfernt;
+  Code.gs 2.7 liest sie bevorzugt aus der Skript-Eigenschaft `SPREADSHEET_ID` (fester Wert bleibt als Rückfall).
+
+## Davor (Auszug, Details in der Git-Historie)
+
+- 2026-10-28 – Drive-Import 2.6: Ordner „MAN Ladelisten TXT“ (Format MAN Fracht), Prompt für den KI-Schritt.
+- 2026-10-22/25 – Automatischer Import aus dem Drive-Ordner „HYDAC TXT“ (Code.gs 2.5), Anleitung, Härtung.
+- 2026-10-18 – Löschen/Deaktivieren mehrgerätesicher (Code.gs 2.4, Sammel-Löschung).
+- 2026-10-14/17 – LKW-Seite mit ⋮-Menü, „Aufträge erfassen“-Feinschliff, Seitenmenü aufgeräumt.
+- 2026-09-24 – Als App installierbar (Manifest, Symbole, Hochformat).
+- 2026-09-18 – Seite „Aufträge erfassen“ (MAN Fracht / Vorverladeliste / Standard).
+- 2026-09-10 – Anmeldung mit PIN (Code.gs 2.2/2.3), Sicherungsnachweis-PDF verschlankt.
+- 2026-09-05 – Pull Request #1: Stabilität, neues Design, Mehrgeräte-Sync (Code.gs 2.0/2.1, Archiv).

@@ -1,3 +1,9 @@
+// App-Version (zentral). Bei jeder veröffentlichten Änderung hochzählen und in CHANGELOG.md, index.html (<title>),
+// sw.js (Cache-Name) und backend/README.md nachziehen – tests/versioncheck.js prüft, dass alle Stellen übereinstimmen.
+// APP_BACKEND_VERSION = Version von backend/Code.gs, zu der diese App gehört (nur Anzeige im Menü).
+const APP_VERSION = '9.0';
+const APP_VERSION_DATE = '2026-11-03';
+const APP_BACKEND_VERSION = '2.7';
 
 // Bibliotheken defensiv einbinden: Fehlt eine Lib (z. B. Datei nicht geladen),
 // darf nur die jeweilige Funktion (PDF / QR-Code) ausfallen – nicht die ganze App.
@@ -87,6 +93,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const confirmNewTotalBtnEl = document.getElementById('confirmNewTotalBtn');
     const skipNewTotalBtnEl = document.getElementById('skipNewTotalBtn');
     const sheetStatusEl = document.getElementById('sheetStatus');
+    // Version sichtbar machen: kleines Kürzel in der Kopfzeile, Details unten im Menü (so sieht man sofort, ob ein Gerät
+    // noch eine alte Version offen hat)
+    (function showAppVersion() {
+        const tag = document.getElementById('appVersionTag');
+        if (tag) { tag.textContent = `v${APP_VERSION}`; tag.title = `Version ${APP_VERSION} vom ${APP_VERSION_DATE}`; }
+        const info = document.getElementById('appVersionInfo');
+        if (info) info.textContent = `Version ${APP_VERSION} · Stand ${APP_VERSION_DATE.split('-').reverse().join('.')} · Server-Skript ${APP_BACKEND_VERSION}`;
+        const auth = document.getElementById('authVersionTag');
+        if (auth) auth.textContent = `Version ${APP_VERSION}`;
+    })();
     const menuToggleBtnEl = document.getElementById('menu-toggle-btn');
     const sideMenuEl = document.getElementById('side-menu');
     const menuOverlayEl = document.getElementById('menu-overlay');
@@ -179,7 +195,7 @@ const suspicionDeclineBtnEl = document.getElementById('suspicionDeclineBtn');
         flushPendingChanges(); // offline erfasste Änderungen vom letzten Mal nachschicken
         flushLkwStatus();      // … ebenso eine noch unbestätigte LKW-Statusänderung
         focusShipmentInput();
-        console.log(`Fracht Tracker ${document.title.split('(')[1].split(')')[0]} initialized.`);
+        console.log(`Fracht Tracker ${APP_VERSION} (${APP_VERSION_DATE}) initialisiert.`);
         hideLoader(); // <<<< NEU: Lade-Spinner verstecken, wenn alles fertig ist
     }
 

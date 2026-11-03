@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="light dark">
     <meta name="theme-color" content="#f1f5f9" media="(prefers-color-scheme: light)">
     <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
-    <title>Fracht Tracker (V8.18 - Refactored)</title>
+    <title>Fracht Tracker 9.0</title>
     <!-- Als App installierbar (Android/Zebra: Chrome-Menü → „App installieren“ / „Zum Startbildschirm hinzufügen“):
          läuft dann ohne Adressleiste und fest im Hochformat (orientation: portrait im Manifest) -->
     <link rel="manifest" href="manifest.webmanifest">
@@ -60,7 +60,7 @@
         <button id="menu-toggle-btn" title="Menü öffnen/schließen" aria-label="Menü öffnen/schließen">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3,6H21V8H3V6M3,11H21V13H3V11M3,16H21V18H3V16Z" /></svg>
         </button>
-        <span class="app-title">Fracht Tracker</span>
+        <span class="app-title">Fracht Tracker <span id="appVersionTag" class="app-version"></span></span>
         <span id="syncIndicator" class="sync-indicator" title="Synchronisierung" role="status" aria-live="polite"><span class="sync-dot"></span></span>
         <div class="app-bar-batch">
             <label for="batchModeToggle">Batch</label>
@@ -255,6 +255,7 @@
     </div>
 
     <div id="sheetStatus"></div>
+    <div id="appVersionInfo" class="side-menu-version"></div>
 </div>
 <div id="menu-overlay" class="menu-overlay"></div>
 
@@ -438,7 +439,7 @@
 <!-- Anmeldung (PIN) / Einladung – liegt über allem, solange keine gültige Sitzung besteht (script.js, Abschnitt ANMELDUNG) -->
 <div id="authView" class="auth-view hidden" role="dialog" aria-modal="true" aria-labelledby="authTitle">
     <div class="auth-card">
-        <div class="auth-brand"><span class="auth-logo" aria-hidden="true">FT</span><h1>Fracht Tracker</h1></div>
+        <div class="auth-brand"><span class="auth-logo" aria-hidden="true">FT</span><h1>Fracht Tracker</h1><span id="authVersionTag" class="auth-version"></span></div>
         <div id="authContent"></div>
     </div>
 </div>

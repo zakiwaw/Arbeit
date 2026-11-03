@@ -273,6 +273,13 @@ let p = api.parseManText_('X, Y\n1\n2\n'); ok(p.orders.length === 0, 'parseManTe
 p = api.parseManText_('Spedition Müller, Österreich\n4711\nPLSO 1\n5 ABC-1|Kiste||\nkaputt zeile mit leerzeichen|x\n');
 ok(p.orders.length === 1 && p.orders[0].spediteur === 'SPEDITION MUELLER' && p.orders[0].land === 'OESTERREICH' && p.orders[0].hus.length === 1 && p.orders[0].hus[0].rawInput === 'ABC-1' && p.orders[0].hus[0].position === 5 && p.orders[0].hus[0].packaging === 'Kiste' && p.orders[0].hus[0].dimensions === null && p.ignored.length === 1,
   'parseManText_: Kopf normalisiert, HU mit Bindestrich/Pos, leere Felder → null, Störzeile ignoriert');
+// 9) Tabellen-ID: Skript-Eigenschaft SPREADSHEET_ID geht vor, sonst fester Wert (2.7)
+ok(api.spreadsheetId_() === api.SPREADSHEET_ID_FALLBACK && /^[A-Za-z0-9_-]{20,}$/.test(api.SPREADSHEET_ID_FALLBACK), 'spreadsheetId_: ohne Eigenschaft der feste Wert');
+props.SPREADSHEET_ID = 'aus-eigenschaft';
+ok(api.spreadsheetId_() === 'aus-eigenschaft', 'spreadsheetId_: gesetzte Skript-Eigenschaft hat Vorrang');
+props.SPREADSHEET_ID = '';
+ok(api.spreadsheetId_() === api.SPREADSHEET_ID_FALLBACK, 'spreadsheetId_: leere Eigenschaft → fester Wert');
+delete props.SPREADSHEET_ID;
 // 7g) Parser direkt
 p = api.parseStandardText_('\uFEFFTitelzeile\n\nUSA\n 123 \n\n\n\nChina\n456\n789\n');
 ok(p.orders.length === 2 && p.orders[0].orderId === 'USA' && p.orders[0].hus.join() === '123' && p.orders[1].hus.join() === '456,789' && p.ignored.length === 0, 'parseStandardText_: BOM, Titelzeile ohne Packstücke, mehrere Leerzeilen');

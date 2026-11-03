@@ -238,6 +238,13 @@ button {
     overflow: hidden;
     text-overflow: ellipsis;
 }
+/* Versionskürzel: in der Kopfzeile nur am Desktop (auf dem Handy ist neben dem Titel kein Platz – dort steht die Version
+   auf der Anmeldeseite und unten im Seitenmenü) */
+.app-version { display: none; margin-left: 2px; font-size: 11px; font-weight: 600; color: var(--text-muted); vertical-align: 1px; }
+.auth-version { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+.side-menu-version { margin-top: auto; padding: var(--sp-3) var(--sp-2) 0; font-size: 11px; color: var(--text-muted); }
+.side-menu-version:empty { display: none;
+}
 
 /* Sync-Punkt: grau = unbekannt, grün = synchron, gelb pulsierend = sendet, rot = offline */
 .sync-indicator {
@@ -2471,6 +2478,7 @@ body.auth-open { overflow: hidden; }
    14. DESKTOP-LAYOUT (≥ 992px)
    =================================================================== */
 @media (min-width: 992px) {
+    .app-version { display: inline; }
     .container { max-width: 1280px; margin: 0 auto; padding: var(--sp-5); }
     .app-bar { padding: var(--sp-2) var(--sp-6); }
 

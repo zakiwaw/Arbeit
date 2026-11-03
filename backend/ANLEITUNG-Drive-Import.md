@@ -56,7 +56,7 @@ CLASQUIN GERMANY GMBH, SOUTH AFRICA
 ## Das brauchst du
 
 - Zugang zum Google-Konto, in dem das **Fracht-Tracker-Skript** liegt (Apps-Script-Projekt mit dem Google Sheet).
-- Die neue Skript-Version **Code.gs 2.6** – öffentlich hier:
+- Die aktuelle Skript-Version **Code.gs 2.7** (2.6 oder neuer genügt für den Import) – öffentlich hier:
   - Ansicht: https://github.com/zakiwaw/Arbeit/blob/arena/01a06f82-arbeit/backend/Code.gs
   - Roh-Text zum Kopieren: https://raw.githubusercontent.com/zakiwaw/Arbeit/arena/01a06f82-arbeit/backend/Code.gs
 
@@ -75,8 +75,8 @@ Das Skript sucht die Ordner „HYDAC TXT“ und „MAN Ladelisten TXT“ **im Dr
 
 1. Im Apps-Script-Projekt links die Datei **Code.gs** öffnen.
 2. **Gesamten** Inhalt markieren und löschen.
-3. Den **gesamten** Inhalt von Code.gs 2.6 (Roh-Text-Link oben) einfügen.
-4. Oben in der Datei prüfen, dass die Zeile `const SPREADSHEET_ID = "1uQJ2nHXyTP5Qen7jMW2UkRitKkqHto0ANg5NrBD1SOs";`
+3. Den **gesamten** Inhalt von Code.gs 2.7 (Roh-Text-Link oben) einfügen.
+4. Oben in der Datei prüfen, dass die Zeile `const SPREADSHEET_ID_FALLBACK = "…";` (bzw. die Skript-Eigenschaft `SPREADSHEET_ID`)
    dieselbe Sheet-ID enthält wie vorher. (Sie ist in der Datei bereits richtig gesetzt. **Nichts anderes ändern.**)
 5. Speichern (Diskettensymbol oder Strg+S). Es darf keine rote Fehlermeldung erscheinen.
 
@@ -137,7 +137,7 @@ Nur nötig, wenn Schritt 0 ein anderes Konto als bisbiss1992@gmail.com ergeben h
 
 ## Was NICHT getan werden darf
 
-- `SPREADSHEET_ID`, `AUTH_*`-Einstellungen oder andere Teile von Code.gs verändern – nur die Datei komplett durch 2.6 ersetzen
+- `SPREADSHEET_ID`, `AUTH_*`-Einstellungen oder andere Teile von Code.gs verändern – nur die Datei komplett durch 2.7 ersetzen
   (und in Fall B die `id`-Einträge in `IMPORT_FOLDERS`).
 - Die Ordner „HYDAC TXT“ / „MAN Ladelisten TXT“ öffentlich („Jeder mit dem Link“) freigeben.
 - Andere Trigger des Projekts löschen (`setupDriveImport` ersetzt nur seinen eigenen).

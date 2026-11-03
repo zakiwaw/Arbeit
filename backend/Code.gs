@@ -1,7 +1,9 @@
 // ===================================================
 // FRACHT TRACKER – Google Apps Script Backend
-// Version 2.6: mehrgeräte-sicher + Archiv + Anmeldung (PIN; Sitzung verlängert sich bei Bedienung) + Sammel-Löschung
+// Version 2.7: mehrgeräte-sicher + Archiv + Anmeldung (PIN; Sitzung verlängert sich bei Bedienung) + Sammel-Löschung
 //   + automatischer Import von Textdateien aus Google Drive.
+//   2.7: Tabellen-ID bevorzugt aus den Skript-Eigenschaften (SPREADSHEET_ID), fester Wert nur noch als Rückfall;
+//        sonst keine Änderung – 2.6 bleibt voll kompatibel.
 //   2.6: Import auch für „MAN Fracht“-Dateien (Ordner „MAN Ladelisten TXT“ → neuer LKW „MAN <n>“ wie beim QR-Scan); mehrere
 //        Ordner mit je eigenem Format (IMPORT_FOLDERS); Prüfbericht der KI ab „Abgleichprotokoll“ wird ignoriert.
 //   2.5: Abschnitt „AUTOMATISCHER IMPORT AUS GOOGLE DRIVE“ – Zeit-Trigger liest Textdateien (Format „Standard (Leerzeilen)“)
@@ -33,7 +35,13 @@
 // ===================================================
 
 // EINSTELLUNGEN
-const SPREADSHEET_ID = "1uQJ2nHXyTP5Qen7jMW2UkRitKkqHto0ANg5NrBD1SOs";
+// Tabellen-ID: bevorzugt aus den Skript-Eigenschaften (Projekteinstellungen → Skript-Eigenschaften → SPREADSHEET_ID),
+// sonst der feste Wert darunter. Sobald die Eigenschaft gesetzt ist, kann der feste Wert in einer späteren Version entfallen.
+const SPREADSHEET_ID_FALLBACK = "1uQJ2nHXyTP5Qen7jMW2UkRitKkqHto0ANg5NrBD1SOs";
+function spreadsheetId_() {
+  try { return PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID') || SPREADSHEET_ID_FALLBACK; }
+  catch (e) { return SPREADSHEET_ID_FALLBACK; }
+}
 const SHEET_NAME = "shipments";
 const LKW_STATUS_SHEET_NAME = "lkw_status";
 const META_SHEET_NAME = "_meta";
@@ -134,7 +142,7 @@ function doPost(e) {
 // ===================================================
 // Tabelle nur einmal je Aufruf öffnen (spart je ~100 ms pro weiterem Zugriff)
 function ss_() {
-  if (!ss_.cache) ss_.cache = SpreadsheetApp.openById(SPREADSHEET_ID);
+  if (!ss_.cache) ss_.cache = SpreadsheetApp.openById(spreadsheetId_());
   return ss_.cache;
 }
 
