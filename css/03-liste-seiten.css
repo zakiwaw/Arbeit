@@ -1,0 +1,739 @@
+/* Fracht Tracker – Stylesheet Teil 3/6: 03-liste-seiten.css
+   Abschnitt 7: Startseite (Kacheln), Unterseiten, Info-Filter, Archiv, Sendungs-Karten/-Tabelle
+   Alle Teile zusammen = ein Stylesheet; index.html bindet sie in dieser Reihenfolge ein (Reihenfolge ist Pflicht: Kaskade). */
+
+/* ===================================================================
+   7. SENDUNGS-KARTEN (Tabelle → Karten auf Mobil)
+   =================================================================== */
+/* ---- Startseite: Suche + Kacheln (unter der Scan-Box) ---- */
+.home-hub { margin-top: var(--sp-4); }
+.home-search {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    width: 100%;
+    min-height: var(--control-h);
+    padding: 0 var(--sp-4);
+    font-size: var(--fs-sm);
+    text-align: left;
+    color: var(--text-muted);
+    background-color: var(--surface);
+    border: 1.5px dashed var(--border-strong);
+    border-radius: var(--r-lg);
+    transition: border-color var(--dur) var(--ease), background-color var(--dur) var(--ease);
+}
+.home-search:hover, .home-search:active { border-color: var(--accent); background-color: var(--surface-2); }
+.home-search svg { width: 20px; height: 20px; flex-shrink: 0; color: var(--text-faint); }
+.home-search span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.home-tiles {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-3);
+    margin-top: var(--sp-3);
+}
+.home-tile {
+    --tile: var(--accent);
+    --tile-soft: var(--accent-soft);
+    --tile-text: var(--accent-text);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--sp-2);
+    min-height: 118px;
+    padding: var(--sp-4);
+    text-align: left;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-xl);
+    box-shadow: var(--shadow-sm);
+    transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.home-tile:hover { border-color: var(--tile); box-shadow: var(--shadow-md); }
+.home-tile:active { transform: scale(.98); }
+.tile-dunkelalarm { --tile: var(--danger); --tile-soft: var(--danger-soft); --tile-text: var(--danger-text); }
+.tile-offen       { --tile: var(--warning); --tile-soft: var(--warning-soft); --tile-text: var(--warning-text); }
+.tile-info        { --tile: var(--info); --tile-soft: var(--info-soft); --tile-text: var(--info-text); }
+.tile-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    color: var(--tile-text);
+    background-color: var(--tile-soft);
+    border-radius: var(--r-md);
+}
+.tile-icon svg { width: 24px; height: 24px; }
+.tile-label { font-size: var(--fs-md); font-weight: 700; letter-spacing: -.01em; color: var(--text); }
+.tile-meta { font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.3; min-height: 1.3em; }
+.tile-count {
+    position: absolute;
+    top: var(--sp-3);
+    right: var(--sp-3);
+    min-width: 26px;
+    height: 26px;
+    padding: 0 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--fs-xs);
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: #fff;
+    background-color: var(--tile);
+    border-radius: var(--r-full);
+    box-shadow: 0 0 0 3px var(--surface);
+}
+.list-caption {
+    margin: var(--sp-5) 0 0;
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+body.batch-mode-active .home-hub { display: none; } /* im Batch-Modus zählt nur Scannen + Liste */
+
+/* ---- Unterseiten (Anlieferung, LKW, Dunkelalarm, Offene Sendungen, Info): Vollbild wie die Detailansicht ---- */
+#pageView {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    padding: 0 var(--sp-3) var(--sp-6);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    background-color: var(--bg);
+}
+.page-view-header h2 { text-align: left; padding-right: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.view-back-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: var(--touch-min);
+    height: var(--touch-min);
+    padding: 0;
+    color: var(--text);
+    background: none;
+    border: none;
+    border-radius: var(--r-md);
+    transition: background-color var(--dur) var(--ease);
+}
+.view-back-btn:hover, .view-back-btn:active { background-color: var(--surface-3); }
+.view-back-btn svg { width: 28px; height: 28px; }
+.page-badge {
+    flex-shrink: 0;
+    padding: 3px 10px;
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent-text);
+    background-color: var(--accent-soft);
+    border-radius: var(--r-full);
+}
+.page-content { min-height: 120px; }
+.page-empty, .page-note { margin: 0 0 var(--sp-3); font-size: var(--fs-sm); color: var(--text-muted); line-height: 1.45; }
+.page-empty { padding: var(--sp-5) var(--sp-4); text-align: center; border: 1px dashed var(--border-strong); border-radius: var(--r-lg); }
+.page-section-title {
+    margin: var(--sp-4) 0 var(--sp-2);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+.page-list { list-style: none; margin: 0; padding: 0; }
+.page-list li + li { margin-top: var(--sp-2); }
+.page-list-muted .page-row { opacity: .7; }
+.page-row {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    width: 100%;
+    min-height: 64px;
+    padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-4);
+    text-align: left;
+    color: var(--text);
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.page-row:hover { border-color: var(--border-strong); box-shadow: var(--shadow-md); }
+.page-row:active { background-color: var(--surface-2); }
+.page-row-icon { flex-shrink: 0; font-size: 24px; line-height: 1; }
+.emoji { font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Twemoji Mozilla", sans-serif; font-style: normal; }
+.page-row-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.page-row-title { font-family: var(--font-mono); font-size: var(--fs-md); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.page-row-sub { font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.35; }
+.page-progress { display: block; height: 4px; margin-top: 2px; background-color: var(--surface-3); border-radius: var(--r-full); overflow: hidden; }
+.page-progress span { display: block; height: 100%; background-color: var(--success); border-radius: var(--r-full); transition: width .3s var(--ease); }
+.page-row-end { display: flex; align-items: center; gap: var(--sp-2); flex-shrink: 0; }
+.page-chip {
+    padding: 3px 8px;
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    white-space: nowrap;
+    color: var(--text-muted);
+    background-color: var(--surface-3);
+    border-radius: var(--r-full);
+}
+.page-chip.warn { color: var(--warning-text); background-color: var(--warning-soft); }
+.page-chip.ok   { color: var(--success-text); background-color: var(--success-soft); }
+.page-chevron { width: 9px; height: 9px; border-right: 2px solid var(--text-faint); border-bottom: 2px solid var(--text-faint); transform: rotate(-45deg); margin-right: 4px; }
+.text-danger { color: var(--danger-text); font-weight: 700; }
+
+.page-banner {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-3);
+    padding: var(--sp-3) var(--sp-4);
+    font-size: var(--fs-sm);
+    color: var(--warning-text);
+    background-color: var(--warning-soft);
+    border-radius: var(--r-lg);
+}
+.page-banner > span { flex: 1; }
+.page-banner-btn, .page-summary-btn, .page-link-btn {
+    min-height: 36px;
+    padding: 0 var(--sp-3);
+    font-size: var(--fs-sm);
+    font-weight: 700;
+    color: var(--accent-text);
+    background-color: var(--surface);
+    border: 1.5px solid var(--accent);
+    border-radius: var(--r-md);
+}
+.page-banner-btn:hover, .page-summary-btn:hover, .page-link-btn:hover { background-color: var(--accent-soft); }
+.page-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-2);
+    font-size: var(--fs-sm);
+    font-weight: 700;
+}
+.page-import-note { margin: -4px 0 10px; font-size: 12.5px; color: var(--text-muted); overflow-wrap: anywhere; }
+.page-summary > span {
+    padding: 4px 10px;
+    color: var(--text-muted);
+    background-color: var(--surface-3);
+    border-radius: var(--r-full);
+    font-variant-numeric: tabular-nums;
+}
+.page-summary > span.ok       { color: var(--success-text); background-color: var(--success-soft); }
+.page-summary > span.mismatch { color: var(--warning-text); background-color: var(--warning-soft); }
+.page-summary > span.over     { color: var(--danger-text);  background-color: var(--danger-soft); }
+.page-summary-btn { margin-left: auto; color: var(--text-muted); border-color: var(--border-strong); }
+.page-summary-btn:hover { color: var(--text); background-color: var(--surface-3); }
+/* LKW-Seite: ⋮-Menü rechts in der Kopfzeile mit den LKW-Aktionen (Umbenennen · Deaktivieren/Aktivieren · Löschen) – klappt unter dem Knopf auf */
+.page-header-actions { position: relative; flex-shrink: 0; display: flex; align-items: center; }
+.page-header-actions:empty { display: none; }
+.page-action-wrap { position: relative; }
+.page-menu-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--touch-min);
+    height: var(--touch-min);
+    padding: 0;
+    color: var(--text-muted);
+    background: none;
+    border: 1.5px solid var(--border-strong);
+    border-radius: var(--r-md);
+}
+.page-menu-btn svg { width: 22px; height: 22px; }
+.page-menu-btn:hover, .page-menu-btn[aria-expanded="true"] { color: var(--text); background-color: var(--surface-3); }
+.page-action-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 60;
+    min-width: 240px;
+    padding: var(--sp-1);
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-lg);
+    animation: overlay-in .15s var(--ease);
+}
+.page-action-item {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    width: 100%;
+    min-height: 48px;
+    padding: 0 var(--sp-3);
+    font-size: var(--fs-md);
+    font-weight: 600;
+    text-align: left;
+    color: var(--text);
+    background: none;
+    border: none;
+    border-radius: var(--r-md);
+}
+.page-action-item svg { width: 20px; height: 20px; flex: 0 0 auto; color: var(--text-muted); }
+.page-action-item:hover, .page-action-item:focus-visible { background-color: var(--surface-2); }
+.page-action-item.is-danger, .page-action-item.is-danger svg { color: var(--danger-text); }
+.page-action-item.is-danger:hover { background-color: var(--danger-soft); }
+.page-action-sep { height: 1px; margin: var(--sp-1) var(--sp-2); background-color: var(--border); }
+/* Batch-Modus: Umbenennen/Löschen sind dort gesperrt (wie Stift/Papierkorb) – nur Deaktivieren/Aktivieren bleibt */
+body.batch-mode-active .page-action-item[data-lkw-rename], body.batch-mode-active .page-action-item[data-lkw-delete], body.batch-mode-active .page-action-sep { display: none; }
+.page-actions { margin: var(--sp-4) 0; text-align: center; }
+.page-link-btn { width: 100%; min-height: var(--control-h); }
+.page-more-btn { margin-top: var(--sp-2); }
+.page-details { margin-top: var(--sp-4); }
+.page-details > summary { padding: var(--sp-3) 0; font-size: var(--fs-sm); font-weight: 700; color: var(--text-muted); cursor: pointer; }
+.page-order .hu-order-title { cursor: pointer; }
+.page-order .hu-order-title:hover { color: var(--accent); }
+.page-shipments { margin-top: 0; }
+.row-chip {
+    margin-left: var(--sp-2);
+    padding: 2px 7px;
+    font-family: var(--font-sans);
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    letter-spacing: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 45%;
+    color: var(--text-muted);
+    background-color: var(--surface-3);
+    border-radius: var(--r-full);
+}
+
+/* Info-Seite: Suche + Filter */
+.info-form { margin-bottom: var(--sp-3); }
+.info-form-head { display: none; }   /* nur in der Desktop-Seitenleiste sichtbar */
+.info-reset-btn {
+    min-height: 28px;
+    padding: 0 var(--sp-2);
+    font: inherit;
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    color: var(--accent);
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    cursor: pointer;
+}
+.info-reset-btn:hover { background-color: var(--accent-soft); border-color: transparent; }
+.info-search-wrapper input[type="search"] {
+    width: 100%;
+    height: var(--control-h);
+    padding: 0 var(--sp-3);
+    font: inherit;
+    font-size: var(--fs-md);
+    color: var(--text);
+    background-color: var(--surface);
+    border: 1.5px solid var(--border-strong);
+    border-radius: var(--r-md);
+    -webkit-appearance: none;
+    appearance: none;
+}
+.info-search-wrapper input[type="search"]:focus { border-color: var(--accent); box-shadow: var(--focus-ring); outline: none; }
+/* Eigenes X im Suchfeld (statt des kleinen Browser-Kreuzes): sichtbar, sobald Text drinsteht; leert nur den Suchtext */
+.info-search-wrapper input[type="search"] { padding-right: 46px; }
+.info-search-wrapper input[type="search"]::-webkit-search-cancel-button, .info-search-wrapper input[type="search"]::-webkit-search-decoration { -webkit-appearance: none; appearance: none; display: none; }
+.info-search-clear.visible { display: flex; align-items: center; justify-content: center; }
+/* „Alle Filter zurücksetzen“ unter dem Suchfeld – erscheint, sobald Suchtext oder ein Filter gesetzt ist */
+.info-reset-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); margin-top: var(--sp-2); }
+.info-reset-row.hidden { display: none; }
+.info-reset-summary { font-size: var(--fs-xs); font-weight: 600; color: var(--text-muted); }
+.info-reset-row .info-reset-btn { min-height: var(--touch-min); padding: 0 var(--sp-3); font-size: var(--fs-sm); color: var(--accent-text); background-color: var(--accent-soft); border-color: transparent; }
+.info-reset-row .info-reset-btn:active { background-color: var(--accent); color: #fff; }
+.info-filters {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-2) var(--sp-3);
+    margin-top: var(--sp-2);
+}
+.info-filters label { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-xs); font-weight: 600; color: var(--text-muted); }
+.info-filters select { height: 40px; font-size: var(--fs-sm); }
+.info-filters .info-archive {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--sp-2);
+    min-height: var(--touch-min);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--text);
+}
+.info-filters .info-archive input { width: 20px; height: 20px; margin: 0; }
+/* Gewichtsbereich „von – bis“ (kg) und Datum „von – bis“: je zwei kleine Felder in einer Zelle des Filterrasters */
+.info-filters .info-weight, .info-filters .info-dates { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.info-weight-inputs input[type="date"] {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 40px;
+    padding: 0 var(--sp-2);
+    font: inherit;
+    font-size: var(--fs-sm);
+    color: var(--text);
+    background-color: var(--surface);
+    border: 1.5px solid var(--border-strong);
+    border-radius: var(--r-md);
+    -webkit-appearance: none;
+    appearance: none;
+}
+.info-weight-inputs input[type="date"]:focus { border-color: var(--accent); box-shadow: var(--focus-ring); outline: none; }
+/* iOS zeigt Datumsfelder sonst zentriert/ohne Höhe */
+.info-weight-inputs input[type="date"]::-webkit-date-and-time-value { text-align: left; min-height: 1.2em; }
+.info-weight-label { font-size: var(--fs-xs); font-weight: 600; color: var(--text-muted); }
+.info-weight-inputs { display: flex; align-items: center; gap: var(--sp-1); min-width: 0; }
+.info-weight-inputs input[type="text"] {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 40px;
+    padding: 0 var(--sp-2);
+    font-size: var(--fs-sm);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+}
+.info-weight-sep { flex-shrink: 0; color: var(--text-faint); }
+/* Treffer-HUs des Gewichtsfilters an der Sendungskarte (in der Übersichtszelle, tippbar → HU-Details) */
+.weight-hits { display: flex; flex-wrap: wrap; gap: var(--sp-1); flex-basis: 100%; margin-top: 2px; }
+.weight-hit {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 28px;
+    padding: 2px 9px;
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--accent-text);
+    background-color: var(--accent-soft);
+    border: 1px solid transparent;
+    border-radius: var(--r-full);
+    white-space: nowrap;
+    cursor: pointer;
+}
+.weight-hit:hover, .weight-hit:active { border-color: var(--accent); }
+.weight-hit-hu { font-weight: 600; opacity: .85; }
+.weight-hit-more { color: var(--text-muted); background-color: var(--surface-3); cursor: default; }
+
+.shipment-table { width: 100%; border-collapse: collapse; margin-top: var(--sp-3); }
+.shipment-table thead { display: none; }
+
+/* Unter der Liste: „Weitere anzeigen“ (nur die neuesten Karten werden gezeichnet) und Leer-Hinweis bei Suche */
+.list-footer { margin: var(--sp-2) 0 var(--sp-4); }
+.list-more-btn {
+    width: 100%;
+    min-height: var(--control-h);
+    padding: 0 var(--sp-4);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--text-muted);
+    background-color: var(--surface);
+    border: 1.5px dashed var(--border-strong);
+    border-radius: var(--r-lg);
+    transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.list-more-btn:hover, .list-more-btn:active { color: var(--text); background-color: var(--surface-3); }
+.list-empty-hint {
+    margin: var(--sp-3) 0 0;
+    padding: var(--sp-3);
+    text-align: center;
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+}
+
+/* ---- Archiv: Hinweis-Knopf unter der Liste, Trefferblock, Kennzeichen, „Wiederherstellen“ ---- */
+.archive-hint-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-2);
+    width: 100%;
+    min-height: var(--control-h);
+    margin-top: var(--sp-2);
+    padding: 0 var(--sp-4);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--accent-text);
+    background-color: var(--accent-soft);
+    border: 1px solid transparent;
+    border-radius: var(--r-lg);
+    transition: background-color var(--dur) var(--ease), opacity var(--dur) var(--ease);
+}
+.archive-hint-btn::before {
+    content: "";
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    background-color: currentColor;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M20.54 5.23 19.15 3.55A1.5 1.5 0 0 0 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6.5c0-.48-.17-.93-.46-1.27zM6.24 5h11.52l.81.97H5.44L6.24 5zM5 19V8h14v11H5zm8.45-9h-2.9v3H8l4 4 4-4h-2.55v-3z'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M20.54 5.23 19.15 3.55A1.5 1.5 0 0 0 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6.5c0-.48-.17-.93-.46-1.27zM6.24 5h11.52l.81.97H5.44L6.24 5zM5 19V8h14v11H5zm8.45-9h-2.9v3H8l4 4 4-4h-2.55v-3z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.archive-hint-btn:hover, .archive-hint-btn:active { background-color: var(--accent); color: #fff; }
+.archive-hint-btn:disabled { opacity: .6; }
+.archive-results { margin: var(--sp-2) 0 var(--sp-4); }
+.archive-results-header {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-2);
+    padding: 0 var(--sp-1);
+}
+.archive-results-header h3 {
+    flex: 1;
+    margin: 0;
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+.archive-close-btn {
+    width: var(--touch-min);
+    height: var(--touch-min);
+    padding: 0;
+    font-size: 22px;
+    line-height: 1;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    border-radius: var(--r-md);
+}
+.archive-close-btn:hover, .archive-close-btn:active { color: var(--text); background-color: var(--surface-3); }
+.archive-results-note { margin: 0 0 var(--sp-2); padding: 0 var(--sp-1); font-size: var(--fs-xs); color: var(--text-muted); }
+.archive-badge {
+    display: inline-block;
+    margin-left: var(--sp-2);
+    padding: 2px 7px;
+    font-family: var(--font-sans);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    background-color: var(--surface-3);
+    border-radius: var(--r-full);
+    vertical-align: middle;
+}
+.shipment-table tr.archived { background-color: var(--surface-2); border-style: dashed; } /* Karte (mobil) – am Desktop s. unten */
+.shipment-table tr.archived td.hawb-cell { color: var(--text-muted); }
+.shipment-table tr.archived .vvl-table-entry { display: inline-block; }
+/* Wiederherstellen-Knopf: als Icon in der Aktionsleiste, als Textknopf im Archiv-Banner der Detailansicht */
+td.actions-cell button.restore-btn {
+    --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6a7 7 0 1 1 2.05 4.95l-1.42 1.42A9 9 0 1 0 13 3zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z'/%3E%3C/svg%3E");
+    color: var(--success-text);
+}
+td.actions-cell button.restore-btn:hover, td.actions-cell button.restore-btn:active { background-color: var(--success-soft); }
+.archive-banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-3);
+    padding: var(--sp-2) var(--sp-3);
+    font-family: var(--font-sans);
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+    background-color: var(--surface-2);
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--r-md);
+}
+.archive-banner .archive-badge { margin-left: 0; }
+.archive-banner > span:not(.archive-badge) { flex: 1 1 140px; }
+.archive-banner .restore-btn {
+    min-height: 36px;
+    padding: 0 var(--sp-3);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: #fff;
+    background-color: var(--success);
+    border: none;
+    border-radius: var(--r-md);
+}
+.archive-banner .restore-btn:hover, .archive-banner .restore-btn:active { background-color: var(--success-hover); }
+/* Karte: HAWB und Status-Pills über die volle Breite, darunter Zeit (links) und Aktions-Icons (rechts).
+   Die Pill-Zeile hängt bewusst NICHT von der Breite der Icon-Leiste ab: Safari (iOS) berechnet die Zeilenhöhe
+   nicht neu, wenn sich nur die Nachbarspalte ändert (z. B. Stift-Icon im Batch-Modus ausgeblendet) – die
+   umgebrochene Pille lag dann über der Uhrzeit. */
+.shipment-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+        "hawb    hawb"
+        "summary summary"
+        "time    actions";
+    column-gap: var(--sp-2);
+    margin-bottom: var(--sp-2);
+    padding: var(--sp-3) var(--sp-3) var(--sp-1) var(--sp-4);
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow var(--dur) var(--ease);
+}
+.shipment-table tr:active { box-shadow: var(--shadow-md); }
+.shipment-table td {
+    display: block;
+    position: relative;
+    padding: 0;
+    min-height: 0;
+    font-size: var(--fs-sm);
+    text-align: left;
+    border: none;
+}
+.shipment-table td::before { display: none; } /* keine Labels mehr – Inhalte erklären sich selbst */
+
+/* HAWB – groß, Monospace, ganze Zeile tippbar (öffnet Details) */
+.shipment-table td.hawb-cell {
+    grid-area: hawb;
+    display: flex;
+    align-items: center;
+    min-height: var(--touch-min);
+    margin: calc(-1 * var(--sp-2)) 0 0;
+    padding: 0 28px 0 0;
+    font-family: var(--font-mono);
+    font-size: var(--fs-lg);
+    font-weight: 700;
+    letter-spacing: .01em;
+    color: var(--text);
+    cursor: pointer;
+}
+.shipment-table td.hawb-cell::after {
+    content: "";
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    width: 9px;
+    height: 9px;
+    margin-top: -6px;
+    border-right: 2px solid var(--text-faint);
+    border-bottom: 2px solid var(--text-faint);
+    transform: rotate(-45deg);
+}
+.th-vvl { display: none; }   /* Kopf „VVL | Kundennr“ nur in reinen VW-Tabellen am Desktop (Klasse vw-only, setzt script.js) */
+.vvl-table-entry { font-size: var(--fs-md); line-height: 1.35; }
+.vvl-table-entry .vvl-col { display: block; }
+.vvl-table-entry .vvl-prefix, .vvl-table-entry .kundennr-prefix { margin-right: 5px; }
+.vvl-table-entry .vvl-prefix::after, .vvl-table-entry .kundennr-prefix::after { content: ":"; }
+.vvl-table-entry .vvl-prefix, .vvl-table-entry .kundennr-prefix {
+    font-family: var(--font-sans);
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+/* Übersicht: Status-Pills, linksbündig unter der Nummer */
+.summary-cell { grid-area: summary; display: flex !important; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: var(--sp-1) var(--sp-2); padding: 0; }
+.summary-cell strong {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+    color: var(--text-muted);
+    background-color: var(--surface-3);
+    border: 1px solid var(--border);
+    border-radius: var(--r-full);
+    white-space: nowrap;
+}
+.summary-cell strong::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--text-faint);
+    flex-shrink: 0;
+}
+.summary-cell strong.ok       { color: var(--success-text); background-color: var(--success-soft); border-color: transparent; }
+.summary-cell strong.ok::before { background-color: var(--success); }
+.summary-cell strong.mismatch { color: var(--warning-text); background-color: var(--warning-soft); border-color: transparent; }
+.summary-cell strong.mismatch::before { background-color: var(--warning); }
+.summary-cell strong.over     { color: var(--danger-text); background-color: var(--danger-soft); border-color: transparent; }
+.summary-cell strong.over::before { background-color: var(--danger); }
+.summary-divider { display: none; }
+
+/* Letzte Änderung: klein, grau, mit Uhr-Icon – einzeilig, damit sich die Zeilenhöhe nie ändert */
+.shipment-table td.time-cell {
+    grid-area: time;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    font-size: var(--fs-xs);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-faint);
+}
+.shipment-table td.time-cell::before {
+    content: "";
+    display: block;
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+    background-color: currentColor;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm.5-13H11v6l5.2 3.1.8-1.3-4.5-2.7V7z'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm.5-13H11v6l5.2 3.1.8-1.3-4.5-2.7V7z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+/* Aktionen: Icon-Leiste rechts (Text bleibt für Screenreader im DOM, wird visuell durch Icon ersetzt) */
+.shipment-table td.actions-cell {
+    grid-area: actions;
+    display: flex;
+    align-items: center;
+    align-self: center;
+    gap: 2px;
+    padding: 0;
+    text-align: right;
+}
+td.actions-cell button {
+    position: relative;
+    width: var(--touch-min);
+    height: var(--touch-min);
+    min-width: 0;
+    padding: 0;
+    font-size: 0;                 /* Text ausblenden … */
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    border-radius: var(--r-md);
+    transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+td.actions-cell button::before {  /* … und Icon zeigen */
+    content: "";
+    display: block;
+    width: 24px;
+    height: 24px;
+    margin: 0 auto;
+    background-color: currentColor;
+    -webkit-mask: var(--icon) center / contain no-repeat;
+    mask: var(--icon) center / contain no-repeat;
+}
+td.actions-cell button:hover, td.actions-cell button:active { background-color: var(--surface-3); color: var(--text); }
+td.actions-cell button.edit-btn { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z'/%3E%3C/svg%3E"); }
+td.actions-cell button.pdf-btn  { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 12h8v2H8v-2zm0 4h8v2H8v-2z'/%3E%3C/svg%3E"); color: var(--accent-text); }
+td.actions-cell button.pdf-btn:hover { background-color: var(--accent-soft); }
+td.actions-cell button.main-delete-btn,
+td.actions-cell button.delete-btn {
+    --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12zM8 9h8v10H8V9zm7.5-5-1-1h-5l-1 1H5v2h14V4h-3.5z'/%3E%3C/svg%3E");
+    color: var(--danger-text) !important;
+    background-color: transparent !important;
+    border-color: transparent !important;
+}
+td.actions-cell button.delete-btn:hover { background-color: var(--danger-soft) !important; }
+body.batch-mode-active td.actions-cell button.edit-btn { display: none; }
+
+th.qr-code-header, td.qr-code-cell { display: none; }
+.shipment-table th.dt-cell, .shipment-table td.dt-cell { display: none; } /* Desktop-Spalten (Status, LKW, WE, Sich., Gewicht, Notizen) – nur ab 992 px */
+.qr-code-cell div { display: flex; justify-content: center; align-items: center; padding: var(--sp-1) 0; }

@@ -1,0 +1,264 @@
+/* Fracht Tracker – Stylesheet Teil 2/6: 02-scan-batch.css
+   Abschnitte 5–6: Scan-Bereich, Batch-Bereich
+   Alle Teile zusammen = ein Stylesheet; index.html bindet sie in dieser Reihenfolge ein (Reihenfolge ist Pflicht: Kaskade). */
+
+/* ===================================================================
+   5. SCAN-BEREICH
+   =================================================================== */
+.input-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-4);
+    margin: var(--sp-3) 0 var(--sp-2);
+    padding: var(--sp-4);
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-md);
+}
+
+/* Das Scan-Feld ist der Held der Seite */
+.scan-input-wrapper .input-icon {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-faint);
+    pointer-events: none;
+    transition: color var(--dur) var(--ease);
+}
+.scan-input-wrapper .input-icon svg { width: 22px; height: 22px; }
+/* Umschalter Scanner ↔ Tastatur: das Symbol im Feld ist antippbar (44 px Trefferfläche) und zeigt den aktiven Modus */
+.scan-input-wrapper .input-mode-toggle {
+    left: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: var(--r-md);
+    pointer-events: auto;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+.scan-input-wrapper .input-mode-toggle:active { background-color: var(--surface-3); }
+.scan-input-wrapper .input-mode-toggle .icon-scan { display: flex; }
+.scan-input-wrapper .input-mode-toggle .icon-keyboard { display: none; }
+.scan-input-wrapper.keyboard-mode .input-mode-toggle .icon-scan { display: none; }
+.scan-input-wrapper.keyboard-mode .input-mode-toggle .icon-keyboard { display: flex; }
+.scan-input-wrapper.keyboard-mode .input-mode-toggle { color: var(--accent); }
+.scan-input-wrapper.keyboard-mode input[type="text"]:focus { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.scan-input-wrapper.keyboard-mode:focus-within .input-mode-toggle { color: var(--accent); }
+.scan-input-wrapper input[type="text"] {
+    height: 56px;
+    padding-left: 48px;
+    font-family: var(--font-mono);
+    font-size: var(--fs-lg);
+    font-weight: 600;
+    letter-spacing: .02em;
+    border-width: 2px;
+}
+.scan-input-wrapper input[type="text"]:focus {
+    border-color: var(--success);
+    box-shadow: 0 0 0 4px var(--success-soft);
+}
+.scan-input-wrapper input[type="text"]:focus ~ .input-icon,
+.scan-input-wrapper:focus-within .input-icon { color: var(--success); }
+.scan-input-wrapper .clear-input-btn { right: 10px; }
+
+.status-and-button-container {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--sp-3);
+}
+.status-select-wrapper { flex: 1; min-width: 0; }
+.status-and-button-container > #mainActionButton {
+    width: auto;
+    flex: 0 1 auto;
+    min-width: 0;
+    height: var(--control-h);
+    padding: 0 var(--sp-4);
+    white-space: nowrap;
+}
+body.batch-mode-active .status-and-button-container { flex-wrap: wrap; }
+body.batch-mode-active .status-and-button-container > #mainActionButton { flex: 1 1 100%; }
+
+.controls-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-3);
+}
+.controls-row:empty { display: none; }
+
+.combo-checkbox-group { display: none; align-items: center; gap: var(--sp-2); }
+.combo-checkbox-group input { width: 22px; height: 22px; margin: 0; }
+.combo-checkbox-group label { margin: 0; font-size: var(--fs-md); font-weight: 500; color: var(--text); cursor: pointer; }
+#comboCheckboxContainer.visible { display: flex; }
+
+.note-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--touch-min);
+    height: var(--touch-min);
+    margin-left: auto;
+    padding: 0;
+    flex-shrink: 0;
+    color: var(--text-muted);
+    background-color: var(--surface);
+    border: 1.5px solid var(--border-strong);
+    border-radius: var(--r-md);
+    transition: background-color var(--dur) var(--ease), border-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.note-toggle-btn svg { width: 22px; height: 22px; }
+.note-toggle-btn:hover { background-color: var(--surface-3); color: var(--text); }
+.note-toggle-btn.note-active {
+    color: #fff;
+    background-color: var(--warning);
+    border-color: var(--warning);
+}
+
+.note-input-area {
+    display: none;
+    padding: var(--sp-3);
+    background-color: var(--warning-soft);
+    border: 1px solid var(--warning);
+    border-radius: var(--r-md);
+}
+.note-input-area label { color: var(--warning-text); }
+.note-input-area input[type="text"] { padding-right: 46px; }
+
+#newTotalSection {
+    display: none;
+    flex-direction: column;
+    gap: var(--sp-3);
+    padding: var(--sp-4);
+    background-color: var(--accent-soft);
+    border: 1px solid var(--accent);
+    border-radius: var(--r-md);
+}
+#newTotalSection.visible { display: flex; }
+#newTotalSection label { color: var(--accent-text); }
+#newTotalSection div { display: flex; gap: var(--sp-2); }
+#newTotalSection button { flex: 1; }
+#skipNewTotalBtn {
+    color: var(--text) !important;
+    background-color: var(--surface) !important;
+    border: 1.5px solid var(--border-strong) !important;
+    box-shadow: none;
+}
+#skipNewTotalBtn:hover { background-color: var(--surface-3) !important; }
+#newTotalSection.warning-existing {
+    background-color: var(--danger-soft);
+    border-color: var(--danger);
+}
+#newTotalSection.warning-existing label { color: var(--danger-text); }
+
+
+/* ===================================================================
+   6. BATCH-BEREICH
+   =================================================================== */
+.batch-area {
+    display: none;
+    margin-top: var(--sp-3);
+    padding: var(--sp-4);
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--success);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-md);
+}
+.batch-area.visible { display: block; }
+.batch-area h3 {
+    margin-bottom: var(--sp-2);
+    font-size: var(--fs-md);
+    color: var(--text);
+}
+#currentBatchNoteDisplay {
+    margin-bottom: var(--sp-2);
+    font-size: var(--fs-sm);
+    font-style: italic;
+    color: var(--warning-text);
+}
+#batchList {
+    list-style: none;
+    margin: var(--sp-2) 0;
+    padding: 0;
+    max-height: 180px;
+    overflow-y: auto;
+    background-color: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+}
+#batchList li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3);
+    font-family: var(--font-mono);
+    font-size: var(--fs-sm);
+    border-bottom: 1px solid var(--border);
+}
+#batchList li:last-child { border-bottom: none; }
+.remove-batch-item {
+    flex-shrink: 0;
+    min-width: 32px;
+    height: 32px;
+    padding: 0 var(--sp-2);
+    font-size: var(--fs-sm);
+    font-weight: 700;
+    color: var(--danger-text);
+    background-color: var(--danger-soft);
+    border-radius: var(--r-sm);
+    transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.remove-batch-item:hover { color: #fff; background-color: var(--danger); }
+#batchSummary {
+    padding: var(--sp-2) 0;
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+}
+#batchItemCount { color: var(--text); font-size: var(--fs-md); }
+.batch-note-toggle-container { margin-top: var(--sp-2); }
+.batch-action-buttons { display: flex; gap: var(--sp-2); margin-top: var(--sp-3); }
+.batch-action-buttons button {
+    flex: 1;
+    height: var(--control-h);
+    font-size: var(--fs-md);
+    font-weight: 650;
+    border-radius: var(--r-md);
+    transition: background-color var(--dur) var(--ease);
+}
+#saveBatchButton { color: #fff; background-color: var(--success); }
+#saveBatchButton:hover { background-color: var(--success-hover); }
+#saveBatchButton.is-empty { opacity: .6; }
+#clearBatchButton { color: var(--text); background-color: var(--surface); border: 1.5px solid var(--border-strong); }
+#clearBatchButton:hover { background-color: var(--surface-3); }
+.batch-save-count { display: inline-block; min-width: 22px; margin-left: 6px; padding: 0 6px; font-size: var(--fs-xs); font-weight: 800; line-height: 20px; color: var(--success-text); background-color: #fff; border-radius: var(--r-full); font-variant-numeric: tabular-nums; }
+/* Handy (unter 992 px): im Batch-Modus hängen „Batch Speichern“ / „Batch Leeren“ als feste Leiste am unteren Bildschirmrand –
+   so bleibt Speichern nach vielen Scans erreichbar, ohne zur Batch-Karte hochzuscrollen. Die Karte selbst bleibt oben wie bisher.
+   Nur in der Hauptansicht (Detailansicht/Unterseiten liegen darüber, z-index 100) und nicht am Desktop. */
+@media (max-width: 991.98px) {
+    body.batch-mode-active .batch-action-buttons {
+        position: fixed;
+        left: 0; right: 0; bottom: 0;
+        z-index: 60;                                   /* über der Liste, unter Detail-/Unterseiten (100) und Dialogen */
+        margin: 0;
+        padding: var(--sp-2) var(--sp-3) calc(var(--sp-2) + env(safe-area-inset-bottom, 0px));
+        background-color: var(--surface);
+        border-top: 1px solid var(--border);
+        box-shadow: 0 -6px 16px -8px rgba(0, 0, 0, .35);
+    }
+    body.batch-mode-active .batch-action-buttons button { white-space: nowrap; }
+    body.batch-mode-active .batch-action-buttons .batch-btn-prefix { display: none; }   /* in der Leiste reicht „Speichern (2)“ / „Leeren“ */
+    body.batch-mode-active .batch-area.visible { padding-bottom: var(--sp-3); }
+    body.batch-mode-active #mainView { padding-bottom: calc(var(--control-h) + var(--sp-4) + env(safe-area-inset-bottom, 0px)); }   /* letzte Karte nicht hinter der Leiste */
+    body.batch-mode-active.modal-open .batch-action-buttons { display: none; }   /* Vollbild-Dialoge (z. B. Packstücke) überdecken alles */
+}
