@@ -37,13 +37,14 @@ const TEST_USER = { id: 'u-admin', name: 'Zakaria Bisbiss', role: 'admin' };
 function makeBackend(initial, lkwStatus) {
   const state = { store: JSON.parse(JSON.stringify(initial || {})), lkwStatus: lkwStatus || {}, version: 1, actions: [], requests: [],
     authDisabled: false, tokens: { [TEST_TOKEN]: 'u-admin' }, invites: { 'inv-max': 'u-max' }, mails: [], failed: 0,
-    delay: {}, failNext: {}, noBatchDelete: false, inFlight: {},
+    delay: {}, failNext: {}, noBatchDelete: false, inFlight: {}, offline: false,
     users: [ { id: 'u-admin', name: 'Zakaria Bisbiss', email: 'bisbiss-92@hotmail.de', role: 'admin', pin: '482913', active: true, hasPin: true },
              { id: 'u-max', name: 'Max Muster', email: 'max@example.com', role: 'user', pin: '778812', active: true, hasPin: true } ] };
   const pub = u => ({ id: u.id, name: u.name, role: u.role });
   const list = () => state.users.map(u => ({ id: u.id, name: u.name, email: u.email, role: u.role, active: u.active, hasPin: u.hasPin, lastLogin: 0, inviteOpen: false, inviteExpires: 0, locked: false }));
   state.handler = async (req) => {
     if (!/script\.google\.com/.test(req.url())) return req.continue();
+    if (state.offline) { state.actions.push('(offline) ' + ((() => { try { return JSON.parse(req.postData() || '{}').action; } catch (e) { return '?'; } })())); return req.abort('internetdisconnected'); }
     let body = {}; try { body = JSON.parse(req.postData() || '{}'); } catch (e) {}
     const action = body.action || ''; state.actions.push(action); state.requests.push(body);
     state.inFlight[action] = (state.inFlight[action] || 0) + 1;
@@ -105,8 +106,12 @@ function makeBackend(initial, lkwStatus) {
 // Anmeldung: standardmäßig ist der Administrator bereits angemeldet (Sitzung im localStorage); opts.loggedOut = true
 // startet ohne Sitzung (Anmeldeseite), opts.session = { token, user, expires } startet mit einer bestimmten Sitzung.
 // Achtung: page.reload() leert den Speicher erneut (Schutz gegen Übernahme aus früheren Szenarien) – Sitzung also per opts setzen.
+// Service Worker: standardmäßig AUS (navigator.serviceWorker wird entfernt) – sonst würde eine Testseite ihn registrieren und
+// alle folgenden Seiten bekämen App-Dateien aus dem Cache. opts.serviceWorker = true lässt ihn zu (tests/offlinecheck.js).
+// opts.url überschreibt die App-Adresse (Standard: APP_URL bzw. http://127.0.0.1:8000/index.html).
 async function openApp(browser, backend, opts = {}) {
   const page = await browser.newPage();
+  if (!opts.serviceWorker) await page.evaluateOnNewDocument(() => { try { delete Navigator.prototype.serviceWorker; } catch (e) {} });
   const seed = opts.session ? JSON.stringify(opts.session) : (opts.loggedOut ? null : JSON.stringify({ token: TEST_TOKEN, user: TEST_USER, expires: Date.now() + 3600e3 }));
   const lastActivity = opts.idleMs ? Date.now() - opts.idleMs : Date.now();
   if (!opts.keepStorage) await page.evaluateOnNewDocument((seed, lastActivity) => { if (!window.__storageCleared) { window.__storageCleared = true; try { localStorage.clear(); sessionStorage.clear(); if (seed) { localStorage.setItem('frachtTracker_session', seed); localStorage.setItem('frachtTracker_lastActivity', String(lastActivity)); } } catch (e) {} } }, seed, lastActivity);
@@ -117,7 +122,7 @@ async function openApp(browser, backend, opts = {}) {
   if (opts.console) page.on('console', m => console.log('  [page]', m.text()));
   await page.setRequestInterception(true);
   page.on('request', backend.handler);
-  await page.goto((process.env.APP_URL || 'http://127.0.0.1:8000/index.html') + (opts.query || ''), { waitUntil: 'networkidle0' });
+  await page.goto((opts.url || process.env.APP_URL || 'http://127.0.0.1:8000/index.html') + (opts.query || ''), { waitUntil: 'networkidle0' });
   await new Promise(r => setTimeout(r, 800));
   return page;
 }

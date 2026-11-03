@@ -434,6 +434,18 @@
 <!-- =============================================================== -->
 
 <script src="script.js"></script>
+<!-- Offline: der Service Worker (sw.js) hält die App-Dateien vor, damit die App auch ohne Netz startet (Details in sw.js).
+     Nur über http(s) möglich – beim Öffnen als Datei (file://) wird er übersprungen. -->
+<script>
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').then((reg) => {
+            // Geräte bleiben tagelang offen: beim Zurückkehren in den Vordergrund nach einer neuen Version sehen
+            document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); });
+        }).catch((err) => console.warn('Service Worker nicht registriert:', err));
+    });
+}
+</script>
 <audio id="errorSound" src="assets/error-sound.mp3" preload="auto"></audio>
 <audio id="nachlieferungSound" src="assets/nachlieferung-sound.mp3" preload="auto"></audio>
 <!-- Anmeldung (PIN) / Einladung – liegt über allem, solange keine gültige Sitzung besteht (script.js, Abschnitt ANMELDUNG) -->

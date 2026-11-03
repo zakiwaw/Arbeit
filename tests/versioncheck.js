@@ -36,7 +36,7 @@ if (fs.existsSync(path.join(root, 'sw.js'))) {
   const swVersion = grab(sw, /const APP_VERSION = '([^']+)';/, 'sw.js APP_VERSION');
   ok(swVersion === appVersion, `sw.js APP_VERSION ${swVersion} = script.js ${appVersion} (neuer Cache je Version)`);
 } else {
-  console.log('info: sw.js noch nicht vorhanden (Service Worker) – Cache-Version nicht geprüft');
+  ok(false, 'sw.js fehlt (Service Worker – App offline startbar)');
 }
 ok(!/AKfycb[\w-]{20,}/.test(read('README.md')), 'README.md enthält keine Web-App-URL/Token');
 console.log(fails ? `SOME FAILED (${fails} von ${oks + fails})` : `ALL GOOD (${oks})`); process.exit(fails ? 1 : 0);

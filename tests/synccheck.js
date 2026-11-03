@@ -42,10 +42,13 @@ async function waitOverlayGone(page, maxMs = 8000) { return waitFor(async () => 
     assert(st['MAN 1'] === false && be.lkwStatus['MAN 1'] === false, 'Auch nach weiteren Abrufen: deaktiviert (lokal + Server)');
 
     // ---------- 2) Senden des Status schlägt fehl → bleibt lokal, wird nachgeschickt, Abruf setzt ihn nicht zurück ----------
-    be.delay.loadChanges = 0; be.delay.saveLkwStatus = 0; be.failNext.saveLkwStatus = 1;
+    // Server lehnt ab, solange failNext > 0 – hoch ansetzen, damit nicht schon der nächste 3-s-Abruf die Änderung
+    // nachschickt, bevor der Zwischenstand geprüft ist (sonst hängt das Ergebnis von der Abruf-Phase ab)
+    be.delay.loadChanges = 0; be.delay.saveLkwStatus = 0; be.failNext.saveLkwStatus = 99;
     assert(await clickToggle(page, 'MAN 1'), 'Schalter „MAN 1“ wieder aktivieren – Server antwortet diesmal mit Fehler (Sperre)');
     assert(await waitOverlayGone(page, 3000), 'Spinner wartet nach dem Fehler nicht bis zum Zeitlimit');
     assert(be.lkwStatus['MAN 1'] === false && (await localLkw(page))['MAN 1'] === true && (await lkwPending(page)), 'Nach dem Fehler: lokal aktiv + vorgemerkt, Server noch alt');
+    be.failNext.saveLkwStatus = 0;
     assert(await waitFor(async () => be.lkwStatus['MAN 1'] === true, 8000), 'Status wird mit dem nächsten Abruf nachgeschickt');
     await wait(3500);
     assert((await localLkw(page))['MAN 1'] === true && (await toggleChecked(page, 'MAN 1')) === true && !(await lkwPending(page)), 'Lokal weiterhin aktiv, nicht mehr vorgemerkt – kein Zurückspringen durch den Abruf');
@@ -109,10 +112,11 @@ async function waitOverlayGone(page, maxMs = 8000) { return waitFor(async () => 
     // ---------- 6) Neuladen mit unbestätigter Statusänderung: Serverstand überschreibt sie nicht, sie wird nachgeschickt ----------
     be = makeBackend(sampleData(), {});
     page = await openApp(browser, be, {}); await wait(600);
-    be.failNext.saveLkwStatus = 1;
+    be.failNext.saveLkwStatus = 99;                      // ablehnen, bis der Zwischenstand geprüft ist (s. o.)
     await page.evaluate(() => document.getElementById('menu-toggle-btn').click()); await wait(300);
-    assert(await clickToggle(page, 'MAN 1'), 'Deaktivieren – Server lehnt einmal ab');
+    assert(await clickToggle(page, 'MAN 1'), 'Deaktivieren – Server lehnt ab');
     assert(await waitOverlayGone(page, 3000) && (await lkwPending(page)) && be.lkwStatus['MAN 1'] !== false, 'Änderung vorgemerkt, Server noch alt');
+    be.failNext.saveLkwStatus = 0;
     await page.close();
     page = await openApp(browser, be, { keepStorage: true }); await wait(600);
     assert((await localLkw(page))['MAN 1'] === false, 'Nach Neuladen: lokal weiterhin deaktiviert (Serverstand hat die vorgemerkte Änderung nicht überschrieben)');

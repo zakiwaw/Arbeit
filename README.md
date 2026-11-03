@@ -23,6 +23,7 @@ Aufträge übernommen.
 | `script.js` | Gesamte App-Logik: Scannen, Sendungen, LKW/Seiten, Sync, Anmeldung, „Aufträge erfassen“, PDF |
 | `styles.css` | Gestaltung (Handy zuerst, Desktop-Ergänzungen ab 992 px, automatischer Dunkelmodus) |
 | `manifest.webmanifest`, `assets/icons/` | Installierbar als App (Startbildschirm, Hochformat) |
+| `sw.js` | Service Worker: App-Dateien im Cache, Start ohne Netz (siehe „Offline“) |
 | `assets/vendor/` | Lokale Bibliotheken: jsPDF, jsPDF-AutoTable, qrcode.js |
 | `assets/*.mp3` | Hinweistöne |
 | `backend/Code.gs` | Google-Apps-Script (Server): Sync, Archiv, Anmeldung, Drive-Import – siehe `backend/README.md` |
@@ -39,6 +40,15 @@ Server-Skript 2.7“). So sieht man auf jedem Gerät sofort, ob noch eine alte V
 Änderung: Version hochzählen und in `index.html` (`<title>`), `CHANGELOG.md` und `backend/README.md` nachziehen –
 `node tests/versioncheck.js` prüft, dass alle Stellen zusammenpassen. Das Server-Skript hat eine eigene Versionszählung
 (oben in `backend/Code.gs`).
+
+## Offline
+
+`sw.js` (Service Worker, registriert in `index.html`) hält alle App-Dateien in einem Cache je Version
+(`fracht-tracker-<APP_VERSION>`). Online kommen die Dateien immer vom Server („Netz zuerst“, Zeitlimit 6 s), offline aus
+dem Cache – die App startet also auch ohne Netz, inklusive Unterseiten-Adressen (`?seite=…`). Scans ohne Netz werden wie
+bisher lokal gespeichert und als unbestätigt vorgemerkt; sobald der Server wieder erreichbar ist, schickt die App sie nach.
+Der Service Worker fasst die Aufrufe zum Google-Apps-Script nicht an. Bei einer neuen Version wird der alte Cache
+automatisch gelöscht. Prüfung: `node tests/offlinecheck.js`; Handprobe siehe `tests/README.md`.
 
 ## Backend bereitstellen (Google Apps Script)
 
@@ -62,6 +72,7 @@ node tests/backendcheck.js      # Server-Skript offline (kein Chrome nötig)
 node tests/versioncheck.js      # Versionsangaben passen zusammen (kein Chrome nötig)
 python3 -m http.server 8000     # App lokal ausliefern (für die Chrome-Tests)
 node tests/regress.js           # App im Chrome (weitere Suiten siehe tests/README.md)
+node tests/offlinecheck.js      # Offline-Start, Scan ohne Netz, Nachschicken (eigener Server auf :8011)
 ```
 
 Nach jeder Änderung: betroffene Suiten laufen lassen, erst bei „ALL GOOD“ veröffentlichen.

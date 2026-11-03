@@ -5,6 +5,10 @@ Neueste zuerst. Datum = Veröffentlichung auf dem Live-Branch `arena/01a06f82-ar
 
 ## 2026-11-03 – App 9.0, Code.gs 2.7
 
+- Offline startbar: Service Worker `sw.js` (registriert in `index.html`) lädt alle App-Dateien in einen Cache je Version
+  vor; online „Netz zuerst“ (Zeitlimit 6 s), ohne Netz aus dem Cache; alter Cache wird bei neuer Version gelöscht; Aufrufe
+  zum Apps-Script bleiben unberührt (Offline-Puffer für Scans arbeitet wie bisher). Prüfung `tests/offlinecheck.js`
+  (eigener Server auf :8011); Chrome-Tests schalten den Service Worker sonst ab (`openApp`).
 - README im Hauptordner (Zweck, Live-Branch, Dateien, Backend bereitstellen, Tests) und dieses Änderungsprotokoll.
 - Version sichtbar: `APP_VERSION` / `APP_VERSION_DATE` / `APP_BACKEND_VERSION` in `script.js`; Anzeige auf der
   Anmeldeseite, unten im Seitenmenü („Version 9.0 · Stand … · Server-Skript 2.7“) und am Desktop klein neben dem Titel

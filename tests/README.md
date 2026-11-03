@@ -24,10 +24,24 @@ node tests/importcheck.js     # Drive-Import Ende-zu-Ende: Code.gs legt aus HYDA
 node tests/erfassencheck.js   # Seite „Aufträge erfassen“: Parser = Original-Generator (tests/reference), QR-Inhalt, Direkt anlegen, Scan-Weg
 node tests/regress.js         # Grundfunktionen: Scan, Batch, Startseite, Unterseiten, Info-Filter
 node tests/synccheck.js       # Sync: Löschen/Deaktivieren bei schnellem Bedienen, langsamen/gestörten Antworten – nichts kommt zurück; Spinner mit Text
+node tests/desktopcheck.js    # Desktop-Layout (≥ 992 px): Tabellen, Sendungsdetails, Packstück-Tabelle, Auswahl-Leiste
+node tests/versioncheck.js    # Versionsangaben passen zusammen (script.js, sw.js, index.html, Code.gs, READMEs, CHANGELOG) – ohne Chrome
+node tests/offlinecheck.js    # Offline (Service Worker): Vorladen, Start ohne Netz, Scan offline → Nachschicken, Cache-Wechsel bei neuer Version – eigener Server auf :8011
 ```
 Jeder Test endet mit `ALL GOOD` (Exit-Code 0) oder `SOME FAILED` (Exit-Code 1) – Ketten wie `node tests/x.js && git push` brechen bei Fehlern ab.
 
-Umgebungsvariablen: `APP_URL` (Standard `http://127.0.0.1:8000/index.html`), `CHROMIUM`, `PUPPETEER_MODULE`.
+Umgebungsvariablen: `APP_URL` (Standard `http://127.0.0.1:8000/index.html`), `CHROMIUM` (Pfad zur Chrome/Chromium-Datei),
+`PUPPETEER_MODULE` (Pfad zu `puppeteer-core`). Ohne Chrome laufen `backendcheck.js` und `versioncheck.js`.
+In GitHub Actions (`.github/workflows/test.yml`) laufen alle Suiten mit dem auf dem Runner vorinstallierten Chrome.
+
+Service Worker in Tests: `openApp()` entfernt `navigator.serviceWorker` (sonst würde eine Testseite ihn registrieren und
+alle weiteren Seiten bekämen Dateien aus dem Cache). Nur `offlinecheck.js` lässt ihn zu (`serviceWorker: true`).
+
+## Offline von Hand prüfen (Handy/Zebra)
+1. App online öffnen, kurz warten (der Service Worker lädt die Dateien im Hintergrund vor).
+2. Flugmodus ein → App schließen und neu öffnen: sie startet, Sync-Punkt zeigt „Server nicht erreichbar“.
+3. Einen Scan buchen → erscheint in der Liste; Sync-Anzeige meldet unbestätigte Änderung.
+4. Flugmodus aus → nach wenigen Sekunden ist der Scan auf dem Server (anderes Gerät zeigt ihn an).
 
 ## Werkzeuge (keine Tests)
 ```bash
