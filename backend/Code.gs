@@ -1,9 +1,9 @@
 // ===================================================
 // FRACHT TRACKER – Google Apps Script Backend
-// Version 2.7: mehrgeräte-sicher + Archiv + Anmeldung (PIN; Sitzung verlängert sich bei Bedienung) + Sammel-Löschung
+// Version 2.8: mehrgeräte-sicher + Archiv + Anmeldung (PIN; Sitzung verlängert sich bei Bedienung) + Sammel-Löschung
 //   + automatischer Import von Textdateien aus Google Drive.
-//   2.7: Tabellen-ID bevorzugt aus den Skript-Eigenschaften (SPREADSHEET_ID), fester Wert nur noch als Rückfall;
-//        sonst keine Änderung – 2.6 bleibt voll kompatibel.
+//   2.8: Tabellen-ID nur noch aus den Skript-Eigenschaften (SPREADSHEET_ID), fester Rückfall entfernt;
+//        fehlt die Eigenschaft, wirft der Code einen klaren Fehler. Sonst keine Änderung gegenüber 2.7.
 //   2.6: Import auch für „MAN Fracht“-Dateien (Ordner „MAN Ladelisten TXT“ → neuer LKW „MAN <n>“ wie beim QR-Scan); mehrere
 //        Ordner mit je eigenem Format (IMPORT_FOLDERS); Prüfbericht der KI ab „Abgleichprotokoll“ wird ignoriert.
 //   2.5: Abschnitt „AUTOMATISCHER IMPORT AUS GOOGLE DRIVE“ – Zeit-Trigger liest Textdateien (Format „Standard (Leerzeilen)“)
@@ -34,7 +34,7 @@
 //   Notschalter: AUTH_ENABLED = false → alles wieder ohne Anmeldung wie in 2.1.
 //
 // AUFBAU DIESER DATEI (eine Datei, Abschnitte mit „// ===“-Kopf; im Editor mit Strg+F nach „// N.“ springen):
-//    1. EINSTELLUNGEN            Tabellen-ID (Skript-Eigenschaft / Rückfall), Blattnamen, Spalten, Sperre, Cache, Archiv-Regeln
+//    1. EINSTELLUNGEN            Tabellen-ID (nur Skript-Eigenschaft), Blattnamen, Spalten, Sperre, Cache, Archiv-Regeln
 //    2. HAUPTFUNKTION doPost      Einstieg jeder Anfrage: bekannte Aktion? Token prüfen (verifySession_), verteilen
 //    3. HILFSFUNKTIONEN           Blätter öffnen, Versionszähler, Script-Cache, Sperre, Zeilen lesen/schreiben (JSON über mehrere Zellen)
 //    4. SPEICHERN MIT MERGE       saveShipments: 3-Wege-Merge je Sendung/Packstück/Notiz
@@ -51,12 +51,13 @@
 // ===================================================
 // 1. EINSTELLUNGEN
 // ===================================================
-// Tabellen-ID: bevorzugt aus den Skript-Eigenschaften (Projekteinstellungen → Skript-Eigenschaften → SPREADSHEET_ID),
-// sonst der feste Wert darunter. Sobald die Eigenschaft gesetzt ist, kann der feste Wert in einer späteren Version entfallen.
-const SPREADSHEET_ID_FALLBACK = "1uQJ2nHXyTP5Qen7jMW2UkRitKkqHto0ANg5NrBD1SOs";
+// Tabellen-ID: nur aus den Skript-Eigenschaften (Projekteinstellungen → Skript-Eigenschaften → SPREADSHEET_ID).
+// Fehlt die Eigenschaft, wirft der Code einen klaren Fehler, statt auf eine andere Tabelle auszuweichen.
 function spreadsheetId_() {
-  try { return PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID') || SPREADSHEET_ID_FALLBACK; }
-  catch (e) { return SPREADSHEET_ID_FALLBACK; }
+  var id = null;
+  try { id = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID'); } catch (e) { id = null; }
+  if (!id) throw new Error('SPREADSHEET_ID fehlt: Bitte in den Skript-Eigenschaften des Apps-Script-Projekts setzen.');
+  return id;
 }
 const SHEET_NAME = "shipments";
 const LKW_STATUS_SHEET_NAME = "lkw_status";

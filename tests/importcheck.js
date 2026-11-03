@@ -6,6 +6,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
 
 // 1) Serverseite: Datei → Sheet-Zeilen
 const env = require('./gas-env')();
+env.props.SPREADSHEET_ID = 'test-tabelle'; // Tabellen-ID (2.8): nur noch Skript-Eigenschaft, kein fester Rückfall
 env.call('authUsers'); const inv = /einladung=([0-9a-f]+)/.exec(env.mails[0].body)[1];
 const adminTok = env.call('authAccept', { invite: inv, pin: '482913', deviceId: 'dev1' }).token;
 const HYDAC_TXT = ['USA', '8118740144', '8118749096', '8118746244', '8118749072', '8118749073', '8118750973', '8118702767', '8118727982', '',

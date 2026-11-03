@@ -36,7 +36,7 @@ Aufträge übernommen.
 
 Die App-Version steht zentral in `js/01-start.js` (`APP_VERSION`, `APP_VERSION_DATE`, `APP_BACKEND_VERSION`) und wird in der
 App angezeigt: auf der Anmeldeseite, unten im Seitenmenü und am Desktop klein neben dem Titel („Version 9.1 · Stand … ·
-Server-Skript 2.7“). So sieht man auf jedem Gerät sofort, ob noch eine alte Version offen ist. Bei jeder veröffentlichten
+Server-Skript 2.8“). So sieht man auf jedem Gerät sofort, ob noch eine alte Version offen ist. Bei jeder veröffentlichten
 Änderung: Version hochzählen und in `index.html` (`<title>`), `CHANGELOG.md` und `backend/README.md` nachziehen –
 `node tests/versioncheck.js` prüft, dass alle Stellen zusammenpassen. Das Server-Skript hat eine eigene Versionszählung
 (oben in `backend/Code.gs`).
@@ -60,8 +60,8 @@ automatisch gelöscht. Prüfung: `node tests/offlinecheck.js`; Handprobe siehe `
 4. Die App zeigt im Seitenmenü, zu welcher Skript-Version sie gehört; eine ältere Skript-Version meldet bei neuen
    Aktionen „Unbekannte Aktion“ (die App fängt das ab und weist auf die Bereitstellung hin).
 
-Die Tabellen-ID liest das Skript bevorzugt aus den **Skript-Eigenschaften** (Projekteinstellungen → Skript-Eigenschaften →
-`SPREADSHEET_ID`); ohne Eigenschaft gilt der feste Wert in `Code.gs`. IDs, PINs oder Tokens gehören nicht in dieses Repo.
+Die Tabellen-ID liest das Skript nur aus den **Skript-Eigenschaften** (Projekteinstellungen → Skript-Eigenschaften →
+`SPREADSHEET_ID`); fehlt die Eigenschaft, meldet der Code einen klaren Fehler und greift auf keine andere Tabelle zu. IDs, PINs oder Tokens gehören nicht in dieses Repo.
 
 ## Tests
 

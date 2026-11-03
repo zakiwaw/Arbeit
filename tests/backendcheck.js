@@ -2,6 +2,7 @@
 // Anmelde-Logik, Sammel-Löschung und den Drive-Import Schritt für Schritt prüfen. Start: node tests/backendcheck.js
 const env = require('./gas-env')();
 const { api, call, sheets, cache, props, mails, log, drive, triggers, lockState, shipmentRows } = env;
+props.SPREADSHEET_ID = 'test-tabelle'; // Tabellen-ID (2.8): nur noch Skript-Eigenschaft, kein fester Rückfall – wie im echten Projekt gesetzt
 const crypto = require('crypto');
 let fails = 0, oks = 0; const ok = (c, m) => { console.log((c ? 'ok  : ' : 'FAIL: ') + m); if (c) oks++; else fails++; };
 const tokenExp = t => JSON.parse(Buffer.from(t.split('.')[0], 'base64url').toString()).e;
@@ -273,13 +274,15 @@ let p = api.parseManText_('X, Y\n1\n2\n'); ok(p.orders.length === 0, 'parseManTe
 p = api.parseManText_('Spedition Müller, Österreich\n4711\nPLSO 1\n5 ABC-1|Kiste||\nkaputt zeile mit leerzeichen|x\n');
 ok(p.orders.length === 1 && p.orders[0].spediteur === 'SPEDITION MUELLER' && p.orders[0].land === 'OESTERREICH' && p.orders[0].hus.length === 1 && p.orders[0].hus[0].rawInput === 'ABC-1' && p.orders[0].hus[0].position === 5 && p.orders[0].hus[0].packaging === 'Kiste' && p.orders[0].hus[0].dimensions === null && p.ignored.length === 1,
   'parseManText_: Kopf normalisiert, HU mit Bindestrich/Pos, leere Felder → null, Störzeile ignoriert');
-// 9) Tabellen-ID: Skript-Eigenschaft SPREADSHEET_ID geht vor, sonst fester Wert (2.7)
-ok(api.spreadsheetId_() === api.SPREADSHEET_ID_FALLBACK && /^[A-Za-z0-9_-]{20,}$/.test(api.SPREADSHEET_ID_FALLBACK), 'spreadsheetId_: ohne Eigenschaft der feste Wert');
-props.SPREADSHEET_ID = 'aus-eigenschaft';
-ok(api.spreadsheetId_() === 'aus-eigenschaft', 'spreadsheetId_: gesetzte Skript-Eigenschaft hat Vorrang');
-props.SPREADSHEET_ID = '';
-ok(api.spreadsheetId_() === api.SPREADSHEET_ID_FALLBACK, 'spreadsheetId_: leere Eigenschaft → fester Wert');
+// 9) Tabellen-ID: nur Skript-Eigenschaft SPREADSHEET_ID (2.8), kein fester Rückfall mehr
+ok(api.spreadsheetId_() === 'test-tabelle', 'spreadsheetId_: gesetzte Skript-Eigenschaft');
 delete props.SPREADSHEET_ID;
+let threw = false; try { api.spreadsheetId_(); } catch (e) { threw = /SPREADSHEET_ID fehlt/.test(e.message); }
+ok(threw, 'spreadsheetId_: ohne Eigenschaft klarer Fehler statt fester Wert');
+props.SPREADSHEET_ID = '';
+threw = false; try { api.spreadsheetId_(); } catch (e) { threw = /SPREADSHEET_ID fehlt/.test(e.message); }
+ok(threw, 'spreadsheetId_: leere Eigenschaft klarer Fehler statt fester Wert');
+props.SPREADSHEET_ID = 'test-tabelle';
 // 7g) Parser direkt
 p = api.parseStandardText_('\uFEFFTitelzeile\n\nUSA\n 123 \n\n\n\nChina\n456\n789\n');
 ok(p.orders.length === 2 && p.orders[0].orderId === 'USA' && p.orders[0].hus.join() === '123' && p.orders[1].hus.join() === '456,789' && p.ignored.length === 0, 'parseStandardText_: BOM, Titelzeile ohne Packstücke, mehrere Leerzeilen');

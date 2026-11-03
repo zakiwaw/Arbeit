@@ -7,7 +7,7 @@
 // APP_BACKEND_VERSION = Version von backend/Code.gs, zu der diese App gehört (nur Anzeige im Menü).
 const APP_VERSION = '9.1';
 const APP_VERSION_DATE = '2026-11-03';
-const APP_BACKEND_VERSION = '2.7';
+const APP_BACKEND_VERSION = '2.8';
 
 // Bibliotheken defensiv einbinden: Fehlt eine Lib (z. B. Datei nicht geladen),
 // darf nur die jeweilige Funktion (PDF / QR-Code) ausfallen – nicht die ganze App.

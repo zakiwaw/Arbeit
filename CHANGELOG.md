@@ -3,6 +3,16 @@
 Neueste zuerst. Datum = Veröffentlichung auf dem Live-Branch `arena/01a06f82-arbeit`. App-Version siehe `js/01-start.js`
 (`APP_VERSION`), Server-Skript siehe Kopf von `backend/Code.gs`.
 
+## 2026-11-03 – App 9.1, Code.gs 2.8
+
+Datenschutz: Tabellen-ID nur noch aus der Skript-Eigenschaft, kein fester Rückfall mehr.
+
+- `backend/Code.gs`: fester Rückfall (Tabellen-ID im Code) entfernt. `spreadsheetId_()` liest nur noch die Skript-Eigenschaft `SPREADSHEET_ID`; fehlt sie oder ist sie leer, wirft der Code einen klaren Fehler, statt auf eine andere Tabelle auszuweichen. Die Eigenschaft ist im Projekt gesetzt. Sonst keine Änderung gegenüber 2.7.
+- `js/01-start.js`: `APP_BACKEND_VERSION` 2.7 → 2.8.
+- `backend/README.md` und `README.md`: Version nachgezogen, Hinweis auf den festen Wert entfernt.
+- `tests/backendcheck.js` und `tests/importcheck.js`: Skript-Eigenschaft wird in den Tests gesetzt (wie im echten Projekt); neuer Test: ohne Eigenschaft klarer Fehler statt fester Wert. `tests/gas-env.js`: der feste Wert wird nicht mehr exportiert.
+- `backend/ANLEITUNG-Drive-Import.md`: Schritte auf Code.gs 2.8 nachgezogen, Prüfung der Skript-Eigenschaft statt der festen Zeile.
+
 ## 2026-11-03 – App 9.1, Code.gs 2.7
 
 Langfristige Nutzbarkeit (Phasen 2–4 des Auftrags vom 3.11.2026); Server-Skript unverändert 2.7 (nur Kommentare).
