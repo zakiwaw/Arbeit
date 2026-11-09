@@ -163,8 +163,8 @@ body.auth-open { overflow: hidden; }
    =================================================================== */
 @media (min-width: 992px) {
     .app-version { display: inline; }
-    .container { max-width: 1280px; margin: 0 auto; padding: var(--sp-5); }
-    .app-bar { padding: var(--sp-2) var(--sp-6); }
+    .container { max-width: 1280px; margin: 0 auto; padding: var(--sp-3) var(--sp-4); }
+    .app-bar { padding: var(--sp-1) var(--sp-5); }
 
     /* Tabelle wieder als Tabelle – dicht wie ein Arbeitsplatz-System: 1 Sendung = 1 Zeile (~36 px),
        Status-Ampel, LKW, Zähler, Gewicht, Notizen als eigene Spalten; QR-Code als Icon mit Vorschau bei Hover */
@@ -179,7 +179,7 @@ body.auth-open { overflow: hidden; }
         font-size: var(--fs-sm);
     }
     .shipment-table thead { display: table-header-group; }
-    .shipment-table th { position: sticky; top: 60px; z-index: 2; }
+    .shipment-table th { position: sticky; top: 48px; z-index: 2; }   /* = Höhe der App-Leiste (49 px) minus 1 px Rand */
     .shipment-table thead tr { display: table-row; margin: 0; padding: 0; border: none; border-radius: 0; box-shadow: none; }
     .shipment-table th {
         padding: 6px 10px;
@@ -571,7 +571,7 @@ body.auth-open { overflow: hidden; }
     .info-main .shipment-table td.hawb-cell { width: 18%; min-width: 130px; }
     .info-form {
         position: sticky;
-        top: 72px;
+        top: 60px;
         margin: 0;
         padding: var(--sp-4);
         background-color: var(--surface);
@@ -593,4 +593,54 @@ body.auth-open { overflow: hidden; }
     .info-main { min-width: 0; }
     .info-main .page-note { margin-top: 0; }
     .info-main .page-section-title:first-child { margin-top: 0; }
+
+    /* --- Feiner am Schreibtisch (9.2) ------------------------------------------------------------
+       Bisher galten am Desktop die Handy-Größen (16 px Grundschrift, 46 px Bedienelemente, 56 px Scanfeld).
+       Hier werden nur die Schrift-Stufen und die Bedienhöhe verkleinert – ausschließlich ab 992 px.
+       Die dichte Tabelle (36 px Zeilen, 14 px) behält ihre alten Werte (siehe .shipment-table/.pack-table).
+       Handy/Zebra (< 992 px) bleibt unverändert. */
+    :root {
+        --fs-xs: .6875rem;   /* 11 px (statt 12) */
+        --fs-sm: .8125rem;   /* 13 px (statt 14) */
+        --fs-md: .875rem;    /* 14 px (statt 16) – Grundschrift */
+        --fs-lg: 1rem;       /* 16 px (statt 18) */
+        --fs-xl: 1.25rem;    /* 20 px (statt 22) */
+        --fs-2xl: 1.5rem;    /* 24 px (statt 28) */
+        --control-h: 38px;   /* Status-Auswahl, Hinzufügen-Knopf, sonstige Eingaben (statt 46) */
+    }
+    body { line-height: 1.4; }
+    /* Tabellen bleiben exakt wie bisher: alte Schrift-Stufen lokal wiederherstellen */
+    .shipment-table, .pack-table { --fs-xs: .75rem; --fs-sm: .875rem; --fs-md: 1rem; --fs-lg: 1.125rem; }
+
+    /* App-Leiste ~48 px: Menü-Knopf 40 px statt 44 px; Titel + Version bleiben sichtbar */
+    .app-bar { min-height: 48px; gap: var(--sp-2); }
+    #menu-toggle-btn { width: 40px; height: 40px; }
+    #menu-toggle-btn svg { width: 24px; height: 24px; }
+    /* Kopfzeile der Unterseiten/Details genauso niedrig */
+    .detail-view-header { min-height: 48px; padding: var(--sp-1) var(--sp-5); }
+    #backToMainViewBtn, #pageBackBtn { width: 40px; height: 40px; }
+    #backToMainViewBtn svg, #pageBackBtn svg { width: 24px; height: 24px; }
+
+    /* Scanbereich: Scanfeld 44 px / 16 px (weiter Monospace), Knöpfe darin passend kleiner */
+    .input-section { gap: var(--sp-3); margin: var(--sp-2) 0 var(--sp-2); padding: var(--sp-3); }
+    .scan-input-wrapper input[type="text"] { height: 44px; padding-left: 44px; font-size: 1rem; }
+    .scan-input-wrapper .input-icon svg { width: 20px; height: 20px; }
+    .scan-input-wrapper .input-mode-toggle { width: 40px; height: 40px; left: 2px; }
+    .scan-input-wrapper .clear-input-btn { width: 30px; height: 30px; font-size: 20px; right: 8px; }
+    label { margin-bottom: 2px; }
+    select { padding-right: 36px; background-size: 18px; }
+    .controls-row { gap: var(--sp-2); }
+    .combo-checkbox-group input { width: 18px; height: 18px; }
+    .note-toggle-btn { width: var(--control-h); height: var(--control-h); }
+    .note-toggle-btn svg { width: 20px; height: 20px; }
+
+    /* Kacheln der Startseite flacher: kleinerer Innenabstand, kleineres Symbol, kleinere Schrift */
+    .home-hub { margin-top: var(--sp-3); }
+    .home-tiles { gap: var(--sp-3); }
+    .home-tile { min-height: 0; padding: var(--sp-3); gap: 6px; }
+    .tile-icon { width: 32px; height: 32px; }
+    .tile-icon svg { width: 20px; height: 20px; }
+    .tile-label { font-size: var(--fs-sm); }
+    .tile-count { top: var(--sp-2); right: var(--sp-2); min-width: 22px; height: 22px; font-size: var(--fs-xs); }
+    .list-caption { margin-top: var(--sp-3); }
 }

@@ -3,6 +3,14 @@
 Neueste zuerst. Datum = Veröffentlichung auf dem Live-Branch `arena/01a06f82-arbeit`. App-Version siehe `js/01-start.js`
 (`APP_VERSION`), Server-Skript siehe Kopf von `backend/Code.gs`.
 
+## 2026-11-09 – App 9.2, Code.gs 2.8
+
+Desktop-Ansicht feiner und kompakter (nur CSS, nur ab 992 px Breite; Handy/Zebra unverändert).
+
+- `css/05-feedback-anmeldung-desktop.css`: Abschnitt „Feiner am Schreibtisch“ im Desktop-Block. Grundschrift 16 → 14 px (alle Schrift-Stufen eine Stufe kleiner, Zeilenabstand 1,4), Bedienhöhe `--control-h` 46 → 38 px (Status-Auswahl, „Hinzufügen“, Notiz-Knopf, sonstige Eingaben), Scanfeld 56 → 44 px bei 16 px Monospace-Schrift (Umschalter/Leeren-Knopf passend kleiner, Verhalten unverändert), Scanbereich mit 12 px Abständen, App-Leiste und Seitenkopf 61 → 49 px (Menü-/Zurück-Knopf 40 px, Titel und Version bleiben sichtbar), Startseiten-Kacheln 132 → 99 px (kleineres Symbol, kleinere Schrift, weniger Innenabstand), `.container` innen 12/16 px statt 20 px (max. 1280 px bleibt). Klebende Tabellenköpfe und das Filterfeld der Info-Seite auf die niedrigere Leiste nachgezogen (48/60 px).
+- Die dichte Sendungs- und Packstücktabelle behält ihre bisherigen Werte (36 px Zeilen, 14 px) – die alten Schrift-Stufen sind dort lokal wiederhergestellt.
+- Keine Änderung an Scan-Ablauf, Batch, Sync, Anmeldung, Menü, Details oder Backend (Code.gs bleibt 2.8). Auf dem Handy (< 992 px) ist die Darstellung pixelgleich wie in 9.1.
+
 ## 2026-11-03 – App 9.1, Code.gs 2.8
 
 Datenschutz: Tabellen-ID nur noch aus der Skript-Eigenschaft, kein fester Rückfall mehr.
