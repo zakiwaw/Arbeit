@@ -5,9 +5,9 @@
 // App-Version (zentral). Bei jeder veröffentlichten Änderung hochzählen und in CHANGELOG.md, index.html (<title>),
 // sw.js (Cache-Name) und backend/README.md nachziehen – tests/versioncheck.js prüft, dass alle Stellen übereinstimmen.
 // APP_BACKEND_VERSION = Version von backend/Code.gs, zu der diese App gehört (nur Anzeige im Menü).
-const APP_VERSION = '9.2';
+const APP_VERSION = '9.3';
 const APP_VERSION_DATE = '2026-11-09';
-const APP_BACKEND_VERSION = '2.8';
+const APP_BACKEND_VERSION = '2.9';
 
 // Bibliotheken defensiv einbinden: Fehlt eine Lib (z. B. Datei nicht geladen),
 // darf nur die jeweilige Funktion (PDF / QR-Code) ausfallen – nicht die ganze App.

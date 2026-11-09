@@ -4,6 +4,18 @@ Neueste zuerst. Datum = Veröffentlichung (bis einschließlich 9.2 auf dem Branc
 Zusammenführen von Pull Request #1 am 09.11.2026 auf `main`). App-Version siehe `js/01-start.js`
 (`APP_VERSION`), Server-Skript siehe Kopf von `backend/Code.gs`.
 
+## 2026-11-09 – App 9.3, Code.gs 2.9
+
+Mehrgeräte-Synchronisations-Konfliktlösung (App 9.3 / Backend 2.9):
+- **Backend (Code.gs 2.9)**: Schema-Erweiterung `lastModifiedBy` (Spalte F), Versions-Handling pro Sendung (Spalte C), `saveShipmentsMerged` mit Feld-Merge und Konflikt-Rückgabe, `loadChangesSince` mit Änderungsprotokoll `_changes`, Versions-Upgrade 2.8 → 2.9.
+- **Frontend (App 9.3)**:
+  - Konfiguration: `APP_VERSION` 9.3, `APP_BACKEND_VERSION` 2.9.
+  - UI/Logik: Offline-Warteschlange (Reihenfolge, keine Duplikate), Konflikt-Handling (Status-Merge), Protokoll-Abruf (HAWB, alter Status, neuer Status, Benutzer, Zeit).
+  - Startseite: "Zuletzt bearbeitet" inkl. Name (in `js/01-start.js` / `js/06-seiten.js`).
+  - Änderungsprotokoll-Tab (in `js/06-seiten.js` / `js/07-import-erfassen.js`).
+- **Versionierung**: `index.html` (<title>), `sw.js` (Cache-Name), `backend/README.md`, `tests/versioncheck.js` auf 9.3 / 2.9 angepasst.
+- **Tests**: Neue Tests für Offline-Konflikte (2 Geräte), doppelte Sendung, alte Sendung ohne Version in `/home/user/Arbeit/tests/synccheck.js`.
+
 ## 2026-11-09 – App 9.2, Code.gs 2.8
 
 Desktop-Ansicht feiner und kompakter (nur CSS, nur ab 992 px Breite; Handy/Zebra unverändert).
@@ -75,3 +87,4 @@ Bestandsaufnahme (Phase 1 des Auftrags).
 - 2026-09-18 – Seite „Aufträge erfassen“ (MAN Fracht / Vorverladeliste / Standard).
 - 2026-09-10 – Anmeldung mit PIN (Code.gs 2.2/2.3), Sicherungsnachweis-PDF verschlankt.
 - 2026-09-05 – Pull Request #1: Stabilität, neues Design, Mehrgeräte-Sync (Code.gs 2.0/2.1, Archiv).
+
