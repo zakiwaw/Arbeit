@@ -1,0 +1,646 @@
+/* Fracht Tracker – Stylesheet Teil 5/6: 05-feedback-anmeldung-desktop.css
+   Abschnitte 12–14: Fehlerzeile + Lade-Spinner, Anmeldung (PIN), Animationen, Desktop-Layout (≥ 992 px)
+   Alle Teile zusammen = ein Stylesheet; index.html bindet sie in dieser Reihenfolge ein (Reihenfolge ist Pflicht: Kaskade). */
+
+/* ===================================================================
+   12. FEEDBACK: Fehlerzeile, Lade-Spinner
+   =================================================================== */
+.error {
+    min-height: 0;
+    margin: var(--sp-2) 0 0;
+    padding: 0;
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    text-align: center;
+    color: var(--danger);
+    transition: padding var(--dur) var(--ease);
+}
+/* Sobald Text drin ist, wird die Zeile zu einer Meldungs-Box.
+   Die Textfarbe setzt das JS (red/green/orange/blue) – der Hintergrund folgt ihr über currentColor. */
+.error[style*="color: red"]    { color: var(--danger-text) !important; }
+.error[style*="color: orange"] { color: var(--warning-text) !important; }
+.error[style*="color: blue"]   { color: var(--info-text) !important; }
+.error[style*="color: green"]  { color: var(--success-text) !important; }
+.error:not(:empty) {
+    padding: var(--sp-3) var(--sp-4);
+    text-align: left;
+    border-radius: var(--r-md);
+    background-color: color-mix(in srgb, currentColor 10%, transparent);
+    border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+    border-left: 4px solid currentColor;
+}
+
+.loading-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: color-mix(in srgb, var(--bg) 70%, transparent);
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity var(--dur) var(--ease), visibility var(--dur) var(--ease);
+}
+.loading-overlay.visible { visibility: visible; opacity: 1; }
+.loading-overlay { flex-direction: column; gap: var(--sp-4); }
+.loading-overlay:not(.visible) { pointer-events: none; }   /* beim Ausblenden nicht mehr im Weg */
+.loading-text { max-width: calc(100% - 2 * var(--sp-5)); padding: var(--sp-2) var(--sp-4); font-size: var(--fs-md); font-weight: 700; color: var(--text); text-align: center; background-color: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--r-md); box-shadow: var(--shadow-lg); }
+.loading-text:empty { display: none; }
+
+/* --- Anmeldung (PIN) / Einladung: liegt über allem – auch über dem Lade-Spinner --- */
+.auth-view {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: max(24px, 8vh) var(--sp-4) var(--sp-6);
+    overflow-y: auto;
+    background-color: var(--bg);
+}
+.auth-view.hidden { display: none; }
+body.auth-open { overflow: hidden; }
+.auth-card {
+    width: 100%;
+    max-width: 420px;
+    padding: var(--sp-6) var(--sp-5);
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-lg);
+}
+.auth-brand { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-5); }
+.auth-brand h1 { margin: 0; font-size: 1.25rem; font-weight: 800; letter-spacing: -.01em; color: var(--text); }
+.auth-logo {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 40px; height: 40px;
+    font-size: var(--fs-sm); font-weight: 800; letter-spacing: .04em; color: #fff;
+    background-color: var(--accent); border-radius: var(--r-md);
+}
+.auth-card h2 { margin: 0 0 var(--sp-2); font-size: 1.1rem; font-weight: 700; color: var(--text); }
+.auth-hint { margin: 0 0 var(--sp-4); font-size: var(--fs-sm); line-height: 1.45; color: var(--text-muted); }
+.auth-card .main-action-button { margin-top: var(--sp-2); }
+.auth-card input.auth-pin { font-size: 1.5rem; letter-spacing: .45em; text-align: center; font-variant-numeric: tabular-nums; }
+.auth-card input.auth-pin::placeholder { letter-spacing: .3em; color: var(--text-faint); }
+.auth-message { display: none; margin: 0 0 var(--sp-3); padding: var(--sp-3) var(--sp-4); font-size: var(--fs-sm); line-height: 1.45; border-radius: var(--r-md); }
+.auth-message.is-error { display: block; color: var(--danger-text); background-color: var(--danger-soft); }
+.auth-message.is-info { display: block; color: var(--accent-text); background-color: var(--accent-soft); }
+.auth-message.is-ok { display: block; color: var(--success-text); background-color: var(--success-soft); }
+
+/* Seitenmenü: angemeldeter Mitarbeiter */
+.side-menu-user { margin: calc(-1 * var(--sp-2)) 0 var(--sp-3); padding: 0 var(--sp-2); font-size: var(--fs-sm); font-weight: 600; color: var(--text); }
+.side-menu-user.hidden { display: none; }
+
+/* Seite „Mitarbeiter“ (Administrator) */
+.admin-invite { margin: var(--sp-3) 0 var(--sp-4); padding: var(--sp-4); background-color: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); }
+.admin-invite .form-group:last-of-type { margin-bottom: var(--sp-3); }
+.admin-notice.is-ok { color: var(--success-text); background-color: var(--success-soft); }
+.admin-notice.is-error { color: var(--danger-text); background-color: var(--danger-soft); }
+.admin-notice.is-warning { color: var(--warning-text); background-color: var(--warning-soft); }
+.admin-link { display: inline-block; max-width: 100%; word-break: break-all; font-size: var(--fs-xs); user-select: all; }
+.admin-row { flex-wrap: wrap; }
+.admin-main { flex: 1 1 220px; min-width: 0; }
+.admin-name { font-weight: 700; color: var(--text); }
+.admin-name .row-chip { margin-left: var(--sp-2); }
+.admin-meta { margin-top: 2px; font-size: var(--fs-xs); color: var(--text-muted); }
+.admin-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.admin-actions .page-link-btn { width: auto; min-height: 36px; }
+.admin-row .admin-name { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) 0; }
+.admin-row .admin-name .row-chip { margin-left: var(--sp-2); }
+.admin-actions .admin-danger { color: var(--danger-text); border-color: var(--danger); }
+.admin-actions .admin-danger:hover { background-color: var(--danger-soft); }
+.admin-self { font-size: var(--fs-xs); color: var(--text-faint); }
+.admin-inactive .admin-main { opacity: .6; }
+.row-chip.chip-ok { color: var(--success-text); background-color: var(--success-soft); }
+.row-chip.chip-warn { color: var(--warning-text); background-color: var(--warning-soft); }
+.row-chip.chip-danger { color: var(--danger-text); background-color: var(--danger-soft); }
+.spinner {
+    width: 56px;
+    height: 56px;
+    border: 6px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+}
+
+
+/* ===================================================================
+   13. ANIMATIONEN & UTILITIES
+   =================================================================== */
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+@keyframes fade-in-out {
+    0%   { opacity: 0; transform: translateY(-50%) scale(.8); }
+    20%  { opacity: 1; transform: translateY(-50%) scale(1); }
+    80%  { opacity: 1; transform: translateY(-50%) scale(1); }
+    100% { opacity: 0; transform: translateY(-50%) scale(.8); }
+}
+@keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sheet-up { from { transform: translateY(24px); opacity: .6; } to { transform: translateY(0); opacity: 1; } }
+@keyframes pop-in { from { transform: scale(.97); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes scrollText {
+    0%, 15%   { transform: translateX(0); }
+    85%, 100% { transform: translateX(calc(-1 * var(--scroll-distance, 0px))); }
+}
+.scrolling-text-container { position: relative; flex: 1; min-width: 0; padding-right: var(--sp-3); overflow: hidden; white-space: nowrap; }
+.scrolling-text { display: inline-block; }
+.scrolling-text.needs-scroll { animation: scrollText 4s linear infinite alternate; }
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+    }
+    .blinking-char { animation: none; }
+}
+
+
+/* ===================================================================
+   14. DESKTOP-LAYOUT (≥ 992px)
+   =================================================================== */
+@media (min-width: 992px) {
+    .app-version { display: inline; }
+    .container { max-width: 1280px; margin: 0 auto; padding: var(--sp-3) var(--sp-4); }
+    .app-bar { padding: var(--sp-1) var(--sp-5); }
+
+    /* Tabelle wieder als Tabelle – dicht wie ein Arbeitsplatz-System: 1 Sendung = 1 Zeile (~36 px),
+       Status-Ampel, LKW, Zähler, Gewicht, Notizen als eigene Spalten; QR-Code als Icon mit Vorschau bei Hover */
+    .shipment-table {
+        width: 100%;
+        table-layout: auto;
+        background-color: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--r-lg);
+        box-shadow: var(--shadow-sm);
+        overflow: visible;                       /* QR-Vorschau darf über den Rand hinausragen */
+        font-size: var(--fs-sm);
+    }
+    .shipment-table thead { display: table-header-group; }
+    .shipment-table th { position: sticky; top: 48px; z-index: 2; }   /* = Höhe der App-Leiste (49 px) minus 1 px Rand */
+    .shipment-table thead tr { display: table-row; margin: 0; padding: 0; border: none; border-radius: 0; box-shadow: none; }
+    .shipment-table th {
+        padding: 6px 10px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+        text-align: left;
+        white-space: nowrap;
+        color: var(--text-muted);
+        background-color: var(--surface-2);
+        border-bottom: 1px solid var(--border);
+        user-select: none;
+    }
+    .shipment-table th:first-child { border-top-left-radius: var(--r-lg); }
+    .shipment-table th:last-child { border-top-right-radius: var(--r-lg); }
+    /* sortierbare Spaltenköpfe: Sendungsliste (data-sort) und Packstücktabelle in den Details (data-psort) – gleiches Dreieck */
+    .shipment-table th[data-sort], .pack-table th[data-psort] { cursor: pointer; user-select: none; }
+    .shipment-table th[data-sort]:hover, .pack-table th[data-psort]:hover { color: var(--text); }
+    .shipment-table th[data-sort]::after, .pack-table th[data-psort]::after { content: ""; display: inline-block; width: 0; height: 0; margin-left: 5px; vertical-align: middle; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid var(--border-strong); opacity: 0; transition: opacity var(--dur) var(--ease); }
+    .shipment-table th[data-sort]:hover::after, .pack-table th[data-psort]:hover::after { opacity: .6; }
+    .shipment-table th.sorted-asc::after, .shipment-table th.sorted-desc::after, .pack-table th.sorted-asc::after, .pack-table th.sorted-desc::after { opacity: 1; border-top-color: var(--accent); }
+    .shipment-table th.sorted-asc::after, .pack-table th.sorted-asc::after { transform: rotate(180deg); }
+    .shipment-table tbody tr {
+        display: table-row;
+        margin: 0;
+        padding: 0;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        transition: background-color var(--dur) var(--ease);
+    }
+    .shipment-table tbody tr:nth-child(even) { background-color: color-mix(in srgb, var(--surface-2) 45%, var(--surface)); }
+    .shipment-table tbody tr:hover { background-color: var(--accent-soft); }
+    .shipment-table tbody tr + tr td { border-top: 1px solid var(--border); }
+    .shipment-table td {
+        display: table-cell;
+        position: static;
+        height: 36px;
+        padding: 3px 10px;
+        text-align: left;
+        vertical-align: middle;
+        white-space: nowrap;
+        border: none;
+        font-size: var(--fs-sm);
+    }
+    .shipment-table td.hawb-cell, .shipment-table td.summary-cell { white-space: normal; }
+    .shipment-table td.hawb-cell { width: 22%; min-width: 150px; }
+    .shipment-table td.dt-status { width: 13%; }
+    .shipment-table td.dt-truck { width: 10%; }
+    .shipment-table td.dt-num { width: 7%; }
+    .shipment-table td.dt-kg { width: 10%; }
+    .shipment-table td.dt-notes { width: 40px; }
+    .shipment-table td.time-cell { width: 13%; }
+    .shipment-table td::before, .shipment-table td.hawb-cell::after { display: none; }
+    .shipment-table td.hawb-cell { display: table-cell; min-height: 0; margin: 0; padding: 3px 10px; font-size: var(--fs-sm); font-weight: 700; letter-spacing: 0; }
+    .shipment-table td.hawb-cell:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+    /* VW-Zeilen: VVL und Kundennr als zwei Spalten in einem Raster (Beschriftung klein darüber – für gemischte Listen) */
+    .vvl-table-entry { display: grid; grid-template-columns: minmax(120px, 1.3fr) minmax(90px, 1fr); gap: 0 var(--sp-3); font-size: var(--fs-sm); line-height: 1.2; }
+    .vvl-table-entry .vvl-col { display: flex; flex-direction: column; min-width: 0; }
+    .vvl-table-entry .vvl-col-kunde { padding-left: var(--sp-3); border-left: 1px solid var(--border); }
+    .vvl-table-entry .vvl-prefix, .vvl-table-entry .kundennr-prefix { margin: 0; font-size: 10px; line-height: 1.3; }
+    .vvl-table-entry .vvl-prefix::after, .vvl-table-entry .kundennr-prefix::after { content: none; }
+    .vvl-table-entry .vvl-no { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .shipment-table td.hawb-cell-vvl { padding-top: 4px; padding-bottom: 4px; }
+    /* Reine VW-Tabellen (LKW-Seite eines VW-LKW): Beschriftung EINMAL im Kopf – „HAWB.“ wird zu „VVL | KUNDENNR“ im selben
+       Raster wie die Zeilen (gleiche Spaltenbreiten → die Nummern fluchten darunter); die Zeilen zeigen nur noch die Nummern */
+    .shipment-table.vw-only th[data-sort="hawb"] .th-hawb, .shipment-table.vw-only th[data-sort="hawb"]::after { display: none; }
+    .shipment-table.vw-only th[data-sort="hawb"] .th-vvl { display: grid; grid-template-columns: minmax(120px, 1.3fr) minmax(90px, 1fr); gap: 0 var(--sp-3); }
+    .shipment-table.vw-only th[data-sort="hawb"] .th-vvl span:last-child { padding-left: var(--sp-3); border-left: 1px solid transparent; }   /* gleiche Einrückung wie die Zeilen (dort mit Trennlinie) */
+    .shipment-table.vw-only th[data-sort="hawb"].sorted-asc .th-vvl, .shipment-table.vw-only th[data-sort="hawb"].sorted-desc .th-vvl { color: var(--accent); }
+    .shipment-table.vw-only .vvl-table-entry .vvl-prefix, .shipment-table.vw-only .vvl-table-entry .kundennr-prefix { display: none; }
+    .shipment-table.vw-only td.hawb-cell-vvl { padding-top: 3px; padding-bottom: 3px; }
+    .shipment-table td.time-cell { display: table-cell; margin: 0; white-space: nowrap; font-size: var(--fs-xs); font-variant-numeric: tabular-nums; color: var(--text-muted); }
+    .shipment-table td.time-cell::before { display: none; }
+    /* „Übersicht“-Pills wiederholen am Desktop nur die WE-/Sich.-Spalten → Spalte bleibt schmal und zeigt
+       nur Zusatzinfos (z. B. Gewichtstreffer der Info-Suche) */
+    .summary-cell { display: table-cell !important; padding: 3px 10px !important; }
+    .summary-cell strong, .summary-cell .summary-divider { display: none; }
+    .summary-cell .weight-hits { display: inline-flex; margin: 0; }
+    .summary-cell:empty, .summary-cell:not(:has(.weight-hits)) { padding: 0 !important; width: 0; }
+    .shipment-table th:nth-child(8) { font-size: 0; padding: 0; }          /* Kopf „Übersicht“ ohne Text (Spalte leer) */
+    .shipment-table:has(.weight-hits) th:nth-child(8) { font-size: 11px; padding: 6px 10px; }
+    .shipment-table:has(.weight-hits) .summary-cell { width: auto; padding: 3px 10px !important; }
+    .shipment-table td.actions-cell { display: table-cell; width: 112px; padding: 0 6px; text-align: right; white-space: nowrap; }
+    td.actions-cell button { display: inline-block; vertical-align: middle; width: 30px; height: 30px; }
+    td.actions-cell button + button { margin-left: 0; }
+    td.actions-cell .restore-btn { width: auto; }
+
+    /* QR-Code: kleines Icon, der echte Code erscheint beim Überfahren (und bleibt beim Drucken sichtbar) */
+    th.qr-code-header, td.qr-code-cell { display: table-cell; width: 44px; padding: 0; text-align: center; }
+    th.qr-code-header { font-size: 0; }
+    th.qr-code-header::before { content: "QR"; font-size: 11px; }
+    td.qr-code-cell { position: relative; }
+    td.qr-code-cell::before {
+        content: "";
+        display: inline-block;
+        width: 18px;
+        height: 18px;
+        vertical-align: middle;
+        background-color: var(--text-faint);
+        -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 11h8V3H3v8zm2-6h4v4H5V5zm-2 14h8v-8H3v8zm2-6h4v4H5v-4zm8-10v8h8V3h-8zm6 6h-4V5h4v4zm-6 4h2v2h-2zm2 2h2v2h-2zm-2 2h2v2h-2zm4 0h2v2h-2zm2-4h2v2h-2zm0 4v2h2v-2zm-2-2h2v2h-2z'/%3E%3C/svg%3E") center / contain no-repeat;
+        mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 11h8V3H3v8zm2-6h4v4H5V5zm-2 14h8v-8H3v8zm2-6h4v4H5v-4zm8-10v8h8V3h-8zm6 6h-4V5h4v4zm-6 4h2v2h-2zm2 2h2v2h-2zm-2 2h2v2h-2zm4 0h2v2h-2zm2-4h2v2h-2zm0 4v2h2v-2zm-2-2h2v2h-2z'/%3E%3C/svg%3E") center / contain no-repeat;
+        transition: background-color var(--dur) var(--ease);
+    }
+    td.qr-code-cell:hover::before { background-color: var(--accent); }
+    .qr-code-cell div {
+        position: absolute;
+        right: 100%;
+        top: 50%;
+        z-index: 5;
+        display: flex;
+        padding: 8px;
+        margin-right: 4px;
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: var(--r-md);
+        box-shadow: var(--shadow-md);
+        transform: translateY(-50%) scale(.9);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
+    }
+    td.qr-code-cell:hover div, td.qr-code-cell:focus-within div { opacity: 1; transform: translateY(-50%) scale(1); }
+
+    /* Desktop-Spalten */
+    .shipment-table th.dt-cell, .shipment-table td.dt-cell { display: table-cell; }
+    th.dt-num, td.dt-num { text-align: right; font-variant-numeric: tabular-nums; }
+    td.dt-num { font-weight: 600; }
+    td.dt-num.ok { color: var(--success-text); }
+    td.dt-num.mismatch { color: var(--warning-text); }
+    td.dt-num.over { color: var(--danger-text); }
+    .dt-dim { font-weight: 400; color: var(--text-faint); }
+    td.dt-status { font-weight: 600; }
+    .dt-light { display: inline-block; width: 9px; height: 9px; margin: 0 7px 1px 0; border-radius: 50%; background-color: var(--border-strong); vertical-align: middle; box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 0%, transparent); }
+    .dt-light.ok { background-color: var(--success); }
+    .dt-light.warn { background-color: var(--warning); }
+    .dt-light.danger { background-color: var(--danger); box-shadow: 0 0 0 3px var(--danger-soft); }
+    .dt-light.muted { background-color: var(--border-strong); }
+    td.dt-status .dt-light + * { vertical-align: middle; }
+    .dt-truck-chip { display: inline-block; padding: 1px 7px; font-size: 11px; font-weight: 600; color: var(--text-muted); background-color: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; }
+    .dt-note-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; font-size: 11px; font-weight: 700; color: var(--accent-text, var(--accent)); background-color: var(--accent-soft); border-radius: 999px; }
+    .shipment-table tr.archived { border-style: none; }               /* Tabellenzeile: kein Kartenrahmen */
+    .shipment-table tbody tr.archived:hover { background-color: var(--surface-3); }
+    .shipment-table tr.archived td.hawb-cell { color: var(--text-muted); }
+    .archive-badge, .row-chip { margin-left: 6px; }
+
+    /* Modals zentriert statt Bottom-Sheet */
+    .modal-overlay { align-items: center; padding: var(--sp-6); }
+    .modal-content {
+        width: 100%;
+        max-width: 520px;
+        max-height: min(88vh, 100%);
+        padding: var(--sp-6);
+        border-radius: var(--r-xl);
+        animation: pop-in .2s var(--ease);
+    }
+    .modal-content::before { display: none; }
+    #openHusModal .modal-content, #importHuModal .modal-content { max-width: 640px; }
+    .modal-tabs { margin: 0 calc(-1 * var(--sp-6)) var(--sp-3); padding: 0 var(--sp-6); }
+    /* Desktop wie bisher: Reiter so breit wie ihr Text, einzeilig, Zähler rechts neben dem Text */
+    .modal-tab-btn { flex: 0 1 auto; padding: var(--sp-3) 26px var(--sp-3) var(--sp-2); white-space: nowrap; }
+    .tab-badge { top: 50%; right: 6px; min-width: 20px; padding: 2px 6px; font-size: var(--fs-xs); line-height: 1.2; transform: translateY(-50%); }
+    .tab-badge.hidden { transform: translateY(-50%) scale(0); }
+
+    #detailView { padding: 0 var(--sp-6) var(--sp-8); }
+    .detail-view-header { margin: 0 calc(-1 * var(--sp-6)) var(--sp-4); padding: var(--sp-2) var(--sp-6); }
+    #detailViewContent { max-width: none; margin: 0 auto; }   /* volle Breite: Packstücktabelle braucht Platz */
+
+    /* Detailansicht am Desktop: Kopfzeile (Pfad · Kennzahlen · Aktionen · QR) und Packstücktabelle.
+       Wird nur ≥ 992 px erzeugt (script.js: buildDetailHead / buildDetailPackTable) – das Handy zeigt weiterhin die Karte. */
+    #currentShipmentDetails { padding: var(--sp-5) var(--sp-6); }
+    #currentShipmentDetails > strong { font-size: var(--fs-2xl); }
+    .detail-head { margin: 0 0 var(--sp-4); padding: 0 0 var(--sp-4); border-bottom: 1px solid var(--border); }
+    .detail-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-2); margin-bottom: var(--sp-3); font-size: var(--fs-sm); color: var(--text-muted); }
+    .detail-crumb { color: var(--accent-text); text-decoration: none; padding: 2px 4px; border-radius: var(--r-sm); }
+    .detail-crumb:hover { background-color: var(--accent-soft); text-decoration: none; }
+    .detail-crumb-sep { color: var(--text-faint); }
+    .detail-crumb-current { font-family: var(--font-mono); font-weight: 700; color: var(--text); }
+    .detail-head-row { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-4); }
+    .detail-facts { display: flex; flex-wrap: wrap; gap: var(--sp-2); flex: 1 1 auto; }
+    .detail-fact { min-width: 96px; padding: 6px 10px; background-color: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md); }
+    .detail-fact-label { display: block; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); }
+    .detail-fact-value { display: block; margin-top: 2px; font-size: var(--fs-sm); font-weight: 600; color: var(--text); white-space: nowrap; }
+    .detail-fact-value .dt-light { margin-bottom: 2px; }
+    .detail-head-side { display: flex; align-items: center; gap: var(--sp-3); flex: 0 0 auto; }
+    .detail-actions { display: flex; align-items: center; gap: 2px; padding: 2px; background-color: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md); }
+    .detail-actions button { position: relative; width: 36px; height: 36px; min-width: 0; padding: 0; font-size: 0; color: var(--text-muted); background: none; border: none; border-radius: var(--r-sm); transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+    .detail-actions button::before { content: ""; display: block; width: 22px; height: 22px; margin: 0 auto; background-color: currentColor; -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat; }
+    .detail-actions button:hover { background-color: var(--surface-3); color: var(--text); }
+    .detail-actions button.edit-btn { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z'/%3E%3C/svg%3E"); }
+    .detail-actions button.pdf-btn { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 12h8v2H8v-2zm0 4h8v2H8v-2z'/%3E%3C/svg%3E"); color: var(--accent-text); }
+    .detail-actions button.pdf-btn:hover { background-color: var(--accent-soft); }
+    .detail-actions button.pdf-btn:disabled { opacity: .5; }
+    .detail-actions button.main-delete-btn { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z'/%3E%3C/svg%3E"); color: var(--danger-text); }
+    .detail-actions button.main-delete-btn:hover { background-color: var(--danger-soft); }
+    body.batch-mode-active .detail-actions button.edit-btn { display: none; }   /* wie in der Liste */
+    .detail-qr { width: 68px; height: 68px; padding: 4px; background: #fff; border: 1px solid var(--border); border-radius: var(--r-md); }
+    .detail-qr div, .detail-qr img, .detail-qr canvas { width: 58px !important; height: 58px !important; display: block; }
+
+    .detail-pack { margin: 0 0 var(--sp-4); }
+    .detail-pack-head { display: flex; align-items: baseline; gap: var(--sp-2); margin-bottom: var(--sp-2); }
+    .detail-pack-head h4 { margin: 0; font-size: var(--fs-sm); font-weight: 700; color: var(--text); }
+    .detail-pack-meta { font-size: var(--fs-xs); font-weight: 600; color: var(--text-muted); }
+    .pack-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); background-color: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
+    .pack-table th { padding: 6px 10px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; text-align: left; white-space: nowrap; color: var(--text-muted); background-color: var(--surface-2); border-bottom: 1px solid var(--border); }
+    .pack-table td { padding: 5px 10px; height: 34px; vertical-align: middle; border-bottom: 1px solid var(--border); }
+    .pack-table tbody tr:last-child td { border-bottom: none; }
+    .pack-table tbody tr:hover td { background-color: var(--surface-2); }
+    .pack-table tr.pack-row-open td { background-color: color-mix(in srgb, var(--warning-soft) 55%, transparent); }
+    .pack-table tr.pack-row-danger td { background-color: color-mix(in srgb, var(--danger-soft) 60%, transparent); }
+    .pack-table td.pack-pos { width: 40px; font-family: var(--font-mono); color: var(--text-faint); }
+    .pack-table td.pack-hu .hu-value { font-family: var(--font-mono); font-weight: 700; cursor: pointer; padding: 2px 6px; border-radius: var(--r-sm); position: relative; }
+    .pack-table td.pack-hu .hu-value:hover { background-color: var(--accent-soft); }
+    .pack-table td.pack-hu .hu-value.copied::after { content: 'Kopiert!'; position: absolute; left: 100%; top: 50%; transform: translateY(-50%); margin-left: 6px; padding: 2px 8px; font-family: var(--font-sans); font-size: var(--fs-xs); font-weight: 700; color: #fff; white-space: nowrap; background-color: var(--success); border-radius: var(--r-sm); animation: fade-in-out 1.5s ease-in-out; }
+    .pack-table .pack-sendnr { display: block; font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted); white-space: nowrap; }
+    .pack-table td.pack-sendnr-cell { white-space: nowrap; }
+    .pack-table td.pack-text { color: var(--text-muted); white-space: nowrap; }
+    .pack-table td.pack-num { font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+    .pack-table td.pack-we-cell { width: 40px; text-align: center; }
+    .pack-we { font-size: var(--fs-xs); font-weight: 700; color: var(--text-faint); }
+    .pack-we.ok { color: var(--success-text); }
+    .pack-status { display: inline-block; padding: 2px 8px; font-size: var(--fs-xs); font-weight: 700; border-radius: var(--r-full); white-space: nowrap; }
+    .pack-status.ok { color: var(--success-text); background-color: var(--success-soft); }
+    .pack-status.open { color: var(--warning-text); background-color: var(--warning-soft); }
+    .pack-status.danger { color: var(--danger-text); background-color: var(--danger-soft); }
+    .pack-table td.pack-time { font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--text-muted); }
+    .pack-table td.pack-notes { max-width: 240px; }
+    .pack-note { display: block; font-size: var(--fs-xs); color: var(--warning-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #currentShipmentDetails .summary { max-width: 560px; }
+    #currentShipmentDetails > ul { max-width: 1100px; }
+    .pack-status-note { display: inline-block; margin-left: 6px; font-size: 10px; font-weight: 600; color: var(--text-faint); white-space: nowrap; }
+    .pack-table-plain td.pack-pos { width: 44px; }
+    #huEditModal.piece-mode .hu-edit-number-group { display: none; }   /* Stück einer normalen Sendung: keine HU-Nummer */
+    #huEditModal.piece-mode .hu-edit-danger { display: none; }         /* Stück einer normalen Sendung: kein Löschen (Stückzahl über „Bearbeiten“) */
+    .hu-edit-danger { display: flex; justify-content: flex-end; margin-top: var(--sp-3); padding-top: var(--sp-3); border-top: 1px solid var(--border); }
+    .hu-edit-delete-btn { height: 34px; padding: 0 var(--sp-4); font-size: var(--fs-sm); font-weight: 700; color: var(--danger-text); background-color: var(--danger-soft); border: 1px solid color-mix(in srgb, var(--danger-text) 30%, transparent); border-radius: var(--r-md); }
+    .hu-edit-delete-btn:hover { color: #fff; background-color: var(--danger); }
+    .pack-add-btn { margin-left: auto; padding: 4px 10px; font-size: var(--fs-xs); font-weight: 700; color: var(--accent-text); background: var(--accent-soft); border: none; border-radius: var(--r-md); cursor: pointer; transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+    .pack-add-btn:hover { background: var(--accent); color: #fff; }
+    body.batch-mode-active .pack-add-btn { display: none; }   /* wie Stift/„Bearbeiten“ im Batch-Modus */
+    /* Auswahl je Packstück + Leiste „Kontrollmethode für die Auswahl“ (nur Desktop-Packstücktabelle der HU-Aufträge) */
+    .pack-table th.pack-select-cell, .pack-table td.pack-select-cell { width: 36px; padding: 0 0 0 10px; text-align: center; }
+    .pack-table input.pack-select, .pack-table input.pack-select-all { width: 16px; height: 16px; margin: 0; vertical-align: middle; cursor: pointer; accent-color: var(--accent); }
+    .pack-table input.pack-select:disabled { opacity: .25; cursor: default; }
+    .pack-select-group { display: inline-flex; align-items: center; gap: var(--sp-3); }
+    .pack-select-group-cancel { padding-left: var(--sp-3); border-left: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); }
+    .pack-select-cancel { color: var(--warning-text); background-color: var(--warning-soft); border: 1px solid color-mix(in srgb, var(--warning-text) 30%, transparent) !important; }
+    .pack-select-cancel:hover { color: #fff; background-color: var(--warning-text); }
+    .pack-select-group-delete { padding-left: var(--sp-3); border-left: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); }
+    .pack-select-delete { color: var(--danger-text); background-color: var(--danger-soft); border: 1px solid color-mix(in srgb, var(--danger-text) 30%, transparent) !important; }
+    .pack-select-delete:hover { color: #fff; background-color: var(--danger); }
+    .pack-table tbody tr:has(.pack-select:checked) td { background-color: var(--accent-soft); }
+    .pack-select-bar { display: flex; align-items: center; gap: var(--sp-3); margin: 0 0 var(--sp-2); padding: var(--sp-2) var(--sp-3); font-size: var(--fs-sm); background-color: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); border-radius: var(--r-md); }
+    .pack-select-count { font-weight: 700; color: var(--accent-text); white-space: nowrap; }
+    .pack-select-label { display: inline-flex; align-items: center; gap: var(--sp-2); margin: 0; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+    .pack-select-bar select.pack-select-status { width: auto; height: 34px; min-width: 150px; padding: 0 36px 0 var(--sp-3); font-size: var(--fs-sm); font-weight: 700; background-position: right 10px center; }
+    /* Häkchen „Kombi“ (nur bei XRY/VCK sichtbar – syncPackSelectCombo) */
+    .pack-select-combo-wrap { gap: 6px; padding: 0 var(--sp-2); height: 34px; color: var(--text); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); border-radius: var(--r-md); background-color: var(--surface); cursor: pointer; }
+    .pack-select-combo-wrap:has(input:checked) { color: var(--accent-text); border-color: var(--accent); }
+    .pack-select-bar input.pack-select-combo { width: 16px; height: 16px; margin: 0; cursor: pointer; accent-color: var(--accent); }
+    .pack-select-bar button { height: 34px; padding: 0 var(--sp-4); font-size: var(--fs-sm); font-weight: 700; border-radius: var(--r-md); }
+    .pack-select-apply { color: #fff; background-color: var(--accent); }
+    .pack-select-apply:hover { background-color: var(--accent-hover); }
+    .pack-select-clear { margin-left: auto; color: var(--text-muted); background: none; }
+    .pack-select-clear:hover { color: var(--text); background-color: var(--surface); }
+    body.batch-mode-active .pack-select-cell, body.batch-mode-active .pack-select-bar { display: none; }   /* im Batch-Modus wie Stift/„+ Packstück“ */
+    .page-summary-add { margin-left: auto; color: var(--accent-text); border-color: transparent; background: var(--accent-soft); }
+    .page-summary-add:hover { color: #fff !important; background-color: var(--accent) !important; }
+    .page-summary-add + .page-summary-btn { margin-left: 0; }
+    body.batch-mode-active .page-summary-add { display: none; }
+    .order-add-content { max-width: 560px; }
+    /* Anlieferung: Karte je LKW = Zeilen-Knopf + Werkzeuge (Stift, Papierkorb) rechts hinter einem Trennstrich */
+    .page-row-wrap { display: flex; align-items: stretch; background-color: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--shadow-sm); transition: box-shadow var(--dur) var(--ease), border-color var(--dur) var(--ease); }
+    .page-row-wrap:hover { border-color: var(--border-strong); box-shadow: var(--shadow-md); }
+    .page-row-wrap .page-row { flex: 1 1 auto; width: auto; min-width: 0; background-color: transparent; border: none; border-radius: var(--r-lg) 0 0 var(--r-lg); box-shadow: none; }
+    .page-row-wrap .page-row:hover { border-color: transparent; box-shadow: none; }
+    .page-row-wrap .page-row:active { background-color: var(--surface-2); }
+    .page-row-tools { display: flex; align-items: center; gap: 2px; padding: 0 var(--sp-3) 0 var(--sp-2); border-left: 1px solid var(--border); }
+    .page-list-muted .page-row-tools { opacity: .7; }
+    .page-row-tool { position: relative; width: 34px; height: 34px; min-width: 0; padding: 0; font-size: 0; color: var(--text-faint); background: none; border: none; border-radius: var(--r-sm); transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+    .page-row-tool::before { content: ""; display: block; width: 20px; height: 20px; margin: 0 auto; background-color: currentColor; -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat; }
+    .page-row-wrap:hover .page-row-tool { color: var(--text-muted); }
+    .page-row-tool:hover { color: var(--text); background-color: var(--surface-3); }
+    .page-row-tool.page-row-rename { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z'/%3E%3C/svg%3E"); }
+    .page-row-tool.page-row-delete { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z'/%3E%3C/svg%3E"); }
+    .page-row-tool.page-row-delete:hover { color: var(--danger-text); background-color: var(--danger-soft); }
+    body.batch-mode-active .page-row-tools { display: none; }
+    .lkw-rename-content { max-width: 440px; }
+    .lkw-rename-hint { margin: calc(-1 * var(--sp-2)) 0 var(--sp-4); font-size: var(--fs-xs); line-height: 1.45; color: var(--text-muted); }
+    .order-add-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 var(--sp-3); }
+    .order-add-grid-3 { grid-template-columns: minmax(0, 1fr) minmax(0, 1.9fr) minmax(0, .8fr); }   /* Maße (L × B × H) brauchen die breiteste Spalte */
+    .order-add-grid .form-group { min-width: 0; }
+    .order-add-grid .dim-fields .dim-field { min-width: 0; }
+    .order-add-sep { margin: var(--sp-1) 0 var(--sp-3); padding-top: var(--sp-3); border-top: 1px solid var(--border); font-size: var(--fs-xs); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); }
+    .pack-table-plain td.pack-time { width: 160px; }
+    .pack-table th.pack-edit-head, .pack-table td.pack-edit-cell { width: 36px; padding: 0 4px; text-align: center; }
+    .pack-edit-btn { width: 30px; height: 30px; padding: 0; font-size: 0; color: var(--text-faint); background: none; border: none; border-radius: var(--r-sm); opacity: .55; transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease), opacity var(--dur) var(--ease); }
+    .pack-edit-btn::before { content: ""; display: block; width: 18px; height: 18px; margin: 0 auto; background-color: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z'/%3E%3C/svg%3E") center / contain no-repeat; }
+    .pack-table tbody tr:hover .pack-edit-btn { opacity: 1; color: var(--text-muted); }
+    .pack-edit-btn:hover { background-color: var(--accent-soft); color: var(--accent-text) !important; opacity: 1; }
+    body.batch-mode-active .pack-edit-btn { display: none; }   /* wie „Bearbeiten“ in der Liste */
+    #huEditModal .modal-content { max-width: 460px; }
+    /* „Packstücke hinzufügen“ = eigene Vollbild-Seite (wie Sendungsdetails), kein mittiges Fenster: das Overlay selbst
+       ist die Seite, das Formular füllt sie, oben die gewohnte Kopfzeile mit Zurück-Pfeil, unten eine feste Leiste. */
+    #huAddModal { display: none; align-items: stretch; justify-content: stretch; padding: 0; overflow: hidden; background-color: var(--bg); -webkit-backdrop-filter: none; backdrop-filter: none; }
+    #huAddModal.visible { display: flex; animation: overlay-in .15s var(--ease); }
+    #huAddModal .modal-content { flex: 1 1 auto; width: 100%; max-width: none; max-height: none; min-height: 0; padding: 0; background: transparent; border-radius: 0; box-shadow: none; animation: none; }
+    .hu-add-header { flex-shrink: 0; margin: 0; padding: var(--sp-2) var(--sp-6); }
+    .hu-add-header h2 { flex: 0 0 auto; }
+    .hu-add-context { flex: 1; min-width: 0; margin-left: var(--sp-3); font-size: var(--fs-sm); color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hu-add-layout { flex: 1 1 auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--sp-5); min-height: 0; padding: var(--sp-4) var(--sp-6) 0; overflow: hidden; }
+    .hu-add-panel { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+    .hu-add-panel .detail-pack-head { flex-shrink: 0; }
+    .hu-add-new .hu-add-table-wrap { flex: 0 1 auto; min-height: 0; max-height: none; margin: 0; overflow: auto; background-color: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); }
+    .hu-add-existing { overflow: auto; padding-bottom: var(--sp-4); }
+    .hu-add-new .hu-add-table th:nth-child(2), .hu-add-new .hu-add-table td:nth-child(2) { width: 34%; min-width: 220px; }   /* HU-Nummer bekommt den meisten Platz */
+    .hu-add-new .hu-add-table th.hu-add-kg, .hu-add-new .hu-add-table td.hu-add-kg { width: 110px; }
+    /* VW-Auftrag: erste Spalte ist die VSE (kein Pos.), daneben die Sendungs-Nr. */
+    .hu-add-new .hu-add-table-vvl th:nth-child(1), .hu-add-new .hu-add-table-vvl td:nth-child(1) { width: 24%; min-width: 150px; padding-left: 6px; }
+    .hu-add-new .hu-add-table-vvl th:nth-child(2), .hu-add-new .hu-add-table-vvl td:nth-child(2) { width: auto; min-width: 0; }
+    .hu-add-new .hu-add-table-vvl th.hu-add-sendnr-cell, .hu-add-new .hu-add-table-vvl td.hu-add-sendnr-cell { width: 110px; min-width: 0; }
+    /* eine Spalte mehr (Sendungs-Nr.) → Maße und Gewicht etwas schmaler, damit nichts abgeschnitten wird */
+    .hu-add-new .hu-add-table-vvl th.hu-add-dim-cell, .hu-add-new .hu-add-table-vvl td.hu-add-dim-cell { width: 200px; }
+    .hu-add-new .hu-add-table-vvl td.hu-add-dim-cell .dim-field { width: 46px; min-width: 34px; }
+    .hu-add-new .hu-add-table-vvl th.hu-add-kg, .hu-add-new .hu-add-table-vvl td.hu-add-kg { width: 84px; }
+    .hu-add-new .hu-add-table-vvl td.hu-add-kg input { min-width: 0; }
+    .hu-add-existing .pack-table { table-layout: auto; }
+    /* rechts zählt nur „was ist schon da“: Zeit- und Notiz-Spalte weglassen, damit alles ohne Querscrollen passt */
+    .hu-add-existing .pack-table th:nth-last-child(-n+2), .hu-add-existing .pack-table td:nth-last-child(-n+2) { display: none; }
+    .hu-add-existing .detail-pack { margin: 0; }
+    .hu-add-existing .pack-table th { top: 0; }
+    .hu-add-existing .pack-table tbody tr:hover td { background-color: inherit; }
+    .hu-add-existing .pack-table tr.pack-row-open:hover td { background-color: color-mix(in srgb, var(--warning-soft) 55%, transparent); }
+    .hu-add-empty { padding: var(--sp-5); font-size: var(--fs-sm); color: var(--text-faint); background-color: var(--surface); border: 1px dashed var(--border-strong); border-radius: var(--r-md); }
+    #huAddModal .modal-actions.hu-add-actions { display: flex; flex-shrink: 0; flex-wrap: nowrap; align-items: center; gap: var(--sp-3); margin: 0; padding: var(--sp-3) var(--sp-6); background-color: var(--surface); border-top: 1px solid var(--border); box-shadow: 0 -4px 12px -8px rgba(0,0,0,.25); }
+    .hu-add-footer-info { flex: 1 1 auto; min-width: 0; }
+    .hu-add-footer-info .hu-add-hint { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hu-add-footer-info .hu-edit-error { margin: var(--sp-1) 0 0; }
+    #huAddModal .hu-add-actions button { flex: 0 0 auto; width: auto; min-width: 200px; }
+    #saveHuAddButton { color: #fff; background-color: var(--accent); }
+    #saveHuAddButton:hover { background-color: var(--accent-hover, var(--accent)); }
+    #cancelHuAddButton { color: var(--text); background-color: var(--surface); border: 1.5px solid var(--border-strong); }
+    .hu-add-table-wrap { max-height: 52vh; overflow: auto; margin: 0 0 var(--sp-2); border: 1px solid var(--border); border-radius: var(--r-md); }
+    .hu-add-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+    .hu-add-table th { position: sticky; top: 0; z-index: 1; padding: 6px 8px; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; text-align: left; color: var(--text-muted); background: var(--surface-2); border-bottom: 1px solid var(--border); }
+    .hu-add-table td { padding: 4px 4px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    .hu-add-table tr:last-child td { border-bottom: none; }
+    .hu-add-table th.hu-add-pos, .hu-add-table td.hu-add-pos { width: 52px; padding-left: 10px; font-family: var(--font-mono, ui-monospace, monospace); font-size: var(--fs-sm); color: var(--text-faint); white-space: nowrap; }
+    .hu-add-table th.hu-add-kg, .hu-add-table td.hu-add-kg { width: 120px; }
+    .hu-add-table th.hu-add-x, .hu-add-table td.hu-add-x { width: 34px; padding: 0 4px; text-align: center; }
+    .hu-add-table input[type="text"] { height: 36px; padding: 0 var(--sp-2); font-size: var(--fs-sm); border-color: transparent; background: transparent; box-shadow: none; }
+    .hu-add-table input[type="text"]:hover { border-color: var(--border); }
+    .hu-add-table input[type="text"]:focus { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px var(--accent-soft); }
+    .hu-add-table input.hu-add-hu { font-weight: 600; }   /* gleiche Schrift wie die übrigen Eingabefelder der Zeile, nur fett */
+    /* Maße-Felder in der Zeilentabelle „Packstücke hinzufügen“ (Basisregeln .dim-fields stehen bei den Formularen) */
+    .th-unit { font-weight: 600; color: var(--text-faint); text-transform: none; letter-spacing: 0; }
+    .hu-add-table th.hu-add-dim-cell, .hu-add-table td.hu-add-dim-cell { width: 232px; }
+    .hu-add-new .hu-add-table th:nth-child(2), .hu-add-new .hu-add-table td:nth-child(2) { width: 30%; min-width: 190px; }   /* etwas Platz an die drei Maßfelder abgeben */
+    .hu-add-table td.hu-add-dim-cell .dim-fields { width: 100%; gap: 2px; }
+    .hu-add-table td.hu-add-dim-cell .dim-field { height: 32px; min-width: 40px; padding: 0 3px; font-size: var(--fs-sm); border-color: var(--border); background: transparent; box-shadow: none; }
+    .hu-add-table td.hu-add-dim-cell .dim-field:hover { border-color: var(--text-faint); }
+    .hu-add-table td.hu-add-dim-cell .dim-field:focus { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px var(--accent-soft); }
+    .hu-add-table td.hu-add-kg input { min-width: 84px; }
+    .hu-add-row-bad td { background: var(--danger-soft); }
+    .hu-add-row-bad input.hu-add-hu { color: var(--danger-text); }
+    .hu-add-remove { width: 26px; height: 26px; padding: 0; font-size: 16px; line-height: 1; color: var(--text-faint); background: none; border: none; border-radius: var(--r-sm); cursor: pointer; }
+    .hu-add-remove:hover { color: var(--danger-text); background: var(--danger-soft); }
+    .hu-add-hint { margin: 0 0 var(--sp-3); font-size: var(--fs-xs); color: var(--text-faint); }
+    .hu-edit-context { margin: calc(-1 * var(--sp-2)) 0 var(--sp-4); font-size: var(--fs-sm); color: var(--text-muted); }
+    #huEditNumber { font-family: var(--font-mono); font-weight: 700; letter-spacing: .02em; }
+    .hu-edit-error { margin: calc(-1 * var(--sp-2)) 0 var(--sp-3); padding: var(--sp-2) var(--sp-3); font-size: var(--fs-sm); font-weight: 600; color: var(--danger-text); background-color: var(--danger-soft); border-radius: var(--r-md); }
+
+    /* Startseite: vier Kacheln nebeneinander; Unterseiten wie die Detailansicht; Filter der Info-Seite in einer Reihe */
+    .home-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-4); }
+    .home-tile { min-height: 132px; }
+    #pageView { padding: 0 var(--sp-6) var(--sp-8); }
+    .page-content { max-width: 1240px; margin: 0 auto; }   /* so breit wie die Startseite: dichte Tabelle braucht Platz */
+    .page-shipments .row-chip { display: none; }            /* LKW steht am Desktop in der eigenen Spalte */
+    .page-summary, .page-banner, .page-details, .page-list { max-width: 900px; margin-left: auto; margin-right: auto; }
+    .admin-invite, #pageContent:has(.admin-invite) > .page-note, #pageContent:has(.admin-invite) > .page-section-title { max-width: 900px; margin-left: auto; margin-right: auto; }   /* Seite „Mitarbeiter“: eine Spalte wie die Liste */
+    .shipment-table td.hawb-cell-vvl { width: 24%; min-width: 250px; }
+    .shipment-table:has(td.hawb-cell-vvl) td.dt-status { width: 10%; }   /* VW-Zeilen: Status-Spalte etwas schmaler, damit QR-Spalte Platz behält */
+    .page-list:has(td.hawb-cell-vvl), #pageContent:has(td.hawb-cell-vvl) .page-shipments { max-width: none; }   /* VW-LKW-Seite: Tabelle darf die volle Seitenbreite nutzen */
+    .weight-hits { flex-basis: auto; margin-top: 0; }
+
+    /* Info & Suche: Filter als feste Seitenleiste links, Ergebnisse rechts – wie ein Arbeitsplatz-System */
+    .info-layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: var(--sp-5); align-items: start; }
+    .info-main .shipment-table td.hawb-cell { width: 18%; min-width: 130px; }
+    .info-form {
+        position: sticky;
+        top: 60px;
+        margin: 0;
+        padding: var(--sp-4);
+        background-color: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--r-lg);
+        box-shadow: var(--shadow-sm);
+    }
+    .info-form-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); margin-bottom: var(--sp-3); }
+    .info-form-title { font-size: var(--fs-xs); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); }
+    .info-search-wrapper input[type="search"] { height: 40px; font-size: var(--fs-sm); }
+    .info-search-wrapper input[type="search"]::placeholder { font-size: var(--fs-xs); }
+    .info-search-wrapper .info-search-clear { width: 28px; height: 28px; font-size: 18px; }
+    .info-reset-row { display: none; }   /* Desktop: „Zurücksetzen“ steht im Kopf der Seitenleiste */
+    .info-filters { grid-template-columns: 1fr; gap: var(--sp-3); margin-top: var(--sp-3); }
+    .info-filters label, .info-filters .info-weight, .info-filters .info-dates { grid-column: auto; }
+    .info-filters select { height: 36px; }
+    .info-weight-inputs input[type="text"], .info-weight-inputs input[type="date"] { height: 36px; }
+    .info-filters .info-archive { grid-column: auto; min-height: 0; padding-top: var(--sp-2); border-top: 1px solid var(--border); font-size: var(--fs-sm); }
+    .info-main { min-width: 0; }
+    .info-main .page-note { margin-top: 0; }
+    .info-main .page-section-title:first-child { margin-top: 0; }
+
+    /* --- Feiner am Schreibtisch (9.2) ------------------------------------------------------------
+       Bisher galten am Desktop die Handy-Größen (16 px Grundschrift, 46 px Bedienelemente, 56 px Scanfeld).
+       Hier werden nur die Schrift-Stufen und die Bedienhöhe verkleinert – ausschließlich ab 992 px.
+       Die dichte Tabelle (36 px Zeilen, 14 px) behält ihre alten Werte (siehe .shipment-table/.pack-table).
+       Handy/Zebra (< 992 px) bleibt unverändert. */
+    :root {
+        --fs-xs: .6875rem;   /* 11 px (statt 12) */
+        --fs-sm: .8125rem;   /* 13 px (statt 14) */
+        --fs-md: .875rem;    /* 14 px (statt 16) – Grundschrift */
+        --fs-lg: 1rem;       /* 16 px (statt 18) */
+        --fs-xl: 1.25rem;    /* 20 px (statt 22) */
+        --fs-2xl: 1.5rem;    /* 24 px (statt 28) */
+        --control-h: 38px;   /* Status-Auswahl, Hinzufügen-Knopf, sonstige Eingaben (statt 46) */
+    }
+    body { line-height: 1.4; }
+    /* Tabellen bleiben exakt wie bisher: alte Schrift-Stufen lokal wiederherstellen */
+    .shipment-table, .pack-table { --fs-xs: .75rem; --fs-sm: .875rem; --fs-md: 1rem; --fs-lg: 1.125rem; }
+
+    /* App-Leiste ~48 px: Menü-Knopf 40 px statt 44 px; Titel + Version bleiben sichtbar */
+    .app-bar { min-height: 48px; gap: var(--sp-2); }
+    #menu-toggle-btn { width: 40px; height: 40px; }
+    #menu-toggle-btn svg { width: 24px; height: 24px; }
+    /* Kopfzeile der Unterseiten/Details genauso niedrig */
+    .detail-view-header { min-height: 48px; padding: var(--sp-1) var(--sp-5); }
+    #backToMainViewBtn, #pageBackBtn { width: 40px; height: 40px; }
+    #backToMainViewBtn svg, #pageBackBtn svg { width: 24px; height: 24px; }
+
+    /* Scanbereich: Scanfeld 44 px / 16 px (weiter Monospace), Knöpfe darin passend kleiner */
+    .input-section { gap: var(--sp-3); margin: var(--sp-2) 0 var(--sp-2); padding: var(--sp-3); }
+    .scan-input-wrapper input[type="text"] { height: 44px; padding-left: 44px; font-size: 1rem; }
+    .scan-input-wrapper .input-icon svg { width: 20px; height: 20px; }
+    .scan-input-wrapper .input-mode-toggle { width: 40px; height: 40px; left: 2px; }
+    .scan-input-wrapper .clear-input-btn { width: 30px; height: 30px; font-size: 20px; right: 8px; }
+    label { margin-bottom: 2px; }
+    select { padding-right: 36px; background-size: 18px; }
+    .controls-row { gap: var(--sp-2); }
+    .combo-checkbox-group input { width: 18px; height: 18px; }
+    .note-toggle-btn { width: var(--control-h); height: var(--control-h); }
+    .note-toggle-btn svg { width: 20px; height: 20px; }
+
+    /* Kacheln der Startseite flacher: kleinerer Innenabstand, kleineres Symbol, kleinere Schrift */
+    .home-hub { margin-top: var(--sp-3); }
+    .home-tiles { gap: var(--sp-3); }
+    .home-tile { min-height: 0; padding: var(--sp-3); gap: 6px; }
+    .tile-icon { width: 32px; height: 32px; }
+    .tile-icon svg { width: 20px; height: 20px; }
+    .tile-label { font-size: var(--fs-sm); }
+    .tile-count { top: var(--sp-2); right: var(--sp-2); min-width: 22px; height: 22px; font-size: var(--fs-xs); }
+    .list-caption { margin-top: var(--sp-3); }
+}
