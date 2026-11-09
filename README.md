@@ -9,10 +9,10 @@ Aufträge übernommen.
 
 ## Live-Stand und Branches
 
-- **Live-Branch: `arena/01a06f82-arbeit`** – GitHub Pages liefert die App aus diesem Branch (https://zakiwaw.github.io/Arbeit/).
-  Alle Änderungen kommen hierhin.
-- `main` ist **alt** (Stand Juli 2026). Der offene Pull Request #1 (`arena/01a06f82-arbeit` → `main`) bleibt offen,
-  bis Zakaria das Zusammenführen freigibt. Nicht selbst mergen.
+- **Live-Branch: `main`** – GitHub Pages liefert die App aus `main` (https://zakiwaw.github.io/Arbeit/). Seit dem
+  Zusammenführen von Pull Request #1 am 09.11.2026 (App 9.2, Code.gs 2.8) ist `main` der aktuelle Stand.
+- Gearbeitet wird im Arbeits-Branch `arena/01a06f82-arbeit`; Änderungen gehen per Pull Request nach `main` und sind erst
+  nach dem Zusammenführen live. Zusammenführen nur nach Freigabe durch Zakaria.
 - Die App braucht **keinen Build-Schritt**: `index.html` öffnen bzw. ausliefern genügt.
 
 ## Dateien

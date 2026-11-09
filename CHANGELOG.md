@@ -1,6 +1,7 @@
 # Änderungen
 
-Neueste zuerst. Datum = Veröffentlichung auf dem Live-Branch `arena/01a06f82-arbeit`. App-Version siehe `js/01-start.js`
+Neueste zuerst. Datum = Veröffentlichung (bis einschließlich 9.2 auf dem Branch `arena/01a06f82-arbeit`, seit dem
+Zusammenführen von Pull Request #1 am 09.11.2026 auf `main`). App-Version siehe `js/01-start.js`
 (`APP_VERSION`), Server-Skript siehe Kopf von `backend/Code.gs`.
 
 ## 2026-11-09 – App 9.2, Code.gs 2.8
