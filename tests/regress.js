@@ -5,27 +5,43 @@ const wait = (ms) => new Promise(r => setTimeout(r, ms));
 // Geometrie statt einer starren Mindesthöhe: Anzahl/Schalter bleiben stehen, die Liste bekommt genau den freien Rest.
 async function batchGeometry(page) {
   return page.evaluate(() => {
+    const isDesktop = innerWidth >= 992;
     const main = document.getElementById('mainView'), form = document.getElementById('main-input-form');
     const area = document.getElementById('batchArea'), list = document.getElementById('batchList');
     const summary = document.getElementById('batchSummary'), bar = document.getElementById('batchActionBar');
+    const settingsHeader = document.getElementById('batchSettingsHeader');
+    const settingsBody = document.getElementById('batchSettingsBody');
+    const isExpanded = settingsBody && !settingsBody.classList.contains('hidden');
     const toggles = [...area.querySelectorAll('.toggle-row')];
+    const statusContainer = document.querySelector('.status-and-button-container');
     const rect = e => e.getBoundingClientRect(), style = e => getComputedStyle(e);
-    const mr = rect(main), fr = rect(form), ar = rect(area), lr = rect(list), br = rect(bar);
+    const mr = rect(main), fr = rect(form), ar = rect(area), lr = rect(list), br = rect(bar), sr = rect(settingsHeader);
     const marginY = e => parseFloat(style(e).marginTop) + parseFloat(style(e).marginBottom);
     const otherHeight = [...area.children].filter(e => e !== list && style(e).display !== 'none' && style(e).position !== 'fixed')
       .reduce((sum, e) => sum + rect(e).height + marginY(e), 0);
     const freeHeight = area.clientHeight - parseFloat(style(area).paddingTop) - parseFloat(style(area).paddingBottom) - otherHeight - marginY(list);
-    const controls = [form, document.getElementById('securityStatusSelect'), document.getElementById('mainActionButton'),
-      area.querySelector('h3'), summary, list, ...toggles, document.getElementById('saveBatchButton'), document.getElementById('clearBatchButton')];
+    const controls = [form, area.querySelector('h3'), summary, list, settingsHeader, document.getElementById('saveBatchButton'), document.getElementById('clearBatchButton')];
+    if (isDesktop) {
+      controls.push(document.getElementById('securityStatusSelect'), document.getElementById('mainActionButton'));
+    }
+    if (isExpanded) {
+      controls.push(...toggles);
+    }
     const visible = controls.every(e => {
       const r = rect(e), hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
       return r.width > 0 && r.height > 0 && r.top >= 0 && r.bottom <= innerHeight + 0.5 && r.left >= 0 && r.right <= innerWidth + 0.5 && !!hit && e.contains(hit);
     });
+    const topOrdered = isDesktop
+      ? (fr.bottom <= rect(statusContainer).top && rect(document.querySelector('.input-section')).bottom <= ar.top)
+      : (rect(statusContainer).width === 0 && rect(statusContainer).height === 0 && style(statusContainer).display === 'none' &&
+         rect(document.querySelector('.input-section')).bottom <= ar.top);
+    const bottomOrdered = isExpanded
+      ? (lr.bottom <= sr.top && sr.bottom <= rect(toggles[0]).top && rect(toggles[2]).bottom <= ar.bottom && ar.bottom <= br.top)
+      : (lr.bottom <= sr.top && sr.bottom <= ar.bottom && ar.bottom <= br.top);
     return {
       fixed: [main, form, bar].every(e => style(e).position === 'fixed'), screenHeight: Math.abs(mr.height - innerHeight) < 1,
       atBottom: Math.abs(br.bottom - innerHeight) < 1, visible,
-      ordered: fr.bottom <= rect(document.querySelector('.status-and-button-container')).top && rect(document.querySelector('.input-section')).bottom <= ar.top &&
-        ar.top <= rect(summary).top && rect(summary).bottom <= lr.top && lr.bottom <= rect(toggles[0]).top && rect(toggles[2]).bottom <= ar.bottom && ar.bottom <= br.top,
+      ordered: topOrdered && ar.top <= rect(summary).top && rect(summary).bottom <= lr.top && bottomOrdered,
       listScroll: style(list).overflowY, maxHeight: style(list).maxHeight, listHeight: lr.height, freeHeight,
       cardNoScroll: area.scrollHeight <= area.clientHeight, mainNoScroll: main.scrollHeight <= main.clientHeight,
       bounds: [mr.top, mr.bottom, fr.top, fr.bottom, ar.top, ar.bottom, lr.top, lr.bottom, br.top, br.bottom], windowY: scrollY
@@ -115,7 +131,7 @@ async function normalGeometry(page) {
     assert(page.__errors.length === 0, `Keine JS-Fehler (${page.__errors.join('; ')})`);
     await page.close(); // Kein Hintergrund-Sync des ersten Szenarios in den gemeinsam genutzten localStorage weiterer Seiten.
 
-    // ---- Batch 9.5: feste Arbeitsfläche, innere Scrollposition, neue Scans und Rückkehr zum normalen Seitenfluss ----
+    // ---- Batch 9.6: feste Arbeitsfläche, kompakte Ansicht auf kleinen Bildschirmen, klappbare Einstellungen ----
     for (const viewport of [
       { width: 320, height: 568, isMobile: true, hasTouch: true, deviceScaleFactor: 2 },
       { width: 360, height: 640, isMobile: true, hasTouch: true, deviceScaleFactor: 2 },
@@ -124,10 +140,83 @@ async function normalGeometry(page) {
     ]) {
       const label = `Batch ${viewport.width}×${viewport.height}`;
       const bb = makeBackend(sampleData(), {}), pb = await openApp(browser, bb, { viewport });
+      assert(await pb.evaluate(() => getComputedStyle(document.querySelector('.status-and-button-container')).display !== 'none'), `${label}: im normalen Modus ist die Status-Zeile sichtbar`);
       const normalBefore = await normalGeometry(pb);
       await setBatchMode(pb, true);
       const empty = await batchGeometry(pb);
       assertBatchViewport(empty, `${label} leer`);
+
+      // 9.6: Auf kleinen Bildschirmen (< 992 px) ist die Status-Zeile ausgeblendet und das Scanfeld voll breit; am Desktop sichtbar
+      if (viewport.width < 992) {
+        const statusMobile = await pb.evaluate(() => {
+          const sc = document.querySelector('.status-and-button-container');
+          const form = document.getElementById('main-input-form');
+          const input = document.getElementById('shipmentNumberInput');
+          return {
+            hidden: getComputedStyle(sc).display === 'none',
+            formFullWidth: form.getBoundingClientRect().width >= innerWidth - 32,
+            inputWidth: input.getBoundingClientRect().width > 150
+          };
+        });
+        assert(statusMobile.hidden && statusMobile.formFullWidth && statusMobile.inputWidth,
+          `${label}: Status-Zeile im Batch-Modus ausgeblendet und Scanfeld voll breit`);
+      } else {
+        const statusDesktop = await pb.evaluate(() => getComputedStyle(document.querySelector('.status-and-button-container')).display !== 'none');
+        assert(statusDesktop, `${label}: Status-Zeile am Desktop sichtbar`);
+      }
+
+      // 9.6: Einstell-Schalter standardmäßig zugeklappt, lassen sich aufklappen, Schalter-Werte bleiben beim Klappen erhalten
+      const settingsCheck = await pb.evaluate(() => {
+        const header = document.getElementById('batchSettingsHeader');
+        const body = document.getElementById('batchSettingsBody');
+        const soundToggle = document.getElementById('unexpectedHuSoundToggle');
+        const feedbackToggle = document.getElementById('batchFeedbackToggle');
+
+        const initiallyClosed = body.classList.contains('hidden') && header.getAttribute('aria-expanded') === 'false';
+        const initialSound = soundToggle.checked;
+
+        // Aufklappen
+        header.click();
+        const opened = !body.classList.contains('hidden') && header.getAttribute('aria-expanded') === 'true';
+
+        // Schalter umschalten
+        soundToggle.checked = !initialSound;
+        soundToggle.dispatchEvent(new Event('change', { bubbles: true }));
+        feedbackToggle.checked = true;
+        feedbackToggle.dispatchEvent(new Event('change', { bubbles: true }));
+
+        // Zuklappen
+        header.click();
+        const closedAgain = body.classList.contains('hidden') && header.getAttribute('aria-expanded') === 'false';
+        const soundWhenClosed = soundToggle.checked;
+        const feedbackWhenClosed = feedbackToggle.checked;
+
+        // Erneut aufklappen
+        header.click();
+        const openedAgain = !body.classList.contains('hidden') && header.getAttribute('aria-expanded') === 'true';
+        const soundAfterReopen = soundToggle.checked;
+        const feedbackAfterReopen = feedbackToggle.checked;
+
+        // Werte zurücksetzen und wieder zuklappen
+        soundToggle.checked = initialSound;
+        soundToggle.dispatchEvent(new Event('change', { bubbles: true }));
+        feedbackToggle.checked = false;
+        feedbackToggle.dispatchEvent(new Event('change', { bubbles: true }));
+        header.click();
+
+        return {
+          initiallyClosed,
+          opened,
+          closedAgain,
+          openedAgain,
+          preserved: soundWhenClosed === !initialSound && feedbackWhenClosed === true &&
+                     soundAfterReopen === !initialSound && feedbackAfterReopen === true
+        };
+      });
+      assert(settingsCheck.initiallyClosed && settingsCheck.opened && settingsCheck.closedAgain &&
+        settingsCheck.openedAgain && settingsCheck.preserved,
+        `${label}: Einstellungen standardmäßig zugeklappt, klappbar und Schalter-Werte bleiben beim Klappen erhalten`);
+
       for (let i = 0; i < 35; i++) await scan(pb, 'ZZBATCH' + String(i).padStart(4, '0'), 0);
       const full = await batchGeometry(pb);
       assertBatchViewport(full, `${label} mit 35 Scans`);
@@ -171,8 +260,8 @@ async function normalGeometry(page) {
       assert(await pb.$eval('#batchList', e => e.scrollTop === 0 && e.firstElementChild.querySelector('.batch-item-number').textContent === 'ZZBATCHENTER'), `${label}: auch der nächste Scanner-Enter zeigt den neuesten Eintrag`);
       if (viewport.width === 390 || viewport.width === 992) {
         const noteTop = await pb.$eval('#batchList', e => { e.scrollTop = 300; return e.scrollTop; });
-        await pb.evaluate(() => { document.getElementById('batchNoteToggle').click(); document.getElementById('batchNoteInput').value = 'Palette 9.5'; document.getElementById('confirmBatchNoteButton').click(); });
-        assert(await pb.$eval('#batchList', (e, top) => e.scrollTop === top && e.querySelector('.batch-item-note').textContent.includes('Palette 9.5'), noteTop), `${label}: Notiz ändern ohne neuen Scan erhält Scrollstand`);
+        await pb.evaluate(() => { document.getElementById('batchNoteToggle').click(); document.getElementById('batchNoteInput').value = 'Palette 9.6'; document.getElementById('confirmBatchNoteButton').click(); });
+        assert(await pb.$eval('#batchList', (e, top) => e.scrollTop === top && e.querySelector('.batch-item-note').textContent.includes('Palette 9.6'), noteTop), `${label}: Notiz ändern ohne neuen Scan erhält Scrollstand`);
         assertBatchViewport(await batchGeometry(pb), `${label} mit Batch-Notiz`);
       }
       // 100dvh statt einer alten 65-vh-/560-px-Kappe: jedes zusätzliche Pixel Höhe landet in der Liste.

@@ -5,10 +5,10 @@ Es liest und schreibt das Google Sheet mit der ID `<SPREADSHEET_ID>` (steht nich
 Skript-Eigenschaften des Apps-Script-Projekts, Schlüssel `SPREADSHEET_ID`; fehlt die Eigenschaft, meldet der Code
 einen klaren Fehler und greift auf keine andere Tabelle zu).
 
-Zusammengehörige Versionen: **App 9.5 ↔ Code.gs 2.9** (die App zeigt beides unten im Seitenmenü). App 9.5 hält nur die
-Batch-Ansicht im Bild und zeigt neue Scans sofort oben; Code.gs bleibt unverändert auf 2.9, keine neuen Skript-Eigenschaften.
+Zusammengehörige Versionen: **App 9.6 ↔ Code.gs 2.9** (die App zeigt beides unten im Seitenmenü). App 9.6 macht die
+Batch-Ansicht auf kleinen Bildschirmen kompakter; Code.gs bleibt unverändert auf 2.9, keine neuen Skript-Eigenschaften.
 Der in App 9.3 eingeführte Mehrgeräte-Sync braucht weiterhin Code.gs 2.9. **Code.gs 2.9 muss bereits bereitgestellt sein,
-bevor App 9.5 live geht; für 9.5 ist keine erneute Backend-Bereitstellung nötig.** Sendungs-Versionen und Konfliktprüfung
+bevor App 9.6 live geht; für 9.6 ist keine erneute Backend-Bereitstellung nötig.** Sendungs-Versionen und Konfliktprüfung
 kann erst das Skript 2.9 beantworten
 (mit 2.8 speichert die App weiter wie 9.2, aber ohne Versionsprüfung, Namen und Protokoll). Bereitstellen siehe
 `README.md` im Hauptordner (bestehende Web-App → neue Version, keine neue Bereitstellung).

@@ -253,6 +253,53 @@ body.batch-mode-active .status-and-button-container > #mainActionButton { flex: 
 @media (prefers-reduced-motion: reduce) {
     #batchList li.is-newest { animation-duration: .01ms; }
 }
+.batch-settings {
+    flex-shrink: 0;
+    margin-top: var(--sp-1);
+    border-top: 1px solid var(--border);
+}
+.batch-settings-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-height: 32px;
+    padding: var(--sp-1) var(--sp-2);
+    font-family: inherit;
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    color: var(--text-muted);
+    background: transparent;
+    border: none;
+    border-radius: var(--r-sm);
+    cursor: pointer;
+    user-select: none;
+    transition: color var(--dur) var(--ease), background-color var(--dur) var(--ease);
+}
+.batch-settings-header:hover {
+    color: var(--text);
+    background-color: var(--surface-3);
+}
+.batch-settings-chevron {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    transition: transform var(--dur) var(--ease);
+}
+.batch-settings-chevron svg {
+    width: 18px;
+    height: 18px;
+}
+.batch-settings.is-open .batch-settings-chevron {
+    transform: rotate(180deg);
+}
+.batch-settings-body {
+    padding: 0;
+}
+.batch-settings-body .batch-note-toggle-container { margin-top: 0; }
+.batch-settings-body .toggle-row:last-child { border-bottom: none; }
 .batch-note-toggle-container { margin-top: var(--sp-2); }
 .batch-action-buttons { display: flex; gap: var(--sp-2); margin-top: var(--sp-3); }
 .batch-action-buttons button {
@@ -307,9 +354,7 @@ body.batch-mode-active .status-and-button-container > #mainActionButton { flex: 
         box-shadow: var(--shadow-md);
     }
     body.batch-mode-active .input-section > div:first-child { min-height: 54px; }
-    body.batch-mode-active .status-and-button-container { flex-wrap: nowrap; }
-    body.batch-mode-active .status-select-wrapper { min-width: 90px; }
-    body.batch-mode-active .status-and-button-container > #mainActionButton { flex: 0 1 auto; white-space: normal; line-height: 1.2; }
+    body.batch-mode-active .status-and-button-container { display: none; }
     /* Einzelnotiz/Kombi sind im Batch bereits ausgeschaltet; auch ihre leeren Abstandszeilen entfallen. */
     body.batch-mode-active .input-section > .controls-row,
     body.batch-mode-active #note-input-form { display: none; }

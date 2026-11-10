@@ -5,7 +5,7 @@
 // App-Version (zentral). Bei jeder veröffentlichten Änderung hochzählen und in CHANGELOG.md, index.html (<title>),
 // sw.js (Cache-Name) und backend/README.md nachziehen – tests/versioncheck.js prüft, dass alle Stellen übereinstimmen.
 // APP_BACKEND_VERSION = Version von backend/Code.gs, zu der diese App gehört (nur Anzeige im Menü).
-const APP_VERSION = '9.5';
+const APP_VERSION = '9.6';
 const APP_VERSION_DATE = '2026-11-10';
 const APP_BACKEND_VERSION = '2.9';
 
