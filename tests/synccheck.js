@@ -183,6 +183,7 @@ async function waitOverlayGone(page, maxMs = 8000) { return waitFor(async () => 
     assert(!/Konflikt/.test(await errorText(pageB)) && !/Konflikt/.test(await errorText(pageA)), 'Kein Konflikt gemeldet (verschiedene HUs lassen sich sauber zusammenführen)');
     const reqB = saves().slice(-1)[0].payload;
     assert(reqB.versions[O] === 2 && reqB.modifiedBy === 'Max Muster', `B hat Version 2 als Ausgangsstand geschickt (${JSON.stringify(reqB.versions)}, ${reqB.modifiedBy})`);
+    await pageA.bringToFront(); await wait(300);
     assert(await waitFor(async () => (await itemStatus(pageA, O, 'HU1003')) === 'XRY', 6000), 'A sieht den Scan von B');
     assert(await waitFor(async () => (await itemStatus(pageB, O, 'HU1002')) === 'XRY', 6000), 'B sieht den Scan von A');
     sA = await localShipments(pageA);
@@ -205,11 +206,14 @@ async function waitOverlayGone(page, maxMs = 8000) { return waitFor(async () => 
     assert(lastChange.k === 'conflict' && lastChange.u === 'Max Muster' && lastChange.by === 'Zakaria Bisbiss' && lastChange.n === 1, `Protokoll: Konflikt-Eintrag (${JSON.stringify(lastChange)})`);
     const errB = await errorText(pageB);
     assert(/Konflikt bei 9007000002/.test(errB) && /gleichzeitig von Zakaria Bisbiss/.test(errB) && /HU HU2001 Status: jetzt ETD \(Eingabe XRY von Zakaria Bisbiss überschrieben\)/.test(errB) && /Version 3/.test(errB), `B zeigt die Konfliktmeldung: „${errB}“`);
+    await pageA.bringToFront(); await wait(300);
     assert(await waitFor(async () => (await itemStatus(pageA, O2, 'HU2001')) === 'ETD', 6000), 'A übernimmt den gültigen Stand (ETD)');
     assert(!/Konflikt/.test(await errorText(pageA)), 'A (dessen Eingabe überschrieben wurde) bekommt keine Fehlermeldung – der Protokolleintrag hält es fest');
 
     // ---------- 11) Änderungsprotokoll (Modal) auf A ----------
-    await pageA.evaluate(() => document.getElementById('changeLogBtn').click()); await wait(300);
+    await pageA.bringToFront(); await wait(300);
+    await pageA.evaluate(() => document.getElementById('changeLogBtn').click());
+    await waitFor(async () => await pageA.evaluate(() => document.querySelectorAll('#changeLogList tbody tr').length >= 7), 8000);
     let log = await pageA.evaluate(() => ({ open: document.getElementById('changeLogModal').classList.contains('visible'), rows: [...document.querySelectorAll('#changeLogList tbody tr')].map(tr => [...tr.children].map(td => td.textContent.trim())), hint: document.getElementById('changeLogHint').textContent }));
     assert(log.open && log.rows.length >= 7, `Protokoll offen, ${log.rows.length} Einträge (${log.hint})`);
     assert(log.rows[0][1] === O2 && log.rows[0][2] === 'Max Muster' && log.rows[0][5] === 'Konflikt mit Zakaria Bisbiss' && /^Fertig · WE 1\/1 · Sich\. 1\/1$/.test(log.rows[0][3]) && /^Fertig · WE 2\/1 · Sich\. 1\/1$/.test(log.rows[0][4]), `Neuester Eintrag: HAWB, Benutzer, alter → neuer Status, Art (${JSON.stringify(log.rows[0])})`);
@@ -232,6 +236,7 @@ async function waitOverlayGone(page, maxMs = 8000) { return waitFor(async () => 
     row = serverRow('N777');
     assert(be.gas.sheets.shipments.rows.filter(r => r[0] === 'N777').length === 1 && row.shipment.scannedItems.length === 2 && row.shipment.totalPiecesExpected === 2, `Eine Zeile, beide Packstücke (${row.shipment.scannedItems.length}), Stückzahl 2`);
     assert(!/Konflikt/.test(await errorText(pageB)), `Kein Konflikt (gleiche Stückzahl, verschiedene Packstücke): „${await errorText(pageB)}“`);
+    await pageA.bringToFront(); await wait(300);
     assert(await waitFor(async () => ((await localShipments(pageA)).N777 || {}).scannedItems?.length === 2, 6000), 'A sieht beide Packstücke');
 
     // ---------- 13) Alte Sendungen ohne Version (Zeilen aus Code.gs ≤ 2.8) → Version 1, kein Name; Speichern klappt ----------
@@ -239,11 +244,12 @@ async function waitOverlayGone(page, maxMs = 8000) { return waitFor(async () => 
     const oldRow = (base, total) => [base, JSON.stringify({ hawb: base, totalPiecesExpected: total, lastModified: new Date().toISOString(), scannedItems: [] }), gv + 1, new Date().toISOString(), ''];   // Zeile ohne version/lastModifiedBy/Spalte F
     be.gas.sheets.shipments.rows.push(oldRow('ALT8', 2), oldRow('ALT9', 1));
     be.gas.sheets._meta.rows[0][0] = gv + 1; delete be.gas.cache['fracht_version'];
+    await pageA.bringToFront(); await wait(300);
     assert(await waitFor(async () => !!(await localShipments(pageA)).ALT9 && !!(await localShipments(pageA)).ALT8, 6000), 'ALT8/ALT9 kommen per Abruf an');
     sA = await localShipments(pageA);
     assert(sA.ALT9.version === 1 && sA.ALT9.lastModifiedBy === '' && Array.isArray(sA.ALT9.changes) && (await nameCell(pageA, 'ALT9')) === '', `ALT9: Version 1, kein Name (Liste zeigt nur die Zeit) (${sA.ALT9.version}, „${sA.ALT9.lastModifiedBy}“, Zelle ${JSON.stringify(await nameCell(pageA, 'ALT9'))})`);
     await setStatus(pageA, 'XRY'); await scan(pageA, 'ALT9', 500);
-    assert(await waitFor(async () => serverRow('ALT9').shipment.version === 2, 6000), 'ALT9 gespeichert → Version 2');
+    assert(await waitFor(async () => { const r = serverRow('ALT9'); return r && r.shipment && r.shipment.version === 2; }, 6000), 'ALT9 gespeichert → Version 2');
     assert(serverRow('ALT9').modifiedBy === 'Zakaria Bisbiss' && serverRow('ALT9').shipment.lastModifiedBy === 'Zakaria Bisbiss', 'ALT9: Name in Spalte F und im JSON');
     assert(!/Konflikt/.test(await errorText(pageA)), 'Kein Konflikt beim ersten Speichern einer alten Sendung');
 
