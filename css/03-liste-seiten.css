@@ -94,6 +94,34 @@
     text-transform: uppercase;
     color: var(--text-muted);
 }
+/* Zeile „Zuletzt bearbeitet“ + Knopf „Protokoll“ (Änderungsprotokoll, 9.3) – Überschrift behält ihren Abstand, Knopf steht rechts */
+.list-caption-row { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--sp-2); }
+.list-caption-row .list-caption { flex: 1; min-width: 0; }
+.change-log-btn {
+    flex-shrink: 0;
+    margin-top: var(--sp-5);
+    padding: 2px var(--sp-2);
+    min-height: 0;
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--accent);
+    background: none;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-full);
+    cursor: pointer;
+}
+.change-log-btn:hover, .change-log-btn:active { color: #fff; background-color: var(--accent); border-color: var(--accent); }
+/* Name des letzten Bearbeiters (lastModifiedBy, 9.3): zweite Zeile unter der Zeit, eingerückt hinter das Uhr-Icon.
+   Zwei Zeilen à 12 px bleiben unter der Höhe der Icon-Leiste (46 px) – die Kartenhöhe ändert sich nicht. */
+.shipment-table td.time-cell { flex-wrap: wrap; align-content: center; row-gap: 0; }
+.shipment-table td.time-cell .modified-by { flex: 0 0 100%; min-width: 0; padding-left: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.25; color: var(--text-muted); }
+@media (min-width: 992px) {
+    /* Desktop-Tabelle: Name als zweite Zeile in der Spalte „Letzte Änd.“; width 0 + min-width 100 % → die Spalte wird dadurch nicht breiter */
+    .shipment-table td.time-cell { line-height: 1.2; }   /* zwei Zeilen à 12 px (2 × 14,4 + 6 px Innenabstand) passen in die 36-px-Zeile – Zeilenhöhe bleibt */
+    .shipment-table td.time-cell .modified-by { display: block; width: 0; min-width: 100%; padding-left: 0; line-height: 1.2; }
+}
 body.batch-mode-active .home-hub { display: none; } /* im Batch-Modus zählt nur Scannen + Liste */
 
 /* ---- Unterseiten (Anlieferung, LKW, Dunkelalarm, Offene Sendungen, Info): Vollbild wie die Detailansicht ---- */

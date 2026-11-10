@@ -283,6 +283,112 @@ props.SPREADSHEET_ID = '';
 threw = false; try { api.spreadsheetId_(); } catch (e) { threw = /SPREADSHEET_ID fehlt/.test(e.message); }
 ok(threw, 'spreadsheetId_: leere Eigenschaft klarer Fehler statt fester Wert');
 props.SPREADSHEET_ID = 'test-tabelle';
+// 11) Sichere Synchronisation (2.9): Sendungs-Version, lastModifiedBy (Spalte F), Versionsprüfung, Konflikte, Protokoll, alte Zeilen
+{
+  const item = (raw, status, t, extra) => Object.assign({ id: raw + '|' + t, rawInput: raw, status, timestamp: t, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null }, extra || {});
+  const S = (items, extra) => Object.assign({ hawb: 'V1', totalPiecesExpected: 3, lastModified: '2026-11-10T08:00:00.000Z', scannedItems: items }, extra || {});
+  // Zweiter Mitarbeiter mit eigener Sitzung (Max) – für „wer hat zuletzt geändert“
+  r = call('adminInvite', { name: 'Max Muster', email: 'max@example.com' }, adminTok);
+  const invMax = /einladung=([0-9a-f]+)/.exec(mails[mails.length - 1].body)[1];
+  const maxTok = call('authAccept', { invite: invMax, pin: '778812', deviceId: 'dev-max' }).token;
+  ok(!!maxTok, '2.9: zweiter Mitarbeiter (Max Muster) angemeldet');
+
+  // a) Neu anlegen → version 1, lastModifiedBy aus der Sitzung (nicht aus dem Payload), Spalte F, Protokoll „new“
+  r = call('saveShipments', { shipments: { V1: S([]) }, bases: {}, versions: { V1: 0 }, modifiedBy: 'Falscher Name' }, adminTok);
+  let m = r.merged.V1;
+  ok(r.status === 'success' && m.version === 1 && m.lastModifiedBy === 'Zakaria Bisbiss' && r.conflicts.length === 0, `Neu: version 1, lastModifiedBy aus der Sitzung (${m.version}, ${m.lastModifiedBy})`);
+  ok(m.changes.length === 1 && m.changes[0].k === 'new' && m.changes[0].u === 'Zakaria Bisbiss' && m.changes[0].from === '' && /^Offen · WE 0\/3 · Sich\. 0\/3$/.test(m.changes[0].to), `Protokoll „new“: ${JSON.stringify(m.changes[0])}`);
+  let rows = shipmentRows();
+  ok(rows.V1.modifiedBy === 'Zakaria Bisbiss' && rows.V1.shipment.version === 1, 'Spalte F = Name, JSON trägt version 1');
+
+  // b) Version passt → 1:1 übernommen, version 2, Max als lastModifiedBy, Status-Protokoll
+  const v1 = JSON.parse(JSON.stringify(m));
+  const scanA = S([item('HU-A', 'XRY', '2026-11-10T08:01:00.000Z')], { version: 1 });
+  r = call('saveShipments', { shipments: { V1: scanA }, bases: { V1: v1 }, versions: { V1: 1 } }, maxTok);
+  m = r.merged.V1;
+  ok(m.version === 2 && m.lastModifiedBy === 'Max Muster' && m.scannedItems.length === 1 && r.conflicts.length === 0, `Version passt: 1:1 übernommen, version 2 von Max (${m.version}, ${m.lastModifiedBy})`);
+  ok(m.changes.length === 2 && m.changes[1].k === 'save' && m.changes[1].from.startsWith('Offen · WE 0/3 · Sich. 0/3') && m.changes[1].to === 'Offen · WE 0/3 · Sich. 1/3', `Protokoll: alter → neuer Status (${m.changes[1].from} → ${m.changes[1].to})`);
+  const v2 = JSON.parse(JSON.stringify(m));
+
+  // c) Zwei Geräte offline, gleiche Sendung, verschiedene HUs: Gerät 2 geht von Version 1 aus → Merge, nichts verloren, KEIN Konflikt
+  const scanB = S([item('HU-B', 'XRY', '2026-11-10T08:02:00.000Z')], { version: 1 });
+  r = call('saveShipments', { shipments: { V1: scanB }, bases: { V1: v1 }, versions: { V1: 1 } }, adminTok);
+  m = r.merged.V1;
+  ok(m.version === 3 && m.scannedItems.map(i => i.rawInput).sort().join() === 'HU-A,HU-B' && r.conflicts.length === 0, `Versionskonflikt ohne Überschneidung: beide Scans behalten, version 3, kein Konflikt gemeldet (${JSON.stringify(r.conflicts)})`);
+  ok(m.changes[m.changes.length - 1].k === 'save' && m.changes[m.changes.length - 1].to === 'Offen · WE 0/3 · Sich. 2/3', 'Protokoll nach Merge: Sich. 2/3');
+  const v3 = JSON.parse(JSON.stringify(m));
+
+  // d) Wiederholung desselben Sendens (Antwort ging verloren): nichts ändert sich, keine neue Version, kein Konflikt, kein neuer Protokolleintrag
+  const before = JSON.stringify(shipmentRows().V1);
+  r = call('saveShipments', { shipments: { V1: scanB }, bases: { V1: v1 }, versions: { V1: 1 } }, adminTok);
+  ok(r.merged.V1.version === 3 && r.conflicts.length === 0 && JSON.stringify(shipmentRows().V1) === before && r.merged.V1.changes.length === v3.changes.length, 'Doppeltes Senden: unverändert (version 3, kein Eintrag, kein Konflikt)');
+
+  // e) Echter Konflikt: beide ändern dieselbe HU verschieden (Gerät geht von Version 3 aus, Server ist inzwischen bei 4)
+  const edit1 = JSON.parse(JSON.stringify(v3)); edit1.scannedItems[0].status = 'ETD';
+  r = call('saveShipments', { shipments: { V1: edit1 }, bases: { V1: v3 }, versions: { V1: 3 } }, maxTok);
+  ok(r.merged.V1.version === 4 && r.conflicts.length === 0, 'Max ändert HU-A auf ETD (version 4)');
+  const v4 = JSON.parse(JSON.stringify(r.merged.V1));
+  const edit2 = JSON.parse(JSON.stringify(v3)); edit2.scannedItems[0].status = 'PHS'; edit2.totalPiecesExpected = 4;
+  r = call('saveShipments', { shipments: { V1: edit2 }, bases: { V1: v3 }, versions: { V1: 3 } }, adminTok);
+  m = r.merged.V1;
+  const c = r.conflicts[0];
+  ok(r.conflicts.length === 1 && c.base === 'V1' && c.serverVersion === 4 && c.clientVersion === 3 && c.newVersion === 5 && c.serverBy === 'Max Muster', `Konflikt gemeldet: ${JSON.stringify(c)}`);
+  ok(m.version === 5 && m.totalPiecesExpected === 4 && m.scannedItems.find(i => i.rawInput === 'HU-A').status === 'PHS', 'Feldweise zusammengeführt: Stückzahl 4 (nur wir geändert) + HU-A PHS (umkämpft, eingehender Stand gilt)');
+  ok(c.overridden.length === 1 && c.overridden[0].what === 'HU HU-A Status' && c.overridden[0].theirs === 'ETD' && c.overridden[0].now === 'PHS' && c.lost.length === 0, `Konfliktdetail: Änderung von Max (ETD) überschrieben, jetzt PHS (${JSON.stringify(c.overridden)})`);
+  const last = m.changes[m.changes.length - 1];
+  ok(last.k === 'conflict' && last.by === 'Max Muster' && last.u === 'Zakaria Bisbiss' && last.n === 1, `Protokoll „conflict“: ${JSON.stringify(last)}`);
+
+  // f) Eigene Eingabe unterliegt (2-Wege ohne Ausgangsstand, älterer Kopfstand): Konflikt mit „lost“, Serverstand gilt
+  const stale = S([item('HU-A', 'XRY', '2026-11-10T08:01:00.000Z')], { totalPiecesExpected: 9, lastModified: '2026-11-10T07:00:00.000Z' });
+  r = call('saveShipments', { shipments: { V1: stale }, bases: {}, versions: { V1: 0 } }, maxTok);
+  m = r.merged.V1;
+  ok(m.totalPiecesExpected === 4 && r.conflicts.length === 1 && r.conflicts[0].lost.some(l => l.what === 'Stückzahl' && l.mine === '9' && l.now === '4'), `Unterlegene Eingabe wird gemeldet (lost): ${JSON.stringify(r.conflicts[0] && r.conflicts[0].lost)}`);
+
+  // g) Alte App ohne versions → wie 2.8: Merge ohne Konfliktmeldung
+  const v5 = JSON.parse(JSON.stringify(m));
+  const oldApp = JSON.parse(JSON.stringify(v5)); oldApp.scannedItems.push(item('HU-C', 'XRY', '2026-11-10T08:05:00.000Z'));
+  r = call('saveShipments', { shipments: { V1: oldApp }, bases: { V1: v5 } }, adminTok);
+  ok(r.merged.V1.version === v5.version + 1 && r.conflicts.length === 0 && r.merged.V1.scannedItems.length === 3, 'Ältere App ohne versions: Merge wie bisher, Version zählt trotzdem weiter');
+
+  // h) Alte Zeile (2.8) ohne version/lastModifiedBy: gilt als Version 1, Name leer; Speichern mit Version 1 passt → Version 2
+  const oldJson = JSON.stringify({ hawb: 'ALT1', totalPiecesExpected: 1, lastModified: '2026-10-01T10:00:00.000Z', scannedItems: [] });
+  sheets.shipments.rows.push(['ALT1', oldJson, 1, '2026-10-01T10:00:00.000Z', '']);
+  delete cache['fracht_version'];
+  r = call('loadChanges', { sinceVersion: 0 }, adminTok);
+  ok(r.changed.ALT1 && r.changed.ALT1.version === 1 && r.changed.ALT1.lastModifiedBy === '' && Array.isArray(r.changed.ALT1.changes), 'Alte Sendung ohne Version: loadChanges liefert version 1, lastModifiedBy leer');
+  const altNew = Object.assign({}, r.changed.ALT1, { scannedItems: [item('ALT1', 'XRY', '2026-11-10T09:00:00.000Z')] });
+  r = call('saveShipments', { shipments: { ALT1: altNew }, bases: { ALT1: r.changed.ALT1 }, versions: { ALT1: 1 } }, maxTok);
+  ok(r.merged.ALT1.version === 2 && r.merged.ALT1.lastModifiedBy === 'Max Muster' && r.conflicts.length === 0 && shipmentRows().ALT1.modifiedBy === 'Max Muster', 'Alte Sendung gespeichert: version 2, Name gesetzt (JSON + Spalte F)');
+
+  // i) Spaltenregel: alte große Zeile (bis 2.8) mit JSON-Fortsetzung in F/G – F darf nicht als Name gelten, nichts fällt weg
+  const bigItems = []; for (let i = 0; i < 400; i++) bigItems.push(item('GROSS-' + i, 'Anstehend', '2026-10-01T10:00:00.000Z', { packaging: 'Palette ' + 'x'.repeat(80) }));
+  const bigJson = JSON.stringify({ hawb: 'GROSS', isHuListOrder: true, truckId: 'MAN 9', lastModified: '2026-10-01T10:00:00.000Z', scannedItems: bigItems });
+  ok(bigJson.length > 45000 * 2, `Testsendung ist groß genug für 3 Zellen (${bigJson.length} Zeichen)`);
+  const parts = []; for (let i = 0; i < bigJson.length; i += 45000) parts.push(bigJson.slice(i, i + 45000));
+  sheets.shipments.rows.push(['GROSS', parts[0], 1, '2026-10-01T10:00:00.000Z', '', parts[1], parts[2]]);   // alte Aufteilung: Fortsetzung ab F
+  delete cache['fracht_version'];
+  r = call('loadChanges', { sinceVersion: 0 }, adminTok);
+  ok(r.changed.GROSS && r.changed.GROSS.scannedItems.length === 400 && r.changed.GROSS.lastModifiedBy === '' && r.changed.GROSS.version === 1, 'Alte große Zeile: Fortsetzung aus F+G vollständig gelesen, F nicht als Name gedeutet');
+  // nach dem ersten Speichern liegt die Zeile in der neuen Aufteilung (F = Name, Fortsetzung ab G) und bleibt vollständig lesbar
+  const grossSaved = Object.assign({}, r.changed.GROSS); grossSaved.scannedItems = grossSaved.scannedItems.map((it, i) => i === 0 ? Object.assign({}, it, { status: 'XRY' }) : it);
+  r = call('saveShipments', { shipments: { GROSS: grossSaved }, bases: { GROSS: r.changed.GROSS }, versions: { GROSS: 1 } }, adminTok);
+  const grossRow = sheets.shipments.rows.find(x => x[0] === 'GROSS');
+  ok(r.merged.GROSS.version === 2 && grossRow[5] === 'Zakaria Bisbiss' && String(grossRow[6]).length === 45000 && String(grossRow[1]).length === 45000, `Große Zeile neu geschrieben: F = Name, Fortsetzung ab G (${grossRow[5]}, G ${String(grossRow[6]).length} Zeichen)`);
+  r = call('loadChanges', { sinceVersion: 0 }, adminTok);
+  ok(r.changed.GROSS.scannedItems.length === 400 && r.changed.GROSS.scannedItems[0].status === 'XRY' && r.changed.GROSS.version === 2 && r.changed.GROSS.lastModifiedBy === 'Zakaria Bisbiss', 'Große Zeile in neuer Aufteilung vollständig gelesen');
+
+  // j) Reihenfolge (order) wird eingehalten; Löschvermerk trägt den Namen in Spalte F
+  r = call('saveShipments', { shipments: { O2: S([], { hawb: 'O2' }), O1: S([], { hawb: 'O1' }) }, bases: {}, versions: { O1: 0, O2: 0 }, order: ['O1', 'O2'] }, maxTok);
+  rows = shipmentRows();
+  ok(rows.O1.version < rows.O2.version, `order: O1 vor O2 geschrieben (Zeilen-Versionen ${rows.O1.version} < ${rows.O2.version})`);
+  r = call('deleteShipments', { baseNumbers: ['O1', 'O2'] }, maxTok);
+  ok(shipmentRows().O1.modifiedBy === 'Max Muster' && shipmentRows().O1.flag === true, 'Löschvermerk: Name in Spalte F');
+  // k) Status-Kurzform: Dunkelalarm offen/erledigt, HU-Auftrag fertig
+  ok(api.shipmentStatusLabel_(S([item('X', 'Dunkelalarm', '2026-11-10T08:00:00.000Z')])) === 'Dunkelalarm · WE 0/3 · Sich. 0/3', 'Status: offener Dunkelalarm');
+  ok(api.shipmentStatusLabel_(S([item('X', 'Dunkelalarm', '2026-11-10T08:00:00.000Z'), item('X', 'ETD', '2026-11-10T08:01:00.000Z')])) === 'Offen · WE 0/3 · Sich. 1/3', 'Status: Dunkelalarm durch spätere Sicherung erledigt');
+  ok(api.shipmentStatusLabel_({ isHuListOrder: true, scannedItems: [item('A', 'XRY', '1'), item('B', 'XRY', '2')] }) === 'Fertig · WE 0/2 · Sich. 2/2', 'Status: HU-Auftrag fertig');
+  ok(api.shipmentStatusLabel_({ scannedItems: [] }) === 'ohne Stückzahl · WE 0/? · Sich. 0/?', 'Status: ohne Stückzahl');
+}
 // 7g) Parser direkt
 p = api.parseStandardText_('\uFEFFTitelzeile\n\nUSA\n 123 \n\n\n\nChina\n456\n789\n');
 ok(p.orders.length === 2 && p.orders[0].orderId === 'USA' && p.orders[0].hus.join() === '123' && p.orders[1].hus.join() === '456,789' && p.ignored.length === 0, 'parseStandardText_: BOM, Titelzeile ohne Packstücke, mehrere Leerzeilen');

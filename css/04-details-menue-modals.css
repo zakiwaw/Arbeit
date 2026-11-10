@@ -566,6 +566,55 @@ body.modal-open { overflow: hidden; }
     border-radius: var(--r-full);
 }
 .modal-content h3 { margin: var(--sp-1) 0 var(--sp-4); font-size: var(--fs-lg); text-align: center; }
+/* Änderungsprotokoll (9.3): Zeit | HAWB | Benutzer | alter Status | neuer Status | Art.
+   Handy: jeder Eintrag als kleiner Block (HAWB + Art, Alt, Neu, Zeit + Benutzer); Desktop (ab 992 px): echte Tabelle. */
+.change-log-hint { margin: 0 0 var(--sp-3); font-size: var(--fs-xs); color: var(--text-muted); text-align: center; }
+.change-log-list { overflow: auto; max-height: 60vh; border: 1px solid var(--border); border-radius: var(--r-md); }
+.change-log-list:empty { display: none; }
+.change-log-table { display: block; width: 100%; border-collapse: collapse; font-size: var(--fs-xs); }
+.change-log-table thead { display: none; }
+.change-log-table tbody { display: block; }
+.change-log-table tr {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+        "hawb hawb kind"
+        "from from from"
+        "to   to   to"
+        "time user user";
+    gap: 2px var(--sp-2);
+    padding: var(--sp-2) var(--sp-3);
+    border-bottom: 1px solid var(--border);
+}
+.change-log-table tr:last-child { border-bottom: none; }
+.change-log-table td { display: block; padding: 0; min-width: 0; color: var(--text); line-height: 1.3; }
+.change-log-hawb-cell { grid-area: hawb; }
+.change-log-kind-cell { grid-area: kind; text-align: right; }
+.change-log-from { grid-area: from; }
+.change-log-to { grid-area: to; }
+.change-log-time { grid-area: time; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--text-muted); }
+.change-log-user { grid-area: user; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.change-log-from::before, .change-log-to::before { display: inline-block; min-width: 3em; margin-right: 4px; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); }
+.change-log-from::before { content: "Alt"; }
+.change-log-to::before { content: "Neu"; }
+.change-log-hawb { padding: 0; min-height: 0; font: inherit; font-family: var(--font-mono); font-size: var(--fs-sm); font-weight: 700; color: var(--accent); background: none; border: none; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.change-log-kind { display: inline-block; padding: 1px 6px; border-radius: var(--r-full); background-color: var(--surface-3); color: var(--text-muted); white-space: nowrap; }
+.change-log-row.conflict .change-log-kind { background-color: var(--warning-soft); color: var(--warning-text); }
+.change-log-row.new .change-log-kind { background-color: var(--success-soft); color: var(--success-text); }
+@media (min-width: 992px) {
+    #changeLogModal .modal-content { max-width: 960px; }   /* Desktop: breites Fenster für die sechs Spalten (schlägt die 520 px aus css/05) */
+    .change-log-table { display: table; }
+    .change-log-table thead { display: table-header-group; }
+    .change-log-table tbody { display: table-row-group; }
+    .change-log-table tr { display: table-row; padding: 0; border-bottom: none; }
+    .change-log-table th { position: sticky; top: 0; padding: 6px 8px; text-align: left; white-space: nowrap; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); background-color: var(--surface-2); border-bottom: 1px solid var(--border); }
+    .change-log-table td { display: table-cell; padding: 5px 8px; vertical-align: top; border-bottom: 1px solid var(--border); }
+    .change-log-table tr:last-child td { border-bottom: none; }
+    .change-log-kind-cell { text-align: left; }
+    .change-log-from::before, .change-log-to::before { content: none; }
+    .change-log-hawb { font-size: inherit; }
+    .change-log-user { white-space: normal; }
+}
 .modal-content .form-group { margin-bottom: var(--sp-4); }
 .modal-content label { margin-bottom: var(--sp-1); }
 .modal-content input[type="number"], .modal-content input[type="text"] { font-size: var(--fs-md); }

@@ -443,6 +443,19 @@ if (huEditFormEl) {
         document.getElementById('cancelOrderAddButton').addEventListener('click', closeOrderAddModal);
         document.getElementById('orderAddModal').addEventListener('click', (e) => { if (e.target.id === 'orderAddModal') closeOrderAddModal(); });
     }
+    // Änderungsprotokoll (9.3): Knopf neben „Zuletzt bearbeitet“, Schließen, Klick auf den Hintergrund, Escape, HAWB → Sendung
+    const changeLogModalEl = document.getElementById('changeLogModal');
+    if (changeLogModalEl) {
+        const openBtn = document.getElementById('changeLogBtn');
+        if (openBtn) openBtn.addEventListener('click', showChangeLog);
+        document.getElementById('closeChangeLogButton').addEventListener('click', closeChangeLog);
+        changeLogModalEl.addEventListener('click', (e) => {
+            if (e.target.id === 'changeLogModal') { closeChangeLog(); return; }
+            const hawb = e.target.closest('.change-log-hawb');
+            if (hawb) { const base = hawb.dataset.base; closeChangeLog(); if (base && loadShipments()[base]) showDetailView(base); }
+        });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && isChangeLogOpen()) { e.preventDefault(); closeChangeLog(); } });
+    }
     const lkwRenameFormEl = document.getElementById('lkw-rename-form');
     if (lkwRenameFormEl) {
         lkwRenameFormEl.addEventListener('submit', (e) => { e.preventDefault(); saveLkwRenameFromModal(); });

@@ -57,8 +57,31 @@ function writeSnapshotFrom(shipments) {
     Object.keys(shipments || {}).forEach(b => { snap[b] = JSON.stringify(shipments[b]); });
     writeSnapshot(snap);
 }
-function readPending() { try { const p = JSON.parse(localStorage.getItem(SYNC_PENDING_KEY) || '{}'); return { changed: p.changed || {}, deleted: p.deleted || {} }; } catch (e) { return { changed: {}, deleted: {} }; } }
-function writePending(p) { localStorage.setItem(SYNC_PENDING_KEY, JSON.stringify(p)); }
+// Vorgemerkte Änderungen = Offline-Warteschlange (9.3): changed/deleted je Sendung (keine Doppelten) + order = Reihenfolge,
+// in der die Sendungen zuerst geändert wurden. Gesendet wird in dieser Reihenfolge; was nicht bestätigt wurde, bleibt stehen.
+function readPending() {
+    try {
+        const p = JSON.parse(localStorage.getItem(SYNC_PENDING_KEY) || '{}');
+        return normalizePending({ changed: p.changed || {}, deleted: p.deleted || {}, order: Array.isArray(p.order) ? p.order : [] });
+    } catch (e) { return { changed: {}, deleted: {}, order: [] }; }
+}
+function normalizePending(p) {
+    const seen = {};
+    const order = [];
+    p.order.concat(Object.keys(p.deleted), Object.keys(p.changed)).forEach(b => {
+        if (seen[b] || !(p.changed[b] || p.deleted[b])) return;   // erledigte Einträge fallen aus der Reihenfolge
+        seen[b] = true; order.push(b);
+    });
+    p.order = order;
+    return p;
+}
+function writePending(p) { localStorage.setItem(SYNC_PENDING_KEY, JSON.stringify(normalizePending(p))); }
+// Sendungs-Version, auf der der lokale Stand beruht (Ausgangsstand vom Server); 0 = auf diesem Gerät neu angelegt
+function baseVersionOf(snapJson) {
+    if (!snapJson) return 0;
+    try { const v = Math.floor(Number(JSON.parse(snapJson).version)); return (isFinite(v) && v > 0) ? v : 1; } catch (e) { return 1; }
+}
+function currentUserName() { const u = currentUser(); return u && u.name ? String(u.name) : ''; }
 function hasPending(p) { p = p || readPending(); return Object.keys(p.changed).length > 0 || Object.keys(p.deleted).length > 0; }
 function clearSyncState() { [SYNC_VERSION_KEY, SYNC_SNAPSHOT_KEY, SYNC_PENDING_KEY, ARCHIVE_BASES_KEY].forEach(k => localStorage.removeItem(k)); archiveKnownBases = new Set(); }
 
@@ -500,13 +523,16 @@ function showSyncOk() {
 // 1) lokal speichern  2) geänderte/gelöschte Sendungen vormerken  3) an den Server schicken
 async function saveShipments(shipments) {
     Object.values(shipments).forEach(ensureItemIds);
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(shipments));
-
     const snap = readSnapshot();
     const pending = readPending();
+    const me = currentUserName();
     Object.keys(shipments).forEach(b => {
+        if (snap[b] === JSON.stringify(shipments[b])) return;
+        // lokal geändert → sofort sichtbar, wer es war (der Server setzt den Namen beim Speichern endgültig)
+        if (me && shipments[b] && typeof shipments[b] === 'object' && shipments[b].lastModifiedBy !== me) shipments[b].lastModifiedBy = me;
         if (snap[b] !== JSON.stringify(shipments[b])) pending.changed[b] = true;
     });
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(shipments));
     // Verschwundene Sendungen bekommen einen Löschvermerk, wenn der Server sie kennt (Ausgangsstand) ODER kennen könnte (Änderung
     // vorgemerkt bzw. gerade unterwegs) – sonst käme eine eben erst angelegte und sofort wieder gelöschte Sendung beim nächsten Abruf zurück.
     Object.keys(pending.changed).forEach(b => { if (!(b in shipments)) { delete pending.changed[b]; pending.deleted[b] = true; } });
@@ -517,10 +543,15 @@ async function saveShipments(shipments) {
 }
 
 // Schickt alles Vorgemerkte an den Server; läuft nie doppelt parallel.
+// Offline (navigator.onLine = false): nichts versuchen, warten – das Ereignis „online“ (startSyncPolling) stößt das Senden an.
+// Reihenfolge: die Warteschlange (pending.order) wird von vorn abgearbeitet; aufeinanderfolgende Löschungen bzw. Änderungen
+// gehen gebündelt in je einem Aufruf (Server-Skript hält die mitgeschickte Reihenfolge ein). Bricht die Verbindung ab,
+// bleibt der Rest stehen und wird nach der Rückkehr in derselben Reihenfolge gesendet.
 async function flushPendingChanges() {
     if (syncInFlight) { syncQueued = true; return; }
     if (!hasPending()) return;
     if (isAuthViewOpen()) { syncQueued = true; return; } // wird nach der Anmeldung nachgeholt (ensureLoggedIn → pollNow)
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) { showOfflineWaiting(); return; }
 
     syncInFlight = true;
     setSyncIndicator('busy', 'Wird synchronisiert …');
@@ -529,64 +560,21 @@ async function flushPendingChanges() {
             // Altes Backend: kompletter Datensatz wie früher
             await postToServer('saveAllData', loadShipments());
             writeSnapshotFrom(loadShipments());
-            writePending({ changed: {}, deleted: {} });
+            writePending({ changed: {}, deleted: {}, order: [] });
         } else {
-            const pending = readPending();
-
-            // Löschungen zuerst (Tombstones), damit kein anderes Gerät die Sendung wiederbelebt –
-            // möglichst alle in EINEM Aufruf (Server-Skript ab 2.4), sonst einzeln wie bisher
-            let delBases = Object.keys(pending.deleted);
-            if (delBases.length > 1 && serverHasBatchDelete) {
-                try {
-                    await postToServer('deleteShipments', { baseNumbers: delBases });
-                    const p = readPending(); const s = readSnapshot();
-                    delBases.forEach(b => { delete p.deleted[b]; delete s[b]; });
-                    writePending(p); writeSnapshot(s);
-                    delBases = [];
-                } catch (e) {
-                    if (!isUnknownActionError(e)) throw e;
-                    serverHasBatchDelete = false;   // älteres Server-Skript → einzeln
-                }
-            }
-            for (const b of delBases) {
-                await postToServer('deleteShipment', { baseNumber: b });
-                const p = readPending(); delete p.deleted[b]; writePending(p);
-                const s = readSnapshot(); delete s[b]; writeSnapshot(s);
-            }
-
-            const changedBases = Object.keys(readPending().changed);
-            if (changedBases.length > 0) {
-                const local = loadShipments();
-                const snap = readSnapshot();
-                const toSend = {}, bases = {}, sentJson = {};
-                changedBases.forEach(b => {
-                    if (!local[b]) return;
-                    toSend[b] = local[b];
-                    sentJson[b] = JSON.stringify(local[b]);
-                    bases[b] = snap[b] ? JSON.parse(snap[b]) : null; // Ausgangsstand für den 3-Wege-Merge
+            // Warteschlange in Gruppen: [{ kind: 'delete'|'change', bases: [...] }, …] in Änderungsreihenfolge
+            const groups = [];
+            const p0 = readPending();
+            p0.order.forEach(b => {
+                [['delete', p0.deleted[b]], ['change', p0.changed[b]]].forEach(([kind, on]) => {
+                    if (!on) return;
+                    const last = groups[groups.length - 1];
+                    if (last && last.kind === kind) last.bases.push(b); else groups.push({ kind, bases: [b] });
                 });
-                const r = await postToServer('saveShipments', { shipments: toSend, bases, deviceId: SYNC_DEVICE_ID });
-
-                // Zusammengeführten Stand übernehmen (enthält ggf. Scans anderer Geräte)
-                const merged = r.merged || {};
-                const after = loadShipments(); const snapNow = readSnapshot(); const p = readPending();
-                let touched = false;
-                Object.keys(merged).forEach(b => {
-                    const mj = JSON.stringify(merged[b]);
-                    if (JSON.stringify(after[b]) === sentJson[b]) {
-                        // lokal seit dem Senden unverändert → Server-Stand ist jetzt unser Stand
-                        snapNow[b] = mj;
-                        if (mj !== sentJson[b]) { after[b] = merged[b]; touched = true; }
-                        delete p.changed[b];
-                    }
-                    // sonst: währenddessen weiter geändert → bleibt vorgemerkt, wird mit altem Ausgangsstand erneut gesendet
-                });
-                changedBases.forEach(b => { if (!toSend[b]) delete p.changed[b]; });
-                writeSnapshot(snapNow); writePending(p);
-                { let k = false; Object.keys(merged).forEach(b => { if (archiveKnownBases.delete(b)) k = true; }); if (k) saveArchiveKnownBases(); } // gespeichert = (wieder) aktiv
-                if (touched) { localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(after)); refreshViewsAfterRemoteChange(); }
-                // Hinweis: die Server-Version wird bewusst NUR beim Abruf (pullRemoteChanges) weitergeschaltet,
-                // sonst würden zwischenzeitliche Änderungen anderer Geräte übersprungen.
+            });
+            for (const g of groups) {
+                if (g.kind === 'delete') await sendDeletes(g.bases);
+                else await sendChanges(g.bases);
             }
         }
         if (!hasPending()) showSyncOk();
@@ -597,6 +585,8 @@ async function flushPendingChanges() {
             setSyncIndicator('error', 'Anmeldung erforderlich – Daten sind lokal gespeichert'); // Anmeldeseite ist bereits offen (postToServer)
         } else if (isUnknownActionError(error) && !serverIsLegacy) {
             serverIsLegacy = true; displayError(SYNC_LEGACY_MESSAGE, 'orange'); syncQueued = true;
+        } else if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            showOfflineWaiting();
         } else {
             setSyncIndicator('error', 'Server nicht erreichbar – Daten sind lokal gespeichert');
             displayError(SYNC_FAILED_MESSAGE, 'red');
@@ -606,6 +596,92 @@ async function flushPendingChanges() {
         if (syncQueued) { syncQueued = false; flushPendingChanges(); }
         if (lkwStatusPending()) flushLkwStatus();
     }
+}
+function pendingCount(p) { p = p || readPending(); return p.order.length; }
+function showOfflineWaiting() {
+    const n = pendingCount();
+    setSyncIndicator('error', `Offline – ${n === 1 ? '1 Änderung wartet' : n + ' Änderungen warten'} (werden gesendet, sobald Netz da ist)`);
+}
+
+// Löschungen (Tombstones), damit kein anderes Gerät die Sendung wiederbelebt – möglichst alle in EINEM Aufruf
+// (Server-Skript ab 2.4), sonst einzeln wie bisher. Bestätigte Einträge verlassen die Warteschlange sofort.
+async function sendDeletes(delBases) {
+    delBases = delBases.slice();
+    if (delBases.length > 1 && serverHasBatchDelete) {
+        try {
+            await postToServer('deleteShipments', { baseNumbers: delBases, modifiedBy: currentUserName() });
+            const p = readPending(); const s = readSnapshot();
+            delBases.forEach(b => { delete p.deleted[b]; delete s[b]; });
+            writePending(p); writeSnapshot(s);
+            delBases = [];
+        } catch (e) {
+            if (!isUnknownActionError(e)) throw e;
+            serverHasBatchDelete = false;   // älteres Server-Skript → einzeln
+        }
+    }
+    for (const b of delBases) {
+        await postToServer('deleteShipment', { baseNumber: b, modifiedBy: currentUserName() });
+        const p = readPending(); delete p.deleted[b]; writePending(p);
+        const s = readSnapshot(); delete s[b]; writeSnapshot(s);
+    }
+}
+
+// Geänderte Sendungen (9.3): je Sendung Stand + Ausgangsstand (3-Wege-Merge) + Version, auf der er beruht (versions)
+// + Name (modifiedBy) + Reihenfolge (order). Antwort: merged = jetzt gültiger Stand, conflicts = was nicht zusammenpasste.
+async function sendChanges(changedBases) {
+    const local = loadShipments();
+    const snap = readSnapshot();
+    const toSend = {}, bases = {}, versions = {}, sentJson = {}, order = [];
+    changedBases.forEach(b => {
+        if (!local[b]) return;
+        toSend[b] = local[b];
+        sentJson[b] = JSON.stringify(local[b]);
+        bases[b] = snap[b] ? JSON.parse(snap[b]) : null; // Ausgangsstand für den 3-Wege-Merge
+        versions[b] = baseVersionOf(snap[b]);
+        order.push(b);
+    });
+    if (order.length === 0) { const p = readPending(); changedBases.forEach(b => { delete p.changed[b]; }); writePending(p); return; }
+    const r = await postToServer('saveShipments', { shipments: toSend, bases, versions, modifiedBy: currentUserName(), order, deviceId: SYNC_DEVICE_ID });
+
+    // Zusammengeführten Stand übernehmen (enthält ggf. Scans anderer Geräte, Version, Name, Protokoll)
+    const merged = r.merged || {};
+    const after = loadShipments(); const snapNow = readSnapshot(); const p = readPending();
+    let touched = false;
+    Object.keys(merged).forEach(b => {
+        const mj = JSON.stringify(merged[b]);
+        if (JSON.stringify(after[b]) === sentJson[b]) {
+            // lokal seit dem Senden unverändert → Server-Stand ist jetzt unser Stand
+            snapNow[b] = mj;
+            if (mj !== sentJson[b]) { after[b] = merged[b]; touched = true; }
+            delete p.changed[b];
+        }
+        // sonst: währenddessen weiter geändert → bleibt vorgemerkt, wird mit altem Ausgangsstand erneut gesendet
+    });
+    changedBases.forEach(b => { if (!toSend[b]) delete p.changed[b]; });
+    writeSnapshot(snapNow); writePending(p);
+    { let k = false; Object.keys(merged).forEach(b => { if (archiveKnownBases.delete(b)) k = true; }); if (k) saveArchiveKnownBases(); } // gespeichert = (wieder) aktiv
+    if (touched) { localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(after)); refreshViewsAfterRemoteChange(); }
+    if (Array.isArray(r.conflicts) && r.conflicts.length) showConflicts(r.conflicts);
+    // Hinweis: die Server-Version wird bewusst NUR beim Abruf (pullRemoteChanges) weitergeschaltet,
+    // sonst würden zwischenzeitliche Änderungen anderer Geräte übersprungen.
+}
+
+// Konflikt anzeigen: Welche Sendung, wer gleichzeitig geändert hat, was jetzt gilt. Nichts wird still verworfen –
+// die Meldung bleibt stehen, bis die nächste Meldung sie ersetzt; das Protokoll (Startseite → „Protokoll“) hält es fest.
+let lastConflicts = [];
+function conflictText(c) {
+    const who = c.serverBy ? ` – gleichzeitig von ${c.serverBy} geändert` : '';
+    const parts = [];
+    (c.lost || []).forEach(l => parts.push(`${l.what}: jetzt ${l.now} (deine Eingabe ${l.mine} nicht übernommen)`));
+    (c.overridden || []).forEach(o => parts.push(`${o.what}: jetzt ${o.now} (Eingabe ${o.theirs}${c.serverBy ? ' von ' + c.serverBy : ''} überschrieben)`));
+    return `Konflikt bei ${c.base}${who}: ${parts.join('; ') || 'Stände zusammengeführt'}. Gültig ist Version ${c.newVersion}.`;
+}
+function showConflicts(conflicts) {
+    lastConflicts = conflicts.slice(0, 20);
+    const lines = conflicts.map(conflictText);
+    const text = lines.length > 2 ? lines.slice(0, 2).join(' ') + ` (+${lines.length - 2} weitere, siehe Protokoll)` : lines.join(' ');
+    console.warn('Sync-Konflikt:', text);
+    if (typeof displayError === 'function') displayError(text, 'orange');
 }
 
 // Übernimmt Sendungen vom Server in den lokalen Bestand.
@@ -707,6 +783,7 @@ async function pullRemoteChanges() {
         syncPollDelay = Math.min(syncPollDelay * 2, SYNC_POLL_MAX_INTERVAL_MS); // Server nicht mit Anfragen fluten
         if (isAuthError(error)) setSyncIndicator('error', 'Anmeldung erforderlich'); // Anmeldeseite ist bereits offen (postToServer)
         else if (isUnknownActionError(error) && !serverIsLegacy) { serverIsLegacy = true; displayError(SYNC_LEGACY_MESSAGE, 'orange'); }
+        else if (typeof navigator !== 'undefined' && navigator.onLine === false && hasPending()) showOfflineWaiting(); // offline mit Warteschlange: das sagen, nicht „Server nicht erreichbar“
         else if (syncPollFailures >= 2) setSyncIndicator('error', 'Server nicht erreichbar'); // ein einzelner Aussetzer flackert nicht rot
     } finally {
         syncInFlight = false;

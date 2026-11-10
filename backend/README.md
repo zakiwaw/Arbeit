@@ -5,7 +5,9 @@ Es liest und schreibt das Google Sheet mit der ID `<SPREADSHEET_ID>` (steht nich
 Skript-Eigenschaften des Apps-Script-Projekts, Schlüssel `SPREADSHEET_ID`; fehlt die Eigenschaft, meldet der Code
 einen klaren Fehler und greift auf keine andere Tabelle zu).
 
-Zusammengehörige Versionen: **App 9.2 ↔ Code.gs 2.8** (2.7 funktioniert mit App 9.1/9.2 ebenfalls) (die App zeigt beides unten im Seitenmenü). Bereitstellen siehe
+Zusammengehörige Versionen: **App 9.3 ↔ Code.gs 2.9** (die App zeigt beides unten im Seitenmenü). **Code.gs 2.9 zuerst
+bereitstellen, dann App 9.3 live schalten** – App 9.3 schickt Sendungs-Versionen mit und zeigt Konflikte an, das kann erst das Skript 2.9
+beantworten (mit 2.8 speichert sie weiter wie 9.2, aber ohne Versionsprüfung, Namen und Protokoll). Bereitstellen siehe
 `README.md` im Hauptordner (bestehende Web-App → neue Version, keine neue Bereitstellung).
 
 ## Version 2 – Mehrgeräte-Sync
@@ -40,6 +42,29 @@ Sheet-Layout `shipments`: A = Sendungsnummer, B = JSON (wie bisher), **neu:** C 
 E = gelöscht, F… = Fortsetzung des JSON bei sehr großen Sendungen (eine Zelle fasst max. 50.000 Zeichen –
 ein großer VVL-Import würde sonst nicht gespeichert). Alte Zeilen ohne C–E funktionieren weiterhin.
 Das Sheet `_meta` (ausgeblendet) hält den globalen Versionszähler in A1 und wird automatisch angelegt.
+
+## Version 2.9 – Sendungs-Version, Name, Konflikte, Protokoll
+
+Bisher hat der Server jede eingehende Sendung ohne Rückfrage mit seinem Stand zusammengeführt; wer zuletzt geändert hat,
+war nirgends sichtbar, und wenn zwei Geräte **dieselbe HU** verschieden setzten, gewann still der spätere Zeitstempel.
+
+- Jede Sendung trägt im JSON `version` (zählt je Speichern um 1 hoch), `lastModifiedBy` (Name aus der Anmeldung) und
+  `changes` (die letzten 20 Protokolleinträge: Zeit `t`, Benutzer `u`, alter Status `from`, neuer Status `to`, Art `k` =
+  `new`/`save`/`conflict`; bei Konflikt zusätzlich `by` = wer gleichzeitig geändert hat). Alte Sendungen ohne diese
+  Felder gelten als Version 1 mit leerem Namen – die Angaben werden beim Lesen ergänzt (`ensureShipmentMeta_`), ohne
+  dass das Sheet dafür umgeschrieben werden muss.
+- `saveShipments` erwartet zusätzlich `versions` (je Sendung die Version, auf der das Gerät aufgesetzt hat; 0 = neu) und
+  `order` (Reihenfolge). **Version passt** → Stand 1:1 übernommen, Version + 1. **Version passt nicht** (ein anderes
+  Gerät hat inzwischen gespeichert) → 3-Wege-Merge wie bisher (Scans beider Seiten bleiben, Storno nie verloren); nur wo
+  beide **dasselbe Feld verschieden** geändert haben, meldet die Antwort `conflicts` (Sendung, Server-Version, wer, welche
+  Felder, was jetzt gilt). Das wiederholte Senden desselben Stands (Antwort war verloren gegangen) ändert nichts. Der Name
+  kommt aus der Sitzung (`verifySession_`), nicht aus dem Payload. Ältere Apps ohne `versions` werden wie bisher bedient.
+- Sheet `shipments`: **Spalte F = `lastModifiedBy`**, die JSON-Fortsetzung sehr großer Sendungen liegt **ab Spalte G**.
+  Alte Zeilen (bis 2.8) mit Fortsetzung ab F werden erkannt: Enthält B weniger als 50.000 Zeichen, ist F der Name; sonst
+  wird B+G… geprüft – ergibt das gültiges JSON, ist F der Name, andernfalls gehört F noch zum JSON (alte Aufteilung) und
+  der Name ist leer. Beim nächsten Speichern wird die Zeile in der neuen Aufteilung geschrieben; eine Migration von Hand
+  ist nicht nötig. Löschvermerke und Drive-Importe schreiben ebenfalls Spalte F (Import: Name `Automatik`).
+- `deleteShipment(s)` tragen den Namen des Löschenden in Spalte F ein.
 
 ## Version 2.1 – Archiv
 

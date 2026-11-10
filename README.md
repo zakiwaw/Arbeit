@@ -26,7 +26,7 @@ Aufträge übernommen.
 | `sw.js` | Service Worker: App-Dateien im Cache, Start ohne Netz (siehe „Offline“) |
 | `assets/vendor/` | Lokale Bibliotheken: jsPDF, jsPDF-AutoTable, qrcode.js |
 | `assets/*.mp3` | Hinweistöne |
-| `backend/Code.gs` | Google-Apps-Script (Server): Sync, Archiv, Anmeldung, Drive-Import – siehe `backend/README.md` |
+| `backend/Code.gs` | Google-Apps-Script (Server): Sync (Sendungs-Version, Name des letzten Bearbeiters, Konfliktmeldung, Änderungsprotokoll), Archiv, Anmeldung, Drive-Import – siehe `backend/README.md` |
 | `backend/ANLEITUNG-Drive-Import.md` | Einrichtung des automatischen Drive-Imports |
 | `backend/PROMPT-MAN-Ladeliste.md` | Prompt für den KI-Schritt „MAN-PDF → Textdatei“ |
 | `tests/` | Prüfskripte (Node + Chrome), siehe `tests/README.md` |
@@ -35,8 +35,8 @@ Aufträge übernommen.
 ## Versionen
 
 Die App-Version steht zentral in `js/01-start.js` (`APP_VERSION`, `APP_VERSION_DATE`, `APP_BACKEND_VERSION`) und wird in der
-App angezeigt: auf der Anmeldeseite, unten im Seitenmenü und am Desktop klein neben dem Titel („Version 9.2 · Stand … ·
-Server-Skript 2.8“). So sieht man auf jedem Gerät sofort, ob noch eine alte Version offen ist. Bei jeder veröffentlichten
+App angezeigt: auf der Anmeldeseite, unten im Seitenmenü und am Desktop klein neben dem Titel („Version 9.3 · Stand … ·
+Server-Skript 2.9“). So sieht man auf jedem Gerät sofort, ob noch eine alte Version offen ist. Bei jeder veröffentlichten
 Änderung: Version hochzählen und in `index.html` (`<title>`), `CHANGELOG.md` und `backend/README.md` nachziehen –
 `node tests/versioncheck.js` prüft, dass alle Stellen zusammenpassen. Das Server-Skript hat eine eigene Versionszählung
 (oben in `backend/Code.gs`).

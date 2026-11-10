@@ -37,20 +37,42 @@ function sampleData() {
 // Anmeldung (Backend 2.2): Der Stub kennt einen Administrator (Token TEST_TOKEN, PIN 482913) und einen Mitarbeiter (PIN 778812).
 // Öffentliche Aktionen: authUsers/authLogin/authAccept/authInviteInfo; alles andere verlangt body.auth = gültiges Token,
 // sonst { status:'error', code:'AUTH_REQUIRED' } – wie das echte Skript. state.authDisabled = true → alles ohne Anmeldung (Skript 2.1).
+// opts.gas = true (9.3): Sendungs-Aktionen (saveShipments, loadChanges, deleteShipment(s), searchArchive) laufen durch das ECHTE
+// backend/Code.gs in der Nachbildung tests/gas-env.js (Versionsprüfung, Merge, Konflikte, Protokoll) – state.gas ist diese Umgebung.
+// Zweites Gerät/Mitarbeiter: Sitzung { token: MAX_TOKEN, user: MAX_USER } (openApp opts.session).
 const TEST_TOKEN = 'tok-admin-test';
 const TEST_USER = { id: 'u-admin', name: 'Zakaria Bisbiss', role: 'admin' };
-function makeBackend(initial, lkwStatus) {
+const MAX_TOKEN = 'tok-max-test';
+const MAX_USER = { id: 'u-max', name: 'Max Muster', role: 'user' };
+const GAS_ACTIONS = ['saveShipments', 'loadChanges', 'deleteShipment', 'deleteShipments', 'searchArchive'];
+function attachGas(state, initial) {
+  const env = require('./gas-env')();
+  env.props.SPREADSHEET_ID = 'test-tabelle';
+  env.call('authUsers');                                                   // legt den Administrator an + Einladung
+  const inv = /einladung=([0-9a-f]+)/.exec(env.mails[env.mails.length - 1].body)[1];
+  const adminTok = env.call('authAccept', { invite: inv, pin: '482913', deviceId: 'dev-admin' }).token;
+  env.call('adminInvite', { name: 'Max Muster', email: 'max@example.com' }, adminTok);
+  const invMax = /einladung=([0-9a-f]+)/.exec(env.mails[env.mails.length - 1].body)[1];
+  const maxTok = env.call('authAccept', { invite: invMax, pin: '778812', deviceId: 'dev-max' }).token;
+  state.gas = env; state.gasTokens = { 'u-admin': adminTok, 'u-max': maxTok };
+  const seed = JSON.parse(JSON.stringify(initial || {}));
+  if (Object.keys(seed).length) { const versions = {}; Object.keys(seed).forEach(b => { versions[b] = 0; }); env.call('saveShipments', { shipments: seed, bases: {}, versions }, adminTok); }
+  state.gasCall = (action, payload, userId) => env.call(action, payload, state.gasTokens[userId]);
+}
+function makeBackend(initial, lkwStatus, opts = {}) {
   const state = { store: JSON.parse(JSON.stringify(initial || {})), lkwStatus: lkwStatus || {}, version: 1, actions: [], requests: [],
-    authDisabled: false, tokens: { [TEST_TOKEN]: 'u-admin' }, invites: { 'inv-max': 'u-max' }, mails: [], failed: 0,
-    delay: {}, failNext: {}, noBatchDelete: false, inFlight: {}, offline: false,
+    authDisabled: false, tokens: { [TEST_TOKEN]: 'u-admin', [MAX_TOKEN]: 'u-max' }, invites: { 'inv-max': 'u-max' }, mails: [], failed: 0,
+    delay: {}, failNext: {}, dropNext: {}, noBatchDelete: false, inFlight: {}, offline: false, blockUsers: new Set(),
     users: [ { id: 'u-admin', name: 'Zakaria Bisbiss', email: 'bisbiss-92@hotmail.de', role: 'admin', pin: '482913', active: true, hasPin: true },
              { id: 'u-max', name: 'Max Muster', email: 'max@example.com', role: 'user', pin: '778812', active: true, hasPin: true } ] };
+  if (opts.gas) attachGas(state, initial);
   const pub = u => ({ id: u.id, name: u.name, role: u.role });
   const list = () => state.users.map(u => ({ id: u.id, name: u.name, email: u.email, role: u.role, active: u.active, hasPin: u.hasPin, lastLogin: 0, inviteOpen: false, inviteExpires: 0, locked: false }));
   state.handler = async (req) => {
     if (!/script\.google\.com/.test(req.url())) return req.continue();
-    if (state.offline) { state.actions.push('(offline) ' + ((() => { try { return JSON.parse(req.postData() || '{}').action; } catch (e) { return '?'; } })())); return req.abort('internetdisconnected'); }
     let body = {}; try { body = JSON.parse(req.postData() || '{}'); } catch (e) {}
+    // state.offline: kein Gerät erreicht den Server; state.blockUsers (Set von Benutzer-IDs): nur dieses Gerät ist ohne Netz
+    if (state.offline || state.blockUsers.has(state.tokens[body.auth])) { state.actions.push('(offline) ' + (body.action || '?')); return req.abort('internetdisconnected'); }
     const action = body.action || ''; state.actions.push(action); state.requests.push(body);
     state.inFlight[action] = (state.inFlight[action] || 0) + 1;
     if (state.delay[action]) await new Promise(r => setTimeout(r, state.delay[action]));
@@ -60,6 +82,11 @@ function makeBackend(initial, lkwStatus) {
     const me = state.authDisabled ? null : state.users.find(u => u.id === state.tokens[body.auth] && u.active);
     if (!state.authDisabled && !isPublic && !me) resp = { status: 'error', code: 'AUTH_REQUIRED', message: 'Anmeldung erforderlich.' };
     else if (state.failNext[action] > 0) { state.failNext[action]--; resp = { status: 'error', message: 'Verarbeitung serverseitig fehlgeschlagen: Server ist gerade beschäftigt (Sperre). Bitte erneut versuchen.' }; }
+    else if (state.gas && GAS_ACTIONS.includes(action)) { // echtes Code.gs; LKW-Status bleibt beim Stub
+      resp = state.gasCall(action, body.payload, me.id);
+      if (action === 'loadChanges' && resp.status === 'success') resp.lkwStatus = state.lkwStatus;
+      if (action === 'saveShipments' && resp.status === 'success') state.version = resp.version;
+    }
     else if (action === 'deleteShipments') { // Backend 2.4: alle Löschvermerke in einem Aufruf; älteres Skript kennt die Aktion nicht
       if (state.noBatchDelete) resp = { status: 'error', message: 'Verarbeitung serverseitig fehlgeschlagen: Unbekannte Aktion empfangen: deleteShipments' };
       else { const bs = (body.payload && body.payload.baseNumbers) || []; bs.forEach(b => { delete state.store[b]; }); state.version += bs.length; resp = { status: 'success', version: state.version, deleted: bs.length }; }
@@ -100,6 +127,8 @@ function makeBackend(initial, lkwStatus) {
     else if (action === 'loadLkwStatus') resp = { status: 'success', data: state.lkwStatus };
     else if (action === 'saveLkwStatus') { const pl = body.payload; state.lkwStatus = (pl && pl.lkwStatus) || pl || body.lkwStatus || {}; resp = { status: 'success' }; } // App schickt die Status-Map direkt als payload
     else if (action === 'searchArchive') resp = { status: 'success', results: {}, order: [], total: 0, truncated: false };
+    // state.dropNext = { action: n }: Server hat verarbeitet, die Antwort geht aber verloren (Verbindungsabbruch) – für Wiederholungs-Prüfungen
+    if (state.dropNext && state.dropNext[action] > 0) { state.dropNext[action]--; state.actions.push('(antwort verloren) ' + action); return req.abort('failed'); }
     await req.respond({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(resp) });
   };
   return state;
@@ -146,4 +175,4 @@ const results = { ok: 0, fail: 0 };
 function assert(cond, msg) { if (cond) { results.ok++; console.log('ok  :', msg); } else { results.fail++; console.log('FAIL:', msg); } }
 function finish() { console.log(results.fail ? `SOME FAILED (${results.fail} von ${results.ok + results.fail})` : `ALL GOOD (${results.ok})`); process.exitCode = results.fail ? 1 : 0; }
 
-module.exports = { launch, makeBackend, openApp, sampleData, scan, setBatchMode, assert, finish, TEST_TOKEN, TEST_USER };
+module.exports = { launch, makeBackend, openApp, sampleData, scan, setBatchMode, assert, finish, TEST_TOKEN, TEST_USER, MAX_TOKEN, MAX_USER };
