@@ -4,6 +4,28 @@ Neueste zuerst. Datum = Veröffentlichung (bis einschließlich 9.2 auf dem Branc
 Zusammenführen von Pull Request #1 am 09.11.2026 auf `main`). App-Version siehe `js/01-start.js`
 (`APP_VERSION`), Server-Skript siehe Kopf von `backend/Code.gs`.
 
+## 2026-11-10 – App 9.5, Code.gs 2.9
+
+Batch-Ansicht fest im Bild: Scanfeld oben, Anzahl und Liste in der Mitte, Notiz-/Ton-/Feedback-Schalter darunter,
+Speichern und Leeren unten – jetzt auch am Desktop. Nur Frontend; `backend/Code.gs` bleibt unverändert 2.9,
+keine neuen Skript-Eigenschaften, Tabellen- oder Sync-Änderungen.
+
+- `index.html`, `css/02-scan-batch.css`, `css/05-feedback-anmeldung-desktop.css`: eigener Batch-Arbeitsbereich in einer
+  auf `100dvh` begrenzten Hauptansicht. Die Liste füllt per Flex-Layout die verbleibende Höhe statt der alten
+  65-vh-/560-px-Grenze; Anzahl, Schalter und feste Aktionsleiste werden nicht weggescrollt oder überdeckt. Status und
+  Hinzufügen stehen platzsparend nebeneinander; nur im Batch entfallen leere Einzelnotiz-/Kombi-Abstände.
+  Außerhalb des Batch-Modus ist die neue Klammer per `display: contents` layoutneutral; Unterseiten bleiben unverändert.
+  Desktop-Regeln stehen ausschließlich im Block ab 992 px.
+- `js/08-scan-batch.js`: nach einem neuen Scan sofort nach oben zum neuesten Eintrag scrollen. Löschen (weiter mit
+  Nachfrage) und Notizänderungen erhalten die manuelle Listenposition. Die doppelte, überschriebene Funktion zum
+  Überspringen der Batch-Notiz entfernt; auch dieser Scan-Weg markiert den neuen Eintrag und gibt die Aktionsleiste
+  beim Schließen des Dialogs wieder frei.
+- `tests/regress.js`: Batch-Geometrie am Handy und Desktop mit vollem/leerem Batch, Seiten- und Listen-Scroll,
+  neue Scans, Löschen ohne Scrollsprung, Größenwechsel sowie unveränderte Normalansicht nach dem Ausschalten.
+  `tests/desktopcheck.js`: alte Erwartung „Knöpfe in der Karte“ durch feste, hinter den Details verborgene Leiste ersetzt.
+- Versionskette auf App 9.5 / Code.gs 2.9 angehoben (`js/01-start.js`, `sw.js`, `<title>`, README-Dateien,
+  `tests/versioncheck.js`); Datum 2026-11-10.
+
 ## 2026-11-10 – App 9.4, Code.gs 2.9
 
 Die Batch-Liste nutzt den verfügbaren Platz statt eines kleinen 180-px-Fensters. Das Scanfeld bleibt beim Scrollen sichtbar,

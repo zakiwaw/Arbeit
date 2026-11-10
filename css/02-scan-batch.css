@@ -269,13 +269,33 @@ body.batch-mode-active .status-and-button-container > #mainActionButton { flex: 
 #clearBatchButton { color: var(--text); background-color: var(--surface); border: 1.5px solid var(--border-strong); }
 #clearBatchButton:hover { background-color: var(--surface-3); }
 .batch-save-count { display: inline-block; min-width: 22px; margin-left: 6px; padding: 0 6px; font-size: var(--fs-xs); font-weight: 800; line-height: 20px; color: var(--success-text); background-color: #fff; border-radius: var(--r-full); font-variant-numeric: tabular-nums; }
-/* Handy (unter 992 px): im Batch-Modus hängen „Batch Speichern“ / „Batch Leeren“ als feste Leiste am unteren Bildschirmrand –
-   so bleibt Speichern nach vielen Scans erreichbar, ohne zur Batch-Karte hochzuscrollen. Die Karte selbst bleibt oben wie bisher.
-   Nur in der Hauptansicht (Detailansicht/Unterseiten liegen darüber, z-index 100) und nicht am Desktop. */
+/* Außerhalb des Batch-Modus erzeugt die zusätzliche Klammer keine Box: normaler Seitenfluss bleibt unverändert. */
+.batch-workspace { display: contents; }
+
+/* Handy (unter 992 px): die Hauptansicht nutzt genau den dynamischen Bildschirm. Der Arbeitsbereich nimmt den Rest
+   zwischen App-Leiste und festen Aktionen ein; nur #batchList scrollt, nicht die Karte mit Anzahl und Schaltern.
+   Andere Hauptseiten-Inhalte bleiben im DOM, liegen aber unterhalb des Arbeitsbereichs außerhalb des sichtbaren Ausschnitts.
+   Detail-/Unterseiten und Dialoge sind eigenständige Vollbild-Ansichten und bleiben unberührt. */
 @media (max-width: 991.98px) {
+    body.batch-mode-active #mainView {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        height: 100dvh;
+        padding-bottom: calc(var(--control-h) + var(--sp-4) + 1px + env(safe-area-inset-bottom, 0px));
+    }
+    body.batch-mode-active #mainView > .app-bar {
+        flex-shrink: 0;
+        padding-top: calc(var(--sp-2) + env(safe-area-inset-top, 0px));
+    }
+    body.batch-mode-active #mainView > .container { flex: 1; min-height: 0; width: 100%; overflow: hidden; }
+    body.batch-mode-active .batch-workspace { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+    body.batch-mode-active .input-section { flex-shrink: 0; gap: var(--sp-1); margin: 0 0 var(--sp-2); padding: var(--sp-2); }
     body.batch-mode-active #main-input-form {
         position: fixed;
-        top: calc(56px + env(safe-area-inset-top, 0px));
+        top: calc(61px + env(safe-area-inset-top, 0px));
         left: var(--sp-3);
         right: var(--sp-3);
         z-index: 55;
@@ -286,11 +306,33 @@ body.batch-mode-active .status-and-button-container > #mainActionButton { flex: 
         border-radius: var(--r-md);
         box-shadow: var(--shadow-md);
     }
-    body.batch-mode-active .input-section > div:first-child { min-height: 68px; }
+    body.batch-mode-active .input-section > div:first-child { min-height: 54px; }
+    body.batch-mode-active .status-and-button-container { flex-wrap: nowrap; }
+    body.batch-mode-active .status-select-wrapper { min-width: 90px; }
+    body.batch-mode-active .status-and-button-container > #mainActionButton { flex: 0 1 auto; white-space: normal; line-height: 1.2; }
+    /* Einzelnotiz/Kombi sind im Batch bereits ausgeschaltet; auch ihre leeren Abstandszeilen entfallen. */
+    body.batch-mode-active .input-section > .controls-row,
+    body.batch-mode-active #note-input-form { display: none; }
+    body.batch-mode-active #errorDisplay { flex-shrink: 0; }
+    body.batch-mode-active #errorDisplay:empty { display: none; }
+    body.batch-mode-active .batch-area.visible {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
+        margin-top: 0;
+        padding: var(--sp-2);
+        overflow: hidden;
+    }
+    body.batch-mode-active .batch-area > :not(#batchList) { flex-shrink: 0; }
+    body.batch-mode-active .batch-area h3 { margin-bottom: var(--sp-1); }
+    body.batch-mode-active #batchSummary { padding: var(--sp-1) 0; }
+    body.batch-mode-active #batchList { flex: 1; height: auto; min-height: 0; max-height: none; margin: var(--sp-1) 0; }
+    body.batch-mode-active .batch-note-toggle-container { margin-top: 0; }
     body.batch-mode-active .batch-action-buttons {
         position: fixed;
         left: 0; right: 0; bottom: 0;
-        z-index: 60;                                   /* über der Liste, unter Detail-/Unterseiten (100) und Dialogen */
+        z-index: 60;                                   /* unter Detail-/Unterseiten und Dialogen */
         margin: 0;
         padding: var(--sp-2) var(--sp-3) calc(var(--sp-2) + env(safe-area-inset-bottom, 0px));
         background-color: var(--surface);
@@ -299,7 +341,5 @@ body.batch-mode-active .status-and-button-container > #mainActionButton { flex: 
     }
     body.batch-mode-active .batch-action-buttons button { white-space: nowrap; }
     body.batch-mode-active .batch-action-buttons .batch-btn-prefix { display: none; }   /* in der Leiste reicht „Speichern (2)“ / „Leeren“ */
-    body.batch-mode-active .batch-area.visible { padding-bottom: var(--sp-3); }
-    body.batch-mode-active #mainView { padding-bottom: calc(var(--control-h) + var(--sp-4) + env(safe-area-inset-bottom, 0px)); }   /* letzte Karte nicht hinter der Leiste */
     body.batch-mode-active.modal-open .batch-action-buttons { display: none; }   /* Vollbild-Dialoge (z. B. Packstücke) überdecken alles */
 }

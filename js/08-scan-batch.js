@@ -552,6 +552,7 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
         }
 
         function updateBatchUI(animateNewest = false) {
+            const previousScrollTop = batchListEl.scrollTop;
             batchListEl.innerHTML = '';
             currentBatch.forEach((batchItem, index) => {
                 const li = document.createElement('li');
@@ -598,11 +599,13 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
                 batchListEl.appendChild(li);
             });
             batchItemCountEl.textContent = currentBatch.length;
-            // Zähler im Speichern-Knopf (feste Leiste am Handy): „Batch Speichern (7)“; leer → Knopf gedämpft
+            // Zähler im Speichern-Knopf (feste Leiste im Batch-Modus): „Batch Speichern (7)“; leer → Knopf gedämpft
             const saveCount = document.getElementById('saveBatchCount');
             if (saveCount) { saveCount.textContent = String(currentBatch.length); saveCount.classList.toggle('hidden', currentBatch.length === 0); }
             if (saveBatchButtonEl) saveBatchButtonEl.classList.toggle('is-empty', currentBatch.length === 0);
             updateCurrentBatchNoteDisplay();
+            // Nur ein neuer Scan holt die oberste Zeile ins Bild. Löschen/Notizänderungen erhalten den manuellen Scrollstand.
+            batchListEl.scrollTop = animateNewest ? 0 : previousScrollTop;
         }
 
         
@@ -789,30 +792,6 @@ function addToBatch() {
             clearError();
             focusShipmentInput();
         }
-
-function skipNoteAndAddFirstBatchItem() {
-            currentBatchGlobalNote = null;
-            currentBatch.forEach(item => { item.note = null; });
-            isBatchNotePromptRequired = false;
-            
-            batchNoteModalEl.classList.remove('visible');
-            document.body.classList.remove('modal-open'); // <-- DIESE ZEILE IST NEU/KORRIGIERT
-
-            updateBatchUI();
-            batchNoteToggleEl.checked = false;
-
-            if (pendingFirstBatchScanData) {
-                const batchItem = { ...pendingFirstBatchScanData, note: null };
-                currentBatch.push(batchItem);
-                pendingFirstBatchScanData = null;
-                updateBatchUI(true);
-                shipmentNumberInputEl.value = '';
-                updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
-            }
-            clearError();
-            focusShipmentInput();
-        }
-
 // --- ERSETZEN Sie die alte Funktion durch diese Version ---
 
         function skipNoteAndAddFirstBatchItem() {
@@ -827,6 +806,7 @@ function skipNoteAndAddFirstBatchItem() {
             
             isBatchNotePromptRequired = false;
             batchNoteModalEl.classList.remove('visible');
+            document.body.classList.remove('modal-open');
             updateBatchUI(); // UI aktualisieren, um die entfernten Notizen zu reflektieren
             batchNoteToggleEl.checked = false; // Schalter nach Benutzung immer deaktivieren
 
@@ -835,7 +815,7 @@ function skipNoteAndAddFirstBatchItem() {
                 const batchItem = { ...pendingFirstBatchScanData, note: null };
                 currentBatch.push(batchItem);
                 pendingFirstBatchScanData = null;
-                updateBatchUI(); // UI erneut aktualisieren
+                updateBatchUI(true); // Neuer Scan: markieren und nach oben holen
                 shipmentNumberInputEl.value = '';
                 updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
             }
