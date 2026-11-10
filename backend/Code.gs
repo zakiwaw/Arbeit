@@ -1,17 +1,10 @@
 // ===================================================
 // FRACHT TRACKER – Google Apps Script Backend
-// Version 2.9: Mehrgeräte-Sicher + Versionsprüfung + Änderungsprotokoll
-//   + Jede Sendung bekommt eine Versionsnummer und ein Feld, wer sie zuletzt geändert hat (lastModifiedBy).
-//   + Der Server prüft die Version beim Speichern: Passt die Version, wird gespeichert und die Version um 1 erhöht.
-//   + Passt sie nicht (ein anderes Gerät war schneller), wird nichts still überschrieben. Der Server schickt die aktuelle Version zurück.
-//   + Änderungsprotokoll: Wer hat was, wann geändert (HAWB, alter Status, neuer Status, Benutzer, Zeit).
-//   + App führt die Änderungen feldweise zusammen, wenn das geht (z. B. anderer Status), sonst zeigt sie dem Benutzer kurz, dass es einen Konflikt gab und welcher Stand jetzt gilt.
-//   + Offline-Änderungen landen in einer Warteschlange und werden in der richtigen Reihenfolge gesendet, wenn das Netz wieder da ist. Keine Änderung darf doppelt ankommen.
-//
+// Version 2.8: mehrgeräte-sicher + Archiv + Anmeldung (PIN; Sitzung verlängert sich bei Bedienung) + Sammel-Löschung
+//   + automatischer Import von Textdateien aus Google Drive.
 //   2.8: Tabellen-ID nur noch aus den Skript-Eigenschaften (SPREADSHEET_ID), fester Rückfall entfernt;
 //        fehlt die Eigenschaft, wirft der Code einen klaren Fehler. Sonst keine Änderung gegenüber 2.7.
-//   2.6: Import auch für „MAN Fracht“-Dateien (Ordner „MAN Ladelisten TXT“ → neuer LKW „MAN 
-“ wie beim QR-Scan); mehrere
+//   2.6: Import auch für „MAN Fracht“-Dateien (Ordner „MAN Ladelisten TXT“ → neuer LKW „MAN <n>“ wie beim QR-Scan); mehrere
 //        Ordner mit je eigenem Format (IMPORT_FOLDERS); Prüfbericht der KI ab „Abgleichprotokoll“ wird ignoriert.
 //   2.5: Abschnitt „AUTOMATISCHER IMPORT AUS GOOGLE DRIVE“ – Zeit-Trigger liest Textdateien (Format „Standard (Leerzeilen)“)
 //        aus dem Drive-Ordner und legt daraus Aufträge an. Einmalig setupDriveImport() im Editor ausführen.
@@ -24,11 +17,9 @@
 // Sheet "shipments":  A = baseNumber | B = JSON | C = Version | D = geändert am | E = gelöscht (TRUE) bzw. archiviert (ARCHIV) | F… = JSON-Fortsetzung
 //   (Spalten C–E werden automatisch mitgeschrieben; alte Zeilen ohne Version gelten als Version 0.
 //    Sehr große Sendungen werden über mehrere Zellen verteilt, weil eine Zelle max. 50.000 Zeichen fasst.)
-//   + Spalte F = lastModifiedBy (Name des angemeldeten Benutzers)
 // Sheet "lkw_status": A1 = JSON (unverändert), B1 = JSON { truckId: Zeitpunkt der Deaktivierung } (neu, automatisch gepflegt)
 // Sheet "_meta":      A1 = globaler Versionszähler, B1 = Zeitpunkt des letzten Archiv-Durchlaufs (automatisch angelegt, ausgeblendet)
 // Sheet "_import":    Protokoll des Drive-Imports (2.5): Zeitpunkt | Datei | Ergebnis | Details (automatisch angelegt, ausgeblendet)
-// Sheet "_changes":   Änderungsprotokoll: HAWB | Alter Status | Neuer Status | Benutzer | Zeit (neu, ausgeblendet)
 //
 // ARCHIV (2.1): Fertige, alte Sendungen bekommen in Spalte E die Markierung ARCHIV (siehe shouldArchive_). Sie bleiben
 //   vollständig im Sheet, werden aber nicht mehr an die Geräte ausgeliefert – die App hält nur noch den laufenden
@@ -39,10 +30,10 @@
 //
 // ANMELDUNG (2.2): Jede Aktion außer den Anmelde-Aktionen braucht ein gültiges Sitzungs-Token (Feld "auth" im
 //   Anfragekörper), sonst antwortet der Server mit { status: 'error', code: 'AUTH_REQUIRED' }. Mitarbeiter stehen im
-//   Sheet "_users"; der Administrator lädt sie per E-Mail ein, jeder wählt seine PIN selbst (Abschnitt ANMELDUNG unten).
+//   Sheet "users"; der Administrator lädt sie per E-Mail ein, jeder wählt seine PIN selbst (Abschnitt ANMELDUNG unten).
 //   Notschalter: AUTH_ENABLED = false → alles wieder ohne Anmeldung wie in 2.1.
 //
-// AUFBAU DIESER DATEI (eine Datei, Abschnitte mit “// ===“-Kopf; im Editor mit Strg+F nach “// N.” springen):
+// AUFBAU DIESER DATEI (eine Datei, Abschnitte mit „// ===“-Kopf; im Editor mit Strg+F nach „// N.“ springen):
 //    1. EINSTELLUNGEN            Tabellen-ID (nur Skript-Eigenschaft), Blattnamen, Spalten, Sperre, Cache, Archiv-Regeln
 //    2. HAUPTFUNKTION doPost      Einstieg jeder Anfrage: bekannte Aktion? Token prüfen (verifySession_), verteilen
 //    3. HILFSFUNKTIONEN           Blätter öffnen, Versionszähler, Script-Cache, Sperre, Zeilen lesen/schreiben (JSON über mehrere Zellen)
@@ -71,10 +62,9 @@ function spreadsheetId_() {
 const SHEET_NAME = "shipments";
 const LKW_STATUS_SHEET_NAME = "lkw_status";
 const META_SHEET_NAME = "_meta";
-const CHANGES_SHEET_NAME = "_changes"; // NEU: Änderungsprotokoll
 
-const COL_BASE = 1, COL_JSON = 2, COL_VERSION = 3, COL_UPDATED = 4, COL_DELETED = 5, COL_MODIFIED_BY = 6; // NEU: Spalte F
-const COL_JSON_EXTRA = 7;        // ab Spalte G: Fortsetzung des JSON, falls eine Zelle nicht reicht
+const COL_BASE = 1, COL_JSON = 2, COL_VERSION = 3, COL_UPDATED = 4, COL_DELETED = 5;
+const COL_JSON_EXTRA = 6;        // ab Spalte F: Fortsetzung des JSON, falls eine Zelle nicht reicht
 const CELL_LIMIT = 45000;        // Google Sheets erlaubt max. 50.000 Zeichen je Zelle
 const LOCK_TIMEOUT_MS = 20000;
 
@@ -195,17 +185,6 @@ function getMetaSheet_() {
   return sheet;
 }
 
-function getChangesSheet_() { // NEU: Änderungsprotokoll
-  const ss = ss_();
-  let sheet = ss.getSheetByName(CHANGES_SHEET_NAME);
-  if (!sheet) {
-    sheet = ss.insertSheet(CHANGES_SHEET_NAME);
-    sheet.getRange(1, 1, 1, 5).setValues([['HAWB', 'Alter Status', 'Neuer Status', 'Benutzer', 'Zeit']]);
-    sheet.hideSheet();
-  }
-  return sheet;
-}
-
 function getGlobalVersion_() {
   const v = Number(getMetaSheet_().getRange('A1').getValue());
   return isNaN(v) ? 0 : v;
@@ -264,7 +243,7 @@ function ensureGrid_(sheet, row, width) {
 
 function dataWidth_(sheet) { return Math.max(sheet.getLastColumn(), COL_DELETED); }
 
-// JSON einer Zeile aus B + G, H, … zusammensetzen
+// JSON einer Zeile aus B + F, G, … zusammensetzen
 function joinJson_(rowValues) {
   let s = String(rowValues[COL_JSON - 1] == null ? '' : rowValues[COL_JSON - 1]);
   for (let c = COL_JSON_EXTRA - 1; c < rowValues.length; c++) {
@@ -280,13 +259,12 @@ function splitJson_(json) {
   return parts.length ? parts : [''];
 }
 // Baut eine komplette Zeile (volle Breite, damit alte Fortsetzungs-Zellen überschrieben werden)
-function buildRow_(base, json, version, now, deleted, modifiedBy, width) {
+function buildRow_(base, json, version, now, deleted, width) {
   const parts = splitJson_(json);
-  const w = Math.max(width, COL_DELETED + parts.length);
+  const w = Math.max(width, COL_DELETED + parts.length - 1);
   const values = []; for (let i = 0; i < w; i++) values.push('');
   values[COL_BASE - 1] = base; values[COL_JSON - 1] = parts[0]; values[COL_VERSION - 1] = version;
   values[COL_UPDATED - 1] = now; values[COL_DELETED - 1] = deleted ? true : '';
-  values[COL_MODIFIED_BY - 1] = modifiedBy || ''; // NEU: lastModifiedBy
   for (let i = 1; i < parts.length; i++) values[COL_JSON_EXTRA - 2 + i] = parts[i];
   return values;
 }
@@ -305,19 +283,19 @@ function readIndex_(sheet) {
   if (lastRow < 2) return map;
   ensureGrid_(sheet, lastRow, COL_DELETED);
   const bases = sheet.getRange(2, COL_BASE, lastRow - 1, 1).getValues();
-  const meta = sheet.getRange(2, COL_VERSION, lastRow - 1, 4).getValues(); // C, D, E, F (lastModifiedBy)
+  const meta = sheet.getRange(2, COL_VERSION, lastRow - 1, 3).getValues(); // C, D, E
   for (let i = 0; i < bases.length; i++) {
     const base = String(bases[i][0] == null ? '' : bases[i][0]).trim();
     if (!base) continue;
     const del = meta[i][2];
-    map[base] = { row: i + 2, version: Number(meta[i][0]) || 0, deleted: isDeletedFlag_(del), archived: isArchivedFlag_(del), modifiedBy: String(meta[i][3] || '') };
+    map[base] = { row: i + 2, version: Number(meta[i][0]) || 0, deleted: isDeletedFlag_(del), archived: isArchivedFlag_(del) };
   }
   return map;
 }
 function readRowJson_(sheet, row) {
   return joinJson_(sheet.getRange(row, 1, 1, dataWidth_(sheet)).getValues()[0]);
 }
-// Alle Zeilen inkl. JSON (für Komplett-Ladevorgänge): baseNumber → { row, json, version, deleted, modifiedBy }
+// Alle Zeilen inkl. JSON (für Komplett-Ladevorgänge): baseNumber → { row, json, version, deleted }
 function readAllRows_(sheet) {
   const lastRow = sheet.getLastRow();
   const map = {};
@@ -328,7 +306,7 @@ function readAllRows_(sheet) {
     const base = String(values[i][COL_BASE - 1] == null ? '' : values[i][COL_BASE - 1]).trim();
     if (!base) continue;
     const del = values[i][COL_DELETED - 1];
-    map[base] = { row: i + 2, json: joinJson_(values[i]), version: Number(values[i][COL_VERSION - 1]) || 0, updatedAt: values[i][COL_UPDATED - 1], deleted: isDeletedFlag_(del), archived: isArchivedFlag_(del), modifiedBy: String(values[i][COL_MODIFIED_BY - 1] || '') };
+    map[base] = { row: i + 2, json: joinJson_(values[i]), version: Number(values[i][COL_VERSION - 1]) || 0, updatedAt: values[i][COL_UPDATED - 1], deleted: isDeletedFlag_(del), archived: isArchivedFlag_(del) };
   }
   return map;
 }
@@ -363,16 +341,13 @@ function deepEqual_(a, b) { return JSON.stringify(a === undefined ? null : a) ==
 // 4. SPEICHERN MIT MERGE (Aktion saveShipments)
 // payload: { shipments: { base: shipmentObj }, bases: { base: shipmentObjOderNull }, deviceId }
 //   bases = der Serverstand, von dem das Gerät ausging (für den 3-Wege-Merge; darf fehlen).
-// Antwort: { status, version, merged: { base: shipmentObj }, conflict: { base: { serverVersion, serverModifiedBy, serverData, clientVersion, clientModifiedBy, clientData } } }
+// Antwort: { status, version, merged: { base: shipmentObj } }  → zusammengeführter Stand, den das Gerät übernimmt
 // ===================================================
 function saveShipmentsMerged(payload) {
   const incoming = (payload && payload.shipments) || {};
   const bases = (payload && payload.bases) || {};
   const baseNumbers = Object.keys(incoming);
   if (baseNumbers.length === 0) return { status: 'success', version: getGlobalVersion_(), merged: {} };
-
-  // NEU: Änderungsprotokoll-Blatt
-  const changesSheet = getChangesSheet_();
 
   return withLock_(function () {
     const sheet = getShipmentSheet_();
@@ -382,7 +357,6 @@ function saveShipmentsMerged(payload) {
     const merged = {};
     const appendRows = [];
     let version = getGlobalVersion_();
-    const conflicts = {};
 
     baseNumbers.forEach(function (base) {
       const ours = incoming[base];
@@ -393,70 +367,19 @@ function saveShipmentsMerged(payload) {
       const theirs = current && !current.deleted ? parseJsonSafe_(readRowJson_(sheet, current.row)) : null;
       const common = bases[base] || null;
 
-      // NEU: Benutzername
-      const clientModifiedBy = (payload && payload.modifiedBy && payload.modifiedBy[base]) || (user && user.name) || '';
-      const serverModifiedBy = current ? current.modifiedBy : '';
-
-      // NEU: Versionsprüfung
-      const clientVersion = (payload && payload.versions && payload.versions[base]) || 0;
-      const serverVersion = current ? current.version : 0;
-
-      let result, conflictInfo = null;
-
-      if (serverVersion === clientVersion || !theirs) {
-        // Version passt (oder Sendung neu) → normaler Merge
-        result = theirs ? mergeShipment_(theirs, ours, common) : ensureItemIds_(ours);
-        // NEU: Protokoll (nur wenn Status oder andere Felder sich ändern)
-        if (theirs && result) logChange_(changesSheet, base, theirs, result, clientModifiedBy);
-      } else {
-        // Version passt NICHT → Konflikt! Nichts still überschreiben.
-        // Server schickt aktuelle Version zurück. App führt feldweise zusammen.
-        conflictInfo = {
-          base: base,
-          serverVersion: serverVersion,
-          serverModifiedBy: serverModifiedBy,
-          serverData: theirs || {},
-          clientVersion: clientVersion,
-          clientModifiedBy: clientModifiedBy,
-          clientData: ours
-        };
-        // Server behält Serverstand (oder führt feldweise zusammen, wenn App das später macht – hier schicken wir den Serverstand zurück)
-        result = theirs || {};
-        // Protokoll: Konflikt (Status bleibt Serverstand, aber wir notieren den Versuch)
-        if (theirs) logChange_(changesSheet, base, theirs, theirs, clientModifiedBy, 'KONFLIKT (Version ' + serverVersion + ' vs ' + clientVersion + ')');
-      }
+      const result = theirs ? mergeShipment_(theirs, ours, common) : ensureItemIds_(ours);
 
       version += 1;
       merged[base] = result;
-      if (conflictInfo) conflicts[base] = conflictInfo;
-
-      const row = buildRow_(base, JSON.stringify(result), version, now, false, clientModifiedBy, width);
+      const row = buildRow_(base, JSON.stringify(result), version, now, false, width);
       if (current) writeRows_(sheet, current.row, [row]);
       else appendRows.push(row);
     });
 
     if (appendRows.length > 0) writeRows_(sheet, sheet.getLastRow() + 1, appendRows);
     setGlobalVersion_(version); // zuletzt, damit Leser nie eine Version ohne die zugehörigen Zeilen sehen
-    
-    const out = { status: 'success', version: version, merged: merged };
-    if (Object.keys(conflicts).length > 0) out.conflicts = conflicts;
-    return out;
+    return { status: 'success', version: version, merged: merged };
   });
-}
-
-// NEU: Änderungsprotokoll schreiben
-function logChange_(sheet, base, oldShipment, newShipment, modifiedBy, note) {
-  const oldStatus = (oldShipment && oldShipment.status) || '';
-  const newStatus = (newShipment && newShipment.status) || '';
-  if (oldStatus === newStatus && !note) return; // nur bei Status-Änderung oder Konflikt
-  const row = [
-    base,
-    oldStatus,
-    newStatus,
-    modifiedBy || '',
-    new Date().toISOString() + (note ? ' (' + note + ')' : '')
-  ];
-  sheet.appendRow(row);
 }
 
 // ---------------------------------------------------
@@ -476,7 +399,6 @@ function mergeShipment_(theirs, ours, base) {
   const keys = {};
   Object.keys(theirs).concat(Object.keys(ours)).forEach(function (k) { keys[k] = true; });
   delete keys.scannedItems;
-  delete keys.lastModifiedBy; // NEU: lastModifiedBy wird immer vom aktuellen Client gesetzt
 
   if (base) {
     Object.keys(keys).forEach(function (k) {
@@ -487,9 +409,6 @@ function mergeShipment_(theirs, ours, base) {
     const oursNewer = (Date.parse(ours.lastModified || 0) || 0) >= (Date.parse(theirs.lastModified || 0) || 0);
     Object.assign(result, oursNewer ? theirs : ours, oursNewer ? ours : theirs);
   }
-
-  // NEU: lastModifiedBy vom Client übernehmen (wenn vorhanden)
-  result.lastModifiedBy = (ours && ours.lastModifiedBy) || (theirs && theirs.lastModifiedBy) || '';
 
   result.scannedItems = mergeItems_(theirs.scannedItems || [], ours.scannedItems || [], base ? (base.scannedItems || []) : null);
   const t1 = Date.parse(theirs.lastModified || 0) || 0, t2 = Date.parse(ours.lastModified || 0) || 0;
@@ -531,6 +450,7 @@ function mergeItems_(theirsItems, oursItems, baseItems) {
   return out;
 }
 
+// Ein Eintrag, der auf beiden Seiten existiert
 function mergeItem_(t, o, b) {
   let result;
   if (b) {
@@ -581,7 +501,7 @@ function deleteShipmentRow(payload) {
     const index = readIndex_(sheet);
     const version = getGlobalVersion_() + 1;
     const now = new Date().toISOString();
-    const row = buildRow_(base, '', version, now, true, '', dataWidth_(sheet));
+    const row = buildRow_(base, '', version, now, true, dataWidth_(sheet));
     writeRows_(sheet, index[base] ? index[base].row : sheet.getLastRow() + 1, [row]);
     setGlobalVersion_(version);
     return { status: 'success', version: version };
@@ -604,7 +524,7 @@ function deleteShipmentRows(payload) {
     let version = getGlobalVersion_();
     bases.forEach(function (base) {
       version += 1;
-      const row = buildRow_(base, '', version, now, true, '', width);
+      const row = buildRow_(base, '', version, now, true, width);
       if (index[base]) writeRows_(sheet, index[base].row, [row]); else appendRows.push(row);
     });
     if (appendRows.length > 0) writeRows_(sheet, sheet.getLastRow() + 1, appendRows);
@@ -741,7 +661,7 @@ function archiveSweep_() {
   const deactivatedAt = loadLkwDeactivatedAt_();
   const values = sheet.getRange(2, 1, lastRow - 1, dataWidth_(sheet)).getValues();
   const nowMs = Date.now(), now = new Date(nowMs).toISOString();
-  const meta = values.map(function (r) { return [r[COL_VERSION - 1], r[COL_UPDATED - 1], r[COL_DELETED - 1], r[COL_MODIFIED_BY - 1]]; });
+  const meta = values.map(function (r) { return [r[COL_VERSION - 1], r[COL_UPDATED - 1], r[COL_DELETED - 1]]; });
   const activeTrucks = {};
   const toArchive = [];
   values.forEach(function (r, i) {
@@ -756,8 +676,8 @@ function archiveSweep_() {
   });
   if (toArchive.length > 0) {
     const version = getGlobalVersion_() + 1;
-    toArchive.forEach(function (i) { meta[i] = [version, now, ARCHIVE_FLAG, meta[i][3]]; });
-    sheet.getRange(2, COL_VERSION, meta.length, 4).setValues(meta);
+    toArchive.forEach(function (i) { meta[i] = [version, now, ARCHIVE_FLAG]; });
+    sheet.getRange(2, COL_VERSION, meta.length, 3).setValues(meta);
     setGlobalVersion_(version);
   }
   let statusChanged = false;
@@ -875,7 +795,7 @@ function clearAllDataInSheet() {
     if (lastRow > 1) {
       const width = dataWidth_(sheet);
       const bases = sheet.getRange(2, COL_BASE, lastRow - 1, 1).getValues();
-      const rows = bases.map(function (r) { return buildRow_(String(r[0] == null ? '' : r[0]), '', version, now, true, '', width); });
+      const rows = bases.map(function (r) { return buildRow_(String(r[0] == null ? '' : r[0]), '', version, now, true, width); });
       writeRows_(sheet, 2, rows);
     }
     setGlobalVersion_(version);
@@ -931,6 +851,7 @@ function loadLkwDeactivatedAt_() {
   const val = getOrCreateLkwSheet().getRange('B1').getValue();
   try { const o = JSON.parse(val || '{}'); return (o && typeof o === 'object') ? o : {}; } catch (e) { return {}; }
 }
+
 function loadLkwStatusFromSheet() {
   const sheet = getOrCreateLkwSheet();
   const val = sheet.getRange('A1').getValue();
@@ -938,7 +859,7 @@ function loadLkwStatusFromSheet() {
 }
 
 // ===================================================
-// 10. E-MAIL (Aktion sendPdfEmail) – von der App seit Sicherungsnachweis v3 (PDF im Browser) nicht mehr aufgerufen (PDF öffnet im Browser);
+// 10. E-MAIL (Aktion sendPdfEmail) – von der App seit Sicherungsnachweis v3 nicht mehr aufgerufen (PDF öffnet im Browser);
 //     bleibt nur für ältere App-Versionen stehen und kann in einer späteren Version entfallen
 // ===================================================
 function sendPdfEmail(payload) {
@@ -954,13 +875,12 @@ function sendPdfEmail(payload) {
 // Ein getrenntes Skript legt je Kunden-PDF eine Textdatei in einem Drive-Ordner ab. Je Ordner ist festgelegt, in welchem
 // Format die Dateien aufgebaut sind (IMPORT_FOLDERS) – die Formate sind dieselben wie auf der Seite „Aufträge erfassen“:
 //   'standard' = „Standard (Leerzeilen)“: Aufträge durch Leerzeilen getrennt, erste Zeile Auftragsnummer (bei HYDAC das
-//                Zielland), jede weitere Zeile ein Packstück. Je Datei ein LKW „<Kunde> <TT.MM.JJJJ>“, Aufträge „<Nummer> <TT.MM.>“
-//   'man'      = „MAN Fracht“: je Auftrag Zeile 1 „Spediteur, Land“, Zeile 2 Rechnung, Zeile 3 PLSO, danach je Zeile
-//                „Pos HU|Verpackung|Maße|Gewicht“. Je Datei ein neuer LKW „MAN 
-“ mit fester MAN-Nummer – genau wie der
+//                Zielland), jede weitere Zeile ein Packstück. Je Datei ein LKW „<Kunde> <TT.MM.JJJJ>“, Aufträge „<Nummer> <TT.MM.>“.
+//   'man'      = „MAN Fracht“: je Auftrag Zeile 1 „Spediteur, Land“, Zeile 2 Rechnungsnummer, Zeile 3 PLSO, danach je Zeile
+//                „Pos HU|Verpackung|Maße|Gewicht“. Je Datei ein neuer LKW „MAN <n>“ mit fester MAN-Nummer – genau wie der
 //                QR-Scan bzw. „Direkt anlegen“ in der App (schon vorhandene Rechnungen werden übersprungen, NACHLIEFERUNG wird
-//                durch Nummerierung ergänzt, archivierte Nummern bekommen „ (2)“).
-// Ab einer Zeile, die mit einem Stop-Marker beginnt (z. B. „Abgleichprotokoll“), wird der Rest der Datei
+//                durchnummeriert, archivierte Nummern bekommen „ (2)“).
+// Ab einer Zeile, die mit einem Eintrag aus IMPORT_STOP_MARKERS beginnt (z. B. „Abgleichprotokoll“), wird der Rest der Datei
 // ignoriert – dort hängt die KI ihren Prüfbericht an.
 // runDriveImport() läuft per Zeit-Trigger (dazu EINMAL setupDriveImport() im Skript-Editor ausführen – das fragt auch die
 // Drive-Berechtigung ab) und verschiebt jede Datei nach der Verarbeitung in den Unterordner „Verarbeitet“ (nicht lesbar →
@@ -1095,7 +1015,7 @@ function isImportCandidate_(f) {
   if (mime === GOOGLE_DOC_MIME_) return true;
   if (mime.indexOf('application/vnd.google-apps.') === 0) return false;         // Tabellen, Formulare, Verknüpfungen …
   if (mime.indexOf('text/') === 0 || mime === '' || mime === 'application/octet-stream') return true;
-  return /\\.(txt|csv|md)$/i.test(f.getName());
+  return /\.(txt|csv|md)$/i.test(f.getName());
 }
 function readImportText_(f) {
   if (f.getMimeType() === GOOGLE_DOC_MIME_) return DocumentApp.openById(f.getId()).getBody().getText();
@@ -1112,8 +1032,7 @@ function importTextFile_(cfg, fileName, text, createdAt) {
   const parsed = isMan ? parseManText_(clean) : parseStandardText_(clean);
   if (parsed.orders.length === 0) {
     const err = new Error(isMan
-      ? 'Keine Aufträge erkannt – erwartet (MAN Fracht): je Auftrag Zeile 1 „Spediteur, Land“, Zeile 2 Rechnung, Zeile 3 PLSO, danach „Pos HU|Verpackung|Maße|Gewicht“. Je Datei ein neuer LKW „MAN 
-“ mit fester MAN-Nummer – genau wie der QR-Scan bzw. „Direkt anlegen“ in der App (schon vorhandene Rechnungen werden übersprungen, NACHLIEFERUNG wird durch Nummerierung ergänzt, archivierte Nummern bekommen „ (2)“).'
+      ? 'Keine Aufträge erkannt – erwartet (MAN Fracht): je Auftrag Zeile 1 „Spediteur, Land“, Zeile 2 Rechnung, Zeile 3 PLSO, danach „Pos HU|Verpackung|Maße|Gewicht“, Aufträge durch Leerzeilen getrennt.'
       : 'Keine Aufträge erkannt – erwartet: Blöcke aus Auftragsnummer + Packstücknummern, durch Leerzeilen getrennt.');
     err.permanent = true;
     throw err;
@@ -1128,7 +1047,7 @@ function importTextFile_(cfg, fileName, text, createdAt) {
     const appendRows = [];
     Object.keys(plan.shipments).forEach(function (base) {
       version += 1;
-      const row = buildRow_(base, JSON.stringify(plan.shipments[base]), version, now, false, IMPORT_MITARBEITER, width);
+      const row = buildRow_(base, JSON.stringify(plan.shipments[base]), version, now, false, width);
       const deletedRow = known.deletedRow[base.toUpperCase()];
       if (deletedRow) writeRows_(sheet, deletedRow, [row]); else appendRows.push(row);
     });
@@ -1146,8 +1065,8 @@ function importTextFile_(cfg, fileName, text, createdAt) {
 function scanRowsForImport_(rows) {
   const known = { takenActive: {}, active: {}, archived: {}, deletedRow: {}, trucks: {}, maxMan: 0 };
   Object.keys(rows).forEach(function (base) {
-    const r = rows[base];
-    if (r.deleted) { known.deletedRow[key = base.toUpperCase()] = r.row; return; } // NEU: key = ...
+    const r = rows[base], key = base.toUpperCase();
+    if (r.deleted) { known.deletedRow[key] = r.row; return; }
     known.takenActive[key] = true;
     if (r.archived) known.archived[key] = true; else known.active[key] = true;
     const s = parseJsonSafe_(r.json);
@@ -1162,7 +1081,8 @@ function scanRowsForImport_(rows) {
   return known;
 }
 function newItem_(hu, position, now) {
-  return { rawInput: hu.rawInput, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null, position: position, packaging: hu.packaging, dimensions: hu.dimensions, grossWeight: hu.grossWeight };
+  return { rawInput: hu.rawInput, status: 'Anstehend', timestamp: now, isCombination: false, notes: [], isCancelled: false,
+           cancelledTimestamp: null, position: position, packaging: hu.packaging, dimensions: hu.dimensions, grossWeight: hu.grossWeight };
 }
 
 // 'standard': LKW „<Kunde> <TT.MM.JJJJ>“ (Kunde = Wortanfang des Dateinamens bis zum ersten „_“, sonst des Ordnernamens; Datum
@@ -1196,8 +1116,7 @@ function planStandardImport_(parsed, known, cfg, fileName, createdAt) {
            summary: truckId + ': ' + parsed.orders.length + ' Auftrag/Aufträge, ' + hus + ' Packstücke – ' + names.join(', ') };
 }
 
-// 'man': neuer LKW „MAN 
-“ (feste Nummer = höchste bekannte + 1) mit den Rechnungen der Datei – dieselben Regeln wie
+// 'man': neuer LKW „MAN <n>“ (feste Nummer = höchste bekannte + 1) mit den Rechnungen der Datei – dieselben Regeln wie
 // importMultiOrdersPayload in der App: vorhandene aktive Rechnung → übersprungen (bleibt, wie sie ist); „NACHLIEFERUNG“ →
 // freie Nummer „NACHLIEFERUNG 1/2/…“; archivierte Nummer → „NUMMER (2)“; nur gelöschte Nummer → wieder frei.
 // Ergibt die Datei keinen einzigen neuen Auftrag, wird auch kein LKW angelegt.
@@ -1246,11 +1165,11 @@ function planManImport_(parsed, known, fileName) {
 
 // Alles ab der ersten Zeile, die mit einem Stop-Marker beginnt, abschneiden (Prüfbericht der KI am Dateiende).
 function cutAtStopMarker_(text) {
-  const norm = String(text == null ? '' : text).replace(/\\uFEFF/g, '').replace(/\\r\\n?/g, '\\n');
-  const lines = norm.split('\\n');
+  const norm = String(text == null ? '' : text).replace(/\uFEFF/g, '').replace(/\r\n?/g, '\n');
+  const lines = norm.split('\n');
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i].trim().toLowerCase();
-    if (IMPORT_STOP_MARKERS.some(function (m) { return l.indexOf(String(m).toLowerCase()) === 0; })) return lines.slice(0, i).join('\\n');
+    if (IMPORT_STOP_MARKERS.some(function (m) { return l.indexOf(String(m).toLowerCase()) === 0; })) return lines.slice(0, i).join('\n');
   }
   return norm;
 }
@@ -1260,18 +1179,18 @@ function cutAtStopMarker_(text) {
 //   • Packstück = Zeile nur aus Ziffern/Buchstaben/Bindestrich (Leerzeichen innerhalb werden entfernt); Dubletten einmal
 //   • Blöcke mit nur einer Zeile (Überschrift) werden übersprungen; gleiche Auftragsnummer in zwei Blöcken wird zusammengelegt
 function parseStandardText_(text) {
-  const norm = String(text == null ? '' : text).replace(/\\uFEFF/g, '').replace(/\\r\\n?/g, '\\n');
+  const norm = String(text == null ? '' : text).replace(/\uFEFF/g, '').replace(/\r\n?/g, '\n');
   const byId = {}, orders = [], ignored = [];
-  norm.split(/\\n\\s*\\n/).forEach(function (block) {
-    const lines = block.split('\\n').map(function (l) { return l.trim(); }).filter(function (l) { return l.length > 0; });
+  norm.split(/\n\s*\n/).forEach(function (block) {
+    const lines = block.split('\n').map(function (l) { return l.trim(); }).filter(function (l) { return l.length > 0; });
     if (lines.length < 2) return;
     const orderId = normalizeOrderId_(lines[0]);
     if (!orderId) return;
     let order = byId[orderId];
     if (!order) { order = byId[orderId] = { orderId: orderId, hus: [], seen: {} }; orders.push(order); }
     lines.slice(1).forEach(function (l) {
-      const hu = l.replace(/\\s+/g, '').toUpperCase();
-      if (!/^[0-9A-Z][0-9A-Z\\-]*$/.test(hu)) { ignored.push(l); return; }
+      const hu = l.replace(/\s+/g, '').toUpperCase();
+      if (!/^[0-9A-Z][0-9A-Z\-]*$/.test(hu)) { ignored.push(l); return; }
       if (order.seen[hu]) return;
       order.seen[hu] = true;
       order.hus.push(hu);
@@ -1288,10 +1207,10 @@ function parseStandardText_(text) {
 //   • Blöcke mit weniger als 3 Zeilen oder ohne Packstücke werden übersprungen; Zeilen ohne erkennbare HU landen in ignored;
 //     dieselbe HU zweimal im selben Auftrag zählt einmal
 function parseManText_(text) {
-  const norm = String(text == null ? '' : text).replace(/\\uFEFF/g, '').replace(/\\r\\n?/g, '\\n');
+  const norm = String(text == null ? '' : text).replace(/\uFEFF/g, '').replace(/\r\n?/g, '\n');
   const orders = [], ignored = [];
-  norm.trim().split(/\\n\\s*\\n/).forEach(function (block) {
-    const lines = block.split('\\n').map(function (l) { return l.trim(); }).filter(function (l) { return l.length > 0; });
+  norm.trim().split(/\n\s*\n/).forEach(function (block) {
+    const lines = block.split('\n').map(function (l) { return l.trim(); }).filter(function (l) { return l.length > 0; });
     if (lines.length < 4) return;                                   // Spediteur, Rechnung, PLSO + mindestens ein Packstück
     const head = lines[0].split(',');
     const orderId = normalizeOrderId_(lines[1]);
@@ -1314,23 +1233,23 @@ function parseManText_(text) {
 function parseHuLine_(line) {
   const parts = String(line).split('|');
   const main = parts[0].trim().toUpperCase();
-  const m = /^(?:(\\d+)\\s+)?([0-9A-Z][0-9A-Z\\-]*)$/.exec(main);
+  const m = /^(?:(\d+)\s+)?([0-9A-Z][0-9A-Z\-]*)$/.exec(main);
   if (!m) return null;
   const clean = function (v) { v = v == null ? '' : String(v).trim(); return v ? v : null; };
   return { position: m[1] ? parseInt(m[1], 10) : null, rawInput: m[2], packaging: clean(parts[1]), dimensions: clean(parts[2]), grossWeight: clean(parts[3]) };
 }
 function normalizeOrderId_(s) {
-  return String(s).replace(/ä/g, 'ae').replace(/Ä/g, 'Ae').replace(/ö/g, 'oe').replace(/Ü/g, 'Ue')
-    .replace(/ß/g, 'ss').replace(/[:;,]+$/, '').replace(/\\s+/g, ' ').trim().toUpperCase();
+  return String(s).replace(/ä/g, 'ae').replace(/Ä/g, 'Ae').replace(/ö/g, 'oe').replace(/Ö/g, 'Oe').replace(/ü/g, 'ue').replace(/Ü/g, 'Ue')
+    .replace(/ß/g, 'ss').replace(/[:;,]+$/, '').replace(/\s+/g, ' ').trim().toUpperCase();
 }
 function customerFromFileName_(fileName, folderName) {
-  const m = /^\\s*([^_]+?)\\s*[_]/.exec(String(fileName || ''));
+  const m = /^\s*([^_]+?)\s*[_]/.exec(String(fileName || ''));
   const raw = (m ? m[1] : '').replace(/[^0-9A-Za-zÄÖÜäöüß&. -]/g, '').trim();
-  const fallback = (String(folderName || '').split(/\\s+/)[0] || 'IMPORT');
+  const fallback = (String(folderName || '').split(/\s+/)[0] || 'IMPORT');
   return (raw || fallback).toUpperCase();
 }
 function dateFromFileName_(fileName) {
-  const m = /(\\d{4})-(\\d{2})-(\\d{2})/.exec(String(fileName || ''));
+  const m = /(\d{4})-(\d{2})-(\d{2})/.exec(String(fileName || ''));
   if (!m) return null;
   const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
   return isNaN(d.getTime()) ? null : d;
@@ -1497,13 +1416,14 @@ function sendInviteMail_(u, admin) {
                       : by + ' hat dich zum Fracht-Tracker eingeladen.';
   const body = 'Hallo ' + u.name + ',\n\n' + intro + '\n\nÖffne diesen Link auf dem Gerät, mit dem du arbeitest, und wähle deine persönliche 6-stellige PIN:\n'
     + link + '\n\nDer Link ist ' + INVITE_HOURS + ' Stunden gültig und kann nur einmal verwendet werden. Bitte gib deine PIN an niemanden weiter.\n\nFracht-Tracker';
-  const html = '<p>Hallo ' + escapeHtml_(u.name) + ',</p><p>' + intro + '</p>'
-    + '<p><a href=\"' + link + '\" style=\"display:inline-block;padding:12px 20px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold\">PIN festlegen</a></p>'
-    + '<p style=\"font-size:12px;color:#555\">Falls der Knopf nicht funktioniert: ' + link + '</p>'
-    + '<p style=\"font-size:12px;color:#555\">Der Link ist ' + INVITE_HOURS + ' Stunden gültig und kann nur einmal verwendet werden. Bitte gib deine PIN an niemanden weiter.</p>';
+  const html = '<p>Hallo ' + escapeHtml_(u.name) + ',</p><p>' + escapeHtml_(intro) + '</p>'
+    + '<p>Öffne diesen Link auf dem Gerät, mit dem du arbeitest, und wähle deine persönliche 6-stellige PIN:</p>'
+    + '<p><a href="' + link + '" style="display:inline-block;padding:12px 20px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold">PIN festlegen</a></p>'
+    + '<p style="font-size:12px;color:#555">Falls der Knopf nicht funktioniert: ' + link + '</p>'
+    + '<p style="font-size:12px;color:#555">Der Link ist ' + INVITE_HOURS + ' Stunden gültig und kann nur einmal verwendet werden. Bitte gib deine PIN an niemanden weiter.</p>';
   MailApp.sendEmail({ to: u.email, subject: subject, body: body, htmlBody: html, name: 'Fracht-Tracker' });
 }
-function escapeHtml_(s) { return String(s).replace(/[&<>\"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' }[c]; }); }
+function escapeHtml_(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 
 // Sitzungs-Token: base64url({ u: Nutzer, g: gen, s: Sitzung, e: Ablauf }) + "." + HMAC. Die Sitzung steht zusätzlich in der
 // Nutzerzeile (Spalte sessions), damit "Abmelden" serverseitig wirkt. Der Aufrufer speichert den Nutzer danach (saveUser_).
@@ -1539,7 +1459,7 @@ function authRefresh(user) {
   return withLock_(function () {
     const u = findUser_(loadUsers_(true), function (x) { return x.id === user.id; });
     if (!u || !u.active) throw authError_('AUTH_REQUIRED', 'Zugang deaktiviert – bitte an den Administrator wenden.');
-    const now = Date.now(), exp = now + SESSION_HOURS * 36000;
+    const now = Date.now(), exp = now + SESSION_HOURS * 3600000;
     const list = sessionList_(u).filter(function (x) { return x && x.e > now; });
     const cur = list.filter(function (x) { return x.s === user.sessionId; })[0];
     if (!cur) throw authError_('AUTH_REQUIRED', 'Abgemeldet – bitte erneut anmelden.');
@@ -1599,7 +1519,7 @@ function authLogin(payload) {
   if (!AUTH_ENABLED) return { status: 'success', authDisabled: true };
   const id = String((payload && payload.userId) || '');
   const pin = String((payload && payload.pin) || '');
-  if (!/^\\d{6}$/.test(pin)) throw authError_('LOGIN_FAILED', 'Die PIN besteht aus 6 Ziffern.');
+  if (!/^\d{6}$/.test(pin)) throw authError_('LOGIN_FAILED', 'Die PIN besteht aus 6 Ziffern.');
   const secret = secret_();
   return withLock_(function () {
     const u = findUser_(loadUsers_(true), function (x) { return x.id === id; });
@@ -1631,8 +1551,8 @@ function authInviteInfo(payload) {
 function authAccept(payload) {
   const inv = String((payload && payload.invite) || '');
   const pin = String((payload && payload.pin) || '');
-  if (!/^\\d{6}$/.test(pin)) throw authError_('PIN_INVALID', 'Die PIN muss aus genau 6 Ziffern bestehen.');
-  if (/^(\\d)\\1{5}$/.test(pin) || '01234567890'.indexOf(pin) !== -1 || '09876543210'.indexOf(pin) !== -1) throw authError_('PIN_WEAK', 'Bitte keine zu einfache PIN (z. B. 111111 oder 123456).');
+  if (!/^\d{6}$/.test(pin)) throw authError_('PIN_INVALID', 'Die PIN muss aus genau 6 Ziffern bestehen.');
+  if (/^(\d)\1{5}$/.test(pin) || '01234567890'.indexOf(pin) !== -1 || '09876543210'.indexOf(pin) !== -1) throw authError_('PIN_WEAK', 'Bitte keine zu einfache PIN (z. B. 111111 oder 123456).');
   const secret = secret_();
   return withLock_(function () {
     const u = inv ? findUser_(loadUsers_(true), function (x) { return x.invite && x.invite === inv; }) : null;
@@ -1657,11 +1577,12 @@ function adminUserList_(users) {
       inviteOpen: inviteOpen, inviteExpires: u.inviteExpires || 0, locked: u.lockedUntil > now };
   });
 }
+// payload { name, email } → neuen Mitarbeiter anlegen (oder vorhandenen erneut einladen) und E-Mail schicken
 function adminInvite(payload, admin) {
   const name = String((payload && payload.name) || '').trim();
   const email = String((payload && payload.email) || '').trim().toLowerCase();
   if (name.length < 2) throw authError_('INVALID', 'Bitte einen Namen angeben.');
-  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) throw authError_('INVALID', 'Bitte eine gültige E-Mail-Adresse angeben.');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw authError_('INVALID', 'Bitte eine gültige E-Mail-Adresse angeben.');
   return withLock_(function () {
     let u = findUser_(loadUsers_(true), function (x) { return x.email.toLowerCase() === email; });
     if (!u) u = newUser_(name, email, 'user'); else u.name = name;
@@ -1675,7 +1596,7 @@ function adminInvite(payload, admin) {
 function inviteResult_(u, mailError) {
   return { id: u.id, name: u.name, email: u.email, mailSent: !mailError, mailError: mailError || '', link: mailError ? inviteLink_(u) : '' };
 }
-// payload { userId } → neue Einladung (PIN zurücksetzen); die alte PIN gilt, bis die neue gesetzt ist
+// payload { userId } → neue Einladung (PIN zurücksetzen); die alte PIN gilt, bis die neue festgelegt wurde
 function adminResetPin(payload, admin) {
   const id = String((payload && payload.userId) || '');
   return withLock_(function () {
@@ -1701,4 +1622,3 @@ function adminSetActive(payload, admin) {
     return { status: 'success', users: adminUserList_() };
   });
 }
-
