@@ -493,6 +493,19 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
             void tableBodyEl.offsetHeight;
             tableBodyEl.style.display = '';
         }
+        function setBatchSettingsExpanded(expanded) {
+            const header = document.getElementById('batchSettingsHeader');
+            const container = document.getElementById('batchSettings');
+            const body = document.getElementById('batchSettingsBody');
+            if (body) body.classList.toggle('hidden', !expanded);
+            if (container) container.classList.toggle('is-open', !!expanded);
+            if (header) header.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        }
+        function toggleBatchSettings() {
+            const body = document.getElementById('batchSettingsBody');
+            const isCurrentlyClosed = !body || body.classList.contains('hidden');
+            setBatchSettingsExpanded(isCurrentlyClosed);
+        }
         function toggleBatchMode(activate) {
             isBatchModeActive = activate;
             clearError();
@@ -521,6 +534,7 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
                 currentBatchGlobalNote = null;
                 isBatchNotePromptRequired = true; // Batch-Notiz-Modal soll beim ersten Scan im neuen Batch kommen
                 pendingFirstBatchScanData = null;
+                setBatchSettingsExpanded(false);
                 updateBatchUI();
                 displayCurrentShipmentDetails(''); // Keine Details im Batch Modus anzeigen
             } else {

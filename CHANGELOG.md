@@ -4,6 +4,21 @@ Neueste zuerst. Datum = Veröffentlichung (bis einschließlich 9.2 auf dem Branc
 Zusammenführen von Pull Request #1 am 09.11.2026 auf `main`). App-Version siehe `js/01-start.js`
 (`APP_VERSION`), Server-Skript siehe Kopf von `backend/Code.gs`.
 
+## 2026-11-10 – App 9.6, Code.gs 2.9
+
+Batch-Ansicht auf kleinen Bildschirmen kompakter: Status-Zeile mit Hinzufügen-Knopf im Batch-Modus unter 992 px ausgeblendet,
+Einstell-Schalter (Notiz-Popup, Überzählig-Ton, Scan-Feedback-Popup) in aufklappbarer Kopfzeile zusammengefasst. Mehr Höhe für
+die Liste auf Zebra-Geräten. Nur Frontend; `backend/Code.gs` bleibt unverändert 2.9, keine neuen Skript-Eigenschaften oder Tabellen-Änderungen.
+
+- `css/02-scan-batch.css`: Im Batch-Modus unter 992 px die Zeile `.status-and-button-container` ausblenden; das Scanfeld behält
+  die volle Breite. Im normalen Modus und am Desktop (ab 992 px) bleiben Status-Auswahl und Hinzufügen-Knopf sichtbar.
+- `index.html`, `css/02-scan-batch.css`, `js/10-menue-events-start.js`, `js/08-scan-batch.js`: Die drei Schalter unter der
+  Batch-Liste erhalten eine Kopfzeile „Einstellungen“, standardmäßig zugeklappt im Batch-Modus. Ein Tippen klappt die Schalter auf
+  und zu. Die Einstellungen selbst bleiben gespeichert und wirksam. Gilt für alle Bildschirmgrößen.
+- `tests/regress.js`: Batch-Prüfungen erweitert: Status-Zeile auf kleinen Bildschirmen ausgeblendet, Scanfeld voll breit,
+  Einstellungen standardmäßig zugeklappt, lassen sich aufklappen, Schalter-Werte bleiben erhalten; Normalmodus und Desktop wie bisher.
+- Versionskette auf App 9.6 / Code.gs 2.9 angehoben (`js/01-start.js`, `sw.js`, `<title>`, README-Dateien, `tests/versioncheck.js`).
+
 ## 2026-11-10 – App 9.5, Code.gs 2.9
 
 Batch-Ansicht fest im Bild: Scanfeld oben, Anzahl und Liste in der Mitte, Notiz-/Ton-/Feedback-Schalter darunter,

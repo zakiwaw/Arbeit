@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="light dark">
     <meta name="theme-color" content="#f1f5f9" media="(prefers-color-scheme: light)">
     <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
-    <title>Fracht Tracker 9.5</title>
+    <title>Fracht Tracker 9.6</title>
     <!-- Als App installierbar (Android/Zebra: Chrome-Menü → „App installieren“ / „Zum Startbildschirm hinzufügen“):
          läuft dann ohne Adressleiste und fest im Hochformat (orientation: portrait im Manifest) -->
     <link rel="manifest" href="manifest.webmanifest">
@@ -147,32 +147,40 @@
             <div id="currentBatchNoteDisplay"></div>
             <div id="batchSummary">Anzahl im Batch: <span id="batchItemCount">0</span></div>
             <ul id="batchList"></ul>
-            <div class="toggle-row batch-note-toggle-container">
-                <label for="batchNoteToggle">Notiz-Popup aktivieren</label>
-                <label class="batch-toggle-switch">
-                    <input type="checkbox" id="batchNoteToggle">
-                    <span class="batch-slider"></span>
-                </label>
-            </div>
-            <div class="toggle-row batch-sound-toggle-container">
-                <label for="unexpectedHuSoundToggle" title="Ton abspielen, wenn eine HU auf keiner Liste steht">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,15.17 16.89,17.84 14,18.7V20.77C18,19.86 21,16.28 21,12C21,7.72 18,4.14 14,3.23M16.5,12C16.5,10.23 15.5,8.71 14,7.97V16C15.5,15.29 16.5,13.76 16.5,12M3,9V15H7L12,20V4L7,9H3Z" /></svg>
-                    Überzählig-Ton
-                </label>
-                <label class="batch-toggle-switch">
-                    <input type="checkbox" id="unexpectedHuSoundToggle" checked>
-                    <span class="batch-slider"></span>
-                </label>
-            </div>
-            <div class="toggle-row batch-sound-toggle-container">
-                <label for="batchFeedbackToggle" title="Scan-Feedback-Popup im Batch-Modus anzeigen">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20,2H4A2,2 0 0,0 2,4V22L6,18H20A2,2 0 0,0 22,16V4A2,2 0 0,0 20,2M6,9H18V11H6M14,14H6V12H14M18,8H6V6H18" /></svg>
-                    Scan-Feedback-Popup
-                </label>
-                <label class="batch-toggle-switch">
-                    <input type="checkbox" id="batchFeedbackToggle">
-                    <span class="batch-slider"></span>
-                </label>
+            <div class="batch-settings" id="batchSettings">
+                <button type="button" class="batch-settings-header" id="batchSettingsHeader" aria-expanded="false" aria-controls="batchSettingsBody">
+                    <span class="batch-settings-title">Einstellungen</span>
+                    <span class="batch-settings-chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z" /></svg></span>
+                </button>
+                <div class="batch-settings-body hidden" id="batchSettingsBody">
+                    <div class="toggle-row batch-note-toggle-container">
+                        <label for="batchNoteToggle">Notiz-Popup aktivieren</label>
+                        <label class="batch-toggle-switch">
+                            <input type="checkbox" id="batchNoteToggle">
+                            <span class="batch-slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-row batch-sound-toggle-container">
+                        <label for="unexpectedHuSoundToggle" title="Ton abspielen, wenn eine HU auf keiner Liste steht">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,15.17 16.89,17.84 14,18.7V20.77C18,19.86 21,16.28 21,12C21,7.72 18,4.14 14,3.23M16.5,12C16.5,10.23 15.5,8.71 14,7.97V16C15.5,15.29 16.5,13.76 16.5,12M3,9V15H7L12,20V4L7,9H3Z" /></svg>
+                            Überzählig-Ton
+                        </label>
+                        <label class="batch-toggle-switch">
+                            <input type="checkbox" id="unexpectedHuSoundToggle" checked>
+                            <span class="batch-slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-row batch-sound-toggle-container">
+                        <label for="batchFeedbackToggle" title="Scan-Feedback-Popup im Batch-Modus anzeigen">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20,2H4A2,2 0 0,0 2,4V22L6,18H20A2,2 0 0,0 22,16V4A2,2 0 0,0 20,2M6,9H18V11H6M14,14H6V12H14M18,8H6V6H18" /></svg>
+                            Scan-Feedback-Popup
+                        </label>
+                        <label class="batch-toggle-switch">
+                            <input type="checkbox" id="batchFeedbackToggle">
+                            <span class="batch-slider"></span>
+                        </label>
+                    </div>
+                </div>
             </div>
             <!-- Im Batch-Modus am Handy und Desktop unten fest; gleiche Knöpfe, gleiche Funktionen. -->
             <div class="batch-action-buttons" id="batchActionBar">

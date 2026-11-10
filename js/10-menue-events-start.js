@@ -553,6 +553,10 @@ if (huEditFormEl) {
 
     // Batch Modus
     batchModeToggleEl.addEventListener('change', (e) => toggleBatchMode(e.target.checked));
+    const batchSettingsHeaderEl = document.getElementById('batchSettingsHeader');
+    if (batchSettingsHeaderEl) {
+        batchSettingsHeaderEl.addEventListener('click', toggleBatchSettings);
+    }
     saveBatchButtonEl.addEventListener('click', saveBatch);
     clearBatchButtonEl.addEventListener('click', () => {
         if (currentBatch.length > 0 && confirm("Aktuellen Batch wirklich leeren?")) {

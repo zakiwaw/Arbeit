@@ -39,6 +39,6 @@ if (fs.existsSync(path.join(root, 'sw.js'))) {
   ok(false, 'sw.js fehlt (Service Worker – App offline startbar)');
 }
 ok(!/AKfycb[\w-]{20,}/.test(read('README.md')), 'README.md enthält keine Web-App-URL/Token');
-// Zielstand dieser Auslieferung (10.11.2026): App 9.5 enthält nur Frontend-Änderungen; Code.gs bleibt 2.9.
-ok(appVersion === '9.5' && backendVersion === '2.9', `Auslieferung: App ${appVersion} ↔ Code.gs ${backendVersion} (erwartet 9.5 / 2.9)`);
+// Zielstand dieser Auslieferung (10.11.2026): App 9.6 enthält nur Frontend-Änderungen; Code.gs bleibt 2.9.
+ok(appVersion === '9.6' && backendVersion === '2.9', `Auslieferung: App ${appVersion} ↔ Code.gs ${backendVersion} (erwartet 9.6 / 2.9)`);
 console.log(fails ? `SOME FAILED (${fails} von ${oks + fails})` : `ALL GOOD (${oks})`); process.exit(fails ? 1 : 0);
