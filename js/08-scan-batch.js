@@ -551,18 +551,34 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
             focusShipmentInput();
         }
 
-        function updateBatchUI() {
+        function updateBatchUI(animateNewest = false) {
             batchListEl.innerHTML = '';
             currentBatch.forEach((batchItem, index) => {
                 const li = document.createElement('li');
+                if (animateNewest && index === 0) li.classList.add('is-newest');
+
                 const itemDate = new Date(batchItem.scanTimestamp);
-                let displayText = `${escapeHtml(batchItem.rawInput)} (${itemDate.toLocaleTimeString('de-DE')})`;
+                const itemInfo = document.createElement('span');
+                itemInfo.classList.add('batch-item-info');
+                const number = document.createElement('strong');
+                number.classList.add('batch-item-number');
+                number.textContent = batchItem.rawInput;
+                const time = document.createElement('time');
+                time.classList.add('batch-item-time');
+                time.dateTime = itemDate.toISOString();
+                time.textContent = itemDate.toLocaleTimeString('de-DE');
+                itemInfo.append(number, time);
                 if (batchItem.note) {
-                    displayText += ` - Notiz: ${escapeHtml(batchItem.note)}`;
+                    const note = document.createElement('span');
+                    note.classList.add('batch-item-note');
+                    note.textContent = `Notiz: ${batchItem.note}`;
+                    itemInfo.appendChild(note);
                 }
-                li.textContent = displayText;
+                li.appendChild(itemInfo);
+
                 const removeBtn = document.createElement('button');
-                removeBtn.textContent = 'X';
+                removeBtn.textContent = '×';
+                removeBtn.setAttribute('aria-label', `${batchItem.rawInput} aus Batch entfernen`);
                 removeBtn.classList.add('remove-batch-item');
                 removeBtn.title = `${escapeHtml(batchItem.rawInput)} aus Batch entfernen`;
                 removeBtn.onclick = () => {
@@ -719,7 +735,7 @@ function addToBatch() {
                 note: currentBatchGlobalNote 
             };
             currentBatch.unshift(tempBatchItem);
-            updateBatchUI();
+            updateBatchUI(true);
             
             // Modal mit dem ersten Vorschlag anzeigen
             showSuspicionModal(processedRawInput, 0);
@@ -742,7 +758,7 @@ function addToBatch() {
     
     currentBatch.unshift(batchItem);
     
-    updateBatchUI();
+    updateBatchUI(true);
     shipmentNumberInputEl.value = '';
     updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
     clearError();
@@ -766,7 +782,7 @@ function addToBatch() {
                 const batchItem = { ...pendingFirstBatchScanData, note: currentBatchGlobalNote };
                 currentBatch.push(batchItem);
                 pendingFirstBatchScanData = null;
-                updateBatchUI();
+                updateBatchUI(true);
                 shipmentNumberInputEl.value = '';
                 updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
             }
@@ -789,7 +805,7 @@ function skipNoteAndAddFirstBatchItem() {
                 const batchItem = { ...pendingFirstBatchScanData, note: null };
                 currentBatch.push(batchItem);
                 pendingFirstBatchScanData = null;
-                updateBatchUI();
+                updateBatchUI(true);
                 shipmentNumberInputEl.value = '';
                 updateClearButtonVisibility(shipmentNumberInputEl, clearInputButtonEl);
             }
