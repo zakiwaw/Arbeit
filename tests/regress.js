@@ -1,6 +1,53 @@
 // Grundfunktionen: Laden, Einzelscan, neue Sendung, Batch-Modus, Startseite/Unterseiten, Info-Filter, Seitenmenü
 const { launch, makeBackend, openApp, sampleData, scan, setBatchMode, assert, finish } = require('./helpers');
 const wait = (ms) => new Promise(r => setTimeout(r, ms));
+
+// Geometrie statt einer starren Mindesthöhe: Anzahl/Schalter bleiben stehen, die Liste bekommt genau den freien Rest.
+async function batchGeometry(page) {
+  return page.evaluate(() => {
+    const main = document.getElementById('mainView'), form = document.getElementById('main-input-form');
+    const area = document.getElementById('batchArea'), list = document.getElementById('batchList');
+    const summary = document.getElementById('batchSummary'), bar = document.getElementById('batchActionBar');
+    const toggles = [...area.querySelectorAll('.toggle-row')];
+    const rect = e => e.getBoundingClientRect(), style = e => getComputedStyle(e);
+    const mr = rect(main), fr = rect(form), ar = rect(area), lr = rect(list), br = rect(bar);
+    const marginY = e => parseFloat(style(e).marginTop) + parseFloat(style(e).marginBottom);
+    const otherHeight = [...area.children].filter(e => e !== list && style(e).display !== 'none' && style(e).position !== 'fixed')
+      .reduce((sum, e) => sum + rect(e).height + marginY(e), 0);
+    const freeHeight = area.clientHeight - parseFloat(style(area).paddingTop) - parseFloat(style(area).paddingBottom) - otherHeight - marginY(list);
+    const controls = [form, document.getElementById('securityStatusSelect'), document.getElementById('mainActionButton'),
+      area.querySelector('h3'), summary, list, ...toggles, document.getElementById('saveBatchButton'), document.getElementById('clearBatchButton')];
+    const visible = controls.every(e => {
+      const r = rect(e), hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return r.width > 0 && r.height > 0 && r.top >= 0 && r.bottom <= innerHeight + 0.5 && r.left >= 0 && r.right <= innerWidth + 0.5 && !!hit && e.contains(hit);
+    });
+    return {
+      fixed: [main, form, bar].every(e => style(e).position === 'fixed'), screenHeight: Math.abs(mr.height - innerHeight) < 1,
+      atBottom: Math.abs(br.bottom - innerHeight) < 1, visible,
+      ordered: fr.bottom <= rect(document.querySelector('.status-and-button-container')).top && rect(document.querySelector('.input-section')).bottom <= ar.top &&
+        ar.top <= rect(summary).top && rect(summary).bottom <= lr.top && lr.bottom <= rect(toggles[0]).top && rect(toggles[2]).bottom <= ar.bottom && ar.bottom <= br.top,
+      listScroll: style(list).overflowY, maxHeight: style(list).maxHeight, listHeight: lr.height, freeHeight,
+      cardNoScroll: area.scrollHeight <= area.clientHeight, mainNoScroll: main.scrollHeight <= main.clientHeight,
+      bounds: [mr.top, mr.bottom, fr.top, fr.bottom, ar.top, ar.bottom, lr.top, lr.bottom, br.top, br.bottom], windowY: scrollY
+    };
+  });
+}
+function assertBatchViewport(g, label) {
+  assert(g.fixed && g.screenHeight && g.atBottom && g.visible && g.ordered && g.listScroll === 'auto' && g.maxHeight === 'none' &&
+    g.listHeight >= 50 && Math.abs(g.listHeight - g.freeHeight) <= 1 && g.cardNoScroll && g.mainNoScroll,
+    `${label}: Scanfeld/Karte/Aktionen im Bild, nur Liste scrollt und füllt den Rest (${JSON.stringify(g)})`);
+}
+async function normalGeometry(page) {
+  return page.evaluate(() => ({
+    mainPosition: getComputedStyle(document.getElementById('mainView')).position,
+    formPosition: getComputedStyle(document.getElementById('main-input-form')).position,
+    workspace: getComputedStyle(document.querySelector('.batch-workspace')).display,
+    barPosition: getComputedStyle(document.getElementById('batchActionBar')).position,
+    paddingBottom: getComputedStyle(document.getElementById('mainView')).paddingBottom,
+    boxes: [...document.querySelectorAll('#mainView, #mainView > .container, .input-section, #main-input-form, #homeHub, .list-caption-row, #mainView .shipment-table')]
+      .map(e => { const r = e.getBoundingClientRect(); return [r.x, r.y + scrollY, r.width, r.height]; })
+  }));
+}
 (async () => {
   const browser = await launch();
   try {
@@ -20,13 +67,7 @@ const wait = (ms) => new Promise(r => setTimeout(r, ms));
     assert(store['55512345'] && store['55512345'].totalPiecesExpected === 2, 'Neue Sendung 55512345 mit 2 Stück angelegt');
     await setBatchMode(page, true);
     assert(await page.evaluate(() => document.body.classList.contains('batch-mode-active')), 'Batch-Modus aktiv');
-    const batchLayout = await page.evaluate(() => {
-      const form = document.getElementById('main-input-form'), list = document.getElementById('batchList'), summary = document.getElementById('batchSummary');
-      return { pinnedInput: getComputedStyle(form).position === 'fixed', listHeight: list.clientHeight, listScroll: getComputedStyle(list).overflowY,
-        summaryAboveList: !!(summary.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING) };
-    });
-    assert(batchLayout.pinnedInput && batchLayout.listHeight >= 480 && batchLayout.listScroll === 'auto' && batchLayout.summaryAboveList,
-      `Batch: Scanfeld fest, Liste groß/scrollbar, Anzahl oberhalb (${JSON.stringify(batchLayout)})`);
+    assertBatchViewport(await batchGeometry(page), 'Batch leer (Handy)');
     // Handy: „Speichern“/„Leeren“ hängen im Batch-Modus als feste Leiste unten (dieselben Knöpfe, aus der Karte gelöst)
     const bar0 = await page.evaluate(() => { const bar = document.getElementById('batchActionBar'); const r = bar.getBoundingClientRect(); return { pos: getComputedStyle(bar).position, atBottom: Math.abs(innerHeight - r.bottom) < 1, save: document.getElementById('saveBatchButton').textContent.trim(), clear: document.getElementById('clearBatchButton').textContent.trim(), prefixHidden: [...document.querySelectorAll('#batchActionBar .batch-btn-prefix')].every(e => getComputedStyle(e).display === 'none'), cnt: getComputedStyle(document.getElementById('saveBatchCount')).display, pad: parseInt(getComputedStyle(document.getElementById('mainView')).paddingBottom) }; });
     assert(bar0.pos === 'fixed' && bar0.atBottom && bar0.save === 'Batch Speichern0' && bar0.clear === 'Batch Leeren' && bar0.prefixHidden && bar0.cnt === 'none' && bar0.pad > 40, `Batch-Leiste unten fest, Zähler bei leerem Batch versteckt, Liste bekommt unten Luft (${JSON.stringify(bar0)})`);
@@ -72,6 +113,90 @@ const wait = (ms) => new Promise(r => setTimeout(r, ms));
     assert(await page.$eval('#side-menu', e => e.classList.contains('open')), 'Seitenmenü öffnet');
     assert((await page.$$eval('.lkw-toggle', e => e.length)) >= 1, 'Seitenmenü zeigt LKW-Schalter');
     assert(page.__errors.length === 0, `Keine JS-Fehler (${page.__errors.join('; ')})`);
+    await page.close(); // Kein Hintergrund-Sync des ersten Szenarios in den gemeinsam genutzten localStorage weiterer Seiten.
+
+    // ---- Batch 9.5: feste Arbeitsfläche, innere Scrollposition, neue Scans und Rückkehr zum normalen Seitenfluss ----
+    for (const viewport of [
+      { width: 320, height: 568, isMobile: true, hasTouch: true, deviceScaleFactor: 2 },
+      { width: 360, height: 640, isMobile: true, hasTouch: true, deviceScaleFactor: 2 },
+      { width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 },
+      { width: 991, height: 800 }, { width: 992, height: 800 }, { width: 1440, height: 1200 }
+    ]) {
+      const label = `Batch ${viewport.width}×${viewport.height}`;
+      const bb = makeBackend(sampleData(), {}), pb = await openApp(browser, bb, { viewport });
+      const normalBefore = await normalGeometry(pb);
+      await setBatchMode(pb, true);
+      const empty = await batchGeometry(pb);
+      assertBatchViewport(empty, `${label} leer`);
+      for (let i = 0; i < 35; i++) await scan(pb, 'ZZBATCH' + String(i).padStart(4, '0'), 0);
+      const full = await batchGeometry(pb);
+      assertBatchViewport(full, `${label} mit 35 Scans`);
+      assert(JSON.stringify(empty.bounds) === JSON.stringify(full.bounds), `${label}: voller Batch verschiebt keine Bedienelemente`);
+      const order = await pb.$$eval('#batchList .batch-item-number', es => es.map(e => e.textContent));
+      assert(order.join('|') === Array.from({ length: 35 }, (_, i) => 'ZZBATCH' + String(34 - i).padStart(4, '0')).join('|'), `${label}: unverändert neuester Scan oben`);
+      // Tatsächliches Mausrad im Listenfenster (nicht nur scrollTop setzen): manuelles Scrollen bleibt möglich.
+      const listBox = await pb.$eval('#batchList', e => { const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+      await pb.mouse.move(listBox.x, listBox.y); await pb.mouse.wheel({ deltaY: 350 }); await wait(150);
+      const manualTop = await pb.$eval('#batchList', e => e.scrollTop);
+      assert(manualTop > 0 && JSON.stringify((await batchGeometry(pb)).bounds) === JSON.stringify(full.bounds), `${label}: nur der Listeninhalt scrollt manuell`);
+      // Seiten-Scrollversuch außerhalb der Liste darf weder Karte noch Schalter aus dem Bild bewegen.
+      await pb.evaluate(() => window.scrollTo(0, 10000));
+      await pb.mouse.move(2, 200); await pb.mouse.wheel({ deltaY: 800 }); await wait(100);
+      const afterPageScroll = await batchGeometry(pb);
+      assert(afterPageScroll.windowY === 0 && JSON.stringify(afterPageScroll.bounds) === JSON.stringify(full.bounds) &&
+        await pb.$eval('#batchList', e => e.scrollTop) === manualTop, `${label}: Seitenscroll lässt Arbeitsfläche und Listenposition unverändert`);
+      // Löschen fragt weiterhin nach; sowohl Abbruch als auch bestätigtes Löschen dürfen nicht nach oben springen.
+      let acceptDialog = false; const dialogs = [];
+      pb.removeAllListeners('dialog');
+      pb.on('dialog', async d => { dialogs.push(d.message()); await (acceptDialog ? d.accept() : d.dismiss()); });
+      const beforeDelete = await pb.$eval('#batchList', e => { e.scrollTop = 300; return e.scrollTop; });
+      await pb.evaluate(() => document.querySelectorAll('#batchList .remove-batch-item')[7].click());
+      assert(dialogs.length === 1 && /aus dem Batch entfernt/.test(dialogs[0]) && await pb.$$eval('#batchList li', es => es.length) === 35 &&
+        await pb.$eval('#batchList', e => e.scrollTop) === beforeDelete, `${label}: Löschen abgebrochen, Liste und Scrollstand bleiben`);
+      acceptDialog = true;
+      await pb.evaluate(() => document.querySelectorAll('#batchList .remove-batch-item')[7].click());
+      assert(dialogs.length === 2 && await pb.$$eval('#batchList li', es => es.length) === 34 &&
+        await pb.$eval('#batchList', e => e.scrollTop) === beforeDelete && !(await pb.$('#batchList .is-newest')), `${label}: Löschen bestätigt, kein Sprung/keine Scan-Markierung`);
+      await scan(pb, 'ZZBATCHNEW', 0);
+      const newest = await pb.$eval('#batchList', e => {
+        const first = e.firstElementChild, r = first.getBoundingClientRect(), l = e.getBoundingClientRect();
+        return { top: e.scrollTop, number: first.querySelector('.batch-item-number').textContent, marked: first.classList.contains('is-newest'),
+          visible: r.top >= l.top && r.bottom <= l.bottom, count: e.children.length };
+      });
+      assert(newest.top === 0 && newest.number === 'ZZBATCHNEW' && newest.marked && newest.visible && newest.count === 35,
+        `${label}: neuer Scan holt sofort die komplette oberste Zeile ins Bild (${JSON.stringify(newest)})`);
+      // Ein zweiter Scan über Enter/Formular nimmt denselben Weg, auch wenn man erneut nach unten scrollt.
+      await pb.$eval('#batchList', e => { e.scrollTop = e.scrollHeight; });
+      await pb.evaluate(() => { const i = document.getElementById('shipmentNumberInput'); i.value = 'ZZBATCHENTER'; document.getElementById('main-input-form').requestSubmit(); });
+      assert(await pb.$eval('#batchList', e => e.scrollTop === 0 && e.firstElementChild.querySelector('.batch-item-number').textContent === 'ZZBATCHENTER'), `${label}: auch der nächste Scanner-Enter zeigt den neuesten Eintrag`);
+      if (viewport.width === 390 || viewport.width === 992) {
+        const noteTop = await pb.$eval('#batchList', e => { e.scrollTop = 300; return e.scrollTop; });
+        await pb.evaluate(() => { document.getElementById('batchNoteToggle').click(); document.getElementById('batchNoteInput').value = 'Palette 9.5'; document.getElementById('confirmBatchNoteButton').click(); });
+        assert(await pb.$eval('#batchList', (e, top) => e.scrollTop === top && e.querySelector('.batch-item-note').textContent.includes('Palette 9.5'), noteTop), `${label}: Notiz ändern ohne neuen Scan erhält Scrollstand`);
+        assertBatchViewport(await batchGeometry(pb), `${label} mit Batch-Notiz`);
+      }
+      // 100dvh statt einer alten 65-vh-/560-px-Kappe: jedes zusätzliche Pixel Höhe landet in der Liste.
+      const beforeResize = await batchGeometry(pb);
+      await pb.setViewport({ ...viewport, height: viewport.height + 120 }); await wait(100);
+      const grown = await batchGeometry(pb);
+      assertBatchViewport(grown, `${label} um 120 px höher`);
+      assert(Math.abs(grown.listHeight - beforeResize.listHeight - 120) < 1, `${label}: zusätzliche Bildschirmhöhe vollständig für die Liste`);
+      if (viewport.height === 1200) assert(full.listHeight > 560, `${label}: keine alte 560-px-Grenze mehr`);
+      await pb.setViewport(viewport); await wait(100);
+      await pb.screenshot({ path: `.arena-shots/batch-${viewport.width}x${viewport.height}.png` });
+      // Auch ein abgebrochenes Ausschalten lässt den festen Batch-Arbeitsbereich bestehen.
+      acceptDialog = false; await setBatchMode(pb, false);
+      assert(await pb.evaluate(() => document.body.classList.contains('batch-mode-active') && document.getElementById('batchModeToggle').checked), `${label}: Ausschalten mit ungespeicherten Scans fragt weiterhin nach`);
+      acceptDialog = true; await setBatchMode(pb, false);
+      const normalAfter = await normalGeometry(pb), sameNormal = JSON.stringify(normalAfter) === JSON.stringify(normalBefore);
+      assert(sameNormal && normalAfter.workspace === 'contents' && normalAfter.mainPosition === 'static' && normalAfter.formPosition === 'static' && normalAfter.barPosition === 'static' && normalAfter.paddingBottom === '0px',
+        `${label}: Batch aus stellt die identische normale Geometrie wieder her${sameNormal ? '' : ' ' + JSON.stringify({ normalBefore, normalAfter })}`);
+      assert(!bb.actions.includes('saveShipments'), `${label}: reine Batch-Anzeige verändert/speichert keine Sendungsdaten`);
+      await setBatchMode(pb, true);
+      assertBatchViewport(await batchGeometry(pb), `${label} erneut eingeschaltet`);
+      assert(await pb.$$eval('#batchList li', es => es.length) === 0 && pb.__errors.length === 0, `${label}: neuer leerer Batch, keine JS-Fehler (${pb.__errors.join(' | ')})`);
+      await pb.close();
+    }
 
     // ---- Scan-Feld: Symbol links schaltet Scanner ↔ Tastatur um (inputMode none ↔ text), Verlassen → zurück zu Scanner ----
     {
@@ -103,7 +228,6 @@ const wait = (ms) => new Promise(r => setTimeout(r, ms));
     }
 
     // Erste Seite schließen: alle Seiten teilen sich localStorage – ihr Sync-Abruf würde die Daten der folgenden Blöcke überschreiben
-    await page.close();
 
     // ---- Scan-Zeitleiste auf schmalen Geräten (Zebra, 360 px): Methode neben der Nummer, Storno in der Aktionszeile ----
     {
@@ -184,6 +308,16 @@ const wait = (ms) => new Promise(r => setTimeout(r, ms));
       await pn.keyboard.type('Palette 3'); await pn.keyboard.press('Enter'); await wait(500);
       const bm2 = await pn.evaluate(() => ({ visible: document.getElementById('batchNoteModal').classList.contains('visible'), items: document.querySelectorAll('#batchList li').length, text: document.getElementById('batchList').textContent }));
       assert(bm.visible && bm.focused && !bm2.visible && bm2.items === 1 && /Palette 3/.test(bm2.text), `Batch-Notiz: Enter übernimmt die Notiz und scannt weiter (${JSON.stringify({ bm, bm2: { visible: bm2.visible, items: bm2.items } })})`);
+      assertBatchViewport(await batchGeometry(pn), 'Batch nach übernommener Notiz');
+      await pn.evaluate(() => document.getElementById('clearBatchButton').click());
+      await pn.evaluate(() => document.getElementById('batchNoteToggle').click());
+      await scan(pn, '0926040955AB', 0);
+      await pn.evaluate(() => document.getElementById('skipBatchNoteButton').click());
+      const skipped = await pn.evaluate(() => ({ modal: document.getElementById('batchNoteModal').classList.contains('visible'),
+        locked: document.body.classList.contains('modal-open'), marked: !!document.querySelector('#batchList li.is-newest'),
+        count: document.querySelectorAll('#batchList li').length, note: !!document.querySelector('#batchList .batch-item-note') }));
+      assert(!skipped.modal && !skipped.locked && skipped.marked && skipped.count === 1 && !skipped.note, `Batch-Notiz überspringen: neuer Scan sichtbar, kein hängen gebliebenes Modal (${JSON.stringify(skipped)})`);
+      assertBatchViewport(await batchGeometry(pn), 'Batch nach übersprungener Notiz');
       assert(pn.__errors.length === 0, `Notiz-Sheet: keine JS-Fehler (${pn.__errors.join(' | ')})`);
       await pn.close();
     }

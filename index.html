@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="light dark">
     <meta name="theme-color" content="#f1f5f9" media="(prefers-color-scheme: light)">
     <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
-    <title>Fracht Tracker 9.4</title>
+    <title>Fracht Tracker 9.5</title>
     <!-- Als App installierbar (Android/Zebra: Chrome-Menü → „App installieren“ / „Zum Startbildschirm hinzufügen“):
          läuft dann ohne Adressleiste und fest im Hochformat (orientation: portrait im Manifest) -->
     <link rel="manifest" href="manifest.webmanifest">
@@ -79,6 +79,8 @@
     </header>
 
     <div class="container">
+        <!-- Im Batch-Modus ein eigener, bildschirmhoher Arbeitsbereich; sonst ohne Layout-Box (display: contents). -->
+        <div class="batch-workspace">
         <div class="input-section">
             <div>
 
@@ -172,13 +174,13 @@
                     <span class="batch-slider"></span>
                 </label>
             </div>
-            <!-- Handy: im Batch-Modus als feste Leiste am unteren Rand (CSS .batch-action-buttons in body.batch-mode-active);
-                 Desktop: wie bisher am Ende der Batch-Karte. Gleiche Knöpfe, gleiche Funktionen. -->
+            <!-- Im Batch-Modus am Handy und Desktop unten fest; gleiche Knöpfe, gleiche Funktionen. -->
             <div class="batch-action-buttons" id="batchActionBar">
                 <button id="saveBatchButton"><span class="batch-btn-prefix">Batch </span>Speichern<span id="saveBatchCount" class="batch-save-count hidden">0</span></button>
                 <button id="clearBatchButton"><span class="batch-btn-prefix">Batch </span>Leeren</button>
             </div>
         </div>
+        </div> <!-- ENDE .batch-workspace -->
         <!-- Startseite: vier Kacheln. Die Sendungsdetails werden in der Detailansicht
              (#detailView → #currentShipmentDetails) angezeigt, die Unterseiten in #pageView (beides Vollbild). -->
         <section id="homeHub" class="home-hub" aria-label="Startseite">
