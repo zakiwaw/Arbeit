@@ -20,11 +20,21 @@ const wait = (ms) => new Promise(r => setTimeout(r, ms));
     assert(store['55512345'] && store['55512345'].totalPiecesExpected === 2, 'Neue Sendung 55512345 mit 2 Stück angelegt');
     await setBatchMode(page, true);
     assert(await page.evaluate(() => document.body.classList.contains('batch-mode-active')), 'Batch-Modus aktiv');
+    const batchLayout = await page.evaluate(() => {
+      const form = document.getElementById('main-input-form'), list = document.getElementById('batchList'), summary = document.getElementById('batchSummary');
+      return { pinnedInput: getComputedStyle(form).position === 'fixed', listHeight: list.clientHeight, listScroll: getComputedStyle(list).overflowY,
+        summaryAboveList: !!(summary.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING) };
+    });
+    assert(batchLayout.pinnedInput && batchLayout.listHeight >= 480 && batchLayout.listScroll === 'auto' && batchLayout.summaryAboveList,
+      `Batch: Scanfeld fest, Liste groß/scrollbar, Anzahl oberhalb (${JSON.stringify(batchLayout)})`);
     // Handy: „Speichern“/„Leeren“ hängen im Batch-Modus als feste Leiste unten (dieselben Knöpfe, aus der Karte gelöst)
     const bar0 = await page.evaluate(() => { const bar = document.getElementById('batchActionBar'); const r = bar.getBoundingClientRect(); return { pos: getComputedStyle(bar).position, atBottom: Math.abs(innerHeight - r.bottom) < 1, save: document.getElementById('saveBatchButton').textContent.trim(), clear: document.getElementById('clearBatchButton').textContent.trim(), prefixHidden: [...document.querySelectorAll('#batchActionBar .batch-btn-prefix')].every(e => getComputedStyle(e).display === 'none'), cnt: getComputedStyle(document.getElementById('saveBatchCount')).display, pad: parseInt(getComputedStyle(document.getElementById('mainView')).paddingBottom) }; });
     assert(bar0.pos === 'fixed' && bar0.atBottom && bar0.save === 'Batch Speichern0' && bar0.clear === 'Batch Leeren' && bar0.prefixHidden && bar0.cnt === 'none' && bar0.pad > 40, `Batch-Leiste unten fest, Zähler bei leerem Batch versteckt, Liste bekommt unten Luft (${JSON.stringify(bar0)})`);
     await page.evaluate(() => { const f = document.getElementById('batchFeedbackToggle'); if (!f.checked) f.click(); }); // Feedback-Popup (Standard: aus) einschalten
     await scan(page, 'HU1002', 300);
+    const batchRow = await page.evaluate(() => { const row = document.querySelector('#batchList li'); return !!row && row.classList.contains('is-newest') &&
+      row.querySelector('.batch-item-number')?.tagName === 'STRONG' && !!row.querySelector('time.batch-item-time'); });
+    assert(batchRow, 'Batch: neuester Scan wird markiert, HU-Nummer und Uhrzeit sind getrennt ausgezeichnet');
     assert(await page.evaluate(() => !document.querySelector('#batchScanFeedbackModal .modal-content').classList.contains('unexpected')), 'Batch: Feedback-Popup zeigt bekannte HU grün');
     await scan(page, 'UNBEKANNT1', 300);
     assert((await page.$$eval('.remove-batch-item', e => e.length)) === 2, 'Batch: 2 Einträge erfasst');

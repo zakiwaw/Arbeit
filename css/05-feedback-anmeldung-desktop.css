@@ -644,3 +644,22 @@ body.auth-open { overflow: hidden; }
     .tile-count { top: var(--sp-2); right: var(--sp-2); min-width: 22px; height: 22px; font-size: var(--fs-xs); }
     .list-caption { margin-top: var(--sp-3); }
 }
+
+/* Batch-Ansicht: Scanfeld bleibt am Desktop unter der App-Leiste stehen; andere Desktop-Seiten bleiben unberührt. */
+@media (min-width: 992px) {
+    body.batch-mode-active #main-input-form {
+        position: fixed;
+        top: 48px;
+        left: 50%;
+        z-index: 55;
+        width: min(calc(100vw - 32px), 1248px);
+        margin: 0;
+        padding: 4px 8px;
+        transform: translateX(-50%);
+        background-color: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--r-md);
+        box-shadow: var(--shadow-md);
+    }
+    body.batch-mode-active .input-section > div:first-child { min-height: 54px; }
+}

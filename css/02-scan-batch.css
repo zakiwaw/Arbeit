@@ -184,12 +184,27 @@ body.batch-mode-active .status-and-button-container > #mainActionButton { flex: 
     font-style: italic;
     color: var(--warning-text);
 }
+#batchSummary {
+    position: relative;
+    z-index: 1;
+    padding: var(--sp-2) 0;
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--text-muted);
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--border);
+}
+#batchItemCount { color: var(--text); font-size: var(--fs-md); }
 #batchList {
     list-style: none;
+    width: 100%;
+    height: min(65vh, 560px);
+    min-height: 240px;
+    max-height: min(65vh, 560px);
     margin: var(--sp-2) 0;
     padding: 0;
-    max-height: 180px;
     overflow-y: auto;
+    overscroll-behavior: contain;
     background-color: var(--surface-2);
     border: 1px solid var(--border);
     border-radius: var(--r-md);
@@ -198,34 +213,46 @@ body.batch-mode-active .status-and-button-container > #mainActionButton { flex: 
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: var(--sp-2);
-    padding: var(--sp-2) var(--sp-3);
-    font-family: var(--font-mono);
-    font-size: var(--fs-sm);
+    gap: var(--sp-3);
+    min-height: 48px;
+    padding: 3px var(--sp-3);
     border-bottom: 1px solid var(--border);
+    transition: background-color var(--dur) var(--ease);
 }
+#batchList li:nth-child(odd) { background-color: var(--surface); }
+#batchList li:nth-child(even) { background-color: var(--surface-3); }
 #batchList li:last-child { border-bottom: none; }
+.batch-item-info { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--sp-3); min-width: 0; }
+.batch-item-number { overflow-wrap: anywhere; font-family: var(--font-mono); font-size: var(--fs-md); font-weight: 750; color: var(--text); }
+.batch-item-time { font-size: var(--fs-xs); font-weight: 500; color: var(--text-muted); white-space: nowrap; }
+.batch-item-note { flex: 0 0 100%; margin-top: 2px; font-family: var(--font-sans); font-size: var(--fs-xs); color: var(--text-muted); overflow-wrap: anywhere; }
+#batchList li.is-newest { animation: batch-scan-arrival 1.25s ease-out; }
+@keyframes batch-scan-arrival {
+    0%, 30% { background-color: var(--success-soft); box-shadow: inset 4px 0 0 var(--success); }
+    100% { background-color: var(--surface); box-shadow: inset 0 0 0 transparent; }
+}
 .remove-batch-item {
+    display: inline-flex;
     flex-shrink: 0;
-    min-width: 32px;
-    height: 32px;
-    padding: 0 var(--sp-2);
-    font-size: var(--fs-sm);
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    min-width: 42px;
+    height: 42px;
+    padding: 0;
+    font-size: 24px;
+    line-height: 1;
     font-weight: 700;
     color: var(--danger-text);
     background-color: var(--danger-soft);
+    border: 1px solid color-mix(in srgb, var(--danger) 28%, transparent);
     border-radius: var(--r-sm);
     transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
 }
 .remove-batch-item:hover { color: #fff; background-color: var(--danger); }
-#batchSummary {
-    padding: var(--sp-2) 0;
-    font-size: var(--fs-sm);
-    font-weight: 600;
-    color: var(--text-muted);
-    border-bottom: 1px solid var(--border);
+@media (prefers-reduced-motion: reduce) {
+    #batchList li.is-newest { animation-duration: .01ms; }
 }
-#batchItemCount { color: var(--text); font-size: var(--fs-md); }
 .batch-note-toggle-container { margin-top: var(--sp-2); }
 .batch-action-buttons { display: flex; gap: var(--sp-2); margin-top: var(--sp-3); }
 .batch-action-buttons button {
@@ -246,6 +273,20 @@ body.batch-mode-active .status-and-button-container > #mainActionButton { flex: 
    so bleibt Speichern nach vielen Scans erreichbar, ohne zur Batch-Karte hochzuscrollen. Die Karte selbst bleibt oben wie bisher.
    Nur in der Hauptansicht (Detailansicht/Unterseiten liegen darüber, z-index 100) und nicht am Desktop. */
 @media (max-width: 991.98px) {
+    body.batch-mode-active #main-input-form {
+        position: fixed;
+        top: calc(56px + env(safe-area-inset-top, 0px));
+        left: var(--sp-3);
+        right: var(--sp-3);
+        z-index: 55;
+        margin: 0;
+        padding: var(--sp-2);
+        background-color: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--r-md);
+        box-shadow: var(--shadow-md);
+    }
+    body.batch-mode-active .input-section > div:first-child { min-height: 68px; }
     body.batch-mode-active .batch-action-buttons {
         position: fixed;
         left: 0; right: 0; bottom: 0;

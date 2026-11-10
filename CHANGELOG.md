@@ -4,6 +4,18 @@ Neueste zuerst. Datum = Veröffentlichung (bis einschließlich 9.2 auf dem Branc
 Zusammenführen von Pull Request #1 am 09.11.2026 auf `main`). App-Version siehe `js/01-start.js`
 (`APP_VERSION`), Server-Skript siehe Kopf von `backend/Code.gs`.
 
+## 2026-11-10 – App 9.4, Code.gs 2.9
+
+Die Batch-Liste nutzt den verfügbaren Platz statt eines kleinen 180-px-Fensters. Das Scanfeld bleibt beim Scrollen sichtbar,
+die Anzahl steht oberhalb der scrollenden Liste; HU, Zeit, Entfernen und neuer Scan sind optisch klarer. Ablauf und Daten
+bleiben unverändert; Handy-Aktionsleiste bleibt bestehen, Desktop-Schaltflächen bleiben in der Karte. Nur Frontend –
+`backend/Code.gs` bleibt unverändert auf 2.9.
+
+- `css/02-scan-batch.css`, `css/05-feedback-anmeldung-desktop.css`, `index.html`, `js/08-scan-batch.js`: Batch-Darstellung,
+  festes Scanfeld, längerer interner Listen-Scrollbereich, angepinnter Zähler, lesbarere Zeilen und kurzes grünes Aufleuchten
+  des neu hinzugekommenen obersten Eintrags. Scan-Reihenfolge, Status, Notizen und Aktionen bleiben gleich.
+- Versionskette auf App 9.4 / Code.gs 2.9 angehoben (`js/01-start.js`, `sw.js`, `<title>`, README-Dateien); Datum 2026-11-10.
+
 ## 2026-11-10 – App 9.3, Code.gs 2.9
 
 Sichere Mehrgeräte-Synchronisation: Sendungs-Version, Name des letzten Bearbeiters, geordnete Offline-Warteschlange,
