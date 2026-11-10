@@ -5,36 +5,10 @@ Es liest und schreibt das Google Sheet mit der ID `<SPREADSHEET_ID>` (steht nich
 Skript-Eigenschaften des Apps-Script-Projekts, Schlüssel `SPREADSHEET_ID`; fehlt die Eigenschaft, meldet der Code
 einen klaren Fehler und greift auf keine andere Tabelle zu).
 
-Zusammengehörige Versionen: **App 9.3 ↔ Code.gs 2.9** (die App zeigt beides unten im Seitenmenü). Bereitstellen siehe
+Zusammengehörige Versionen: **App 9.2 ↔ Code.gs 2.8** (2.7 funktioniert mit App 9.1/9.2 ebenfalls) (die App zeigt beides unten im Seitenmenü). Bereitstellen siehe
 `README.md` im Hauptordner (bestehende Web-App → neue Version, keine neue Bereitstellung).
 
-## Version 2.9 – Mehrgeräte-Synchronisations-Konfliktlösung
-
-Erweiterung von Version 2.8 (Mehrgeräte-Sync, Archiv, Anmeldung) um die Konfliktlösung und das Änderungsprotokoll:
-
-| Aktion | Zweck |
-|---|---|
-| `saveShipmentsMerged` | Gerät schickt **nur die geänderten Sendungen** plus den Serverstand, von dem es ausging. Der Server führt zusammen (3-Wege-Merge): Status-Felder werden zusammengeführt, Version wird geprüft (Version passt → Speichern + Version+1; Version passt nicht → Konflikt, Feld-Merge, Rückgabe aktueller Version + Konflikt-Hinweis). `lastModifiedBy` (Spalte F) wird gesetzt. |
-| `loadChangesSince` | Gerät holt **nur die Änderungen seit Version X** (alle 3 s, beim Zurückkehren in den Vordergrund, bei „online“). Liefert auch das Änderungsprotokoll `_changes` (HAWB, alter Status, neuer Status, Benutzer, Zeit) und den LKW-Status. |
-| `searchArchive` | Archivsuche (siehe Abschnitt Archiv). |
-| `deleteShipments` / `deleteShipment` | Löschung als Markierung (Tombstone, Spalte E = TRUE), damit andere Geräte die Sendung nicht wiederbeleben. |
-| `loadAllData`, `saveAllData`, `clearAllData`, `sendPdfEmail`, `saveLkwStatus`, `loadLkwStatus` | Wie bisher – `saveAllData` läuft jetzt ebenfalls durch den Merge, ein altes Gerät kann also nichts mehr überschreiben. |
-| `authUsers`, `authLogin`, `authAccept`, `authInviteInfo`, `authCheck`, `authRefresh`, `authLogout`, `admin*` | Anmeldung (siehe Version 2.2). |
-
-Sheet-Layout `shipments`: A = Sendungsnummer, B = JSON (wie bisher), **neu:** C = Version, D = geändert am,
-E = gelöscht, F = `lastModifiedBy` (Benutzer, der zuletzt geändert hat), G… = Fortsetzung des JSON bei sehr großen Sendungen (eine Zelle fasst max. 50.000 Zeichen – ein großer VVL-Import würde sonst nicht gespeichert). Alte Zeilen ohne C–F funktionieren weiterhin (Version 1, `lastModifiedBy` leer).
-
-Das Sheet `_meta` (ausgeblendet) hält den globalen Versionszähler in A1 und wird automatisch angelegt.
-Das Sheet `_changes` (ausgeblendet) hält das Änderungsprotokoll.
-
-Merge-Regeln (je Scan-Eintrag, identifiziert über eine stabile `id`):
-- Einträge beider Seiten bleiben erhalten; nur was ein Gerät **selbst** geändert hat, setzt sich durch.
-- **Storno geht nie verloren** (ein Gerät, das das Storno noch nicht kannte, kann es nicht aufheben).
-- Notizen werden vereinigt; bewusst gelöschte Notizen bleiben gelöscht.
-- Eine gelöschte Sendung bleibt gelöscht, auch wenn ein anderes Gerät kurz danach noch einen alten Stand schickt.
-- Feld-Merge (Status): Bei Konflikt wird der Status zusammengeführt (z. B. Wareneingang + Dunkelalarm → beide bleiben erhalten, wenn möglich).
-
-## Version 2.8 – Mehrgeräte-Sync (Basis)
+## Version 2 – Mehrgeräte-Sync
 
 Bis V1 hat jedes Gerät bei jedem Scan **den kompletten Datensatz** geschickt und der Server hat alle
 Zeilen gelöscht und neu geschrieben. Zwei Geräte gleichzeitig → das langsamere überschreibt die Scans
@@ -49,12 +23,12 @@ V2 ändert das:
 | `searchArchive` | Archivsuche (siehe Abschnitt Archiv). |
 | `deleteShipment` | Löschung als Markierung (Tombstone, Spalte E = TRUE), damit andere Geräte die Sendung nicht wiederbeleben. |
 | `loadAllData`, `saveAllData`, `clearAllData`, `sendPdfEmail`, `saveLkwStatus`, `loadLkwStatus` | Wie bisher – `saveAllData` läuft jetzt ebenfalls durch den Merge, ein altes Gerät kann also nichts mehr überschreiben. |
-| `authUsers`, `authLogin`, `authAccept`, `authInviteInfo`, `authCheck`, `authRefresh`, `authLogout`, `admin*` | Anmeldung (siehe Version 2.2). |
+| `authUsers`, `authLogin`, `authAccept`, `authInviteInfo`, `authCheck`, `authLogout`, `admin*` | Anmeldung (siehe Version 2.2). |
 
 Nicht im Skript enthalten: `shipmentComplete` (Abschluss-Benachrichtigung) und `sendSummaryEmail`. Die App wertet die
 Antwort „Unbekannte Aktion“ auf `shipmentComplete` **nicht** als Fehler – die Scans sind zu dem Zeitpunkt längst über
 `saveShipments` gespeichert, es entfällt nur die Zusatz-Benachrichtigung. Soll beim Abschluss einer Sendung wirklich eine
-E-Mail verschickt werden, muss dafür ein `case \"shipmentComplete\"` mit `MailApp.sendEmail(...)` ergänzt werden.
+E-Mail verschickt werden, muss dafür ein `case "shipmentComplete"` mit `MailApp.sendEmail(...)` ergänzt werden.
 
 Merge-Regeln (je Scan-Eintrag, identifiziert über eine stabile `id`):
 - Einträge beider Seiten bleiben erhalten; nur was ein Gerät **selbst** geändert hat, setzt sich durch.
@@ -140,12 +114,12 @@ arbeitet wie bisher (kompletter Datensatz, kein Mehrgeräte-Schutz).
 ## Auslegung
 
 Abgestimmt auf **bis zu 3 Geräte gleichzeitig** mit einem Abruf **alle 3 s** je sichtbarem Gerät (max. 60 Anfragen/Minute).
-Damit das nicht teuer wird, beantwortet der Server die häufige Frage „gibt es etwas Neues?\" aus dem
+Damit das nicht teuer wird, beantwortet der Server die häufige Frage „gibt es etwas Neues?" aus dem
 **Script-Cache** (Versionszähler + LKW-Status), ohne die Tabelle zu öffnen – erst wenn wirklich etwas geändert
 wurde, wird das Sheet gelesen. Der Cache wird bei jedem Schreibvorgang unter Sperre aktualisiert und läuft nach
 30 s ab (`CACHE_TTL_S`), sodass ein veralteter Eintrag höchstens 30 s verzögern könnte.
 
-Auf dem Gerät: im Hintergrund kein Abruf; beim Zurückkehren/„online\" sofort; bei Verbindungsfehlern
+Auf dem Gerät: im Hintergrund kein Abruf; beim Zurückkehren/„online" sofort; bei Verbindungsfehlern
 verlangsamt sich der Takt schrittweise (3 → 6 → 12 → 24 → 30 s) und springt beim nächsten Erfolg zurück.
 Bei deutlich mehr Geräten `SYNC_POLL_INTERVAL_MS` in `js/02-sync-anmeldung.js` erhöhen.
 
