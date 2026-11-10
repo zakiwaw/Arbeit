@@ -302,6 +302,57 @@ function truckRowHtml(t) {
         <span class="page-row-end">${state}<span class="page-chevron" aria-hidden="true"></span></span>
     </button>${tools}</li>`;
 }
+// ---- Änderungsprotokoll (9.3) ---------------------------------------------------------------------------------------
+// Jede Sendung trägt die letzten Protokolleinträge (changes: Zeit t, Benutzer u, alter Status from, neuer Status to,
+// Art k = new/save/conflict). Das Modal zeigt sie über alle Sendungen hinweg, neueste zuerst; Tippen auf die HAWB öffnet die Sendung.
+const CHANGE_LOG_LIMIT = 150;
+function collectChangeLog(shipments) {
+    const out = [];
+    Object.keys(shipments || {}).forEach(base => {
+        const s = shipments[base];
+        (Array.isArray(s && s.changes) ? s.changes : []).forEach(c => { if (c && c.t) out.push({ base, t: c.t, ms: Date.parse(c.t) || 0, u: c.u || '', from: c.from || '', to: c.to || '', k: c.k || 'save', by: c.by || '', n: c.n || 0 }); });
+    });
+    out.sort((a, b) => b.ms - a.ms);
+    return out;
+}
+function changeLogKindLabel(c) {
+    if (c.k === 'new') return 'Neu';
+    if (c.k === 'conflict') return c.by ? `Konflikt mit ${c.by}` : 'Konflikt';
+    return 'Änderung';
+}
+function renderChangeLog() {
+    const list = document.getElementById('changeLogList'), hint = document.getElementById('changeLogHint');
+    if (!list) return;
+    const entries = collectChangeLog(loadShipments());
+    const shown = entries.slice(0, CHANGE_LOG_LIMIT);
+    if (hint) hint.textContent = entries.length === 0
+        ? 'Noch keine Einträge – sie entstehen, sobald eine Sendung mit dem Server-Skript ab 2.9 gespeichert wird.'
+        : `${shown.length}${entries.length > shown.length ? ` von ${entries.length}` : ''} Einträge, neueste zuerst · je Sendung werden die letzten 20 aufgehoben`;
+    if (entries.length === 0) { list.innerHTML = ''; return; }
+    list.innerHTML = `<table class="change-log-table"><thead><tr><th>Zeit</th><th>HAWB</th><th>Benutzer</th><th>Alter Status</th><th>Neuer Status</th><th>Art</th></tr></thead><tbody>${
+        shown.map(c => `<tr class="change-log-row ${escapeHtml(c.k)}"><td class="change-log-time">${escapeHtml(c.ms ? new Date(c.ms).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : c.t)}</td>`
+            + `<td class="change-log-hawb-cell"><button type="button" class="change-log-hawb" data-base="${escapeHtml(c.base)}">${escapeHtml(c.base)}</button></td>`
+            + `<td class="change-log-user">${escapeHtml(c.u || '–')}</td><td class="change-log-from">${escapeHtml(c.from || '–')}</td><td class="change-log-to">${escapeHtml(c.to || '–')}</td>`
+            + `<td class="change-log-kind-cell"><span class="change-log-kind">${escapeHtml(changeLogKindLabel(c))}</span></td></tr>`).join('')}</tbody></table>`;
+}
+function showChangeLog() {
+    const modal = document.getElementById('changeLogModal');
+    if (!modal) return;
+    renderChangeLog();
+    modal.classList.add('visible');
+    document.body.classList.add('modal-open');
+    const btn = document.getElementById('closeChangeLogButton');
+    if (btn) setTimeout(() => btn.focus(), 50);
+}
+function closeChangeLog() {
+    const modal = document.getElementById('changeLogModal');
+    if (!modal || !modal.classList.contains('visible')) return;
+    modal.classList.remove('visible');
+    document.body.classList.remove('modal-open');
+    focusShipmentInput();
+}
+function isChangeLogOpen() { const m = document.getElementById('changeLogModal'); return !!(m && m.classList.contains('visible')); }
+
 // ---- LKW umbenennen / löschen (Seite „Anlieferung“, Desktop) ---------------------------------------------------------
 // Der Anzeigename liegt als truckName an jeder Sendung des LKW und wandert über den normalen Sync auf alle Geräte.
 // Die Kennung (truckId: „VVL-…“ / „MAN n“) bleibt unverändert – Importe, Adressen (?lkw=…) und der Archivlauf arbeiten damit.

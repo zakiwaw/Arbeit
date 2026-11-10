@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="light dark">
     <meta name="theme-color" content="#f1f5f9" media="(prefers-color-scheme: light)">
     <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
-    <title>Fracht Tracker 9.2</title>
+    <title>Fracht Tracker 9.3</title>
     <!-- Als App installierbar (Android/Zebra: Chrome-Menü → „App installieren“ / „Zum Startbildschirm hinzufügen“):
          läuft dann ohne Adressleiste und fest im Hochformat (orientation: portrait im Manifest) -->
     <link rel="manifest" href="manifest.webmanifest">
@@ -210,7 +210,10 @@
 
 
         <!-- Sendungsliste: ohne Suchtext die zuletzt bearbeiteten Sendungen, bei Eingabe die Treffer -->
-        <h3 id="listCaption" class="list-caption">Zuletzt bearbeitet</h3>
+        <div class="list-caption-row">
+            <h3 id="listCaption" class="list-caption">Zuletzt bearbeitet</h3>
+            <button type="button" id="changeLogBtn" class="change-log-btn" title="Änderungsprotokoll: wer hat wann welche Sendung geändert">Protokoll</button>
+        </div>
        <table class="shipment-table">
             <thead>
                 <tr><th data-sort="hawb"><span class="th-hawb">HAWB.</span><span class="th-vvl"><span>VVL</span><span>Kundennr</span></span></th><th class="dt-cell" data-sort="status">Status</th><th class="dt-cell" data-sort="truck">LKW</th><th class="dt-cell dt-num" data-sort="we" title="Wareneingang erfasst / erwartet">WE</th><th class="dt-cell dt-num" data-sort="sich" title="Gesichert (inkl. Dunkelalarm) / erwartet">Sich.</th><th class="dt-cell dt-num" data-sort="kg">Gewicht</th><th class="dt-cell dt-notes" title="Notizen">✎</th><th>Übersicht</th><th data-sort="time">Letzte Änd.</th><th>Aktionen</th><th class="qr-code-header">QR-Code</th></tr>
@@ -381,6 +384,15 @@
         <div id="orderAddError" class="hu-edit-error hidden"></div>
         <div class="modal-actions"><button type="submit" id="saveOrderAddButton" class="main-action-button">Auftrag anlegen</button><button type="button" id="cancelOrderAddButton">Abbrechen</button></div>
     </form>
+</div>
+<!-- Änderungsprotokoll (9.3): HAWB, alter Status, neuer Status, Benutzer, Zeit – aus den Protokolleinträgen aller Sendungen -->
+<div id="changeLogModal" class="modal-overlay" role="dialog" aria-labelledby="changeLogTitle">
+    <div class="modal-content change-log-content">
+        <h3 id="changeLogTitle">Änderungsprotokoll</h3>
+        <p id="changeLogHint" class="change-log-hint"></p>
+        <div id="changeLogList" class="change-log-list"></div>
+        <div class="modal-actions"><button type="button" id="closeChangeLogButton" class="main-action-button">Schließen</button></div>
+    </div>
 </div>
 <div id="lkwRenameModal" class="modal-overlay">
     <form id="lkw-rename-form" action="#" class="modal-content lkw-rename-content">

@@ -1,7 +1,14 @@
 // ===================================================
 // FRACHT TRACKER – Google Apps Script Backend
-// Version 2.8: mehrgeräte-sicher + Archiv + Anmeldung (PIN; Sitzung verlängert sich bei Bedienung) + Sammel-Löschung
+// Version 2.9: mehrgeräte-sicher + Archiv + Anmeldung (PIN; Sitzung verlängert sich bei Bedienung) + Sammel-Löschung
 //   + automatischer Import von Textdateien aus Google Drive.
+//   2.9: Sichere Synchronisation – je Sendung eine eigene Versionsnummer (JSON-Feld "version", ab 1) und "lastModifiedBy"
+//        (Name des Mitarbeiters, zusätzlich in Spalte F). saveShipments prüft die vom Gerät mitgeschickte Version
+//        (payload.versions): passt sie, wird der Stand übernommen und die Version +1 gezählt; passt sie nicht, führt der
+//        Server feldweise zusammen (3-Wege-Merge wie bisher) und meldet in "conflicts", was dabei nicht beide Seiten behalten
+//        konnten. Je Sendung ein kurzes Änderungsprotokoll (JSON-Feld "changes": Zeit, Benutzer, alter/neuer Status).
+//        Spaltenwechsel: F = lastModifiedBy, JSON-Fortsetzung ab G; alte Zeilen mit Fortsetzung in F werden weiter richtig
+//        gelesen (readRowParts_). Sonst keine Änderung gegenüber 2.8.
 //   2.8: Tabellen-ID nur noch aus den Skript-Eigenschaften (SPREADSHEET_ID), fester Rückfall entfernt;
 //        fehlt die Eigenschaft, wirft der Code einen klaren Fehler. Sonst keine Änderung gegenüber 2.7.
 //   2.6: Import auch für „MAN Fracht“-Dateien (Ordner „MAN Ladelisten TXT“ → neuer LKW „MAN <n>“ wie beim QR-Scan); mehrere
@@ -14,9 +21,13 @@
 //   - Geräte holen regelmäßig nur die Änderungen ab ("loadChanges" seit Version X).
 //   - Die alten Aktionen (loadAllData/saveAllData/…) funktionieren weiterhin für ältere App-Versionen.
 //
-// Sheet "shipments":  A = baseNumber | B = JSON | C = Version | D = geändert am | E = gelöscht (TRUE) bzw. archiviert (ARCHIV) | F… = JSON-Fortsetzung
-//   (Spalten C–E werden automatisch mitgeschrieben; alte Zeilen ohne Version gelten als Version 0.
-//    Sehr große Sendungen werden über mehrere Zellen verteilt, weil eine Zelle max. 50.000 Zeichen fasst.)
+// Sheet "shipments":  A = baseNumber | B = JSON | C = Zeilen-Version (globaler Zähler) | D = geändert am | E = gelöscht (TRUE) bzw. archiviert (ARCHIV)
+//                     | F = lastModifiedBy (2.9) | G… = JSON-Fortsetzung
+//   (Spalten C–F werden automatisch mitgeschrieben; alte Zeilen ohne Zeilen-Version gelten als Version 0.
+//    Sehr große Sendungen werden über mehrere Zellen verteilt, weil eine Zelle max. 50.000 Zeichen fasst.
+//    Bis 2.8 begann die Fortsetzung in Spalte F – solche alten Zeilen erkennt readRowParts_ und liest sie unverändert.)
+//   Im JSON jeder Sendung (2.9): version = Sendungs-Version (1, 2, 3 … je Speichern +1; alte Sendungen ohne Feld = 1),
+//     lastModifiedBy = wer zuletzt gespeichert hat, changes = die letzten Protokolleinträge (SHIPMENT_CHANGES_MAX).
 // Sheet "lkw_status": A1 = JSON (unverändert), B1 = JSON { truckId: Zeitpunkt der Deaktivierung } (neu, automatisch gepflegt)
 // Sheet "_meta":      A1 = globaler Versionszähler, B1 = Zeitpunkt des letzten Archiv-Durchlaufs (automatisch angelegt, ausgeblendet)
 // Sheet "_import":    Protokoll des Drive-Imports (2.5): Zeitpunkt | Datei | Ergebnis | Details (automatisch angelegt, ausgeblendet)
@@ -64,8 +75,10 @@ const LKW_STATUS_SHEET_NAME = "lkw_status";
 const META_SHEET_NAME = "_meta";
 
 const COL_BASE = 1, COL_JSON = 2, COL_VERSION = 3, COL_UPDATED = 4, COL_DELETED = 5;
-const COL_JSON_EXTRA = 6;        // ab Spalte F: Fortsetzung des JSON, falls eine Zelle nicht reicht
+const COL_MODIFIED_BY = 6;       // Spalte F (2.9): Name, der zuletzt gespeichert hat (steht auch im JSON als lastModifiedBy)
+const COL_JSON_EXTRA = 7;        // ab Spalte G: Fortsetzung des JSON, falls eine Zelle nicht reicht (bis 2.8: ab F, siehe readRowParts_)
 const CELL_LIMIT = 45000;        // Google Sheets erlaubt max. 50.000 Zeichen je Zelle
+const SHIPMENT_CHANGES_MAX = 20; // Protokolleinträge je Sendung (changes), ältere fallen weg
 const LOCK_TIMEOUT_MS = 20000;
 
 // Schnellpfad für den häufigen Abruf "gibt es etwas Neues?" (alle 3 s je Gerät):
@@ -117,9 +130,9 @@ function doPost(e) {
 
     switch (action) {
       // ---- Neu (V2) ----
-      case "saveShipments":   result = saveShipmentsMerged(payload); break;
-      case "deleteShipment":  result = deleteShipmentRow(payload); break;
-      case "deleteShipments": result = deleteShipmentRows(payload); break;
+      case "saveShipments":   result = saveShipmentsMerged(payload, user); break;
+      case "deleteShipment":  result = deleteShipmentRow(payload, user); break;
+      case "deleteShipments": result = deleteShipmentRows(payload, user); break;
       case "loadChanges":     result = loadChangesSince(payload); break;
       case "searchArchive":   result = searchArchive(payload); break;
 
@@ -241,30 +254,38 @@ function ensureGrid_(sheet, row, width) {
   if (sheet.getMaxColumns() < width) sheet.insertColumnsAfter(sheet.getMaxColumns(), width - sheet.getMaxColumns());
 }
 
-function dataWidth_(sheet) { return Math.max(sheet.getLastColumn(), COL_DELETED); }
+function dataWidth_(sheet) { return Math.max(sheet.getLastColumn(), COL_MODIFIED_BY); }
 
-// JSON einer Zeile aus B + F, G, … zusammensetzen
-function joinJson_(rowValues) {
-  let s = String(rowValues[COL_JSON - 1] == null ? '' : rowValues[COL_JSON - 1]);
-  for (let c = COL_JSON_EXTRA - 1; c < rowValues.length; c++) {
-    const part = rowValues[c];
-    if (part === '' || part === null || part === undefined) break;
-    s += String(part);
-  }
-  return s;
+// Zeile zerlegen: { json, modifiedBy }. JSON = B + Fortsetzungszellen.
+// Seit 2.9 steht in F der Name (lastModifiedBy) und die Fortsetzung beginnt in G. Bis 2.8 begann die Fortsetzung in F.
+// Eine Fortsetzung gibt es nur, wenn B randvoll ist (genau CELL_LIMIT Zeichen) – kürzere Zeilen sind eindeutig.
+// Ist B voll, wird zuerst die neue Aufteilung (B + G …) probiert; ergibt sie kein gültiges JSON, ist die Zeile alt und
+// F gehört zum JSON (B + F + G …). So wird ein alter Fortsetzungsteil nie als Name gelesen und fällt nie aus dem JSON.
+function readRowParts_(rowValues) {
+  const cell = function (c) { const v = rowValues[c - 1]; return (v === null || v === undefined) ? '' : String(v); };
+  const b = cell(COL_JSON);
+  const f = cell(COL_MODIFIED_BY);
+  let rest = '';
+  for (let c = COL_JSON_EXTRA; c <= rowValues.length; c++) { const part = cell(c); if (part === '') break; rest += part; }
+  if (b.length < CELL_LIMIT) return { json: b, modifiedBy: f };
+  if (f === '' || parseJsonSafe_(b + rest)) return { json: b + rest, modifiedBy: f };
+  return { json: b + f + rest, modifiedBy: '' };   // alte Aufteilung (bis 2.8): Fortsetzung begann in F
 }
+function joinJson_(rowValues) { return readRowParts_(rowValues).json; }
 function splitJson_(json) {
   const parts = [];
   for (let i = 0; i < json.length; i += CELL_LIMIT) parts.push(json.slice(i, i + CELL_LIMIT));
   return parts.length ? parts : [''];
 }
 // Baut eine komplette Zeile (volle Breite, damit alte Fortsetzungs-Zellen überschrieben werden)
-function buildRow_(base, json, version, now, deleted, width) {
+// modifiedBy → Spalte F (2.9); JSON-Fortsetzung ab Spalte G.
+function buildRow_(base, json, version, now, deleted, width, modifiedBy) {
   const parts = splitJson_(json);
-  const w = Math.max(width, COL_DELETED + parts.length - 1);
+  const w = Math.max(width, COL_MODIFIED_BY, COL_JSON_EXTRA - 1 + parts.length - 1);
   const values = []; for (let i = 0; i < w; i++) values.push('');
   values[COL_BASE - 1] = base; values[COL_JSON - 1] = parts[0]; values[COL_VERSION - 1] = version;
   values[COL_UPDATED - 1] = now; values[COL_DELETED - 1] = deleted ? true : '';
+  values[COL_MODIFIED_BY - 1] = modifiedBy ? String(modifiedBy) : '';
   for (let i = 1; i < parts.length; i++) values[COL_JSON_EXTRA - 2 + i] = parts[i];
   return values;
 }
@@ -281,7 +302,7 @@ function readIndex_(sheet) {
   const lastRow = sheet.getLastRow();
   const map = {};
   if (lastRow < 2) return map;
-  ensureGrid_(sheet, lastRow, COL_DELETED);
+  ensureGrid_(sheet, lastRow, COL_MODIFIED_BY);
   const bases = sheet.getRange(2, COL_BASE, lastRow - 1, 1).getValues();
   const meta = sheet.getRange(2, COL_VERSION, lastRow - 1, 3).getValues(); // C, D, E
   for (let i = 0; i < bases.length; i++) {
@@ -300,13 +321,14 @@ function readAllRows_(sheet) {
   const lastRow = sheet.getLastRow();
   const map = {};
   if (lastRow < 2) return map;
-  ensureGrid_(sheet, lastRow, COL_DELETED);
+  ensureGrid_(sheet, lastRow, COL_MODIFIED_BY);
   const values = sheet.getRange(2, 1, lastRow - 1, dataWidth_(sheet)).getValues();
   for (let i = 0; i < values.length; i++) {
     const base = String(values[i][COL_BASE - 1] == null ? '' : values[i][COL_BASE - 1]).trim();
     if (!base) continue;
     const del = values[i][COL_DELETED - 1];
-    map[base] = { row: i + 2, json: joinJson_(values[i]), version: Number(values[i][COL_VERSION - 1]) || 0, updatedAt: values[i][COL_UPDATED - 1], deleted: isDeletedFlag_(del), archived: isArchivedFlag_(del) };
+    const parts = readRowParts_(values[i]);
+    map[base] = { row: i + 2, json: parts.json, modifiedBy: parts.modifiedBy, version: Number(values[i][COL_VERSION - 1]) || 0, updatedAt: values[i][COL_UPDATED - 1], deleted: isDeletedFlag_(del), archived: isArchivedFlag_(del) };
   }
   return map;
 }
@@ -339,15 +361,29 @@ function deepEqual_(a, b) { return JSON.stringify(a === undefined ? null : a) ==
 
 // ===================================================
 // 4. SPEICHERN MIT MERGE (Aktion saveShipments)
-// payload: { shipments: { base: shipmentObj }, bases: { base: shipmentObjOderNull }, deviceId }
-//   bases = der Serverstand, von dem das Gerät ausging (für den 3-Wege-Merge; darf fehlen).
-// Antwort: { status, version, merged: { base: shipmentObj } }  → zusammengeführter Stand, den das Gerät übernimmt
+// payload: { shipments: { base: shipmentObj }, bases: { base: shipmentObjOderNull }, versions: { base: n }, modifiedBy, order: [base, …], deviceId }
+//   bases    = der Serverstand, von dem das Gerät ausging (für den 3-Wege-Merge; darf fehlen).
+//   versions = Sendungs-Version, auf der der geschickte Stand beruht (2.9; 0 = Sendung ist auf dem Gerät neu). Fehlt die
+//              Angabe (ältere App), wird wie bisher ohne Versionsprüfung zusammengeführt.
+//   modifiedBy = Name des Mitarbeiters (Anzeige); angemeldeter Benutzer (Sitzung) hat Vorrang.
+//   order    = Reihenfolge, in der das Gerät die Änderungen gemacht hat (Offline-Warteschlange); fehlt sie, Schlüsselreihenfolge.
+// Antwort: { status, version, merged: { base: shipmentObj }, conflicts: [ … ] }
+//   merged    = zusammengeführter Stand, den das Gerät übernimmt (mit version, lastModifiedBy, changes)
+//   conflicts = nur Sendungen, bei denen die Version nicht passte UND etwas nicht von beiden Seiten behalten werden konnte:
+//               { base, serverVersion, clientVersion, newVersion, serverBy, lost: [{ what, mine, now }], overridden: [{ what, theirs, now }] }
+//               lost = eigene Eingabe nicht übernommen (jetzt gilt now), overridden = Eingabe des anderen Geräts überschrieben.
+// Versionsregel: passt versions[base] zur Sendungs-Version auf dem Server → Stand 1:1 übernehmen, Version +1.
+//   Passt sie nicht → 3-Wege-Merge (feldweise, je Packstück, Notizen vereinigt), Version +1, Konflikte melden.
+//   Schickt ein Gerät denselben Stand erneut (Wiederholung nach Verbindungsabbruch), ändert sich nichts: kein neuer
+//   Eintrag, keine neue Version, kein Konflikt.
 // ===================================================
-function saveShipmentsMerged(payload) {
+function saveShipmentsMerged(payload, user) {
   const incoming = (payload && payload.shipments) || {};
   const bases = (payload && payload.bases) || {};
-  const baseNumbers = Object.keys(incoming);
-  if (baseNumbers.length === 0) return { status: 'success', version: getGlobalVersion_(), merged: {} };
+  const versions = (payload && payload.versions && typeof payload.versions === 'object') ? payload.versions : null;
+  const modifiedBy = String((user && user.name) || (payload && payload.modifiedBy) || '').trim().slice(0, 80);
+  const baseNumbers = orderedKeys_(payload && payload.order, Object.keys(incoming));
+  if (baseNumbers.length === 0) return { status: 'success', version: getGlobalVersion_(), merged: {}, conflicts: [] };
 
   return withLock_(function () {
     const sheet = getShipmentSheet_();
@@ -355,6 +391,7 @@ function saveShipmentsMerged(payload) {
     const now = new Date().toISOString();
     const width = dataWidth_(sheet);
     const merged = {};
+    const conflicts = [];
     const appendRows = [];
     let version = getGlobalVersion_();
 
@@ -365,21 +402,177 @@ function saveShipmentsMerged(payload) {
       // Eine archivierte Zeile zählt als aktueller Serverstand; sie wird zusammengeführt und OHNE Markierung
       // zurückgeschrieben – damit ist die Sendung wieder aktiv (Wiederherstellen aus dem Archiv).
       const theirs = current && !current.deleted ? parseJsonSafe_(readRowJson_(sheet, current.row)) : null;
+      if (theirs) ensureShipmentMeta_(theirs);
       const common = bases[base] || null;
+      const serverVersion = theirs ? theirs.version : 0;
+      const clientVersion = (versions && Object.prototype.hasOwnProperty.call(versions, base)) ? (Number(versions[base]) || 0) : null;
 
-      const result = theirs ? mergeShipment_(theirs, ours, common) : ensureItemIds_(ours);
+      let result, conflict = null;
+      if (!theirs) {
+        result = ensureItemIds_(ours);                                   // neu auf dem Server
+      } else if (clientVersion !== null && clientVersion === serverVersion) {
+        result = ensureItemIds_(ours);                                   // Version passt → Stand 1:1 übernehmen
+      } else {
+        result = mergeShipment_(theirs, ours, common);                   // Version passt nicht (oder alte App) → feldweise zusammenführen
+        if (clientVersion !== null) {
+          conflict = describeConflict_(theirs, ours, common, result);
+          if (conflict) { conflict.base = base; conflict.clientVersion = clientVersion; }
+        }
+      }
+
+      if (theirs && sameShipmentContent_(result, theirs)) {              // nichts Neues (z. B. Wiederholung desselben Sendens)
+        merged[base] = theirs;
+        if (conflict) { conflict.newVersion = theirs.version; conflicts.push(conflict); }   // eigene Eingabe unterlag → trotzdem melden
+        return;
+      }
+
+      const before = theirs ? shipmentStatusLabel_(theirs) : '';
+      result.version = serverVersion + 1;
+      result.lastModifiedBy = modifiedBy;
+      const after = shipmentStatusLabel_(result);
+      const entry = { t: now, u: modifiedBy, from: before, to: after, k: !theirs ? 'new' : (conflict ? 'conflict' : 'save') };
+      if (conflict) { entry.by = theirs.lastModifiedBy || ''; entry.n = conflict.lost.length + conflict.overridden.length; }
+      result.changes = appendChange_(theirs ? theirs.changes : (ours.changes || null), entry);
+      if (conflict) { conflict.newVersion = result.version; conflicts.push(conflict); }
 
       version += 1;
       merged[base] = result;
-      const row = buildRow_(base, JSON.stringify(result), version, now, false, width);
+      const row = buildRow_(base, JSON.stringify(result), version, now, false, width, modifiedBy);
       if (current) writeRows_(sheet, current.row, [row]);
       else appendRows.push(row);
     });
 
     if (appendRows.length > 0) writeRows_(sheet, sheet.getLastRow() + 1, appendRows);
     setGlobalVersion_(version); // zuletzt, damit Leser nie eine Version ohne die zugehörigen Zeilen sehen
-    return { status: 'success', version: version, merged: merged };
+    return { status: 'success', version: version, merged: merged, conflicts: conflicts };
   });
+}
+
+// Reihenfolge der Sendungen: erst die vom Gerät gemeldete (order), dann alle übrigen Schlüssel; Doppelte und Unbekannte fallen weg.
+function orderedKeys_(order, keys) {
+  const out = [], seen = {};
+  (Array.isArray(order) ? order : []).concat(keys).forEach(function (b) {
+    b = String(b == null ? '' : b);
+    if (!b || seen[b] || keys.indexOf(b) === -1) return;
+    seen[b] = true; out.push(b);
+  });
+  return out;
+}
+
+// Sendungs-Version und lastModifiedBy nachrüsten: alte Sendungen (bis 2.8) haben kein Feld → Version 1, Name leer.
+function ensureShipmentMeta_(s) {
+  if (!s || typeof s !== 'object') return s;
+  const v = Math.floor(Number(s.version));
+  s.version = (isFinite(v) && v > 0) ? v : 1;
+  if (typeof s.lastModifiedBy !== 'string') s.lastModifiedBy = '';
+  if (!Array.isArray(s.changes)) s.changes = [];
+  return s;
+}
+
+// Inhalt ohne Verwaltungsfelder vergleichen (version, lastModifiedBy, changes, lastModified zählen nicht als Änderung)
+const META_FIELDS_ = { version: 1, lastModifiedBy: 1, changes: 1, lastModified: 1 };
+function stripMeta_(s) {
+  const out = {};
+  Object.keys(s || {}).forEach(function (k) { if (!META_FIELDS_[k]) out[k] = s[k]; });
+  return out;
+}
+function sameShipmentContent_(a, b) { return deepEqual_(stripMeta_(a), stripMeta_(b)); }
+
+// Protokoll je Sendung: neuester Eintrag zuletzt, höchstens SHIPMENT_CHANGES_MAX Einträge
+function appendChange_(prev, entry) {
+  const list = (Array.isArray(prev) ? prev : []).filter(function (c) { return c && typeof c === 'object' && c.t; }).slice();
+  list.push(entry);
+  return list.length > SHIPMENT_CHANGES_MAX ? list.slice(list.length - SHIPMENT_CHANGES_MAX) : list;
+}
+
+// Kurzer Status einer Sendung für das Protokoll – gleiche Zählweise wie die App (Ampel in der Liste):
+// "Dunkelalarm" (offener Dunkelalarm), "Fertig", "Offen" oder "ohne Stückzahl", dazu WE x/y und Sich. x/y.
+const SECURITY_STATUSES_ = ['XRY', 'ETD', 'EDD', 'PHS', 'VCK'];
+function shipmentStatusLabel_(s) {
+  const items = (Array.isArray(s && s.scannedItems) ? s.scannedItems : []).filter(function (it) { return it && !it.isCancelled; });
+  let counted = 0, we = 0, pending = 0;
+  items.forEach(function (it) {
+    if (it.status === 'Wareneingang') we++;
+    if (it.status === 'Anstehend') pending++;
+    if (!it.isCombination && NON_COUNTING_STATUSES_.indexOf(it.status) === -1) counted++;
+  });
+  const isSecured = function (it) { return SECURITY_STATUSES_.indexOf(it.status) !== -1; };
+  // Stückzahl: Einzelsendung = totalPiecesExpected; HU-Auftrag = Zahl der Positionen (totalPiecesExpected wird beim Import so gesetzt,
+  // sonst die Positionen ohne Wareneingangs-/Kombi-Einträge zählen) – wie die App (renderLkwMenu / shipmentProgress)
+  const total = Number(s && s.totalPiecesExpected) > 0 ? Number(s.totalPiecesExpected) : null;
+  const expected = s && s.isHuListOrder ? (total || items.filter(function (it) { return it.status !== 'Wareneingang' && !it.isCombination; }).length) : total;
+  let dunkel = 0;
+  const alarms = items.filter(function (it) { return it.status === 'Dunkelalarm'; });
+  if (alarms.length) {
+    const secured = items.filter(function (it) { return isSecured(it) && !it.isCombination; }).length;
+    if (!(s && !s.isHuListOrder && expected && secured >= expected)) {
+      dunkel = alarms.filter(function (a) {
+        const t = Date.parse(a.timestamp) || 0;
+        return !items.some(function (it) { return isSecured(it) && String(it.rawInput).toUpperCase() === String(a.rawInput).toUpperCase() && (Date.parse(it.timestamp) || 0) >= t; });
+      }).length;
+    }
+  }
+  let state;
+  if (dunkel > 0) state = 'Dunkelalarm';
+  else if (s && s.isHuListOrder) state = pending > 0 ? 'Offen' : 'Fertig';
+  else if (!expected) state = 'ohne Stückzahl';
+  else state = (expected - counted - dunkel) > 0 ? 'Offen' : 'Fertig';
+  const exp = expected === null ? '?' : String(expected);
+  return state + ' · WE ' + we + '/' + exp + ' · Sich. ' + counted + '/' + exp;
+}
+
+// Was konnte beim Zusammenführen nicht von beiden Seiten behalten werden? Vergleicht je Feld/Packstück, was das Gerät
+// gegenüber seinem Ausgangsstand geändert hat (ours ≠ base) bzw. was der Server seither geändert hat (theirs ≠ base),
+// mit dem Ergebnis. Ohne Ausgangsstand (2-Wege-Merge) zählt jede abweichende Stelle, bei der eine Seite unterlag.
+const FIELD_LABELS_ = { totalPiecesExpected: 'Stückzahl', truckId: 'LKW', truckName: 'LKW-Name', notes: 'Notizen', status: 'Status',
+  isCancelled: 'Storno', grossWeight: 'Gewicht', dimensions: 'Maße', packaging: 'Verpackung', position: 'Position', mitarbeiter: 'Erfasst von',
+  spediteur: 'Spediteur', land: 'Land', customer: 'Kunde', rechnung: 'Rechnung', plso: 'PLSO', hawb: 'HAWB' };
+const ITEM_SKIP_FIELDS_ = { id: 1, timestamp: 1, cancelledTimestamp: 1, notes: 1 };
+const HEAD_SKIP_FIELDS_ = { mitarbeiter: 1 };   // „Erfasst von“ ist nur Information (zwei Geräte legen dieselbe Sendung an) – kein Konflikt
+function fieldLabel_(k) { return FIELD_LABELS_[k] || k; }
+function shortValue_(v) {
+  if (v === undefined || v === null || v === '') return '–';
+  if (typeof v === 'boolean') return v ? 'ja' : 'nein';
+  if (typeof v === 'object') return JSON.stringify(v).slice(0, 40);
+  return String(v).slice(0, 40);
+}
+function describeConflict_(theirs, ours, base, result) {
+  const lost = [], overridden = [];
+  const note = function (what, mineOrTheirs, now, mine) {
+    (mine ? lost : overridden).push(mine ? { what: what, mine: shortValue_(mineOrTheirs), now: shortValue_(now) } : { what: what, theirs: shortValue_(mineOrTheirs), now: shortValue_(now) });
+  };
+  // Kopffelder
+  const keys = {};
+  Object.keys(theirs).concat(Object.keys(ours)).forEach(function (k) { if (k !== 'scannedItems' && !META_FIELDS_[k] && !HEAD_SKIP_FIELDS_[k]) keys[k] = true; });
+  Object.keys(keys).forEach(function (k) {
+    const oursChanged = base ? !deepEqual_(ours[k], base[k]) : !deepEqual_(ours[k], theirs[k]);
+    const theirsChanged = base ? !deepEqual_(theirs[k], base[k]) : !deepEqual_(ours[k], theirs[k]);
+    if (oursChanged && !deepEqual_(result[k], ours[k])) note(fieldLabel_(k), ours[k], result[k], true);
+    if (theirsChanged && !deepEqual_(result[k], theirs[k])) note(fieldLabel_(k), theirs[k], result[k], false);
+  });
+  // Packstücke (je id)
+  const T = indexById_(theirs.scannedItems || []), O = indexById_(ours.scannedItems || []), R = indexById_(result.scannedItems || []);
+  const B = base ? indexById_(base.scannedItems || []) : null;
+  const ids = {};
+  T.order.concat(O.order).forEach(function (id) { ids[id] = true; });
+  Object.keys(ids).forEach(function (id) {
+    const t = T.map[id], o = O.map[id], r = R.map[id], b = B ? B.map[id] : null;
+    const name = 'HU ' + String((o || t).rawInput || id);
+    if (o && !r) { note(name, 'vorhanden', 'entfernt', true); return; }
+    if (t && !r) { note(name, 'vorhanden', 'entfernt', false); return; }
+    if (!o || !t || !r) return;                                           // nur auf einer Seite vorhanden → übernommen, kein Konflikt
+    const fk = {};
+    Object.keys(t).concat(Object.keys(o)).forEach(function (k) { if (!ITEM_SKIP_FIELDS_[k]) fk[k] = true; });
+    Object.keys(fk).forEach(function (k) {
+      const oursChanged = b ? !deepEqual_(o[k], b[k]) : !deepEqual_(o[k], t[k]);
+      const theirsChanged = b ? !deepEqual_(t[k], b[k]) : !deepEqual_(o[k], t[k]);
+      if (oursChanged && !deepEqual_(r[k], o[k])) note(name + ' ' + fieldLabel_(k), o[k], r[k], true);
+      if (theirsChanged && !deepEqual_(r[k], t[k])) note(name + ' ' + fieldLabel_(k), t[k], r[k], false);
+    });
+  });
+  if (!lost.length && !overridden.length) return null;                   // sauber zusammengeführt → kein Konflikt
+  return { base: '', serverVersion: theirs.version, clientVersion: null, newVersion: null, serverBy: theirs.lastModifiedBy || '',
+           lost: lost.slice(0, 10), overridden: overridden.slice(0, 10) };
 }
 
 // ---------------------------------------------------
@@ -493,15 +686,16 @@ function mergeNotes_(t, o, b) {
 // 5. LÖSCHEN (Aktionen deleteShipment / deleteShipments) – Löschvermerk statt Zeile entfernen, damit andere Geräte die Sendung nicht wiederbeleben
 // payload: { baseNumber }
 // ===================================================
-function deleteShipmentRow(payload) {
+function deleteShipmentRow(payload, user) {
   const base = payload && String(payload.baseNumber || '').trim();
   if (!base) throw new Error("deleteShipment: baseNumber fehlt.");
+  const who = String((user && user.name) || (payload && payload.modifiedBy) || '').trim().slice(0, 80);
   return withLock_(function () {
     const sheet = getShipmentSheet_();
     const index = readIndex_(sheet);
     const version = getGlobalVersion_() + 1;
     const now = new Date().toISOString();
-    const row = buildRow_(base, '', version, now, true, dataWidth_(sheet));
+    const row = buildRow_(base, '', version, now, true, dataWidth_(sheet), who);
     writeRows_(sheet, index[base] ? index[base].row : sheet.getLastRow() + 1, [row]);
     setGlobalVersion_(version);
     return { status: 'success', version: version };
@@ -510,11 +704,12 @@ function deleteShipmentRow(payload) {
 
 // V2.4: mehrere Löschvermerke in EINEM Aufruf (LKW löschen = alle seine Aufträge; schnell hintereinander gelöschte Sendungen).
 // payload: { baseNumbers: [base, …] } – unbekannte Nummern bekommen ebenfalls einen Löschvermerk (schadet nicht, verhindert Wiederbelebung).
-function deleteShipmentRows(payload) {
+function deleteShipmentRows(payload, user) {
   const raw = (payload && payload.baseNumbers) || [];
   const bases = [];
   (Array.isArray(raw) ? raw : []).forEach(function (b) { b = String(b || '').trim(); if (b && bases.indexOf(b) === -1) bases.push(b); });
   if (!bases.length) throw new Error("deleteShipments: baseNumbers fehlen.");
+  const who = String((user && user.name) || (payload && payload.modifiedBy) || '').trim().slice(0, 80);
   return withLock_(function () {
     const sheet = getShipmentSheet_();
     const index = readIndex_(sheet);
@@ -524,7 +719,7 @@ function deleteShipmentRows(payload) {
     let version = getGlobalVersion_();
     bases.forEach(function (base) {
       version += 1;
-      const row = buildRow_(base, '', version, now, true, width);
+      const row = buildRow_(base, '', version, now, true, width, who);
       if (index[base]) writeRows_(sheet, index[base].row, [row]); else appendRows.push(row);
     });
     if (appendRows.length > 0) writeRows_(sheet, sheet.getLastRow() + 1, appendRows);
@@ -563,7 +758,7 @@ function loadChangesSince(payload) {
       if (rows[base].deleted) return;
       if (rows[base].archived) { archivedBases.push(base); return; }   // Archiv bleibt auf dem Server
       const obj = parseJsonSafe_(rows[base].json);
-      if (obj) changed[base] = obj;
+      if (obj) changed[base] = ensureShipmentMeta_(obj);               // alte Sendungen: version 1, lastModifiedBy leer
     });
   } else if (since < version) {
     const sheet = getShipmentSheet_();
@@ -574,7 +769,7 @@ function loadChangesSince(payload) {
       if (r.deleted) { deleted.push(base); return; }
       if (r.archived) { archived.push(base); return; }
       const obj = parseJsonSafe_(readRowJson_(sheet, r.row));
-      if (obj) changed[base] = obj;
+      if (obj) changed[base] = ensureShipmentMeta_(obj);
     });
   }
   // Cache fehlt oder hinkt hinterher → nachziehen (damit die nächsten Abrufe wieder über den Schnellpfad gehen)
@@ -656,7 +851,7 @@ function archiveSweep_() {
   const sheet = getShipmentSheet_();
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return 0;
-  ensureGrid_(sheet, lastRow, COL_DELETED);
+  ensureGrid_(sheet, lastRow, COL_MODIFIED_BY);
   const lkwStatus = loadLkwStatusFromSheet() || {};
   const deactivatedAt = loadLkwDeactivatedAt_();
   const values = sheet.getRange(2, 1, lastRow - 1, dataWidth_(sheet)).getValues();
@@ -723,7 +918,7 @@ function searchArchive(payload) {
       const r = index[base];
       if (!r || !r.archived || r.deleted) return;
       const obj = parseJsonSafe_(readRowJson_(sheet, r.row));
-      if (obj) results[base] = ensureItemIds_(obj);
+      if (obj) results[base] = ensureShipmentMeta_(ensureItemIds_(obj));
     });
     const order = Object.keys(results);
     return { status: 'success', results: results, order: order, total: order.length, truncated: false };
@@ -744,7 +939,7 @@ function searchArchive(payload) {
   });
   hits.sort(function (a, b) { return b.t - a.t; });
   const order = [];
-  hits.slice(0, ARCHIVE_SEARCH_LIMIT).forEach(function (h) { results[h.base] = ensureItemIds_(h.s); order.push(h.base); });
+  hits.slice(0, ARCHIVE_SEARCH_LIMIT).forEach(function (h) { results[h.base] = ensureShipmentMeta_(ensureItemIds_(h.s)); order.push(h.base); });
   return { status: 'success', results: results, order: order, total: hits.length, truncated: hits.length > ARCHIVE_SEARCH_LIMIT };
 }
 function archiveMatches_(B, s, q, head, mode) {
@@ -773,7 +968,7 @@ function loadAllDataFromSheet() {
   Object.keys(rows).forEach(function (base) {
     if (rows[base].deleted || rows[base].archived) return;   // Archiv wird auch an alte App-Versionen nicht ausgeliefert
     const obj = parseJsonSafe_(rows[base].json);
-    if (obj) shipments[base] = obj;
+    if (obj) shipments[base] = ensureShipmentMeta_(obj);
     else Logger.log("Fehler beim Parsen der Daten für " + base);
   });
   return { status: 'success', data: shipments };
@@ -1047,7 +1242,10 @@ function importTextFile_(cfg, fileName, text, createdAt) {
     const appendRows = [];
     Object.keys(plan.shipments).forEach(function (base) {
       version += 1;
-      const row = buildRow_(base, JSON.stringify(plan.shipments[base]), version, now, false, width);
+      const s = ensureShipmentMeta_(plan.shipments[base]);
+      s.lastModifiedBy = IMPORT_MITARBEITER;
+      s.changes = appendChange_(null, { t: now, u: IMPORT_MITARBEITER, from: '', to: shipmentStatusLabel_(s), k: 'new' });
+      const row = buildRow_(base, JSON.stringify(s), version, now, false, width, IMPORT_MITARBEITER);
       const deletedRow = known.deletedRow[base.toUpperCase()];
       if (deletedRow) writeRows_(sheet, deletedRow, [row]); else appendRows.push(row);
     });

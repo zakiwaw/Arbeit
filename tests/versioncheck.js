@@ -39,4 +39,6 @@ if (fs.existsSync(path.join(root, 'sw.js'))) {
   ok(false, 'sw.js fehlt (Service Worker – App offline startbar)');
 }
 ok(!/AKfycb[\w-]{20,}/.test(read('README.md')), 'README.md enthält keine Web-App-URL/Token');
+// Zielstand dieser Auslieferung (Brief vom 10.11.2026): App 9.3 gehört zu Code.gs 2.9 – bei der nächsten Version hier mit anheben.
+ok(appVersion === '9.3' && backendVersion === '2.9', `Auslieferung: App ${appVersion} ↔ Code.gs ${backendVersion} (erwartet 9.3 / 2.9)`);
 console.log(fails ? `SOME FAILED (${fails} von ${oks + fails})` : `ALL GOOD (${oks})`); process.exit(fails ? 1 : 0);

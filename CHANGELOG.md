@@ -4,6 +4,46 @@ Neueste zuerst. Datum = Veröffentlichung (bis einschließlich 9.2 auf dem Branc
 Zusammenführen von Pull Request #1 am 09.11.2026 auf `main`). App-Version siehe `js/01-start.js`
 (`APP_VERSION`), Server-Skript siehe Kopf von `backend/Code.gs`.
 
+## 2026-11-10 – App 9.3, Code.gs 2.9
+
+Sichere Mehrgeräte-Synchronisation: Sendungs-Version, Name des letzten Bearbeiters, geordnete Offline-Warteschlange,
+Versionsprüfung mit Konfliktmeldung und Änderungsprotokoll. Scan, Batch, PIN-Anmeldung, Menü, Tabelle, Details, Drive-Import,
+Dark Mode sowie Handy- und Desktop-Ansicht bleiben wie in 9.2. **Code.gs 2.9 muss vor App 9.3 bereitgestellt sein.**
+
+- `backend/Code.gs` 2.9: `saveShipmentsMerged` prüft je Sendung die mitgeschickte Version (`versions`). Passt sie, wird der
+  Stand 1:1 übernommen; passt sie nicht, wird wie bisher feldweise zusammengeführt (`mergeShipment_`) und nur bei wirklich
+  umkämpften Feldern (`describeConflict_`) ein Konflikt zurückgegeben (`conflicts`: Sendung, Server-Version, wer, welche Felder,
+  was jetzt gilt). Jede gespeicherte Sendung erhält `version` (+1 je Speichern), `lastModifiedBy` (Name aus der Sitzung) und
+  Protokolleinträge `changes` (`appendChange_`, max. 20 je Sendung: Zeit, Benutzer, alter/neuer Status aus
+  `shipmentStatusLabel_`, Art neu/Änderung/Konflikt). Wiederholtes Senden desselben Stands ändert nichts
+  (`sameShipmentContent_`). Alte Sendungen ohne Version gelten als Version 1 mit leerem Namen (`ensureShipmentMeta_`, auch
+  beim Abruf). Sheet: Spalte F = `lastModifiedBy`, JSON-Fortsetzung großer Sendungen ab Spalte G; alte große Zeilen mit
+  Fortsetzung ab F erkennt `readRowParts_` (F ist nur dann der Name, wenn B+G… gültiges JSON ergibt) – keine Migration nötig,
+  beim nächsten Speichern liegt die Zeile in der neuen Aufteilung. Löschvermerke und Drive-Importe schreiben F ebenfalls;
+  Importe tragen `Automatik` als Namen. Ältere Apps ohne `versions` werden wie bisher bedient.
+- `js/02-sync-anmeldung.js`: Vorgemerkte Änderungen bilden eine geordnete Warteschlange (`pending.order`, ohne Doppelte, überlebt
+  Neustart). Offline (`navigator.onLine === false`) wird nicht gesendet, der Sync-Punkt zeigt „Offline – N Änderungen warten“;
+  nach „online“ wird in derselben Reihenfolge weitergesendet (`sendDeletes`/`sendChanges` in Gruppen). Jede Sendung geht mit
+  Ausgangsstand, Version (`versions`), Name (`modifiedBy`) und Reihenfolge (`order`) an den Server; der zurückgegebene
+  Stand (`merged`) wird übernommen, `conflicts` werden sofort als orangefarbene Meldung gezeigt (`showConflicts`: Sendung,
+  wer gleichzeitig geändert hat, welches Feld jetzt welchen Wert hat, gültige Version). Beim Speichern setzt die App lokal
+  `lastModifiedBy` auf den angemeldeten Namen, endgültig vergibt ihn der Server.
+- Startseite: „Zuletzt bearbeitet“ zeigt unter der Zeit den Namen aus `lastModifiedBy` (`js/05-liste-archiv.js`,
+  `.modified-by`; Handy weiterhin 5, Desktop 15 Einträge). Karten- bzw. Zeilenhöhe bleiben gleich (Handy: zweite Zeile im
+  Zeit-Feld unterhalb der Icon-Leistenhöhe; Desktop: zwei Zeilen à 12 px in der 36-px-Zeile, Spalte wird nicht breiter).
+  Neuer Knopf **Protokoll** neben der Überschrift öffnet das Änderungsprotokoll (`#changeLogModal` in `index.html`,
+  `showChangeLog`/`renderChangeLog`/`closeChangeLog` in `js/06-seiten.js`, Ereignisse in `js/10-menue-events-start.js`):
+  HAWB, alter Status, neuer Status, Benutzer, Zeit über alle Sendungen, neueste zuerst (max. 150); Tippen auf die HAWB öffnet
+  die Sendung. Handy: ein Block je Eintrag, Desktop (ab 992 px): Tabelle in breiterem Fenster. CSS in
+  `css/03-liste-seiten.css` und `css/04-details-menue-modals.css`.
+- Tests: `tests/backendcheck.js` (Versionsprüfung, Merge ohne/mit Konflikt, Wiederholung, alte Zeile ohne Version, alte große
+  Zeile mit Fortsetzung in F/G, Reihenfolge, Löschvermerk mit Name, Status-Kurzform), `tests/synccheck.js` (zwei Geräte mit
+  dem echten Code.gs in der Nachbildung – `makeBackend(…, { gas: true })` in `tests/helpers.js`: offline mit `navigator.onLine`,
+  zwei Geräte an derselben HAWB ohne und mit Konflikt, Protokoll-Modal, dieselbe neue Sendung auf beiden Geräten,
+  verlorene Antwort/Wiederholung, alte Sendung ohne Version, Warteschlange in Reihenfolge), `tests/versioncheck.js`
+  (ausdrücklich 9.3 ↔ 2.9), `tests/gas-env.js` (neue Spaltenaufteilung).
+- Versionskette: `js/01-start.js`, `sw.js`, `<title>`, `CHANGELOG.md`, `README.md`, `backend/README.md` (Abschnitt „Version 2.9“).
+
 ## 2026-11-09 – App 9.2, Code.gs 2.8
 
 Desktop-Ansicht feiner und kompakter (nur CSS, nur ab 992 px Breite; Handy/Zebra unverändert).

@@ -294,7 +294,9 @@ function appendShipmentRow(tbody, baseNumber, shipment, archived) {
             
             row.insertCell().outerHTML = `<td data-label="\u00DCbersicht" class="summary-cell">${summaryHtml}</td>`;
             
-            row.insertCell().outerHTML = `<td data-label="Letzte Änd." class="time-cell">${shipment.lastModified ? new Date(shipment.lastModified).toLocaleString('de-DE') : '-'}</td>`;
+            // 9.3: dahinter der Name, der zuletzt gespeichert hat (lastModifiedBy; alte Sendungen ohne Angabe: nur die Zeit)
+            const modifiedBy = shipment.lastModifiedBy ? `<span class="modified-by" title="Zuletzt geändert von ${escapeHtml(shipment.lastModifiedBy)}">${escapeHtml(shipment.lastModifiedBy)}</span>` : '';
+            row.insertCell().outerHTML = `<td data-label="Letzte Änd." class="time-cell">${shipment.lastModified ? new Date(shipment.lastModified).toLocaleString('de-DE') : '-'}${modifiedBy}</td>`;
             
             const actionsCell = row.insertCell();
             actionsCell.setAttribute('data-label', 'Aktionen');
