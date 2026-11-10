@@ -170,8 +170,10 @@ async function waitOverlayGone(page, maxMs = 8000) { return waitFor(async () => 
     await setStatus(pageA, 'XRY'); await scan(pageA, 'HU1002', 500);
     await setStatus(pageB, 'XRY'); await scan(pageB, 'HU1003', 500);
     assert((await syncPending(pageA)).changed[O] === true && (await syncPending(pageB)).changed[O] === true && serverRow(O).shipment.version === 2, 'Beide Änderungen warten lokal, Server noch bei Version 2');
+    await pageA.bringToFront(); await wait(300);
     await netBack(pageA, 'u-admin');
     assert(await waitFor(async () => serverRow(O).shipment.version === 3, 6000), 'A zuerst: Version 3');
+    await pageB.bringToFront(); await wait(300);
     await netBack(pageB, 'u-max');
     assert(await waitFor(async () => serverRow(O).shipment.version === 4, 6000), 'B danach (Ausgangsstand Version 2 → Merge): Version 4');
     let row = serverRow(O);
@@ -191,8 +193,10 @@ async function waitOverlayGone(page, maxMs = 8000) { return waitFor(async () => 
     be.blockUsers.add('u-admin'); be.blockUsers.add('u-max');
     await setStatus(pageA, 'XRY'); await scan(pageA, 'HU2001', 500);
     await setStatus(pageB, 'ETD'); await scan(pageB, 'HU2001', 500);
+    await pageA.bringToFront(); await wait(300);
     await netBack(pageA, 'u-admin');
     assert(await waitFor(async () => serverRow(O2).shipment.version === 2, 6000), 'A zuerst: HU2001 = XRY (Version 2)');
+    await pageB.bringToFront(); await wait(300);
     await netBack(pageB, 'u-max');
     assert(await waitFor(async () => serverRow(O2).shipment.version === 3, 6000), 'B danach: Version 3');
     row = serverRow(O2);
@@ -219,8 +223,10 @@ async function waitOverlayGone(page, maxMs = 8000) { return waitFor(async () => 
     await setStatus(pageA, 'XRY'); await newShipment(pageA, 'N777', 2);
     await setStatus(pageB, 'XRY'); await newShipment(pageB, 'N777', 2);
     assert((await localShipments(pageA)).N777 && (await localShipments(pageB)).N777 && !serverRow('N777'), 'N777 auf beiden Geräten angelegt (ohne Netz), Server kennt sie noch nicht');
+    await pageA.bringToFront(); await wait(300);
     await netBack(pageA, 'u-admin');
     assert(await waitFor(async () => serverRow('N777') && serverRow('N777').shipment.version === 1, 6000), 'A: N777 neu auf dem Server (Version 1)');
+    await pageB.bringToFront(); await wait(300);
     await netBack(pageB, 'u-max');
     assert(await waitFor(async () => serverRow('N777').shipment.version === 2, 6000), 'B: zusammengeführt (Version 2)');
     row = serverRow('N777');
