@@ -12,7 +12,7 @@ Aufträge übernommen.
 - **Live-Branch: `main`** – GitHub Pages liefert die App aus `main` (https://zakiwaw.github.io/Arbeit/). Seit dem
   Zusammenführen von Pull Request #1 am 09.11.2026 (App 9.2, Code.gs 2.8) ist `main` der aktuelle Stand.
 - Gearbeitet wird im Arbeits-Branch `arena/01a06f82-arbeit`; Änderungen gehen per Pull Request nach `main` und sind erst
-  nach dem Zusammenführen live. Zusammenführen nur nach Freigabe durch Zakaria.
+  nach dem Zusammenführen live. Zusammenführen nur nach Freigabe durch den Repository-Inhaber.
 - Die App braucht **keinen Build-Schritt**: `index.html` öffnen bzw. ausliefern genügt.
 
 ## Dateien
@@ -35,15 +35,15 @@ Aufträge übernommen.
 ## Versionen
 
 Die App-Version steht zentral in `js/01-start.js` (`APP_VERSION`, `APP_VERSION_DATE`, `APP_BACKEND_VERSION`) und wird in der
-App angezeigt: auf der Anmeldeseite, unten im Seitenmenü und am Desktop klein neben dem Titel („Version 9.6 · Stand … ·
-Server-Skript 2.9“). So sieht man auf jedem Gerät sofort, ob noch eine alte Version offen ist. Bei jeder veröffentlichten
+App angezeigt: auf der Anmeldeseite, unten im Seitenmenü und am Desktop klein neben dem Titel („Version 9.7 · Stand … ·
+Server-Skript 2.10“). So sieht man auf jedem Gerät sofort, ob noch eine alte Version offen ist. Bei jeder veröffentlichten
 Änderung: Version hochzählen und in `index.html` (`<title>`), `CHANGELOG.md` und `backend/README.md` nachziehen –
 `node tests/versioncheck.js` prüft, dass alle Stellen zusammenpassen. Das Server-Skript hat eine eigene Versionszählung
 (oben in `backend/Code.gs`).
 
-App 9.6 macht die Batch-Ansicht auf kleinen Bildschirmen kompakter: Status-Zeile mit Hinzufügen-Knopf unter 992 px ausgeblendet
-(Scanfeld voll breit), Einstell-Schalter in aufklappbarer Kopfzeile. Mehr vertikaler Platz für die Batch-Liste.
-Code.gs bleibt unverändert auf 2.9; keine neue Backend-Bereitstellung oder Skript-Eigenschaft nötig.
+App 9.7 / Code.gs 2.10 entfernen persönliche Daten aus dem Repo: Anmeldung nur noch mit PIN (keine Namensliste), Haupt-Administrator
+nur in den Skript-Eigenschaften `BOOTSTRAP_ADMIN_NAME` / `BOOTSTRAP_ADMIN_EMAIL`, Zuordnung Kundennummer → Spediteur im Blatt
+`kundennr_carrier` statt im Code. **Code.gs 2.10 bereitstellen und beide Skript-Eigenschaften setzen, bevor App 9.7 live geht.**
 
 ## Offline
 
@@ -65,7 +65,9 @@ automatisch gelöscht. Prüfung: `node tests/offlinecheck.js`; Handprobe siehe `
    Aktionen „Unbekannte Aktion“ (die App fängt das ab und weist auf die Bereitstellung hin).
 
 Die Tabellen-ID liest das Skript nur aus den **Skript-Eigenschaften** (Projekteinstellungen → Skript-Eigenschaften →
-`SPREADSHEET_ID`); fehlt die Eigenschaft, meldet der Code einen klaren Fehler und greift auf keine andere Tabelle zu. IDs, PINs oder Tokens gehören nicht in dieses Repo.
+`SPREADSHEET_ID`); fehlt die Eigenschaft, meldet der Code einen klaren Fehler und greift auf keine andere Tabelle zu. Ebenso
+Name und E-Mail des Haupt-Administrators (`BOOTSTRAP_ADMIN_NAME`, `BOOTSTRAP_ADMIN_EMAIL`, seit 2.10). IDs, PINs, Tokens und
+persönliche Daten (Namen, E-Mail-Adressen) gehören nicht in dieses Repo.
 
 ## Tests
 

@@ -1,7 +1,7 @@
 // Sync-Prüfungen: Löschen / Deaktivieren / Umbenennen kommen auch bei schnellem Bedienen und langsamen oder gestörten
 // Serverantworten zuverlässig durch – nichts kommt zurück. Außerdem die blockierende Rückmeldung (Spinner mit Text).
 // Voraussetzung: Server auf :8000 (siehe tests/README.md). Start: node tests/synccheck.js
-const { launch, makeBackend, openApp, sampleData, scan, MAX_TOKEN, MAX_USER } = require('./helpers');
+const { launch, makeBackend, openApp, sampleData, scan, MA2_TOKEN, MA2_USER } = require('./helpers');
 const wait = ms => new Promise(r => setTimeout(r, ms));
 let fails = 0, oks = 0;
 const assert = (c, m) => { console.log((c ? 'ok  : ' : 'FAIL: ') + m); if (c) oks++; else fails++; };
@@ -125,7 +125,7 @@ async function waitOverlayGone(page, maxMs = 8000) { return waitFor(async () => 
     await page.close();
 
     // ================= 9.3: sichere Synchronisation – zwei Geräte, echtes Code.gs 2.9 (tests/gas-env.js) =================
-    // Gerät A = Zakaria (127.0.0.1), Gerät B = Max Muster (localhost → eigener localStorage). Beide reden mit demselben Server.
+    // Gerät A = Mitarbeiter 1 (127.0.0.1), Gerät B = Mitarbeiter 2 (localhost → eigener localStorage). Beide reden mit demselben Server.
     // „Ohne Netz“ je Gerät: be.blockUsers (Anfragen dieses Benutzers scheitern); navigator.onLine ist im Testbrowser prozessweit,
     // deshalb wird page.setOfflineMode nur mit einem einzelnen Gerät geprüft (Schritt 8).
     be = makeBackend(sampleData(), {}, { gas: true });
@@ -143,8 +143,8 @@ async function waitOverlayGone(page, maxMs = 8000) { return waitFor(async () => 
 
     // ---------- 7) Startseite zeigt den Namen aus lastModifiedBy; Server-Stand trägt Version 1 ----------
     let sA = await localShipments(pageA);
-    assert(sA[O] && sA[O].version === 1 && sA[O].lastModifiedBy === 'Zakaria Bisbiss', `Gerät A hat die Sendung mit version 1 + lastModifiedBy (${sA[O] && sA[O].version}, ${sA[O] && sA[O].lastModifiedBy})`);
-    assert((await nameCell(pageA, O)) === 'Zakaria Bisbiss', `„Zuletzt bearbeitet“ zeigt den Namen unter der Zeit (${await nameCell(pageA, O)})`);
+    assert(sA[O] && sA[O].version === 1 && sA[O].lastModifiedBy === 'Mitarbeiter 1', `Gerät A hat die Sendung mit version 1 + lastModifiedBy (${sA[O] && sA[O].version}, ${sA[O] && sA[O].lastModifiedBy})`);
+    assert((await nameCell(pageA, O)) === 'Mitarbeiter 1', `„Zuletzt bearbeitet“ zeigt den Namen unter der Zeit (${await nameCell(pageA, O)})`);
     const cardHeights = await pageA.evaluate(() => [...document.querySelectorAll('#shipmentTableBody tr')].map(tr => Math.round(tr.getBoundingClientRect().height)));
     assert(cardHeights.length === 3 && cardHeights.every(h => h === cardHeights[0]), `Kartenhöhe mit Namen unverändert gleich hoch (${cardHeights.join('/')})`);
 
@@ -160,13 +160,13 @@ async function waitOverlayGone(page, maxMs = 8000) { return waitFor(async () => 
     be.offline = false; await pageA.setOfflineMode(false);
     assert(await waitFor(async () => serverRow(O).shipment.version === 2, 6000), 'Netz zurück → Sendung auf dem Server in Version 2');
     const req1 = saves().slice(-1)[0].payload;
-    assert(req1.versions && req1.versions[O] === 1 && req1.modifiedBy === 'Zakaria Bisbiss' && Array.isArray(req1.order) && req1.order[0] === O, `Gesendet mit versions/modifiedBy/order (${JSON.stringify({ v: req1.versions, by: req1.modifiedBy, o: req1.order })})`);
+    assert(req1.versions && req1.versions[O] === 1 && req1.modifiedBy === 'Mitarbeiter 1' && Array.isArray(req1.order) && req1.order[0] === O, `Gesendet mit versions/modifiedBy/order (${JSON.stringify({ v: req1.versions, by: req1.modifiedBy, o: req1.order })})`);
     assert(await waitFor(async () => !(await syncPending(pageA)).order.length, 4000) && /Synchronisiert/.test(await indicator(pageA)), 'Warteschlange leer, Sync-Punkt „Synchronisiert“');
 
     // ---------- 9) Zwei Geräte ohne Netz an derselben HAWB, verschiedene HUs → beides bleibt, kein Konflikt ----------
-    const pageB = await openApp(browser, be, { url: 'http://localhost:8000/index.html', session: { token: MAX_TOKEN, user: MAX_USER, expires: Date.now() + 3600e3 } }); await wait(800);
-    assert((await itemStatus(pageB, O, 'HU1001')) === 'XRY' && (await nameCell(pageB, O)) === 'Zakaria Bisbiss', 'Gerät B (Max) sieht den Stand von A samt Namen');
-    be.blockUsers.add('u-admin'); be.blockUsers.add('u-max');
+    const pageB = await openApp(browser, be, { url: 'http://localhost:8000/index.html', session: { token: MA2_TOKEN, user: MA2_USER, expires: Date.now() + 3600e3 } }); await wait(800);
+    assert((await itemStatus(pageB, O, 'HU1001')) === 'XRY' && (await nameCell(pageB, O)) === 'Mitarbeiter 1', 'Gerät B (Mitarbeiter 2) sieht den Stand von A samt Namen');
+    be.blockUsers.add('u-admin'); be.blockUsers.add('u-ma2');
     await setStatus(pageA, 'XRY'); await scan(pageA, 'HU1002', 500);
     await setStatus(pageB, 'XRY'); await scan(pageB, 'HU1003', 500);
     assert((await syncPending(pageA)).changed[O] === true && (await syncPending(pageB)).changed[O] === true && serverRow(O).shipment.version === 2, 'Beide Änderungen warten lokal, Server noch bei Version 2');
@@ -174,38 +174,38 @@ async function waitOverlayGone(page, maxMs = 8000) { return waitFor(async () => 
     await netBack(pageA, 'u-admin');
     assert(await waitFor(async () => serverRow(O).shipment.version === 3, 6000), 'A zuerst: Version 3');
     await pageB.bringToFront(); await wait(300);
-    await netBack(pageB, 'u-max');
+    await netBack(pageB, 'u-ma2');
     assert(await waitFor(async () => serverRow(O).shipment.version === 4, 6000), 'B danach (Ausgangsstand Version 2 → Merge): Version 4');
     let row = serverRow(O);
     const huStatus = hu => row.shipment.scannedItems.find(i => i.rawInput === hu).status;
     assert(huStatus('HU1001') === 'XRY' && huStatus('HU1002') === 'XRY' && huStatus('HU1003') === 'XRY', 'Server: alle drei Scans vorhanden, nichts verloren');
-    assert(row.shipment.lastModifiedBy === 'Max Muster' && row.modifiedBy === 'Max Muster', `lastModifiedBy = Max Muster (JSON + Spalte F: ${row.modifiedBy})`);
+    assert(row.shipment.lastModifiedBy === 'Mitarbeiter 2' && row.modifiedBy === 'Mitarbeiter 2', `lastModifiedBy = Mitarbeiter 2 (JSON + Spalte F: ${row.modifiedBy})`);
     assert(!/Konflikt/.test(await errorText(pageB)) && !/Konflikt/.test(await errorText(pageA)), 'Kein Konflikt gemeldet (verschiedene HUs lassen sich sauber zusammenführen)');
     const reqB = saves().slice(-1)[0].payload;
-    assert(reqB.versions[O] === 2 && reqB.modifiedBy === 'Max Muster', `B hat Version 2 als Ausgangsstand geschickt (${JSON.stringify(reqB.versions)}, ${reqB.modifiedBy})`);
+    assert(reqB.versions[O] === 2 && reqB.modifiedBy === 'Mitarbeiter 2', `B hat Version 2 als Ausgangsstand geschickt (${JSON.stringify(reqB.versions)}, ${reqB.modifiedBy})`);
     await pageA.bringToFront(); await wait(300);
     assert(await waitFor(async () => (await itemStatus(pageA, O, 'HU1003')) === 'XRY', 6000), 'A sieht den Scan von B');
     assert(await waitFor(async () => (await itemStatus(pageB, O, 'HU1002')) === 'XRY', 6000), 'B sieht den Scan von A');
     sA = await localShipments(pageA);
-    assert(sA[O].version === 4 && sA[O].lastModifiedBy === 'Max Muster' && (await nameCell(pageA, O)) === 'Max Muster', `A: version 4, Name Max Muster in der Liste (${await nameCell(pageA, O)})`);
+    assert(sA[O].version === 4 && sA[O].lastModifiedBy === 'Mitarbeiter 2' && (await nameCell(pageA, O)) === 'Mitarbeiter 2', `A: version 4, Name Mitarbeiter 2 in der Liste (${await nameCell(pageA, O)})`);
     assert(!(await syncPending(pageA)).order.length && !(await syncPending(pageB)).order.length, 'Warteschlangen beider Geräte leer');
 
     // ---------- 10) Echter Konflikt: beide setzen ohne Netz DIESELBE HU verschieden → Meldung auf B, Protokoll, nichts still verworfen ----------
-    be.blockUsers.add('u-admin'); be.blockUsers.add('u-max');
+    be.blockUsers.add('u-admin'); be.blockUsers.add('u-ma2');
     await setStatus(pageA, 'XRY'); await scan(pageA, 'HU2001', 500);
     await setStatus(pageB, 'ETD'); await scan(pageB, 'HU2001', 500);
     await pageA.bringToFront(); await wait(300);
     await netBack(pageA, 'u-admin');
     assert(await waitFor(async () => serverRow(O2).shipment.version === 2, 6000), 'A zuerst: HU2001 = XRY (Version 2)');
     await pageB.bringToFront(); await wait(300);
-    await netBack(pageB, 'u-max');
+    await netBack(pageB, 'u-ma2');
     assert(await waitFor(async () => serverRow(O2).shipment.version === 3, 6000), 'B danach: Version 3');
     row = serverRow(O2);
-    assert(huStatus('HU2001') === 'ETD' && row.shipment.lastModifiedBy === 'Max Muster', `Gültig ist der eingehende Stand von B (HU2001 = ${huStatus('HU2001')})`);
+    assert(huStatus('HU2001') === 'ETD' && row.shipment.lastModifiedBy === 'Mitarbeiter 2', `Gültig ist der eingehende Stand von B (HU2001 = ${huStatus('HU2001')})`);
     const lastChange = row.shipment.changes[row.shipment.changes.length - 1];
-    assert(lastChange.k === 'conflict' && lastChange.u === 'Max Muster' && lastChange.by === 'Zakaria Bisbiss' && lastChange.n === 1, `Protokoll: Konflikt-Eintrag (${JSON.stringify(lastChange)})`);
+    assert(lastChange.k === 'conflict' && lastChange.u === 'Mitarbeiter 2' && lastChange.by === 'Mitarbeiter 1' && lastChange.n === 1, `Protokoll: Konflikt-Eintrag (${JSON.stringify(lastChange)})`);
     const errB = await errorText(pageB);
-    assert(/Konflikt bei 9007000002/.test(errB) && /gleichzeitig von Zakaria Bisbiss/.test(errB) && /HU HU2001 Status: jetzt ETD \(Eingabe XRY von Zakaria Bisbiss überschrieben\)/.test(errB) && /Version 3/.test(errB), `B zeigt die Konfliktmeldung: „${errB}“`);
+    assert(/Konflikt bei 9007000002/.test(errB) && /gleichzeitig von Mitarbeiter 1/.test(errB) && /HU HU2001 Status: jetzt ETD \(Eingabe XRY von Mitarbeiter 1 überschrieben\)/.test(errB) && /Version 3/.test(errB), `B zeigt die Konfliktmeldung: „${errB}“`);
     await pageA.bringToFront(); await wait(300);
     assert(await waitFor(async () => (await itemStatus(pageA, O2, 'HU2001')) === 'ETD', 6000), 'A übernimmt den gültigen Stand (ETD)');
     assert(!/Konflikt/.test(await errorText(pageA)), 'A (dessen Eingabe überschrieben wurde) bekommt keine Fehlermeldung – der Protokolleintrag hält es fest');
@@ -216,14 +216,14 @@ async function waitOverlayGone(page, maxMs = 8000) { return waitFor(async () => 
     await waitFor(async () => await pageA.evaluate(() => document.querySelectorAll('#changeLogList tbody tr').length >= 7), 8000);
     let log = await pageA.evaluate(() => ({ open: document.getElementById('changeLogModal').classList.contains('visible'), rows: [...document.querySelectorAll('#changeLogList tbody tr')].map(tr => [...tr.children].map(td => td.textContent.trim())), hint: document.getElementById('changeLogHint').textContent }));
     assert(log.open && log.rows.length >= 7, `Protokoll offen, ${log.rows.length} Einträge (${log.hint})`);
-    assert(log.rows[0][1] === O2 && log.rows[0][2] === 'Max Muster' && log.rows[0][5] === 'Konflikt mit Zakaria Bisbiss' && /^Fertig · WE 1\/1 · Sich\. 1\/1$/.test(log.rows[0][3]) && /^Fertig · WE 2\/1 · Sich\. 1\/1$/.test(log.rows[0][4]), `Neuester Eintrag: HAWB, Benutzer, alter → neuer Status, Art (${JSON.stringify(log.rows[0])})`);
-    assert(log.rows[1][1] === O2 && log.rows[1][2] === 'Zakaria Bisbiss' && log.rows[1][5] === 'Änderung' && /^Offen · WE 0\/1 · Sich\. 0\/1$/.test(log.rows[1][3]), `Eintrag davor: Änderung von Zakaria (${JSON.stringify(log.rows[1])})`);
+    assert(log.rows[0][1] === O2 && log.rows[0][2] === 'Mitarbeiter 2' && log.rows[0][5] === 'Konflikt mit Mitarbeiter 1' && /^Fertig · WE 1\/1 · Sich\. 1\/1$/.test(log.rows[0][3]) && /^Fertig · WE 2\/1 · Sich\. 1\/1$/.test(log.rows[0][4]), `Neuester Eintrag: HAWB, Benutzer, alter → neuer Status, Art (${JSON.stringify(log.rows[0])})`);
+    assert(log.rows[1][1] === O2 && log.rows[1][2] === 'Mitarbeiter 1' && log.rows[1][5] === 'Änderung' && /^Offen · WE 0\/1 · Sich\. 0\/1$/.test(log.rows[1][3]), `Eintrag davor: Änderung von Mitarbeiter 1 (${JSON.stringify(log.rows[1])})`);
     assert(log.rows.every(r => r[0] && r[1] && r[2]) && log.rows.some(r => r[5] === 'Neu'), 'Jeder Eintrag hat Zeit, HAWB und Benutzer; Anlage als „Neu“');
     await pageA.evaluate(() => document.getElementById('closeChangeLogButton').click()); await wait(200);
     assert(!(await pageA.evaluate(() => document.getElementById('changeLogModal').classList.contains('visible'))), 'Protokoll geschlossen');
 
     // ---------- 12) Dieselbe NEUE Sendung auf beiden Geräten ohne Netz angelegt → eine Zeile, beide Packstücke, kein Duplikat ----------
-    be.blockUsers.add('u-admin'); be.blockUsers.add('u-max');
+    be.blockUsers.add('u-admin'); be.blockUsers.add('u-ma2');
     await setStatus(pageA, 'XRY'); await newShipment(pageA, 'N777', 2);
     await setStatus(pageB, 'XRY'); await newShipment(pageB, 'N777', 2);
     assert((await localShipments(pageA)).N777 && (await localShipments(pageB)).N777 && !serverRow('N777'), 'N777 auf beiden Geräten angelegt (ohne Netz), Server kennt sie noch nicht');
@@ -231,7 +231,7 @@ async function waitOverlayGone(page, maxMs = 8000) { return waitFor(async () => 
     await netBack(pageA, 'u-admin');
     assert(await waitFor(async () => serverRow('N777') && serverRow('N777').shipment.version === 1, 6000), 'A: N777 neu auf dem Server (Version 1)');
     await pageB.bringToFront(); await wait(300);
-    await netBack(pageB, 'u-max');
+    await netBack(pageB, 'u-ma2');
     assert(await waitFor(async () => serverRow('N777').shipment.version === 2, 6000), 'B: zusammengeführt (Version 2)');
     row = serverRow('N777');
     assert(be.gas.sheets.shipments.rows.filter(r => r[0] === 'N777').length === 1 && row.shipment.scannedItems.length === 2 && row.shipment.totalPiecesExpected === 2, `Eine Zeile, beide Packstücke (${row.shipment.scannedItems.length}), Stückzahl 2`);
@@ -250,7 +250,7 @@ async function waitOverlayGone(page, maxMs = 8000) { return waitFor(async () => 
     assert(sA.ALT9.version === 1 && sA.ALT9.lastModifiedBy === '' && Array.isArray(sA.ALT9.changes) && (await nameCell(pageA, 'ALT9')) === '', `ALT9: Version 1, kein Name (Liste zeigt nur die Zeit) (${sA.ALT9.version}, „${sA.ALT9.lastModifiedBy}“, Zelle ${JSON.stringify(await nameCell(pageA, 'ALT9'))})`);
     await setStatus(pageA, 'XRY'); await scan(pageA, 'ALT9', 500);
     assert(await waitFor(async () => { const r = serverRow('ALT9'); return r && r.shipment && r.shipment.version === 2; }, 6000), 'ALT9 gespeichert → Version 2');
-    assert(serverRow('ALT9').modifiedBy === 'Zakaria Bisbiss' && serverRow('ALT9').shipment.lastModifiedBy === 'Zakaria Bisbiss', 'ALT9: Name in Spalte F und im JSON');
+    assert(serverRow('ALT9').modifiedBy === 'Mitarbeiter 1' && serverRow('ALT9').shipment.lastModifiedBy === 'Mitarbeiter 1', 'ALT9: Name in Spalte F und im JSON');
     assert(!/Konflikt/.test(await errorText(pageA)), 'Kein Konflikt beim ersten Speichern einer alten Sendung');
 
     // ---------- 14) Antwort geht verloren → Wiederholung ändert nichts (keine Doppelten, keine zweite Version) ----------

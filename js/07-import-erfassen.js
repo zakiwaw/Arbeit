@@ -178,8 +178,8 @@ const manTruckId = 'MAN ' + newManNumber;
                 truckId: 'VVL-' + vorverladelisteNr,
             };
 
-            if (KUNDENNR_CARRIER_MAP[kundennr]) {
-                shipments[kundennr].freightForwarder = KUNDENNR_CARRIER_MAP[kundennr];
+            if (kundennrCarrierMap[kundennr]) {
+                shipments[kundennr].freightForwarder = kundennrCarrierMap[kundennr];
             }
 
             positionen.forEach(pos => {
@@ -206,8 +206,8 @@ const manTruckId = 'MAN ' + newManNumber;
             const existingShipment = shipments[kundennr];
             let newPositionsAddedToThisCustomer = 0;
 
-            if (KUNDENNR_CARRIER_MAP[kundennr] && !existingShipment.freightForwarder) {
-                existingShipment.freightForwarder = KUNDENNR_CARRIER_MAP[kundennr];
+            if (kundennrCarrierMap[kundennr] && !existingShipment.freightForwarder) {
+                existingShipment.freightForwarder = kundennrCarrierMap[kundennr];
             }
 
             existingShipment.parentOrderNumber = vorverladelisteNr;

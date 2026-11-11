@@ -1,12 +1,12 @@
 # Anleitung: Automatischen Drive-Import für den Fracht-Tracker einrichten
 
-Diese Anleitung ist für einen Assistenten (KI oder Person), der die Einrichtung **für Zakaria** übernimmt.
+Diese Anleitung ist für einen Assistenten (KI oder Person), der die Einrichtung **für den Nutzer** übernimmt.
 Sie ist vollständig – es wird kein weiteres Wissen über die App benötigt.
 
 ## Ziel
 
 Der Fracht-Tracker (Web-App) speichert seine Daten über ein **Google Apps Script** (Datei `Code.gs`) in einem Google Sheet.
-Ein anderes Skript legt im Google-Drive-Konto **bisbiss1992@gmail.com** im Ordner **„HYDAC TXT“** Textdateien ab
+Ein anderes Skript legt im Google-Drive-Konto des Nutzers (im Folgenden **„Ordner-Konto“**) im Ordner **„HYDAC TXT“** Textdateien ab
 (z. B. `HYDAC_2026-10-22_18-34_Scan.txt`, Inhalt: Länder und 10-stellige Packstücknummern, durch Leerzeilen getrennt).
 
 Nach der Einrichtung liest das Fracht-Tracker-Skript **alle 5 Minuten** automatisch zwei Ordner aus und legt aus jeder
@@ -68,7 +68,7 @@ Das Skript sucht die Ordner „HYDAC TXT“ und „MAN Ladelisten TXT“ **im Dr
    (Der Projektname ist der des Skripts, das zum Fracht-Tracker-Sheet gehört. Wenn unklar: Google Sheet des
    Fracht-Trackers öffnen → Menü **Erweiterungen → Apps Script** – das öffnet das richtige Projekt.)
 2. Schau oben rechts am Konto-Avatar, **welches Konto** das ist.
-   - **Ist es bisbiss1992@gmail.com** → weiter mit Schritt 1, nichts weiter zu beachten.
+   - **Ist es das Ordner-Konto** → weiter mit Schritt 1, nichts weiter zu beachten.
    - **Ist es ein anderes Konto** → zuerst den Abschnitt „Fall B: anderes Konto“ ganz unten erledigen, dann Schritt 1.
 
 ## Schritt 1 – Code.gs ersetzen
@@ -105,7 +105,7 @@ Mehr ist nicht nötig – ab jetzt läuft der Import von allein.
 
 ## Schritt 4 – Ergebnis prüfen (Abnahme)
 
-1. **Google Drive (bisbiss1992@gmail.com):** In den Ordnern „HYDAC TXT“ bzw. „MAN Ladelisten TXT“ gibt es jetzt den
+1. **Google Drive (Ordner-Konto):** In den Ordnern „HYDAC TXT“ bzw. „MAN Ladelisten TXT“ gibt es jetzt den
    Unterordner **„Verarbeitet“**; die importierte Datei liegt dort (ggf. zusätzlich „Fehler“, falls eine Datei unbrauchbar war).
 2. **Google Sheet des Fracht-Trackers:** Menü **Ansicht → Ausgeblendete Tabellenblätter → `_import`** einblenden.
    Je Datei steht eine Zeile: Zeitpunkt | Datei | Ergebnis (`ok` / `fehler` / `später`) | Details
@@ -124,9 +124,9 @@ Die Web-App-URL bleibt dabei gleich; in der App muss nichts geändert werden.
 
 ## Fall B: Das Skript liegt in einem anderen Konto als der Ordner
 
-Nur nötig, wenn Schritt 0 ein anderes Konto als bisbiss1992@gmail.com ergeben hat.
+Nur nötig, wenn Schritt 0 ein anderes Konto als das Ordner-Konto ergeben hat.
 
-1. In Google Drive mit **bisbiss1992@gmail.com** anmelden, Ordner „HYDAC TXT“ (und „MAN Ladelisten TXT“) → Rechtsklick → **Freigeben** →
+1. In Google Drive mit dem **Ordner-Konto** anmelden, Ordner „HYDAC TXT“ (und „MAN Ladelisten TXT“) → Rechtsklick → **Freigeben** →
    die E-Mail-Adresse des Skript-Kontos eintragen, Rolle **„Mitbearbeiter“** (nicht „Betrachter“ – das Skript muss
    Unterordner anlegen und Dateien verschieben) → Senden.
 2. Den Ordner öffnen und aus der Adresszeile die **Ordner-ID** kopieren:

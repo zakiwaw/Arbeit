@@ -34,37 +34,41 @@ function sampleData() {
 // Zeitverhalten/Fehler (für Sync-Prüfungen): state.delay = { action: ms } verzögert die Antwort; state.failNext = { action: n } beantwortet
 // die nächsten n Aufrufe mit einem Serverfehler (Sperre); state.noBatchDelete = true → „deleteShipments“ unbekannt (Server-Skript < 2.4).
 // state.inFlight[action] zählt gerade laufende Anfragen.
-// Anmeldung (Backend 2.2): Der Stub kennt einen Administrator (Token TEST_TOKEN, PIN 482913) und einen Mitarbeiter (PIN 778812).
-// Öffentliche Aktionen: authUsers/authLogin/authAccept/authInviteInfo; alles andere verlangt body.auth = gültiges Token,
+// Anmeldung (Backend 2.2, ab 2.10 nur PIN): Der Stub kennt einen Administrator (Token TEST_TOKEN, PIN 482913) und einen Mitarbeiter
+// (PIN 778812). authLogin findet den Nutzer allein über die PIN (ohne PIN: Vorabprüfung → PIN_REQUIRED bzw. SETUP_PENDING; PIN bei
+// mehreren aktiven Nutzern → PIN_AMBIGUOUS); authAccept lehnt eine schon vergebene PIN ab (PIN_TAKEN).
+// Öffentliche Aktionen: authLogin/authAccept/authInviteInfo; alles andere verlangt body.auth = gültiges Token,
 // sonst { status:'error', code:'AUTH_REQUIRED' } – wie das echte Skript. state.authDisabled = true → alles ohne Anmeldung (Skript 2.1).
+// loadCarrierMap (2.10) liefert state.carrierMap (Kundennummer → Spediteur; Standard: leer).
 // opts.gas = true (9.3): Sendungs-Aktionen (saveShipments, loadChanges, deleteShipment(s), searchArchive) laufen durch das ECHTE
 // backend/Code.gs in der Nachbildung tests/gas-env.js (Versionsprüfung, Merge, Konflikte, Protokoll) – state.gas ist diese Umgebung.
-// Zweites Gerät/Mitarbeiter: Sitzung { token: MAX_TOKEN, user: MAX_USER } (openApp opts.session).
+// Zweites Gerät/Mitarbeiter: Sitzung { token: MA2_TOKEN, user: MA2_USER } (openApp opts.session).
 const TEST_TOKEN = 'tok-admin-test';
-const TEST_USER = { id: 'u-admin', name: 'Zakaria Bisbiss', role: 'admin' };
-const MAX_TOKEN = 'tok-max-test';
-const MAX_USER = { id: 'u-max', name: 'Max Muster', role: 'user' };
+const TEST_USER = { id: 'u-admin', name: 'Mitarbeiter 1', role: 'admin' };
+const MA2_TOKEN = 'tok-ma2-test';
+const MA2_USER = { id: 'u-ma2', name: 'Mitarbeiter 2', role: 'user' };
 const GAS_ACTIONS = ['saveShipments', 'loadChanges', 'deleteShipment', 'deleteShipments', 'searchArchive'];
 function attachGas(state, initial) {
   const env = require('./gas-env')();
   env.props.SPREADSHEET_ID = 'test-tabelle';
-  env.call('authUsers');                                                   // legt den Administrator an + Einladung
+  env.props.BOOTSTRAP_ADMIN_NAME = 'Mitarbeiter 1'; env.props.BOOTSTRAP_ADMIN_EMAIL = 'admin@example.com';   // 2.10: nur Skript-Eigenschaften
+  env.call('authLogin', {});                                               // Vorabprüfung der Anmeldeseite: legt den Administrator an + Einladung
   const inv = /einladung=([0-9a-f]+)/.exec(env.mails[env.mails.length - 1].body)[1];
   const adminTok = env.call('authAccept', { invite: inv, pin: '482913', deviceId: 'dev-admin' }).token;
-  env.call('adminInvite', { name: 'Max Muster', email: 'max@example.com' }, adminTok);
-  const invMax = /einladung=([0-9a-f]+)/.exec(env.mails[env.mails.length - 1].body)[1];
-  const maxTok = env.call('authAccept', { invite: invMax, pin: '778812', deviceId: 'dev-max' }).token;
-  state.gas = env; state.gasTokens = { 'u-admin': adminTok, 'u-max': maxTok };
+  env.call('adminInvite', { name: 'Mitarbeiter 2', email: 'mitarbeiter2@example.com' }, adminTok);
+  const invMa2 = /einladung=([0-9a-f]+)/.exec(env.mails[env.mails.length - 1].body)[1];
+  const ma2Tok = env.call('authAccept', { invite: invMa2, pin: '778812', deviceId: 'dev-ma2' }).token;
+  state.gas = env; state.gasTokens = { 'u-admin': adminTok, 'u-ma2': ma2Tok };
   const seed = JSON.parse(JSON.stringify(initial || {}));
   if (Object.keys(seed).length) { const versions = {}; Object.keys(seed).forEach(b => { versions[b] = 0; }); env.call('saveShipments', { shipments: seed, bases: {}, versions }, adminTok); }
   state.gasCall = (action, payload, userId) => env.call(action, payload, state.gasTokens[userId]);
 }
 function makeBackend(initial, lkwStatus, opts = {}) {
   const state = { store: JSON.parse(JSON.stringify(initial || {})), lkwStatus: lkwStatus || {}, version: 1, actions: [], requests: [],
-    authDisabled: false, tokens: { [TEST_TOKEN]: 'u-admin', [MAX_TOKEN]: 'u-max' }, invites: { 'inv-max': 'u-max' }, mails: [], failed: 0,
+    authDisabled: false, carrierMap: {}, tokens: { [TEST_TOKEN]: 'u-admin', [MA2_TOKEN]: 'u-ma2' }, invites: { 'inv-ma2': 'u-ma2' }, mails: [], failed: 0,
     delay: {}, failNext: {}, dropNext: {}, noBatchDelete: false, inFlight: {}, offline: false, blockUsers: new Set(),
-    users: [ { id: 'u-admin', name: 'Zakaria Bisbiss', email: 'bisbiss-92@hotmail.de', role: 'admin', pin: '482913', active: true, hasPin: true },
-             { id: 'u-max', name: 'Max Muster', email: 'max@example.com', role: 'user', pin: '778812', active: true, hasPin: true } ] };
+    users: [ { id: 'u-admin', name: 'Mitarbeiter 1', email: 'admin@example.com', role: 'admin', pin: '482913', active: true, hasPin: true },
+             { id: 'u-ma2', name: 'Mitarbeiter 2', email: 'mitarbeiter2@example.com', role: 'user', pin: '778812', active: true, hasPin: true } ] };
   if (opts.gas) attachGas(state, initial);
   const pub = u => ({ id: u.id, name: u.name, role: u.role });
   const list = () => state.users.map(u => ({ id: u.id, name: u.name, email: u.email, role: u.role, active: u.active, hasPin: u.hasPin, lastLogin: 0, inviteOpen: false, inviteExpires: 0, locked: false }));
@@ -78,7 +82,7 @@ function makeBackend(initial, lkwStatus, opts = {}) {
     if (state.delay[action]) await new Promise(r => setTimeout(r, state.delay[action]));
     state.inFlight[action]--;
     let resp = { status: 'success' };
-    const isPublic = ['authUsers', 'authLogin', 'authAccept', 'authInviteInfo'].includes(action);
+    const isPublic = ['authLogin', 'authAccept', 'authInviteInfo'].includes(action);
     const me = state.authDisabled ? null : state.users.find(u => u.id === state.tokens[body.auth] && u.active);
     if (!state.authDisabled && !isPublic && !me) resp = { status: 'error', code: 'AUTH_REQUIRED', message: 'Anmeldung erforderlich.' };
     else if (state.failNext[action] > 0) { state.failNext[action]--; resp = { status: 'error', message: 'Verarbeitung serverseitig fehlgeschlagen: Server ist gerade beschäftigt (Sperre). Bitte erneut versuchen.' }; }
@@ -91,12 +95,18 @@ function makeBackend(initial, lkwStatus, opts = {}) {
       if (state.noBatchDelete) resp = { status: 'error', message: 'Verarbeitung serverseitig fehlgeschlagen: Unbekannte Aktion empfangen: deleteShipments' };
       else { const bs = (body.payload && body.payload.baseNumbers) || []; bs.forEach(b => { delete state.store[b]; }); state.version += bs.length; resp = { status: 'success', version: state.version, deleted: bs.length }; }
     }
-    else if (action === 'authUsers') resp = state.authDisabled ? { status: 'success', users: [], authDisabled: true } : { status: 'success', users: state.users.filter(u => u.active && u.hasPin).map(u => ({ id: u.id, name: u.name })), setupPending: false };
     else if (action === 'authCheck') resp = state.authDisabled ? { status: 'success', user: null, authDisabled: true } : { status: 'success', user: pub(me) };
-    else if (action === 'authLogin') {
-      const p = body.payload || {}; const u = state.users.find(x => x.id === p.userId && x.active && x.hasPin);
-      if (u && u.pin === p.pin) { const t = 'tok-' + Math.random().toString(36).slice(2); state.tokens[t] = u.id; state.failed = 0; resp = { status: 'success', token: t, expires: Date.now() + 3600e3, user: pub(u) }; }
-      else { state.failed++; resp = state.failed >= 5 ? { status: 'error', code: 'LOCKED', message: 'Zu viele Fehlversuche – Zugang für 15 Minuten gesperrt.' } : { status: 'error', code: 'LOGIN_FAILED', message: `PIN falsch – noch ${5 - state.failed} Versuch(e).` }; }
+    else if (action === 'authLogin') {   // 2.10: nur PIN – Nutzer allein über die PIN finden
+      const p = body.payload || {}; const ready = state.users.filter(x => x.active && x.hasPin);
+      if (state.authDisabled) resp = { status: 'success', authDisabled: true };
+      else if (!ready.length) resp = { status: 'error', code: 'SETUP_PENDING', message: 'Noch kein Mitarbeiter eingerichtet. Der Administrator hat eine Einladung per E-Mail erhalten – bitte den Link darin öffnen und die PIN festlegen.' };
+      else if (!p.pin) resp = { status: 'error', code: 'PIN_REQUIRED', message: 'Bitte die 6-stellige PIN eingeben.' };
+      else {
+        const matches = ready.filter(x => x.pin === p.pin);
+        if (matches.length > 1) resp = { status: 'error', code: 'PIN_AMBIGUOUS', message: 'PIN nicht eindeutig – Anmeldung nicht möglich. Der Administrator muss für einen der Mitarbeiter die PIN ändern (PIN zurücksetzen).' };
+        else if (matches.length === 1) { const u = matches[0]; const t = 'tok-' + Math.random().toString(36).slice(2); state.tokens[t] = u.id; state.failed = 0; resp = { status: 'success', token: t, expires: Date.now() + 3600e3, user: pub(u) }; }
+        else { state.failed++; resp = state.failed >= 5 ? { status: 'error', code: 'LOCKED', message: 'Zu viele Fehlversuche – Anmeldung für 15 Minuten gesperrt.' } : { status: 'error', code: 'LOGIN_FAILED', message: `PIN falsch – noch ${5 - state.failed} Versuch(e).` }; }
+      }
     }
     else if (action === 'authInviteInfo') { const uid = state.invites[(body.payload || {}).invite]; const u = uid && state.users.find(x => x.id === uid); resp = u ? { status: 'success', valid: true, name: u.name, isReset: u.hasPin } : { status: 'success', valid: false }; }
     else if (action === 'authAccept') {
@@ -104,6 +114,7 @@ function makeBackend(initial, lkwStatus, opts = {}) {
       if (!u) resp = { status: 'error', code: 'INVITE_INVALID', message: 'Dieser Einladungslink ist ungültig oder abgelaufen.' };
       else if (!/^\d{6}$/.test(p.pin)) resp = { status: 'error', code: 'PIN_INVALID', message: 'Die PIN muss aus genau 6 Ziffern bestehen.' };
       else if (/^(\d)\1{5}$/.test(p.pin) || '01234567890'.includes(p.pin)) resp = { status: 'error', code: 'PIN_WEAK', message: 'Bitte keine zu einfache PIN (z. B. 111111 oder 123456).' };
+      else if (state.users.some(x => x.id !== u.id && x.hasPin && x.pin === p.pin)) resp = { status: 'error', code: 'PIN_TAKEN', message: 'Diese PIN ist schon vergeben – bitte eine andere wählen.' };
       else { u.pin = p.pin; u.hasPin = true; delete state.invites[p.invite]; const t = 'tok-' + Math.random().toString(36).slice(2); state.tokens[t] = u.id; resp = { status: 'success', token: t, expires: Date.now() + 3600e3, user: pub(u) }; }
     }
     else if (action === 'authLogout') { delete state.tokens[body.auth]; resp = { status: 'success' }; }
@@ -125,6 +136,7 @@ function makeBackend(initial, lkwStatus, opts = {}) {
       const b = body.payload && body.payload.baseNumber; if (b) delete state.store[b]; state.version++; resp = { status: 'success', version: state.version };
     }
     else if (action === 'loadLkwStatus') resp = { status: 'success', data: state.lkwStatus };
+    else if (action === 'loadCarrierMap') resp = { status: 'success', map: JSON.parse(JSON.stringify(state.carrierMap)) };
     else if (action === 'saveLkwStatus') { const pl = body.payload; state.lkwStatus = (pl && pl.lkwStatus) || pl || body.lkwStatus || {}; resp = { status: 'success' }; } // App schickt die Status-Map direkt als payload
     else if (action === 'searchArchive') resp = { status: 'success', results: {}, order: [], total: 0, truncated: false };
     // state.dropNext = { action: n }: Server hat verarbeitet, die Antwort geht aber verloren (Verbindungsabbruch) – für Wiederholungs-Prüfungen
@@ -175,4 +187,4 @@ const results = { ok: 0, fail: 0 };
 function assert(cond, msg) { if (cond) { results.ok++; console.log('ok  :', msg); } else { results.fail++; console.log('FAIL:', msg); } }
 function finish() { console.log(results.fail ? `SOME FAILED (${results.fail} von ${results.ok + results.fail})` : `ALL GOOD (${results.ok})`); process.exitCode = results.fail ? 1 : 0; }
 
-module.exports = { launch, makeBackend, openApp, sampleData, scan, setBatchMode, assert, finish, TEST_TOKEN, TEST_USER, MAX_TOKEN, MAX_USER };
+module.exports = { launch, makeBackend, openApp, sampleData, scan, setBatchMode, assert, finish, TEST_TOKEN, TEST_USER, MA2_TOKEN, MA2_USER };

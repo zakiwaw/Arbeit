@@ -13,18 +13,30 @@ let r = call('loadChanges', { sinceVersion: 0 });
 ok(r.status === 'error' && r.code === 'AUTH_REQUIRED', 'loadChanges ohne Token → AUTH_REQUIRED');
 r = call('quatsch', {});
 ok(r.status === 'error' && /Unbekannte Aktion/.test(r.message) && !r.code, 'Unbekannte Aktion bleibt erkennbar (Legacy-Erkennung der App)');
-// 2) Erster Aufruf legt Administrator an + Einladung
-r = call('authUsers');
-ok(r.status === 'success' && r.users.length === 0 && r.setupPending === true, 'authUsers: noch niemand mit PIN, setupPending');
-ok(mails.length === 1 && mails[0].to === 'bisbiss-92@hotmail.de' && /einladung=[0-9a-f]{64}/.test(mails[0].body), 'Admin-Einladung per Mail');
+// 2) Haupt-Administrator nur aus den Skript-Eigenschaften (2.10): fehlt eine, klarer Fehler und niemand wird angelegt
+r = call('authLogin', {});
+ok(r.status === 'error' && /BOOTSTRAP_ADMIN_NAME fehlt/.test(r.message) && mails.length === 0 && !usersSheet(), `Ohne Skript-Eigenschaften: klarer Fehler, kein Administrator angelegt (${r.message})`);
+props.BOOTSTRAP_ADMIN_NAME = 'Mitarbeiter 1';
+r = call('authLogin', {});
+ok(r.status === 'error' && /BOOTSTRAP_ADMIN_EMAIL fehlt/.test(r.message) && mails.length === 0 && !usersSheet(), `Nur Name gesetzt: klarer Fehler wegen der E-Mail (${r.message})`);
+props.BOOTSTRAP_ADMIN_EMAIL = '   ';
+r = call('authLogin', {});
+ok(r.status === 'error' && /BOOTSTRAP_ADMIN_EMAIL fehlt/.test(r.message) && mails.length === 0, 'Leere E-Mail-Eigenschaft: klarer Fehler');
+props.BOOTSTRAP_ADMIN_EMAIL = ' Admin@Example.com ';
+// Erster Aufruf der Anmeldeseite (authLogin ohne PIN = Vorabprüfung) legt den Administrator an + Einladung
+r = call('authLogin', {});
+ok(r.status === 'error' && r.code === 'SETUP_PENDING' && /Noch kein Mitarbeiter eingerichtet/.test(r.message), 'Vorabprüfung: noch niemand mit PIN → SETUP_PENDING');
+ok(mails.length === 1 && mails[0].to === 'admin@example.com' && /einladung=[0-9a-f]{64}/.test(mails[0].body) && /Hallo Mitarbeiter 1/.test(mails[0].body), 'Admin-Einladung per Mail (Name/Adresse aus den Skript-Eigenschaften)');
+ok(call('authLogin', {}).code === 'SETUP_PENDING' && mails.length === 1 && usersSheet().rows.length === 2, 'Zweite Vorabprüfung legt keinen weiteren Administrator an');
+ok(call('authLogin', { pin: '482913' }).code === 'SETUP_PENDING' && !props.AUTH_LOGIN_FAILED, 'Anmeldeversuch vor dem Einrichten: SETUP_PENDING, kein Fehlversuch');
 const inv = /einladung=([0-9a-f]+)/.exec(mails[0].body)[1];
-r = call('authInviteInfo', { invite: inv }); ok(r.valid === true && r.name === 'Zakaria Bisbiss' && r.isReset === false, 'authInviteInfo gültig');
+r = call('authInviteInfo', { invite: inv }); ok(r.valid === true && r.name === 'Mitarbeiter 1' && r.isReset === false, 'authInviteInfo gültig');
 r = call('authInviteInfo', { invite: 'x' }); ok(r.valid === false, 'authInviteInfo ungültig');
 r = call('authAccept', { invite: inv, pin: '123456' }); ok(r.code === 'PIN_WEAK', 'Schwache PIN abgelehnt');
 r = call('authAccept', { invite: inv, pin: '12345' }); ok(r.code === 'PIN_INVALID', '5-stellige PIN abgelehnt');
 r = call('authAccept', { invite: inv, pin: '482913', deviceId: 'dev1' });
-ok(r.status === 'success' && r.token && r.user.role === 'admin' && r.user.name === 'Zakaria Bisbiss', 'PIN gesetzt + angemeldet');
-const adminTok = r.token;
+ok(r.status === 'success' && r.token && r.user.role === 'admin' && r.user.name === 'Mitarbeiter 1', 'PIN gesetzt + angemeldet');
+const adminTok = r.token, uid = r.user.id;
 r = call('authAccept', { invite: inv, pin: '482913' }); ok(r.code === 'INVITE_INVALID', 'Einladung nur einmal nutzbar');
 // 3) Mit Token
 ok(call('loadChanges', { sinceVersion: 0 }, adminTok).status === 'success', 'loadChanges mit Token ok');
@@ -42,18 +54,25 @@ r = call('loadChanges', { sinceVersion: 0 }, adminTok);
 ok(r.status === 'success' && !r.changed.D1 && !r.changed.D2 && r.changed.D3, 'Komplettabruf: D1/D2 weg, D3 bleibt');
 ok(call('deleteShipments', { baseNumbers: [] }, adminTok).status === 'error', 'deleteShipments ohne Nummern → Fehler');
 ok(call('deleteShipment', { baseNumber: 'D3' }, adminTok).status === 'success' && !call('loadChanges', { sinceVersion: 0 }, adminTok).changed.D3, 'Einzel-Löschung wie bisher');
-// 4) Login
-r = call('authUsers'); ok(r.users.length === 1 && r.users[0].name === 'Zakaria Bisbiss' && !r.users[0].email, 'authUsers liefert nur id+Name');
-const uid = r.users[0].id;
-r = call('authLogin', { userId: uid, pin: '000000' }); ok(r.code === 'LOGIN_FAILED' && /noch 4/.test(r.message), 'Falsche PIN: ' + r.message);
-for (let i = 0; i < 4; i++) r = call('authLogin', { userId: uid, pin: '000000' });
-ok(r.code === 'LOCKED', 'Nach 5 Fehlversuchen gesperrt');
-ok(call('authLogin', { userId: uid, pin: '482913' }).code === 'LOCKED', 'Auch richtige PIN während der Sperre abgelehnt');
-usersSheet().rows[1][11] = String(Date.now() - 1000); delete cache['fracht_users'];   // Sperre ablaufen lassen
-r = call('authLogin', { userId: uid, pin: '482913', deviceId: 'dev2' }); ok(r.status === 'success' && r.token, 'Nach Ablauf der Sperre Anmeldung ok');
+// 4) Login nur mit PIN (2.10): Nutzer allein über den PIN-Hash, öffentliche Namensliste (authUsers) gibt es nicht mehr
+r = call('authUsers'); ok(r.status === 'error' && /Unbekannte Aktion empfangen: authUsers/.test(r.message) && !r.users, 'authUsers entfernt (Unbekannte Aktion, keine Namensliste)');
+r = call('authLogin', {}); ok(r.code === 'PIN_REQUIRED' && !r.token && !props.AUTH_LOGIN_FAILED, 'Vorabprüfung nach dem Einrichten: PIN_REQUIRED, kein Fehlversuch');
+r = call('authLogin', { pin: '12345' }); ok(r.code === 'LOGIN_FAILED' && /6 Ziffern/.test(r.message) && !props.AUTH_LOGIN_FAILED, '5-stellige PIN: Hinweis, kein Fehlversuch');
+r = call('authLogin', { pin: '000000' }); ok(r.code === 'LOGIN_FAILED' && /noch 4/.test(r.message), 'Falsche PIN: ' + r.message);
+r = call('authLogin', { pin: '000001' }); ok(r.code === 'LOGIN_FAILED' && /noch 3/.test(r.message), 'Zweiter Fehlversuch: ' + r.message);
+r = call('authLogin', { pin: '482913', deviceId: 'dev3' }); ok(r.status === 'success' && r.user.id === uid, 'Richtige PIN zwischendurch: angemeldet');
+ok(props.AUTH_LOGIN_FAILED === '0', 'Erfolgreiche Anmeldung setzt den Fehlversuchs-Zähler zurück');
+ok(call('authLogout', {}, r.token).status === 'success', 'Abmelden (dev3)');
+r = call('authLogin', { userId: uid, pin: '000000' }); ok(r.code === 'LOGIN_FAILED' && /noch 4/.test(r.message), 'Nach Erfolg wieder volle Versuche (eine mitgeschickte userId wird ignoriert): ' + r.message);
+for (let i = 0; i < 4; i++) r = call('authLogin', { pin: '000000' });
+ok(r.code === 'LOCKED' && /15 Minuten gesperrt/.test(r.message), 'Nach 5 Fehlversuchen ist die Anmeldung gesperrt');
+ok(Number(props.AUTH_LOGIN_LOCKED_UNTIL) > Date.now() && usersSheet().rows.every(row => !row[11] || row[11] === 'lockedUntil' || Number(row[11]) === 0), 'Sperre steht in den Skript-Eigenschaften, nicht beim Nutzer');
+ok(call('authLogin', { pin: '482913' }).code === 'LOCKED', 'Auch richtige PIN während der Sperre abgelehnt');
+props.AUTH_LOGIN_LOCKED_UNTIL = String(Date.now() - 1000);   // Sperre ablaufen lassen
+r = call('authLogin', { pin: '482913', deviceId: 'dev2' }); ok(r.status === 'success' && r.token && r.user.id === uid && r.user.name === 'Mitarbeiter 1' && r.user.role === 'admin', 'Nach Ablauf der Sperre: Anmeldung nur mit PIN, Nutzer über die PIN gefunden');
 const tok2 = r.token;
 ok(call('loadChanges', { sinceVersion: 0 }, adminTok).status === 'success', 'Sitzung des anderen Geräts bleibt parallel gültig');
-r = call('authLogin', { userId: uid, pin: '482913', deviceId: 'dev2' }); const tok2b = r.token;
+r = call('authLogin', { pin: '482913', deviceId: 'dev2' }); const tok2b = r.token;
 ok(call('loadChanges', { sinceVersion: 0 }, tok2).code === 'AUTH_REQUIRED' && call('loadChanges', { sinceVersion: 0 }, tok2b).status === 'success', 'Neue Anmeldung desselben Geräts ersetzt dessen alte Sitzung');
 // 5) Verlängern (authRefresh)
 const expBefore = tokenExp(tok2b);
@@ -71,32 +90,74 @@ ok(call('loadChanges', { sinceVersion: 0 }, tok2b).code === 'AUTH_REQUIRED' && c
 ok(call('authRefresh', {}, tokR).code === 'AUTH_REQUIRED', 'Abgemeldete Sitzung lässt sich nicht verlängern');
 ok(call('loadChanges', { sinceVersion: 0 }, adminTok).status === 'success', 'Andere Sitzung des Admins bleibt');
 // 6) Administrator: einladen
-r = call('adminInvite', { name: 'Max Muster', email: 'MAX@example.com' }, adminTok);
-ok(r.status === 'success' && r.users.length === 2 && r.invited.mailSent && !r.invited.link && mails.length === 2 && mails[1].to === 'max@example.com', 'adminInvite: Nutzer angelegt + Mail, kein Link in der Antwort');
-const invMax = /einladung=([0-9a-f]+)/.exec(mails[1].body)[1];
-r = call('authAccept', { invite: invMax, pin: '778812' }); ok(r.status === 'success' && r.user.role === 'user', 'Max setzt PIN');
-const tokMax = r.token, maxId = r.user.id;
-ok(call('adminInvite', { name: 'X', email: 'y@z.de' }, tokMax).code === 'FORBIDDEN', 'Normaler Nutzer darf nicht einladen');
-ok(call('adminListUsers', {}, tokMax).code === 'FORBIDDEN', 'Normaler Nutzer darf Liste nicht sehen');
-ok(call('saveLkwStatus', { 'MAN 1': true }, tokMax).status === 'success', 'Normaler Nutzer darf Daten schreiben');
+r = call('adminInvite', { name: 'Mitarbeiter 2', email: 'Mitarbeiter2@Example.com' }, adminTok);
+ok(r.status === 'success' && r.users.length === 2 && r.invited.mailSent && !r.invited.link && mails.length === 2 && mails[1].to === 'mitarbeiter2@example.com', 'adminInvite: Nutzer angelegt + Mail, kein Link in der Antwort');
+const invMa2 = /einladung=([0-9a-f]+)/.exec(mails[1].body)[1];
+r = call('authAccept', { invite: invMa2, pin: '778812' }); ok(r.status === 'success' && r.user.role === 'user', 'Mitarbeiter 2 setzt PIN');
+const tokMa2 = r.token, ma2Id = r.user.id;
+ok(call('adminInvite', { name: 'X', email: 'y@example.com' }, tokMa2).code === 'FORBIDDEN', 'Normaler Nutzer darf nicht einladen');
+ok(call('adminListUsers', {}, tokMa2).code === 'FORBIDDEN', 'Normaler Nutzer darf Liste nicht sehen');
+ok(call('saveLkwStatus', { 'MAN 1': true }, tokMa2).status === 'success', 'Normaler Nutzer darf Daten schreiben');
 // 7) Sperren / Freigeben
-ok(call('adminSetActive', { userId: maxId, active: false }, adminTok).status === 'success', 'Max gesperrt');
-ok(call('loadChanges', { sinceVersion: 0 }, tokMax).code === 'AUTH_REQUIRED', 'Gesperrter Nutzer sofort ausgesperrt');
-ok(call('authUsers').users.length === 1, 'Gesperrter Nutzer nicht in der Namensliste');
-ok(call('authLogin', { userId: maxId, pin: '778812' }).code === 'LOGIN_FAILED', 'Gesperrter Nutzer kann sich nicht anmelden');
-ok(call('adminSetActive', { userId: maxId, active: true }, adminTok).status === 'success', 'Max freigegeben');
-r = call('authLogin', { userId: maxId, pin: '778812' }); ok(r.status === 'success', 'Nach Freigabe Anmeldung ok (alte PIN)');
-const tokMax2 = r.token;
+ok(call('adminSetActive', { userId: ma2Id, active: false }, adminTok).status === 'success', 'Mitarbeiter 2 gesperrt');
+ok(call('loadChanges', { sinceVersion: 0 }, tokMa2).code === 'AUTH_REQUIRED', 'Gesperrter Nutzer sofort ausgesperrt');
+ok(call('authLogin', { pin: '778812' }).code === 'LOGIN_FAILED', 'Gesperrter Nutzer kann sich nicht anmelden');
+ok(call('adminSetActive', { userId: ma2Id, active: true }, adminTok).status === 'success', 'Mitarbeiter 2 freigegeben');
+r = call('authLogin', { pin: '778812' }); ok(r.status === 'success' && r.user.id === ma2Id, 'Nach Freigabe Anmeldung ok (alte PIN)');
+const tokMa2b = r.token;
 // 8) PIN-Reset (Mail schlägt fehl → Link zum Weitergeben)
 env.mailFail = true;
-r = call('adminResetPin', { userId: maxId }, adminTok); ok(r.status === 'success' && r.invited.mailSent === false && /einladung=/.test(r.invited.link), 'Reset ohne Mail liefert Link zum Weitergeben');
+r = call('adminResetPin', { userId: ma2Id }, adminTok); ok(r.status === 'success' && r.invited.mailSent === false && /einladung=/.test(r.invited.link), 'Reset ohne Mail liefert Link zum Weitergeben');
 env.mailFail = false;
-ok(call('loadChanges', { sinceVersion: 0 }, tokMax2).status === 'success', 'Alte PIN/Sitzung gilt bis zum Setzen der neuen');
+ok(call('loadChanges', { sinceVersion: 0 }, tokMa2b).status === 'success', 'Alte PIN/Sitzung gilt bis zum Setzen der neuen');
 const invR = /einladung=([0-9a-f]+)/.exec(r.invited.link)[1];
 ok(call('authInviteInfo', { invite: invR }).isReset === true, 'Reset-Einladung erkannt');
+r = call('authAccept', { invite: invR, pin: '482913' }); ok(r.code === 'PIN_TAKEN' && /schon vergeben/.test(r.message) && !r.token, 'PIN-Reset: PIN eines anderen Mitarbeiters abgelehnt (PIN_TAKEN)');
+ok(call('authInviteInfo', { invite: invR }).valid === true, 'Reset-Einladung bleibt nach der Ablehnung gültig');
 ok(call('authAccept', { invite: invR, pin: '901276' }).status === 'success', 'Neue PIN gesetzt');
-ok(call('loadChanges', { sinceVersion: 0 }, tokMax2).code === 'AUTH_REQUIRED', 'Nach PIN-Reset alte Sitzung ungültig');
+ok(call('loadChanges', { sinceVersion: 0 }, tokMa2b).code === 'AUTH_REQUIRED', 'Nach PIN-Reset alte Sitzung ungültig');
 ok(call('adminSetActive', { userId: uid, active: false }, adminTok).code === 'INVALID', 'Selbst-Sperren abgelehnt');
+// 8b) Einladung mit schon vergebener PIN (2.10): abgelehnt, zählt als Fehlversuch des Eingeladenen; eigene alte PIN beim Reset erlaubt
+r = call('adminInvite', { name: 'Mitarbeiter 3', email: 'mitarbeiter3@example.com' }, adminTok);
+const inv3 = /einladung=([0-9a-f]+)/.exec(mails[mails.length - 1].body)[1], ma3Id = r.invited.id;
+r = call('authAccept', { invite: inv3, pin: '901276' }); ok(r.code === 'PIN_TAKEN', 'Einladung: vergebene PIN (von Mitarbeiter 2) abgelehnt (PIN_TAKEN)');
+for (let i = 0; i < 3; i++) r = call('authAccept', { invite: inv3, pin: i % 2 ? '482913' : '901276' });
+ok(r.code === 'PIN_TAKEN', 'Weitere vergebene PINs abgelehnt (4 Versuche)');
+r = call('authAccept', { invite: inv3, pin: '482913' }); ok(r.code === 'LOCKED', 'Nach 5 vergebenen PINs: Einladung 15 Minuten gesperrt (keine fremden PINs ausprobierbar)');
+ok(call('authAccept', { invite: inv3, pin: '135792' }).code === 'LOCKED', 'Während der Sperre auch eine freie PIN abgelehnt');
+{ const row = usersSheet().rows.find(x => x[0] === ma3Id); row[11] = String(Date.now() - 1000); delete cache['fracht_users']; }   // Sperre ablaufen lassen
+r = call('authAccept', { invite: inv3, pin: '135792', deviceId: 'dev-ma3' }); ok(r.status === 'success' && r.user.id === ma3Id, 'Nach Ablauf der Sperre: freie PIN gesetzt + angemeldet');
+const tokMa3 = r.token;
+r = call('adminResetPin', { userId: ma3Id }, adminTok);
+const invR3 = /einladung=([0-9a-f]+)/.exec(mails[mails.length - 1].body)[1];
+ok(call('authAccept', { invite: invR3, pin: '135792' }).status === 'success', 'PIN-Reset: die eigene bisherige PIN ist erlaubt (keine Kollision mit sich selbst)');
+ok(call('loadChanges', { sinceVersion: 0 }, tokMa3).code === 'AUTH_REQUIRED', 'Nach dem Reset alte Sitzung ungültig (wie bisher)');
+// 8c) PIN passt zu mehreren aktiven Nutzern (z. B. Altbestand vor 2.10): Anmeldung schlägt fehl, keine Sitzung, kein Fehlversuch
+{
+  const rows = usersSheet().rows, ma3Row = rows.find(x => x[0] === ma3Id), admRow = rows.find(x => x[0] === uid);
+  ma3Row[4] = admRow[4]; ma3Row[5] = admRow[5]; delete cache['fracht_users'];   // gleicher Hash + Salt wie der Administrator = gleiche PIN
+  const sessBefore = JSON.stringify([admRow[14], ma3Row[14]]), failedBefore = props.AUTH_LOGIN_FAILED;
+  r = call('authLogin', { pin: '482913', deviceId: 'dev-x' });
+  ok(r.status === 'error' && r.code === 'PIN_AMBIGUOUS' && /PIN nicht eindeutig/.test(r.message) && /Administrator/.test(r.message) && !r.token, `Doppelte PIN: Anmeldung abgelehnt mit klarer Meldung (${r.message})`);
+  ok(JSON.stringify([admRow[14], ma3Row[14]]) === sessBefore && props.AUTH_LOGIN_FAILED === failedBefore, 'Doppelte PIN: keine Sitzung angelegt, kein Fehlversuch gezählt');
+  ok(call('adminSetActive', { userId: ma3Id, active: false }, adminTok).status === 'success', 'Administrator sperrt einen der beiden');
+  r = call('authLogin', { pin: '482913', deviceId: 'dev-x' }); ok(r.status === 'success' && r.user.id === uid, 'Nur aktive Nutzer zählen: danach Anmeldung des Administrators wieder eindeutig');
+  ok(call('authLogout', {}, r.token).status === 'success', 'Abmelden (dev-x)');
+}
+// 8d) Haupt-Administrator bleibt geschützt; fehlt die Eigenschaft später, klarer Fehler statt stiller Annahme
+ok(call('adminSetActive', { userId: uid, active: false }, adminTok).code === 'INVALID', 'Haupt-Administrator (aus der Eigenschaft) nicht deaktivierbar');
+delete props.BOOTSTRAP_ADMIN_EMAIL;
+r = call('loadChanges', { sinceVersion: 0 }, adminTok); ok(r.status === 'error' && /BOOTSTRAP_ADMIN_EMAIL fehlt/.test(r.message), `Eigenschaft entfernt: klarer Fehler bei jedem Zugriff (${r.message})`);
+props.BOOTSTRAP_ADMIN_EMAIL = 'admin@example.com';
+ok(call('loadChanges', { sinceVersion: 0 }, adminTok).status === 'success', 'Eigenschaft wieder gesetzt: alles wie vorher');
+// 8e) Kundennummer → Spediteur aus dem Blatt kundennr_carrier (2.10)
+ok(call('loadCarrierMap', {}).code === 'AUTH_REQUIRED', 'loadCarrierMap ohne Token → AUTH_REQUIRED');
+r = call('loadCarrierMap', {}, adminTok);
+ok(r.status === 'success' && JSON.stringify(r.map) === '{}' && sheets.kundennr_carrier && JSON.stringify(sheets.kundennr_carrier.rows) === '[["Kundennr","Spediteur"]]', 'Blatt fehlt: wird mit Überschriften angelegt, Zuordnung leer');
+sheets.kundennr_carrier.rows.push([111, 'Spediteur A'], ['  222001 ', ' Spediteur B '], ['', 'ohne Nummer'], ['333', ''], ['444', 'Spediteur A']);
+r = call('loadCarrierMap', {}, call('authLogin', { pin: '901276', deviceId: 'dev-ma2c' }).token);
+ok(r.status === 'success' && JSON.stringify(r.map) === JSON.stringify({ 111: 'Spediteur A', 222001: 'Spediteur B', 444: 'Spediteur A' }), `Zuordnung aus dem Sheet (Zahl/Text, getrimmt, leere Zeilen übersprungen) – auch für normale Mitarbeiter (${JSON.stringify(r.map)})`);
+ok(Object.keys(r.map).every(k => typeof k === 'string') && r.map['111'] === 'Spediteur A', 'Kundennummern als Text-Schlüssel');
 // 9) Abgelaufenes, korrekt signiertes Token
 const d = JSON.parse(Buffer.from(adminTok.split('.')[0], 'base64url').toString()); d.e = Date.now() - 1;
 const nb = Buffer.from(JSON.stringify(d)).toString('base64url'); const sig = crypto.createHmac('sha256', props.AUTH_SECRET).update(nb).digest('hex');
@@ -287,26 +348,26 @@ props.SPREADSHEET_ID = 'test-tabelle';
 {
   const item = (raw, status, t, extra) => Object.assign({ id: raw + '|' + t, rawInput: raw, status, timestamp: t, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null }, extra || {});
   const S = (items, extra) => Object.assign({ hawb: 'V1', totalPiecesExpected: 3, lastModified: '2026-11-10T08:00:00.000Z', scannedItems: items }, extra || {});
-  // Zweiter Mitarbeiter mit eigener Sitzung (Max) – für „wer hat zuletzt geändert“
-  r = call('adminInvite', { name: 'Max Muster', email: 'max@example.com' }, adminTok);
-  const invMax = /einladung=([0-9a-f]+)/.exec(mails[mails.length - 1].body)[1];
-  const maxTok = call('authAccept', { invite: invMax, pin: '778812', deviceId: 'dev-max' }).token;
-  ok(!!maxTok, '2.9: zweiter Mitarbeiter (Max Muster) angemeldet');
+  // Zweiter Mitarbeiter mit eigener Sitzung (Mitarbeiter 2) – für „wer hat zuletzt geändert“
+  r = call('adminInvite', { name: 'Mitarbeiter 2', email: 'mitarbeiter2@example.com' }, adminTok);
+  const invMa2 = /einladung=([0-9a-f]+)/.exec(mails[mails.length - 1].body)[1];
+  const ma2Tok = call('authAccept', { invite: invMa2, pin: '778812', deviceId: 'dev-ma2' }).token;
+  ok(!!ma2Tok, '2.9: zweiter Mitarbeiter (Mitarbeiter 2) angemeldet');
 
   // a) Neu anlegen → version 1, lastModifiedBy aus der Sitzung (nicht aus dem Payload), Spalte F, Protokoll „new“
   r = call('saveShipments', { shipments: { V1: S([]) }, bases: {}, versions: { V1: 0 }, modifiedBy: 'Falscher Name' }, adminTok);
   let m = r.merged.V1;
-  ok(r.status === 'success' && m.version === 1 && m.lastModifiedBy === 'Zakaria Bisbiss' && r.conflicts.length === 0, `Neu: version 1, lastModifiedBy aus der Sitzung (${m.version}, ${m.lastModifiedBy})`);
-  ok(m.changes.length === 1 && m.changes[0].k === 'new' && m.changes[0].u === 'Zakaria Bisbiss' && m.changes[0].from === '' && /^Offen · WE 0\/3 · Sich\. 0\/3$/.test(m.changes[0].to), `Protokoll „new“: ${JSON.stringify(m.changes[0])}`);
+  ok(r.status === 'success' && m.version === 1 && m.lastModifiedBy === 'Mitarbeiter 1' && r.conflicts.length === 0, `Neu: version 1, lastModifiedBy aus der Sitzung (${m.version}, ${m.lastModifiedBy})`);
+  ok(m.changes.length === 1 && m.changes[0].k === 'new' && m.changes[0].u === 'Mitarbeiter 1' && m.changes[0].from === '' && /^Offen · WE 0\/3 · Sich\. 0\/3$/.test(m.changes[0].to), `Protokoll „new“: ${JSON.stringify(m.changes[0])}`);
   let rows = shipmentRows();
-  ok(rows.V1.modifiedBy === 'Zakaria Bisbiss' && rows.V1.shipment.version === 1, 'Spalte F = Name, JSON trägt version 1');
+  ok(rows.V1.modifiedBy === 'Mitarbeiter 1' && rows.V1.shipment.version === 1, 'Spalte F = Name, JSON trägt version 1');
 
-  // b) Version passt → 1:1 übernommen, version 2, Max als lastModifiedBy, Status-Protokoll
+  // b) Version passt → 1:1 übernommen, version 2, Mitarbeiter 2 als lastModifiedBy, Status-Protokoll
   const v1 = JSON.parse(JSON.stringify(m));
   const scanA = S([item('HU-A', 'XRY', '2026-11-10T08:01:00.000Z')], { version: 1 });
-  r = call('saveShipments', { shipments: { V1: scanA }, bases: { V1: v1 }, versions: { V1: 1 } }, maxTok);
+  r = call('saveShipments', { shipments: { V1: scanA }, bases: { V1: v1 }, versions: { V1: 1 } }, ma2Tok);
   m = r.merged.V1;
-  ok(m.version === 2 && m.lastModifiedBy === 'Max Muster' && m.scannedItems.length === 1 && r.conflicts.length === 0, `Version passt: 1:1 übernommen, version 2 von Max (${m.version}, ${m.lastModifiedBy})`);
+  ok(m.version === 2 && m.lastModifiedBy === 'Mitarbeiter 2' && m.scannedItems.length === 1 && r.conflicts.length === 0, `Version passt: 1:1 übernommen, version 2 von Mitarbeiter 2 (${m.version}, ${m.lastModifiedBy})`);
   ok(m.changes.length === 2 && m.changes[1].k === 'save' && m.changes[1].from.startsWith('Offen · WE 0/3 · Sich. 0/3') && m.changes[1].to === 'Offen · WE 0/3 · Sich. 1/3', `Protokoll: alter → neuer Status (${m.changes[1].from} → ${m.changes[1].to})`);
   const v2 = JSON.parse(JSON.stringify(m));
 
@@ -325,22 +386,22 @@ props.SPREADSHEET_ID = 'test-tabelle';
 
   // e) Echter Konflikt: beide ändern dieselbe HU verschieden (Gerät geht von Version 3 aus, Server ist inzwischen bei 4)
   const edit1 = JSON.parse(JSON.stringify(v3)); edit1.scannedItems[0].status = 'ETD';
-  r = call('saveShipments', { shipments: { V1: edit1 }, bases: { V1: v3 }, versions: { V1: 3 } }, maxTok);
-  ok(r.merged.V1.version === 4 && r.conflicts.length === 0, 'Max ändert HU-A auf ETD (version 4)');
+  r = call('saveShipments', { shipments: { V1: edit1 }, bases: { V1: v3 }, versions: { V1: 3 } }, ma2Tok);
+  ok(r.merged.V1.version === 4 && r.conflicts.length === 0, 'Mitarbeiter 2 ändert HU-A auf ETD (version 4)');
   const v4 = JSON.parse(JSON.stringify(r.merged.V1));
   const edit2 = JSON.parse(JSON.stringify(v3)); edit2.scannedItems[0].status = 'PHS'; edit2.totalPiecesExpected = 4;
   r = call('saveShipments', { shipments: { V1: edit2 }, bases: { V1: v3 }, versions: { V1: 3 } }, adminTok);
   m = r.merged.V1;
   const c = r.conflicts[0];
-  ok(r.conflicts.length === 1 && c.base === 'V1' && c.serverVersion === 4 && c.clientVersion === 3 && c.newVersion === 5 && c.serverBy === 'Max Muster', `Konflikt gemeldet: ${JSON.stringify(c)}`);
+  ok(r.conflicts.length === 1 && c.base === 'V1' && c.serverVersion === 4 && c.clientVersion === 3 && c.newVersion === 5 && c.serverBy === 'Mitarbeiter 2', `Konflikt gemeldet: ${JSON.stringify(c)}`);
   ok(m.version === 5 && m.totalPiecesExpected === 4 && m.scannedItems.find(i => i.rawInput === 'HU-A').status === 'PHS', 'Feldweise zusammengeführt: Stückzahl 4 (nur wir geändert) + HU-A PHS (umkämpft, eingehender Stand gilt)');
-  ok(c.overridden.length === 1 && c.overridden[0].what === 'HU HU-A Status' && c.overridden[0].theirs === 'ETD' && c.overridden[0].now === 'PHS' && c.lost.length === 0, `Konfliktdetail: Änderung von Max (ETD) überschrieben, jetzt PHS (${JSON.stringify(c.overridden)})`);
+  ok(c.overridden.length === 1 && c.overridden[0].what === 'HU HU-A Status' && c.overridden[0].theirs === 'ETD' && c.overridden[0].now === 'PHS' && c.lost.length === 0, `Konfliktdetail: Änderung von Mitarbeiter 2 (ETD) überschrieben, jetzt PHS (${JSON.stringify(c.overridden)})`);
   const last = m.changes[m.changes.length - 1];
-  ok(last.k === 'conflict' && last.by === 'Max Muster' && last.u === 'Zakaria Bisbiss' && last.n === 1, `Protokoll „conflict“: ${JSON.stringify(last)}`);
+  ok(last.k === 'conflict' && last.by === 'Mitarbeiter 2' && last.u === 'Mitarbeiter 1' && last.n === 1, `Protokoll „conflict“: ${JSON.stringify(last)}`);
 
   // f) Eigene Eingabe unterliegt (2-Wege ohne Ausgangsstand, älterer Kopfstand): Konflikt mit „lost“, Serverstand gilt
   const stale = S([item('HU-A', 'XRY', '2026-11-10T08:01:00.000Z')], { totalPiecesExpected: 9, lastModified: '2026-11-10T07:00:00.000Z' });
-  r = call('saveShipments', { shipments: { V1: stale }, bases: {}, versions: { V1: 0 } }, maxTok);
+  r = call('saveShipments', { shipments: { V1: stale }, bases: {}, versions: { V1: 0 } }, ma2Tok);
   m = r.merged.V1;
   ok(m.totalPiecesExpected === 4 && r.conflicts.length === 1 && r.conflicts[0].lost.some(l => l.what === 'Stückzahl' && l.mine === '9' && l.now === '4'), `Unterlegene Eingabe wird gemeldet (lost): ${JSON.stringify(r.conflicts[0] && r.conflicts[0].lost)}`);
 
@@ -357,8 +418,8 @@ props.SPREADSHEET_ID = 'test-tabelle';
   r = call('loadChanges', { sinceVersion: 0 }, adminTok);
   ok(r.changed.ALT1 && r.changed.ALT1.version === 1 && r.changed.ALT1.lastModifiedBy === '' && Array.isArray(r.changed.ALT1.changes), 'Alte Sendung ohne Version: loadChanges liefert version 1, lastModifiedBy leer');
   const altNew = Object.assign({}, r.changed.ALT1, { scannedItems: [item('ALT1', 'XRY', '2026-11-10T09:00:00.000Z')] });
-  r = call('saveShipments', { shipments: { ALT1: altNew }, bases: { ALT1: r.changed.ALT1 }, versions: { ALT1: 1 } }, maxTok);
-  ok(r.merged.ALT1.version === 2 && r.merged.ALT1.lastModifiedBy === 'Max Muster' && r.conflicts.length === 0 && shipmentRows().ALT1.modifiedBy === 'Max Muster', 'Alte Sendung gespeichert: version 2, Name gesetzt (JSON + Spalte F)');
+  r = call('saveShipments', { shipments: { ALT1: altNew }, bases: { ALT1: r.changed.ALT1 }, versions: { ALT1: 1 } }, ma2Tok);
+  ok(r.merged.ALT1.version === 2 && r.merged.ALT1.lastModifiedBy === 'Mitarbeiter 2' && r.conflicts.length === 0 && shipmentRows().ALT1.modifiedBy === 'Mitarbeiter 2', 'Alte Sendung gespeichert: version 2, Name gesetzt (JSON + Spalte F)');
 
   // i) Spaltenregel: alte große Zeile (bis 2.8) mit JSON-Fortsetzung in F/G – F darf nicht als Name gelten, nichts fällt weg
   const bigItems = []; for (let i = 0; i < 400; i++) bigItems.push(item('GROSS-' + i, 'Anstehend', '2026-10-01T10:00:00.000Z', { packaging: 'Palette ' + 'x'.repeat(80) }));
@@ -373,16 +434,16 @@ props.SPREADSHEET_ID = 'test-tabelle';
   const grossSaved = Object.assign({}, r.changed.GROSS); grossSaved.scannedItems = grossSaved.scannedItems.map((it, i) => i === 0 ? Object.assign({}, it, { status: 'XRY' }) : it);
   r = call('saveShipments', { shipments: { GROSS: grossSaved }, bases: { GROSS: r.changed.GROSS }, versions: { GROSS: 1 } }, adminTok);
   const grossRow = sheets.shipments.rows.find(x => x[0] === 'GROSS');
-  ok(r.merged.GROSS.version === 2 && grossRow[5] === 'Zakaria Bisbiss' && String(grossRow[6]).length === 45000 && String(grossRow[1]).length === 45000, `Große Zeile neu geschrieben: F = Name, Fortsetzung ab G (${grossRow[5]}, G ${String(grossRow[6]).length} Zeichen)`);
+  ok(r.merged.GROSS.version === 2 && grossRow[5] === 'Mitarbeiter 1' && String(grossRow[6]).length === 45000 && String(grossRow[1]).length === 45000, `Große Zeile neu geschrieben: F = Name, Fortsetzung ab G (${grossRow[5]}, G ${String(grossRow[6]).length} Zeichen)`);
   r = call('loadChanges', { sinceVersion: 0 }, adminTok);
-  ok(r.changed.GROSS.scannedItems.length === 400 && r.changed.GROSS.scannedItems[0].status === 'XRY' && r.changed.GROSS.version === 2 && r.changed.GROSS.lastModifiedBy === 'Zakaria Bisbiss', 'Große Zeile in neuer Aufteilung vollständig gelesen');
+  ok(r.changed.GROSS.scannedItems.length === 400 && r.changed.GROSS.scannedItems[0].status === 'XRY' && r.changed.GROSS.version === 2 && r.changed.GROSS.lastModifiedBy === 'Mitarbeiter 1', 'Große Zeile in neuer Aufteilung vollständig gelesen');
 
   // j) Reihenfolge (order) wird eingehalten; Löschvermerk trägt den Namen in Spalte F
-  r = call('saveShipments', { shipments: { O2: S([], { hawb: 'O2' }), O1: S([], { hawb: 'O1' }) }, bases: {}, versions: { O1: 0, O2: 0 }, order: ['O1', 'O2'] }, maxTok);
+  r = call('saveShipments', { shipments: { O2: S([], { hawb: 'O2' }), O1: S([], { hawb: 'O1' }) }, bases: {}, versions: { O1: 0, O2: 0 }, order: ['O1', 'O2'] }, ma2Tok);
   rows = shipmentRows();
   ok(rows.O1.version < rows.O2.version, `order: O1 vor O2 geschrieben (Zeilen-Versionen ${rows.O1.version} < ${rows.O2.version})`);
-  r = call('deleteShipments', { baseNumbers: ['O1', 'O2'] }, maxTok);
-  ok(shipmentRows().O1.modifiedBy === 'Max Muster' && shipmentRows().O1.flag === true, 'Löschvermerk: Name in Spalte F');
+  r = call('deleteShipments', { baseNumbers: ['O1', 'O2'] }, ma2Tok);
+  ok(shipmentRows().O1.modifiedBy === 'Mitarbeiter 2' && shipmentRows().O1.flag === true, 'Löschvermerk: Name in Spalte F');
   // k) Status-Kurzform: Dunkelalarm offen/erledigt, HU-Auftrag fertig
   ok(api.shipmentStatusLabel_(S([item('X', 'Dunkelalarm', '2026-11-10T08:00:00.000Z')])) === 'Dunkelalarm · WE 0/3 · Sich. 0/3', 'Status: offener Dunkelalarm');
   ok(api.shipmentStatusLabel_(S([item('X', 'Dunkelalarm', '2026-11-10T08:00:00.000Z'), item('X', 'ETD', '2026-11-10T08:01:00.000Z')])) === 'Offen · WE 0/3 · Sich. 1/3', 'Status: Dunkelalarm durch spätere Sicherung erledigt');

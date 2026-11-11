@@ -11,7 +11,7 @@
 //    Abruf/„online“) arbeitet also unverändert.
 //
 // APP_VERSION hier und in js/01-start.js müssen gleich sein (tests/versioncheck.js prüft das). Registriert wird er in index.html.
-const APP_VERSION = '9.6';
+const APP_VERSION = '9.7';
 const CACHE_PREFIX = 'fracht-tracker-';
 const CACHE_NAME = CACHE_PREFIX + APP_VERSION;
 const NETWORK_TIMEOUT_MS = 6000;                 // „verbunden, aber kein Internet“ darf den Start nicht endlos blockieren
