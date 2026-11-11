@@ -105,7 +105,7 @@ function makeBackend(initial, lkwStatus, opts = {}) {
         const matches = ready.filter(x => x.pin === p.pin);
         if (matches.length > 1) resp = { status: 'error', code: 'PIN_AMBIGUOUS', message: 'PIN nicht eindeutig – Anmeldung nicht möglich. Der Administrator muss für einen der Mitarbeiter die PIN ändern (PIN zurücksetzen).' };
         else if (matches.length === 1) { const u = matches[0]; const t = 'tok-' + Math.random().toString(36).slice(2); state.tokens[t] = u.id; state.failed = 0; resp = { status: 'success', token: t, expires: Date.now() + 3600e3, user: pub(u) }; }
-        else { state.failed++; resp = state.failed >= 5 ? { status: 'error', code: 'LOCKED', message: 'Zu viele Fehlversuche – Anmeldung für 15 Minuten gesperrt.' } : { status: 'error', code: 'LOGIN_FAILED', message: `PIN falsch – noch ${5 - state.failed} Versuch(e).` }; }
+        else { state.failed++; resp = state.failed >= 5 ? { status: 'error', code: 'LOCKED', message: 'Zu viele Fehlversuche – Zugang für 15 Minuten gesperrt.' } : { status: 'error', code: 'LOGIN_FAILED', message: `PIN falsch – noch ${5 - state.failed} Versuch(e).` }; }
       }
     }
     else if (action === 'authInviteInfo') { const uid = state.invites[(body.payload || {}).invite]; const u = uid && state.users.find(x => x.id === uid); resp = u ? { status: 'success', valid: true, name: u.name, isReset: u.hasPin } : { status: 'success', valid: false }; }

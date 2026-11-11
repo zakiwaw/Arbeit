@@ -43,7 +43,7 @@ Server-Skript 2.10“). So sieht man auf jedem Gerät sofort, ob noch eine alte 
 
 App 9.7 / Code.gs 2.10 entfernen persönliche Daten aus dem Repo: Anmeldung nur noch mit PIN (keine Namensliste), Haupt-Administrator
 nur in den Skript-Eigenschaften `BOOTSTRAP_ADMIN_NAME` / `BOOTSTRAP_ADMIN_EMAIL`, Zuordnung Kundennummer → Spediteur im Blatt
-`kundennr_carrier` statt im Code. **Code.gs 2.10 bereitstellen und beide Skript-Eigenschaften setzen, bevor App 9.7 live geht.**
+`kundennr_carrier` statt im Frontend (beim ersten Abruf einmalig mit allen 94 Einträgen gefüllt, Stand 16.10.2025). **Code.gs 2.10 bereitstellen und beide Skript-Eigenschaften setzen, bevor App 9.7 live geht.**
 
 ## Offline
 

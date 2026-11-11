@@ -39,6 +39,8 @@ if (fs.existsSync(path.join(root, 'sw.js'))) {
   ok(false, 'sw.js fehlt (Service Worker – App offline startbar)');
 }
 ok(!/AKfycb[\w-]{20,}/.test(read('README.md')), 'README.md enthält keine Web-App-URL/Token');
+const readme = read('README.md');
+ok(readme.includes(`„Version ${appVersion} · Stand`) && readme.includes(`Server-Skript ${backendVersion}“`) && readme.includes(`App ${appVersion} / Code.gs ${backendVersion}`), `README.md nennt App ${appVersion} / Code.gs ${backendVersion}`);
 // Zielstand dieser Auslieferung (11.11.2026): App 9.7 / Code.gs 2.10 – persönliche Daten aus dem Repo entfernt, Anmeldung nur mit PIN.
 ok(appVersion === '9.7' && backendVersion === '2.10', `Auslieferung: App ${appVersion} ↔ Code.gs ${backendVersion} (erwartet 9.7 / 2.10)`);
 console.log(fails ? `SOME FAILED (${fails} von ${oks + fails})` : `ALL GOOD (${oks})`); process.exit(fails ? 1 : 0);

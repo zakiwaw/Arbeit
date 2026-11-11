@@ -9,7 +9,8 @@ Zusammengehörige Versionen: **App 9.7 ↔ Code.gs 2.10** (die App zeigt beides 
 Daten aus dem Code: Der Haupt-Administrator steht nur noch in den Skript-Eigenschaften **`BOOTSTRAP_ADMIN_NAME`** und
 **`BOOTSTRAP_ADMIN_EMAIL`** (fehlt eine, meldet der Code einen klaren Fehler – wie bei `SPREADSHEET_ID`). Die Zuordnung
 Kundennummer → Spediteur für den VVL-Import liegt im Blatt **`kundennr_carrier`** (Spalten Kundennr | Spediteur, Zeile 1 =
-Überschriften; wird beim ersten Abruf leer angelegt) und kommt per `loadCarrierMap` in die App. Anmeldung nur noch mit PIN
+Überschriften; wird beim ersten Abruf angelegt und einmalig mit allen 94 Einträgen der bisherigen App-Liste gefüllt –
+Kundennummerliste VW.xlsx, Stand 16.10.2025; danach wird es nur noch im Sheet gepflegt) und kommt per `loadCarrierMap` in die App. Anmeldung nur noch mit PIN
 (siehe Version 2.2 unten). **Code.gs 2.10 muss bereitgestellt und die beiden Skript-Eigenschaften gesetzt sein, bevor App 9.7
 live geht** – App 9.7 schickt keine Nutzer-ID mehr, ein Skript 2.9 lehnt die Anmeldung ab. Der Mehrgeräte-Sync (Sendungs-
 Versionen, Konfliktprüfung, seit App 9.3 / Code.gs 2.9) ist unverändert
@@ -169,8 +170,8 @@ App zeigt die Anmeldeseite. Öffentlich bleiben nur die Anmelde-Aktionen selbst.
 
 | Aktion | Wer | Zweck |
 |---|---|---|
-| `authLogin` `{ pin, deviceId }` | alle | Nur die 6-stellige PIN → Sitzungs-Token (2.10: keine Namensauswahl, der Server findet den Nutzer über den PIN-Hash). Passt die PIN zu mehreren aktiven Nutzern: Fehler `PIN_AMBIGUOUS`, keine Sitzung – der Administrator muss eine der PINs zurücksetzen. 5 Fehlversuche → Anmeldung 15 Minuten gesperrt (Zähler für die ganze Anmeldung, weil eine falsche PIN keinem Nutzer gehört; eine erfolgreiche Anmeldung setzt ihn zurück). Ohne PIN = Vorabprüfung der Anmeldeseite: legt beim allerersten Aufruf den Haupt-Administrator an und schickt ihm die Einladung; Antwort `SETUP_PENDING` (noch niemand mit PIN) bzw. `PIN_REQUIRED` (bereit). |
-| `authInviteInfo` `{ invite }` / `authAccept` `{ invite, pin }` | alle | Einladungslink prüfen bzw. einlösen: Mitarbeiter wählt seine PIN selbst und ist danach angemeldet. Link 48 h gültig, einmalig. Eine PIN, die schon ein anderer Mitarbeiter hat, wird abgelehnt (`PIN_TAKEN`, zählt als Fehlversuch des Eingeladenen – nach 5 Versuchen 15 Minuten gesperrt). |
+| `authLogin` `{ pin, deviceId }` | alle | Nur die 6-stellige PIN → Sitzungs-Token (2.10: keine Namensauswahl, der Server findet den Nutzer über den PIN-Hash). Passt die PIN zu mehreren aktiven Nutzern: Fehler `PIN_AMBIGUOUS`, keine Sitzung – der Administrator muss eine der PINs zurücksetzen. 5 Fehlversuche → 15 Minuten gesperrt (wie bisher in den Spalten failed/lockedUntil; eine falsche PIN gehört zu keinem Nutzer und zählt deshalb bei allen anmeldbaren Nutzern, eine erfolgreiche Anmeldung setzt den Zähler zurück). Ohne PIN = Vorabprüfung der Anmeldeseite: legt beim allerersten Aufruf den Haupt-Administrator an und schickt ihm die Einladung; Antwort `SETUP_PENDING` (noch niemand mit PIN) bzw. `PIN_REQUIRED` (bereit). |
+| `authInviteInfo` `{ invite }` / `authAccept` `{ invite, pin }` | alle | Einladungslink prüfen bzw. einlösen: Mitarbeiter wählt seine PIN selbst und ist danach angemeldet. Link 48 h gültig, einmalig. Eine PIN, die schon ein anderer Mitarbeiter hat, wird abgelehnt (`PIN_TAKEN`; die eigene bisherige PIN beim Reset ist erlaubt). |
 | `authCheck`, `authRefresh`, `authLogout` | angemeldet | Sitzung prüfen / verlängern / beenden. |
 | `adminListUsers`, `adminInvite` `{ name, email }`, `adminSetActive` `{ userId, active }`, `adminResetPin` `{ userId }` | Administrator | Mitarbeiter verwalten: einladen (E-Mail mit Link), sperren/freigeben, PIN zurücksetzen (= neue Einladung; die alte PIN gilt, bis die neue gesetzt ist). |
 

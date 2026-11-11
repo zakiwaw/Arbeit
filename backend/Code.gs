@@ -6,8 +6,8 @@
 //        BOOTSTRAP_ADMIN_NAME und BOOTSTRAP_ADMIN_EMAIL (fehlt eine, klarer Fehler wie bei SPREADSHEET_ID).
 //        Anmeldung nur noch mit PIN: authLogin findet den Nutzer allein über den PIN-Hash; passt die PIN zu mehreren
 //        aktiven Nutzern, schlägt die Anmeldung fehl (PIN_AMBIGUOUS). authAccept lehnt eine PIN ab, die schon ein anderer
-//        Nutzer hat (PIN_TAKEN). Öffentliche Aktion authUsers entfernt. Fehlversuche zählen für die ganze Anmeldung
-//        (ein falscher PIN gehört zu keinem Nutzer), gleiche Grenzen wie bisher. Neues Blatt „kundennr_carrier“
+//        Nutzer hat (PIN_TAKEN). Öffentliche Aktion authUsers entfernt. Hash, Sperre (failed/lockedUntil je Nutzerzeile), Sitzungen
+//        und Token unverändert; eine falsche PIN zählt bei allen anmeldbaren Nutzern. Neues Blatt „kundennr_carrier“
 //        (Kundennr | Spediteur) + Aktion loadCarrierMap: Zuordnung Kundennummer → Spediteur für den VVL-Import der App.
 //   2.9: Sichere Synchronisation – je Sendung eine eigene Versionsnummer (JSON-Feld "version", ab 1) und "lastModifiedBy"
 //        (Name des Mitarbeiters, zusätzlich in Spalte F). saveShipments prüft die vom Gerät mitgeschickte Version
@@ -38,8 +38,8 @@
 // Sheet "lkw_status": A1 = JSON (unverändert), B1 = JSON { truckId: Zeitpunkt der Deaktivierung } (neu, automatisch gepflegt)
 // Sheet "_meta":      A1 = globaler Versionszähler, B1 = Zeitpunkt des letzten Archiv-Durchlaufs (automatisch angelegt, ausgeblendet)
 // Sheet "_import":    Protokoll des Drive-Imports (2.5): Zeitpunkt | Datei | Ergebnis | Details (automatisch angelegt, ausgeblendet)
-// Sheet "kundennr_carrier": A = Kundennr | B = Spediteur, Zeile 1 = Überschriften (2.10; automatisch angelegt, Inhalt pflegt der
-//                     Nutzer im Sheet). Die App holt die Zuordnung mit loadCarrierMap (VVL-Import: Spediteur je Kundennummer).
+// Sheet "kundennr_carrier": A = Kundennr | B = Spediteur, Zeile 1 = Überschriften (2.10; automatisch angelegt und einmalig mit
+//                     der bisherigen App-Liste gefüllt, Stand 16.10.2025; danach pflegt der Nutzer den Inhalt im Sheet). Die App holt die Zuordnung mit loadCarrierMap (VVL-Import: Spediteur je Kundennummer).
 //
 // ARCHIV (2.1): Fertige, alte Sendungen bekommen in Spalte E die Markierung ARCHIV (siehe shouldArchive_). Sie bleiben
 //   vollständig im Sheet, werden aber nicht mehr an die Geräte ausgeliefert – die App hält nur noch den laufenden
@@ -1067,7 +1067,35 @@ function loadLkwStatusFromSheet() {
 // ---- 9b. Kundennummer → Spediteur (2.10) ----
 // Blatt "kundennr_carrier": Zeile 1 = Überschriften „Kundennr | Spediteur“, ab Zeile 2 je Zeile eine Zuordnung. Die App
 // trägt beim VVL-Import den Spediteur zur Kundennummer ein (bis App 9.6 stand die Liste fest im Frontend). Fehlt das Blatt,
-// wird es leer mit Überschriften angelegt; der Inhalt wird im Sheet gepflegt. Leere Zeilen werden übersprungen.
+// wird es angelegt und einmalig mit CARRIER_SEED_ gefüllt (alle Einträge 1:1 aus der bisherigen App-Liste); danach wird der
+// Inhalt nur noch im Sheet gepflegt – CARRIER_SEED_ wird nie wieder geschrieben. Leere Zeilen werden übersprungen.
+// Erstbefüllung: Kundennummerliste VW.xlsx, Stand 16.10.2025 (94 Einträge, Reihenfolge wie in der App bis 9.6).
+const CARRIER_SEED_ = [
+  ['294', 'DSV'], ['334', 'DHL'], ['341', 'DWF'], ['355201', 'Kühne + Nagel'],
+  ['360', 'Maersk'], ['381', 'DSV'], ['524', 'DSV'], ['541', 'Kühne + Nagel'],
+  ['595', 'DSV'], ['602201', 'DSV'], ['603', 'DSV'], ['607', 'Maersk'],
+  ['608', 'WWS Freight'], ['613', 'DSV'], ['615', 'Kühne + Nagel'], ['631', 'Maersk'],
+  ['637', 'DSV'], ['726', 'DHL'], ['730', 'UPS'], ['730201', 'UPS'],
+  ['758001', 'DHL'], ['758204', 'Geodis'], ['7589911', 'Geodis'], ['7589983', 'Geodis'],
+  ['7589984', 'Geodis'], ['7589988', 'Geodis'], ['7650201', 'DHL'], ['772201', 'DHL'],
+  ['7960032', 'DHL'], ['7960041', 'DHL'], ['796022', 'DHL'], ['796201', 'DHL'],
+  ['796203', 'DHL'], ['796204', 'DHL'], ['796206', 'DHL'], ['796207', 'DHL'],
+  ['796208', 'DHL'], ['801', 'WWS Freight'], ['802', 'DSV'], ['804', 'DHL'],
+  ['811205', 'DB Schenker'], ['813', 'DSV'], ['815', 'DHL'], ['817', 'DSV'],
+  ['819202', 'DHL'], ['824', 'Kühne + Nagel'], ['862', 'DSV'], ['865', 'DHL'],
+  ['868', 'WWS Freight'], ['875201', 'Maersk'], ['897', 'DSV'], ['9380011', 'DHL'],
+  ['938203', 'DHL'], ['945', 'DSV'], ['959201', 'DHL'], ['959202', 'DHL'],
+  ['959203', 'DHL'], ['981', 'DHL'], ['981299', 'DHL'], ['985202', 'Kühne + Nagel'],
+  ['996001', 'DB Schenker'], ['9969726', 'DB Schenker'], ['9969729', 'DB Schenker'], ['9974021', 'Kühne + Nagel'],
+  ['9974024', 'Kühne + Nagel'], ['9974029', 'Kühne + Nagel'], ['9974051', 'Kühne + Nagel'], ['9974054', 'Kühne + Nagel'],
+  ['9974071', 'Kühne + Nagel'], ['9974074', 'Kühne + Nagel'], ['9974079', 'Kühne + Nagel'], ['9974101', 'Kühne + Nagel'],
+  ['9974104', 'Kühne + Nagel'], ['9974109', 'Kühne + Nagel'], ['9974141', 'Kühne + Nagel'], ['9974144', 'Kühne + Nagel'],
+  ['9974149', 'Kühne + Nagel'], ['9974221', 'Kühne + Nagel'], ['9974224', 'Kühne + Nagel'], ['9974229', 'Kühne + Nagel'],
+  ['9974251', 'Kühne + Nagel'], ['9974261', 'Kühne + Nagel'], ['9974264', 'Kühne + Nagel'], ['9974269', 'Kühne + Nagel'],
+  ['9975001', 'Kühne + Nagel'], ['9975006', 'Kühne + Nagel'], ['998', 'DSV'], ['9994951', 'DB Schenker'],
+  ['9994954', 'DB Schenker'], ['9994959', 'DB Schenker'], ['9994991', 'DB Schenker'], ['9994994', 'DB Schenker'],
+  ['9994999', 'DB Schenker'], ['285201', 'WWS Freight']
+];
 function getOrCreateCarrierSheet_() {
   const ss = ss_();
   let sheet = ss.getSheetByName(CARRIER_SHEET_NAME);
@@ -1076,6 +1104,7 @@ function getOrCreateCarrierSheet_() {
     catch (e) { sheet = ss.getSheetByName(CARRIER_SHEET_NAME); if (!sheet) throw e; }   // gleichzeitig von einem anderen Gerät angelegt
     sheet.getRange(1, 1, sheet.getMaxRows(), 1).setNumberFormat('@');   // Kundennummern als Text
     sheet.getRange(1, 1, 1, 2).setValues([['Kundennr', 'Spediteur']]);
+    sheet.getRange(2, 1, CARRIER_SEED_.length, 2).setValues(CARRIER_SEED_.map(function (r) { return [r[0], r[1]]; }));
     sheet.setFrozenRows(1);
     Logger.log("Neues Sheet '" + CARRIER_SHEET_NAME + "' erstellt.");
   }
@@ -1541,10 +1570,10 @@ function importLog_(fileName, result, details) {
 //   Bedienung meldet die App selbst ab (authLogout). Ein Token, das nicht mehr verlängert wird (Gerät aus, Browser geschlossen,
 //   App abgestürzt), verfällt spätestens SESSION_HOURS nach der letzten Verlängerung.
 // Sicherheit: PINs liegen nur als HMAC-SHA256 (Salt je Nutzer + geheimer Schlüssel aus den Script-Eigenschaften) im Sheet –
-//   ohne den Schlüssel lässt sich die PIN auch aus dem Sheet nicht zurückrechnen. Nach PIN_MAX_ATTEMPTS Fehlversuchen ist die
-//   Anmeldung PIN_LOCK_MINUTES gesperrt (2.10: Zähler für die ganze Anmeldung in den Script-Eigenschaften, weil eine falsche PIN
-//   keinem Nutzer gehört; eine erfolgreiche Anmeldung setzt ihn zurück). Beim Festlegen der PIN zählt eine schon vergebene PIN
-//   als Fehlversuch des Eingeladenen (gleiche Grenzen), damit sich über den Einladungslink keine fremden PINs ausprobieren lassen. Sitzungs-Token sind signiert (HMAC) und in der Spalte "sessions" des Nutzers eingetragen:
+//   ohne den Schlüssel lässt sich die PIN auch aus dem Sheet nicht zurückrechnen. Nach PIN_MAX_ATTEMPTS Fehlversuchen ist der
+//   Zugang PIN_LOCK_MINUTES gesperrt (Spalten failed / lockedUntil; 2.10: eine falsche PIN gehört zu keinem Nutzer und zählt
+//   deshalb bei allen anmeldbaren Nutzern, eine erfolgreiche Anmeldung setzt den Zähler zurück). Sitzungs-Token sind signiert
+//   (HMAC) und in der Spalte "sessions" des Nutzers eingetragen:
 //   "Abmelden" streicht die Sitzung dort, PIN-Reset oder Deaktivierung leert die Liste → laufende Anmeldungen verfallen sofort.
 // Erster Administrator (Haupt-Administrator): Name und E-Mail stehen NUR in den Skript-Eigenschaften BOOTSTRAP_ADMIN_NAME und
 //   BOOTSTRAP_ADMIN_EMAIL (2.10; fehlt eine, meldet der Code einen klaren Fehler). Er wird beim ersten Aufruf der Anmeldeseite mit
@@ -1562,8 +1591,6 @@ const PIN_LOCK_MINUTES = 15;                                            // … u
 const CACHE_KEY_USERS = 'fracht_users';
 const USERS_CACHE_TTL_S = 600;                                          // Nutzerliste im Script-Cache (wird bei jeder Änderung geleert)
 const PUBLIC_ACTIONS_ = { authLogin: 1, authAccept: 1, authInviteInfo: 1 };
-const LOGIN_FAILED_PROP_ = 'AUTH_LOGIN_FAILED';                         // Script-Eigenschaft: Fehlversuche der Anmeldung (2.10)
-const LOGIN_LOCKED_PROP_ = 'AUTH_LOGIN_LOCKED_UNTIL';                   // Script-Eigenschaft: Anmeldung gesperrt bis (ms)
 const ADMIN_ACTIONS_ = { adminListUsers: 1, adminInvite: 1, adminSetActive: 1, adminResetPin: 1 };
 const USER_COLS_ = ['id', 'name', 'email', 'role', 'pinHash', 'salt', 'active', 'createdAt', 'invite', 'inviteExpires', 'failed', 'lockedUntil', 'lastLogin', 'gen', 'sessions'];
 const MAX_SESSIONS_PER_USER = 10;
@@ -1785,24 +1812,24 @@ function authLogin(payload) {
   if (!/^\d{6}$/.test(pin)) throw authError_('LOGIN_FAILED', 'Die PIN besteht aus 6 Ziffern.');
   const secret = secret_();
   return withLock_(function () {
-    const props = PropertiesService.getScriptProperties();
+    // Sperre wie bisher in den Nutzerzeilen (failed / lockedUntil, PIN_MAX_ATTEMPTS, PIN_LOCK_MINUTES, gleiche Meldungen). Eine
+    // falsche PIN gehört zu keinem Nutzer → sie zählt bei allen anmeldbaren Nutzern; ist einer gesperrt, ist die Anmeldung gesperrt.
+    const ready = loadUsers_(true).filter(function (x) { return x.active && x.pinHash; });
     const now = Date.now();
-    const lockedUntil = Number(props.getProperty(LOGIN_LOCKED_PROP_)) || 0;
+    const lockedUntil = ready.reduce(function (m, x) { return Math.max(m, x.lockedUntil || 0); }, 0);
     if (lockedUntil > now) throw authError_('LOCKED', 'Zu viele Fehlversuche – gesperrt für ' + Math.ceil((lockedUntil - now) / 60000) + ' Min.');
-    const matches = loadUsers_(true).filter(function (x) { return x.active && x.pinHash && hashPin_(pin, x.salt, secret) === x.pinHash; });
+    const matches = ready.filter(function (x) { return hashPin_(pin, x.salt, secret) === x.pinHash; });
     if (!matches.length) {
-      const failed = (Number(props.getProperty(LOGIN_FAILED_PROP_)) || 0) + 1;
+      const failed = ready.reduce(function (m, x) { return Math.max(m, x.failed || 0); }, 0) + 1;
       let code = 'LOGIN_FAILED', msg = 'PIN falsch – noch ' + (PIN_MAX_ATTEMPTS - failed) + ' Versuch(e).';
-      if (failed >= PIN_MAX_ATTEMPTS) {
-        props.setProperty(LOGIN_LOCKED_PROP_, String(now + PIN_LOCK_MINUTES * 60000)); props.setProperty(LOGIN_FAILED_PROP_, '0');
-        code = 'LOCKED'; msg = 'Zu viele Fehlversuche – Anmeldung für ' + PIN_LOCK_MINUTES + ' Minuten gesperrt.';
-      } else props.setProperty(LOGIN_FAILED_PROP_, String(failed));
+      const lock = failed >= PIN_MAX_ATTEMPTS;
+      if (lock) { code = 'LOCKED'; msg = 'Zu viele Fehlversuche – Zugang für ' + PIN_LOCK_MINUTES + ' Minuten gesperrt.'; }
+      ready.forEach(function (x) { if (lock) { x.lockedUntil = now + PIN_LOCK_MINUTES * 60000; x.failed = 0; } else x.failed = failed; saveUser_(x); });
       throw authError_(code, msg);
     }
     if (matches.length > 1) throw authError_('PIN_AMBIGUOUS', 'PIN nicht eindeutig – Anmeldung nicht möglich. Der Administrator muss für einen der Mitarbeiter die PIN ändern (PIN zurücksetzen).');
     const u = matches[0];
-    if (u.lockedUntil > now) throw authError_('LOCKED', 'Zu viele Fehlversuche – gesperrt für ' + Math.ceil((u.lockedUntil - now) / 60000) + ' Min.');
-    if (props.getProperty(LOGIN_FAILED_PROP_) && props.getProperty(LOGIN_FAILED_PROP_) !== '0') props.setProperty(LOGIN_FAILED_PROP_, '0');
+    ready.forEach(function (x) { if (x !== u && x.failed) { x.failed = 0; saveUser_(x); } });   // Erfolg setzt den Zähler zurück (wie bisher)
     u.failed = 0; u.lockedUntil = 0; u.lastLogin = now;
     const session = makeSession_(u, payload.deviceId);
     saveUser_(u);
@@ -1828,17 +1855,8 @@ function authAccept(payload) {
     const users = loadUsers_(true);
     const u = inv ? findUser_(users, function (x) { return x.invite && x.invite === inv; }) : null;
     if (!u || !(u.inviteExpires > Date.now())) throw authError_('INVITE_INVALID', 'Dieser Einladungslink ist ungültig oder abgelaufen. Bitte beim Administrator eine neue Einladung anfordern.');
-    // 2.10: Anmeldung nur mit PIN → jede PIN nur einmal. Schon vergeben = Fehlversuch des Eingeladenen (Sperre wie beim Login).
-    const now = Date.now();
-    if (u.lockedUntil > now) throw authError_('LOCKED', 'Zu viele Fehlversuche – gesperrt für ' + Math.ceil((u.lockedUntil - now) / 60000) + ' Min.');
-    const taken = users.some(function (x) { return x.id !== u.id && x.pinHash && hashPin_(pin, x.salt, secret) === x.pinHash; });
-    if (taken) {
-      u.failed = (u.failed || 0) + 1;
-      let code = 'PIN_TAKEN', msg = 'Diese PIN ist schon vergeben – bitte eine andere wählen.';
-      if (u.failed >= PIN_MAX_ATTEMPTS) { u.lockedUntil = now + PIN_LOCK_MINUTES * 60000; u.failed = 0; code = 'LOCKED'; msg = 'Zu viele Fehlversuche – für ' + PIN_LOCK_MINUTES + ' Minuten gesperrt.'; }
-      saveUser_(u);
-      throw authError_(code, msg);
-    }
+    // 2.10: Anmeldung nur mit PIN → jede PIN darf nur einem Mitarbeiter gehören (eigene bisherige PIN beim Reset erlaubt)
+    if (users.some(function (x) { return x.id !== u.id && x.pinHash && hashPin_(pin, x.salt, secret) === x.pinHash; })) throw authError_('PIN_TAKEN', 'Diese PIN ist schon vergeben – bitte eine andere wählen.');
     u.salt = randomToken_().slice(0, 32);
     u.pinHash = hashPin_(pin, u.salt, secret);
     u.invite = ''; u.inviteExpires = 0; u.failed = 0; u.lockedUntil = 0; u.active = true;

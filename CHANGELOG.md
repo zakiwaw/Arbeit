@@ -12,11 +12,13 @@ Persönliche Daten aus dem Repo entfernt. **Code.gs 2.10 bereitstellen und die S
 - `js/01-start.js`: Standard-Mitarbeitername leer (`MITARBEITER_NAME_DEFAULT = ""`); feste Liste Kundennummer → Spediteur entfernt.
 - `backend/Code.gs`: Haupt-Administrator nur noch aus den Skript-Eigenschaften `BOOTSTRAP_ADMIN_NAME` / `BOOTSTRAP_ADMIN_EMAIL`
   (fehlt eine: klarer Fehler wie bei `SPREADSHEET_ID`). Ungenutzte Mailadresse in `sendPdfEmail` entfernt.
-- Kundennummer → Spediteur: neues Blatt `kundennr_carrier` (Kundennr | Spediteur, wird leer angelegt), Aktion `loadCarrierMap`;
-  die App holt die Zuordnung nach dem Start und hält sie für den Start ohne Netz im Speicher.
+- Kundennummer → Spediteur: neues Blatt `kundennr_carrier` (Kundennr | Spediteur), Aktion `loadCarrierMap`. Das Blatt wird beim ersten
+  Abruf angelegt und einmalig mit allen 94 Einträgen 1:1 aus der bisherigen App-Liste gefüllt (Kundennummerliste VW.xlsx, Stand
+  16.10.2025); danach wird es im Sheet gepflegt. Die App holt die Zuordnung nach dem Start und hält sie für den Start ohne Netz im Speicher.
 - Anmeldung nur mit PIN: Anmeldeseite zeigt nur noch das PIN-Feld, `authLogin` findet den Nutzer über den PIN-Hash. PIN bei
   mehreren aktiven Nutzern → Anmeldung schlägt fehl (`PIN_AMBIGUOUS`). Einladung/PIN-Reset lehnen eine schon vergebene PIN ab
-  (`PIN_TAKEN`). Fehlversuche zählen für die ganze Anmeldung (gleiche Grenzen: 5 Versuche, 15 Minuten). Aktion `authUsers` entfernt.
+  (`PIN_TAKEN`). Aktion `authUsers` entfernt. Hash, Sperre (5 Versuche, 15 Minuten, Spalten failed/lockedUntil), Sitzungen und Token
+  unverändert; eine falsche PIN gehört zu keinem Nutzer und zählt deshalb bei allen anmeldbaren Nutzern.
 - Doku und Tests: Namen und Mailadressen durch neutrale Platzhalter ersetzt (`Mitarbeiter 1`, `admin@example.com` …); neue Prüfungen
   (Skript-Eigenschaften fehlen, Spediteur-Zuordnung aus dem Sheet, PIN-Anmeldung, doppelte PIN, keine Mailadressen im Repo).
 - Versionskette auf App 9.7 / Code.gs 2.10 angehoben.

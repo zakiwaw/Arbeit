@@ -28,7 +28,7 @@ r = call('authLogin', {});
 ok(r.status === 'error' && r.code === 'SETUP_PENDING' && /Noch kein Mitarbeiter eingerichtet/.test(r.message), 'Vorabprüfung: noch niemand mit PIN → SETUP_PENDING');
 ok(mails.length === 1 && mails[0].to === 'admin@example.com' && /einladung=[0-9a-f]{64}/.test(mails[0].body) && /Hallo Mitarbeiter 1/.test(mails[0].body), 'Admin-Einladung per Mail (Name/Adresse aus den Skript-Eigenschaften)');
 ok(call('authLogin', {}).code === 'SETUP_PENDING' && mails.length === 1 && usersSheet().rows.length === 2, 'Zweite Vorabprüfung legt keinen weiteren Administrator an');
-ok(call('authLogin', { pin: '482913' }).code === 'SETUP_PENDING' && !props.AUTH_LOGIN_FAILED, 'Anmeldeversuch vor dem Einrichten: SETUP_PENDING, kein Fehlversuch');
+ok(call('authLogin', { pin: '482913' }).code === 'SETUP_PENDING' && Number(usersSheet().rows[1][10] || 0) === 0, 'Anmeldeversuch vor dem Einrichten: SETUP_PENDING, kein Fehlversuch');
 const inv = /einladung=([0-9a-f]+)/.exec(mails[0].body)[1];
 r = call('authInviteInfo', { invite: inv }); ok(r.valid === true && r.name === 'Mitarbeiter 1' && r.isReset === false, 'authInviteInfo gültig');
 r = call('authInviteInfo', { invite: 'x' }); ok(r.valid === false, 'authInviteInfo ungültig');
@@ -56,19 +56,21 @@ ok(call('deleteShipments', { baseNumbers: [] }, adminTok).status === 'error', 'd
 ok(call('deleteShipment', { baseNumber: 'D3' }, adminTok).status === 'success' && !call('loadChanges', { sinceVersion: 0 }, adminTok).changed.D3, 'Einzel-Löschung wie bisher');
 // 4) Login nur mit PIN (2.10): Nutzer allein über den PIN-Hash, öffentliche Namensliste (authUsers) gibt es nicht mehr
 r = call('authUsers'); ok(r.status === 'error' && /Unbekannte Aktion empfangen: authUsers/.test(r.message) && !r.users, 'authUsers entfernt (Unbekannte Aktion, keine Namensliste)');
-r = call('authLogin', {}); ok(r.code === 'PIN_REQUIRED' && !r.token && !props.AUTH_LOGIN_FAILED, 'Vorabprüfung nach dem Einrichten: PIN_REQUIRED, kein Fehlversuch');
-r = call('authLogin', { pin: '12345' }); ok(r.code === 'LOGIN_FAILED' && /6 Ziffern/.test(r.message) && !props.AUTH_LOGIN_FAILED, '5-stellige PIN: Hinweis, kein Fehlversuch');
+const failedCol = () => Number(usersSheet().rows[1][10] || 0);   // Spalte „failed“ des Administrators (Sperre wie bisher je Nutzerzeile)
+r = call('authLogin', {}); ok(r.code === 'PIN_REQUIRED' && !r.token && failedCol() === 0, 'Vorabprüfung nach dem Einrichten: PIN_REQUIRED, kein Fehlversuch');
+r = call('authLogin', { pin: '12345' }); ok(r.code === 'LOGIN_FAILED' && /6 Ziffern/.test(r.message) && failedCol() === 0, '5-stellige PIN: Hinweis, kein Fehlversuch');
 r = call('authLogin', { pin: '000000' }); ok(r.code === 'LOGIN_FAILED' && /noch 4/.test(r.message), 'Falsche PIN: ' + r.message);
 r = call('authLogin', { pin: '000001' }); ok(r.code === 'LOGIN_FAILED' && /noch 3/.test(r.message), 'Zweiter Fehlversuch: ' + r.message);
 r = call('authLogin', { pin: '482913', deviceId: 'dev3' }); ok(r.status === 'success' && r.user.id === uid, 'Richtige PIN zwischendurch: angemeldet');
-ok(props.AUTH_LOGIN_FAILED === '0', 'Erfolgreiche Anmeldung setzt den Fehlversuchs-Zähler zurück');
+ok(failedCol() === 0, 'Erfolgreiche Anmeldung setzt den Fehlversuchs-Zähler zurück (Spalte failed)');
 ok(call('authLogout', {}, r.token).status === 'success', 'Abmelden (dev3)');
 r = call('authLogin', { userId: uid, pin: '000000' }); ok(r.code === 'LOGIN_FAILED' && /noch 4/.test(r.message), 'Nach Erfolg wieder volle Versuche (eine mitgeschickte userId wird ignoriert): ' + r.message);
 for (let i = 0; i < 4; i++) r = call('authLogin', { pin: '000000' });
-ok(r.code === 'LOCKED' && /15 Minuten gesperrt/.test(r.message), 'Nach 5 Fehlversuchen ist die Anmeldung gesperrt');
-ok(Number(props.AUTH_LOGIN_LOCKED_UNTIL) > Date.now() && usersSheet().rows.every(row => !row[11] || row[11] === 'lockedUntil' || Number(row[11]) === 0), 'Sperre steht in den Skript-Eigenschaften, nicht beim Nutzer');
+ok(r.code === 'LOCKED' && r.message === 'Zu viele Fehlversuche – Zugang für 15 Minuten gesperrt.', 'Nach 5 Fehlversuchen gesperrt (Meldung wie bisher)');
+ok(Number(usersSheet().rows[1][11]) > Date.now() && !Object.keys(props).some(k => /LOGIN/.test(k)), 'Sperre steht wie bisher in der Nutzerzeile (lockedUntil), keine neuen Skript-Eigenschaften');
+ok(/^Zu viele Fehlversuche – gesperrt für \d+ Min\.$/.test(call('authLogin', { pin: '000000' }).message), 'Weitere Versuche während der Sperre: Meldung wie bisher, kein weiterer Zähler');
 ok(call('authLogin', { pin: '482913' }).code === 'LOCKED', 'Auch richtige PIN während der Sperre abgelehnt');
-props.AUTH_LOGIN_LOCKED_UNTIL = String(Date.now() - 1000);   // Sperre ablaufen lassen
+usersSheet().rows[1][11] = String(Date.now() - 1000); delete cache['fracht_users'];   // Sperre ablaufen lassen (wie bisher)
 r = call('authLogin', { pin: '482913', deviceId: 'dev2' }); ok(r.status === 'success' && r.token && r.user.id === uid && r.user.name === 'Mitarbeiter 1' && r.user.role === 'admin', 'Nach Ablauf der Sperre: Anmeldung nur mit PIN, Nutzer über die PIN gefunden');
 const tok2 = r.token;
 ok(call('loadChanges', { sinceVersion: 0 }, adminTok).status === 'success', 'Sitzung des anderen Geräts bleibt parallel gültig');
@@ -117,16 +119,12 @@ ok(call('authInviteInfo', { invite: invR }).valid === true, 'Reset-Einladung ble
 ok(call('authAccept', { invite: invR, pin: '901276' }).status === 'success', 'Neue PIN gesetzt');
 ok(call('loadChanges', { sinceVersion: 0 }, tokMa2b).code === 'AUTH_REQUIRED', 'Nach PIN-Reset alte Sitzung ungültig');
 ok(call('adminSetActive', { userId: uid, active: false }, adminTok).code === 'INVALID', 'Selbst-Sperren abgelehnt');
-// 8b) Einladung mit schon vergebener PIN (2.10): abgelehnt, zählt als Fehlversuch des Eingeladenen; eigene alte PIN beim Reset erlaubt
+// 8b) Einladung mit schon vergebener PIN (2.10): abgelehnt; eigene alte PIN beim Reset erlaubt
 r = call('adminInvite', { name: 'Mitarbeiter 3', email: 'mitarbeiter3@example.com' }, adminTok);
 const inv3 = /einladung=([0-9a-f]+)/.exec(mails[mails.length - 1].body)[1], ma3Id = r.invited.id;
 r = call('authAccept', { invite: inv3, pin: '901276' }); ok(r.code === 'PIN_TAKEN', 'Einladung: vergebene PIN (von Mitarbeiter 2) abgelehnt (PIN_TAKEN)');
-for (let i = 0; i < 3; i++) r = call('authAccept', { invite: inv3, pin: i % 2 ? '482913' : '901276' });
-ok(r.code === 'PIN_TAKEN', 'Weitere vergebene PINs abgelehnt (4 Versuche)');
-r = call('authAccept', { invite: inv3, pin: '482913' }); ok(r.code === 'LOCKED', 'Nach 5 vergebenen PINs: Einladung 15 Minuten gesperrt (keine fremden PINs ausprobierbar)');
-ok(call('authAccept', { invite: inv3, pin: '135792' }).code === 'LOCKED', 'Während der Sperre auch eine freie PIN abgelehnt');
-{ const row = usersSheet().rows.find(x => x[0] === ma3Id); row[11] = String(Date.now() - 1000); delete cache['fracht_users']; }   // Sperre ablaufen lassen
-r = call('authAccept', { invite: inv3, pin: '135792', deviceId: 'dev-ma3' }); ok(r.status === 'success' && r.user.id === ma3Id, 'Nach Ablauf der Sperre: freie PIN gesetzt + angemeldet');
+ok(call('authInviteInfo', { invite: inv3 }).valid === true && Number(usersSheet().rows.find(x => x[0] === ma3Id)[10] || 0) === 0, 'Einladung bleibt gültig, Ablehnung ist kein Fehlversuch (PIN-Verfahren unverändert)');
+r = call('authAccept', { invite: inv3, pin: '135792', deviceId: 'dev-ma3' }); ok(r.status === 'success' && r.user.id === ma3Id, 'Freie PIN gesetzt + angemeldet');
 const tokMa3 = r.token;
 r = call('adminResetPin', { userId: ma3Id }, adminTok);
 const invR3 = /einladung=([0-9a-f]+)/.exec(mails[mails.length - 1].body)[1];
@@ -136,10 +134,10 @@ ok(call('loadChanges', { sinceVersion: 0 }, tokMa3).code === 'AUTH_REQUIRED', 'N
 {
   const rows = usersSheet().rows, ma3Row = rows.find(x => x[0] === ma3Id), admRow = rows.find(x => x[0] === uid);
   ma3Row[4] = admRow[4]; ma3Row[5] = admRow[5]; delete cache['fracht_users'];   // gleicher Hash + Salt wie der Administrator = gleiche PIN
-  const sessBefore = JSON.stringify([admRow[14], ma3Row[14]]), failedBefore = props.AUTH_LOGIN_FAILED;
+  const sessBefore = JSON.stringify([admRow[14], ma3Row[14]]), failedBefore = JSON.stringify(rows.map(x => x[10]));
   r = call('authLogin', { pin: '482913', deviceId: 'dev-x' });
   ok(r.status === 'error' && r.code === 'PIN_AMBIGUOUS' && /PIN nicht eindeutig/.test(r.message) && /Administrator/.test(r.message) && !r.token, `Doppelte PIN: Anmeldung abgelehnt mit klarer Meldung (${r.message})`);
-  ok(JSON.stringify([admRow[14], ma3Row[14]]) === sessBefore && props.AUTH_LOGIN_FAILED === failedBefore, 'Doppelte PIN: keine Sitzung angelegt, kein Fehlversuch gezählt');
+  ok(JSON.stringify([admRow[14], ma3Row[14]]) === sessBefore && JSON.stringify(rows.map(x => x[10])) === failedBefore, 'Doppelte PIN: keine Sitzung angelegt, kein Fehlversuch gezählt');
   ok(call('adminSetActive', { userId: ma3Id, active: false }, adminTok).status === 'success', 'Administrator sperrt einen der beiden');
   r = call('authLogin', { pin: '482913', deviceId: 'dev-x' }); ok(r.status === 'success' && r.user.id === uid, 'Nur aktive Nutzer zählen: danach Anmeldung des Administrators wieder eindeutig');
   ok(call('authLogout', {}, r.token).status === 'success', 'Abmelden (dev-x)');
@@ -153,10 +151,16 @@ ok(call('loadChanges', { sinceVersion: 0 }, adminTok).status === 'success', 'Eig
 // 8e) Kundennummer → Spediteur aus dem Blatt kundennr_carrier (2.10)
 ok(call('loadCarrierMap', {}).code === 'AUTH_REQUIRED', 'loadCarrierMap ohne Token → AUTH_REQUIRED');
 r = call('loadCarrierMap', {}, adminTok);
-ok(r.status === 'success' && JSON.stringify(r.map) === '{}' && sheets.kundennr_carrier && JSON.stringify(sheets.kundennr_carrier.rows) === '[["Kundennr","Spediteur"]]', 'Blatt fehlt: wird mit Überschriften angelegt, Zuordnung leer');
-sheets.kundennr_carrier.rows.push([111, 'Spediteur A'], ['  222001 ', ' Spediteur B '], ['', 'ohne Nummer'], ['333', ''], ['444', 'Spediteur A']);
+const cRows = sheets.kundennr_carrier ? sheets.kundennr_carrier.rows : [];
+ok(r.status === 'success' && JSON.stringify(cRows[0]) === '["Kundennr","Spediteur"]' && cRows.length === 95 && Object.keys(r.map).length === 94, `Blatt fehlt: wird mit Überschriften angelegt und einmalig mit 94 Einträgen gefüllt (${cRows.length - 1} Zeilen, ${Object.keys(r.map).length} Zuordnungen)`);
+// 1:1 wie die bisherige App-Liste (js/01-start.js bis 9.6, Kundennummerliste VW.xlsx Stand 16.10.2025): Prüfsumme über alle Paare in Reihenfolge
+const seedHash = crypto.createHash('sha256').update(JSON.stringify(cRows.slice(1).map(x => [String(x[0]), String(x[1])]))).digest('hex');
+ok(seedHash === '1b3d9edaeebf33104dcbb63d8747861107d7c2a52094f2a806ae24c007be83b0', `Erstbefüllung 1:1 wie die bisherige App-Liste (Prüfsumme ${seedHash.slice(0, 12)}…)`);
+ok(r.map['294'] === 'DSV' && r.map['355201'] === 'Kühne + Nagel' && r.map['7589911'] === 'Geodis' && r.map['9994999'] === 'DB Schenker' && r.map['285201'] === 'WWS Freight', 'Stichproben: erste, mittlere und letzte Einträge');
+// Danach pflegt der Nutzer das Blatt: Änderungen kommen an, die Erstbefüllung wird nie wieder geschrieben
+cRows.splice(1, cRows.length - 1, [111, 'Spediteur A'], ['  222001 ', ' Spediteur B '], ['', 'ohne Nummer'], ['333', ''], ['444', 'Spediteur A']);
 r = call('loadCarrierMap', {}, call('authLogin', { pin: '901276', deviceId: 'dev-ma2c' }).token);
-ok(r.status === 'success' && JSON.stringify(r.map) === JSON.stringify({ 111: 'Spediteur A', 222001: 'Spediteur B', 444: 'Spediteur A' }), `Zuordnung aus dem Sheet (Zahl/Text, getrimmt, leere Zeilen übersprungen) – auch für normale Mitarbeiter (${JSON.stringify(r.map)})`);
+ok(r.status === 'success' && JSON.stringify(r.map) === JSON.stringify({ 111: 'Spediteur A', 222001: 'Spediteur B', 444: 'Spediteur A' }) && cRows.length === 6, `Gepflegtes Blatt: Zuordnung aus dem Sheet (Zahl/Text, getrimmt, leere Zeilen übersprungen), keine erneute Erstbefüllung – auch für normale Mitarbeiter (${JSON.stringify(r.map)})`);
 ok(Object.keys(r.map).every(k => typeof k === 'string') && r.map['111'] === 'Spediteur A', 'Kundennummern als Text-Schlüssel');
 // 9) Abgelaufenes, korrekt signiertes Token
 const d = JSON.parse(Buffer.from(adminTok.split('.')[0], 'base64url').toString()); d.e = Date.now() - 1;
