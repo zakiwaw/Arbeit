@@ -4,6 +4,25 @@ Neueste zuerst. Datum = Veröffentlichung (bis einschließlich 9.2 auf dem Branc
 Zusammenführen von Pull Request #1 am 09.11.2026 auf `main`). App-Version siehe `js/01-start.js`
 (`APP_VERSION`), Server-Skript siehe Kopf von `backend/Code.gs`.
 
+## 2026-11-11 – App 9.7, Code.gs 2.10
+
+Persönliche Daten aus dem Repo entfernt. **Code.gs 2.10 bereitstellen und die Skript-Eigenschaften `BOOTSTRAP_ADMIN_NAME` und
+`BOOTSTRAP_ADMIN_EMAIL` setzen, bevor App 9.7 live geht.** Merge, Versionen, Sync und Sitzungen bleiben unverändert.
+
+- `js/01-start.js`: Standard-Mitarbeitername leer (`MITARBEITER_NAME_DEFAULT = ""`); feste Liste Kundennummer → Spediteur entfernt.
+- `backend/Code.gs`: Haupt-Administrator nur noch aus den Skript-Eigenschaften `BOOTSTRAP_ADMIN_NAME` / `BOOTSTRAP_ADMIN_EMAIL`
+  (fehlt eine: klarer Fehler wie bei `SPREADSHEET_ID`). Ungenutzte Mailadresse in `sendPdfEmail` entfernt.
+- Kundennummer → Spediteur: neues Blatt `kundennr_carrier` (Kundennr | Spediteur), Aktion `loadCarrierMap`. Das Blatt wird beim ersten
+  Abruf angelegt und einmalig mit allen 94 Einträgen 1:1 aus der bisherigen App-Liste gefüllt (Kundennummerliste VW.xlsx, Stand
+  16.10.2025); danach wird es im Sheet gepflegt. Die App holt die Zuordnung nach dem Start (klappt das nicht, beim nächsten Abgleich) und hält sie für den Start ohne Netz im Speicher.
+- Anmeldung nur mit PIN: Anmeldeseite zeigt nur noch das PIN-Feld, `authLogin` findet den Nutzer über den PIN-Hash. PIN bei
+  mehreren aktiven Nutzern → Anmeldung schlägt fehl (`PIN_AMBIGUOUS`). Einladung/PIN-Reset lehnen eine schon vergebene PIN ab
+  (`PIN_TAKEN`). Aktion `authUsers` entfernt. Hash, Sperre (5 Versuche, 15 Minuten, Spalten failed/lockedUntil), Sitzungen und Token
+  unverändert; eine falsche PIN gehört zu keinem Nutzer und zählt deshalb bei allen anmeldbaren Nutzern.
+- Doku und Tests: Namen und Mailadressen durch neutrale Platzhalter ersetzt (`Mitarbeiter 1`, `admin@example.com` …); neue Prüfungen
+  (Skript-Eigenschaften fehlen, Spediteur-Zuordnung aus dem Sheet, PIN-Anmeldung, doppelte PIN, keine Mailadressen im Repo).
+- Versionskette auf App 9.7 / Code.gs 2.10 angehoben.
+
 ## 2026-11-10 – App 9.6, Code.gs 2.9
 
 Batch-Ansicht auf kleinen Bildschirmen kompakter: Status-Zeile mit Hinzufügen-Knopf im Batch-Modus unter 992 px ausgeblendet,

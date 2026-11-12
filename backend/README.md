@@ -5,11 +5,15 @@ Es liest und schreibt das Google Sheet mit der ID `<SPREADSHEET_ID>` (steht nich
 Skript-Eigenschaften des Apps-Script-Projekts, Schlüssel `SPREADSHEET_ID`; fehlt die Eigenschaft, meldet der Code
 einen klaren Fehler und greift auf keine andere Tabelle zu).
 
-Zusammengehörige Versionen: **App 9.6 ↔ Code.gs 2.9** (die App zeigt beides unten im Seitenmenü). App 9.6 macht die
-Batch-Ansicht auf kleinen Bildschirmen kompakter; Code.gs bleibt unverändert auf 2.9, keine neuen Skript-Eigenschaften.
-Der in App 9.3 eingeführte Mehrgeräte-Sync braucht weiterhin Code.gs 2.9. **Code.gs 2.9 muss bereits bereitgestellt sein,
-bevor App 9.6 live geht; für 9.6 ist keine erneute Backend-Bereitstellung nötig.** Sendungs-Versionen und Konfliktprüfung
-kann erst das Skript 2.9 beantworten
+Zusammengehörige Versionen: **App 9.7 ↔ Code.gs 2.10** (die App zeigt beides unten im Seitenmenü). 2.10 entfernt persönliche
+Daten aus dem Code: Der Haupt-Administrator steht nur noch in den Skript-Eigenschaften **`BOOTSTRAP_ADMIN_NAME`** und
+**`BOOTSTRAP_ADMIN_EMAIL`** (fehlt eine, meldet der Code einen klaren Fehler – wie bei `SPREADSHEET_ID`). Die Zuordnung
+Kundennummer → Spediteur für den VVL-Import liegt im Blatt **`kundennr_carrier`** (Spalten Kundennr | Spediteur, Zeile 1 =
+Überschriften; wird beim ersten Abruf angelegt und einmalig mit allen 94 Einträgen der bisherigen App-Liste gefüllt –
+Kundennummerliste VW.xlsx, Stand 16.10.2025; danach wird es nur noch im Sheet gepflegt) und kommt per `loadCarrierMap` in die App. Anmeldung nur noch mit PIN
+(siehe Version 2.2 unten). **Code.gs 2.10 muss bereitgestellt und die beiden Skript-Eigenschaften gesetzt sein, bevor App 9.7
+live geht** – App 9.7 schickt keine Nutzer-ID mehr, ein Skript 2.9 lehnt die Anmeldung ab. Der Mehrgeräte-Sync (Sendungs-
+Versionen, Konfliktprüfung, seit App 9.3 / Code.gs 2.9) ist unverändert
 (mit 2.8 speichert die App weiter wie 9.2, aber ohne Versionsprüfung, Namen und Protokoll). Bereitstellen siehe
 `README.md` im Hauptordner (bestehende Web-App → neue Version, keine neue Bereitstellung).
 
@@ -27,8 +31,9 @@ V2 ändert das:
 | `loadChanges` | Gerät holt **nur die Änderungen seit Version X** (alle 3 s, beim Zurückkehren in den Vordergrund, bei „online“). „Nichts Neues“ wird aus dem Script-Cache beantwortet, ohne die Tabelle zu öffnen. Liefert auch den LKW-Status mit; archivierte Sendungen werden nicht ausgeliefert (siehe Archiv). |
 | `searchArchive` | Archivsuche (siehe Abschnitt Archiv). |
 | `deleteShipment` | Löschung als Markierung (Tombstone, Spalte E = TRUE), damit andere Geräte die Sendung nicht wiederbeleben. |
+| `loadCarrierMap` | Zuordnung Kundennummer → Spediteur aus dem Blatt `kundennr_carrier` (2.10) – `{ map: { "<Kundennr>": "<Spediteur>" } }`. |
 | `loadAllData`, `saveAllData`, `clearAllData`, `sendPdfEmail`, `saveLkwStatus`, `loadLkwStatus` | Wie bisher – `saveAllData` läuft jetzt ebenfalls durch den Merge, ein altes Gerät kann also nichts mehr überschreiben. |
-| `authUsers`, `authLogin`, `authAccept`, `authInviteInfo`, `authCheck`, `authLogout`, `admin*` | Anmeldung (siehe Version 2.2). |
+| `authLogin`, `authAccept`, `authInviteInfo`, `authCheck`, `authLogout`, `admin*` | Anmeldung (siehe Version 2.2). |
 
 Nicht im Skript enthalten: `shipmentComplete` (Abschluss-Benachrichtigung) und `sendSummaryEmail`. Die App wertet die
 Antwort „Unbekannte Aktion“ auf `shipmentComplete` **nicht** als Fehler – die Scans sind zu dem Zeitpunkt längst über
@@ -165,9 +170,8 @@ App zeigt die Anmeldeseite. Öffentlich bleiben nur die Anmelde-Aktionen selbst.
 
 | Aktion | Wer | Zweck |
 |---|---|---|
-| `authUsers` | alle | Namen der anmeldbaren Mitarbeiter (nur id + Name) für die Auswahl auf der Anmeldeseite. Legt beim allerersten Aufruf den Haupt-Administrator an und schickt ihm die Einladung. |
-| `authLogin` `{ userId, pin, deviceId }` | alle | Name + 6-stellige PIN → Sitzungs-Token. 5 Fehlversuche → 15 Minuten gesperrt. |
-| `authInviteInfo` `{ invite }` / `authAccept` `{ invite, pin }` | alle | Einladungslink prüfen bzw. einlösen: Mitarbeiter wählt seine PIN selbst und ist danach angemeldet. Link 48 h gültig, einmalig. |
+| `authLogin` `{ pin, deviceId }` | alle | Nur die 6-stellige PIN → Sitzungs-Token (2.10: keine Namensauswahl, der Server findet den Nutzer über den PIN-Hash). Passt die PIN zu mehreren aktiven Nutzern: Fehler `PIN_AMBIGUOUS`, keine Sitzung – der Administrator muss eine der PINs zurücksetzen. 5 Fehlversuche → 15 Minuten gesperrt (wie bisher in den Spalten failed/lockedUntil; eine falsche PIN gehört zu keinem Nutzer und zählt deshalb bei allen anmeldbaren Nutzern, eine erfolgreiche Anmeldung setzt den Zähler zurück). Ohne PIN = Vorabprüfung der Anmeldeseite: legt beim allerersten Aufruf den Haupt-Administrator an und schickt ihm die Einladung; Antwort `SETUP_PENDING` (noch niemand mit PIN) bzw. `PIN_REQUIRED` (bereit). |
+| `authInviteInfo` `{ invite }` / `authAccept` `{ invite, pin }` | alle | Einladungslink prüfen bzw. einlösen: Mitarbeiter wählt seine PIN selbst und ist danach angemeldet. Link 48 h gültig, einmalig. Eine PIN, die schon ein anderer Mitarbeiter hat, wird abgelehnt (`PIN_TAKEN`; die eigene bisherige PIN beim Reset ist erlaubt). |
 | `authCheck`, `authRefresh`, `authLogout` | angemeldet | Sitzung prüfen / verlängern / beenden. |
 | `adminListUsers`, `adminInvite` `{ name, email }`, `adminSetActive` `{ userId, active }`, `adminResetPin` `{ userId }` | Administrator | Mitarbeiter verwalten: einladen (E-Mail mit Link), sperren/freigeben, PIN zurücksetzen (= neue Einladung; die alte PIN gilt, bis die neue gesetzt ist). |
 
@@ -178,8 +182,9 @@ offene Einladung, laufende Sitzungen. Sperren oder PIN-Reset beendet sofort alle
 Einrichtung:
 1. `Code.gs` ersetzen, **Bereitstellen → Bereitstellung verwalten → Neue Version**. Beim ersten Ausführen fragt Google
    zusätzlich nach der Berechtigung „E-Mails senden“ (MailApp) – bestätigen.
-2. App öffnen: der Haupt-Administrator (`BOOTSTRAP_ADMIN` in `Code.gs`, `bisbiss-92@hotmail.de`) bekommt automatisch die
-   Einladungs-Mail. Kommt sie nicht an: im Skript-Editor `setupFirstAdmin` ausführen – das Protokoll zeigt den Link, er kann
+2. Skript-Eigenschaften `BOOTSTRAP_ADMIN_NAME` (Name) und `BOOTSTRAP_ADMIN_EMAIL` (E-Mail-Adresse) des Haupt-Administrators
+   setzen (Projekteinstellungen → Skript-Eigenschaften; seit 2.10 stehen sie nicht mehr im Code). App öffnen: der
+   Haupt-Administrator bekommt automatisch die Einladungs-Mail. Kommt sie nicht an: im Skript-Editor `setupFirstAdmin` ausführen – das Protokoll zeigt den Link, er kann
    auch direkt geöffnet werden.
 3. Über den Link die eigene PIN festlegen. Danach im Menü **Mitarbeiter** die anderen Mitarbeiter einladen (Name + E-Mail).
    Schlägt der Mail-Versand fehl, zeigt die App den Einladungslink zum Weitergeben an.

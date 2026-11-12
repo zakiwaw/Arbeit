@@ -179,10 +179,32 @@ async function postToServer(action, payload, authOverride) {
     return result;
 }
 
+// Kundennummer → Spediteur für den VVL-Import (Blatt „kundennr_carrier“ im Sheet, Code.gs 2.10 – bis 9.6 fest im Code).
+// Läuft im Hintergrund nach dem Start bzw. nach einer Anmeldung; ohne Netz oder mit älterem Server-Skript bleibt der zuletzt
+// gespeicherte Stand (localStorage, siehe CARRIER_MAP_KEY in 01-start.js). Schlägt das Laden fehl (z. B. kein Netz beim Start),
+// holt der nächste erfolgreiche Abgleich (pullRemoteChanges) die Zuordnung nach – damit sie wie früher für den VVL-Import da ist.
+let carrierMapLoaded = false, carrierMapLoading = false;
+async function loadCarrierMap() {
+    if (carrierMapLoading) return;
+    carrierMapLoading = true;
+    try {
+        const r = await postToServer('loadCarrierMap');
+        const m = r && r.map;
+        if (m && typeof m === 'object' && !Array.isArray(m)) {
+            kundennrCarrierMap = m; carrierMapLoaded = true;
+            try { localStorage.setItem(CARRIER_MAP_KEY, JSON.stringify(m)); } catch (e) { /* Speicher voll – Zuordnung gilt trotzdem für diese Sitzung */ }
+        }
+    } catch (e) {
+        if (isUnknownActionError(e)) carrierMapLoaded = true;   // Server-Skript vor 2.10: nicht bei jeder Anmeldung erneut fragen
+        console.warn('Spediteur-Zuordnung konnte nicht geladen werden – nutze den zuletzt gespeicherten Stand.', e);
+    } finally { carrierMapLoading = false; }
+}
+
 // ===================================================================
 // ANMELDUNG (PIN) – siehe backend/Code.gs, Abschnitt ANMELDUNG
 // Ablauf: Server-Skript verlangt für jede Daten-Aktion ein Sitzungs-Token. Ohne gültige Sitzung zeigt die App vor dem
-// Laden die Anmeldeseite (Name wählen + 6-stellige PIN). Einladungslink ?einladung=<Token> → Mitarbeiter legt seine PIN
+// Laden die Anmeldeseite (nur die 6-stellige PIN, 9.7: keine Namensauswahl – der Server erkennt den Mitarbeiter an der PIN).
+// Einladungslink ?einladung=<Token> → Mitarbeiter legt seine PIN
 // selbst fest. Die PIN wird nie gespeichert – nur das Token (12 h) und Name/Rolle des Angemeldeten (localStorage).
 // Administrator: Seite „Mitarbeiter“ im Menü (einladen, sperren, PIN zurücksetzen).
 // ===================================================================
@@ -311,7 +333,10 @@ function finishAuth() {
     authLastRefresh = Date.now();
     const r = authResolve; authResolve = null;
     if (r) { showLoader(); r(); }                          // App-Start geht weiter (loadDataFromServer …)
-    else { syncPollFailures = 0; pollNow(); }              // Anmeldung im laufenden Betrieb: sofort abgleichen (nachholen, was wartete)
+    else {                                                 // Anmeldung im laufenden Betrieb: sofort abgleichen (nachholen, was wartete)
+        syncPollFailures = 0; pollNow();
+        if (!carrierMapLoaded) loadCarrierMap();           // Start war ohne Netz/Sitzung → Spediteur-Zuordnung jetzt holen
+    }
 }
 function showAuthView(html) {
     if (!authViewEl) return;
@@ -339,29 +364,28 @@ function pinField(id, label, autofocus) {
 function pinValue(id) { return (document.getElementById(id)?.value || '').replace(/\D/g, ''); }
 
 // ---- Anmeldeseite ----
+// Nur ein PIN-Feld (9.7). Vorab fragt die Seite authLogin ohne PIN: Das Server-Skript meldet damit „Anmeldung abgeschaltet“
+// (authDisabled), „noch niemand eingerichtet“ (SETUP_PENDING – legt beim allerersten Aufruf den Administrator an) oder
+// „bereit“ (PIN_REQUIRED). Ein altes Skript ohne Anmeldung antwortet „Unbekannte Aktion“ → App läuft ohne Anmeldung.
 async function showLoginPage(message, kind) {
     if (isAuthViewOpen() && document.getElementById('authLoginForm')) { authMsg(message, kind || 'error'); return; }
-    showAuthView('<h2 id="authTitle">Anmelden</h2><p class="auth-hint">Namen wählen und PIN eingeben.</p><div id="authMessage" class="auth-message"></div><p class="page-note" id="authLoading">Lade Mitarbeiter …</p>');
+    showAuthView('<h2 id="authTitle">Anmelden</h2><p class="auth-hint">PIN eingeben.</p><div id="authMessage" class="auth-message"></div><p class="page-note" id="authLoading">Verbindung wird geprüft …</p>');
     if (message) authMsg(message, kind || 'error');
-    let users = [], setupPending = false;
     try {
-        const r = await postToServer('authUsers');
+        const r = await postToServer('authLogin', { deviceId: SYNC_DEVICE_ID });
         if (r.authDisabled) { authDisabled = true; setAuthSession(null); finishAuth(); return; }
-        users = r.users || []; setupPending = !!r.setupPending;
     } catch (e) {
         if (isUnknownActionError(e)) { authDisabled = true; setAuthSession(null); finishAuth(); return; } // altes Skript ohne Anmeldung
-        renderLoginError(`Server nicht erreichbar (${escapeHtml(e.message)}).`); return;
+        if (e.code === 'SETUP_PENDING') {
+            if (document.getElementById('authLoading')) renderLoginError(e.message || 'Noch kein Mitarbeiter eingerichtet.', true);
+            return;
+        }
+        if (!e.code) { if (document.getElementById('authLoading')) renderLoginError(`Server nicht erreichbar (${escapeHtml(e.message)}).`); return; }
+        // PIN_REQUIRED (bereit) – oder eine andere Meldung des Skripts: PIN-Feld zeigen, die Anmeldung meldet Genaueres
     }
     if (!document.getElementById('authLoading')) return; // inzwischen anders weitergegangen
-    if (setupPending || !users.length) {
-        renderLoginError('Noch kein Mitarbeiter eingerichtet. Der Administrator hat eine Einladung per E-Mail erhalten – bitte den Link darin öffnen und die PIN festlegen.', true);
-        return;
-    }
-    const lastId = localStorage.getItem('frachtTracker_lastUserId') || '';
-    const opts = users.map(u => `<option value="${escapeHtml(u.id)}" ${u.id === lastId ? 'selected' : ''}>${escapeHtml(u.name)}</option>`).join('');
-    authContentEl.innerHTML = `<h2 id="authTitle">Anmelden</h2><p class="auth-hint">Namen wählen und PIN eingeben.</p>
+    authContentEl.innerHTML = `<h2 id="authTitle">Anmelden</h2><p class="auth-hint">PIN eingeben.</p>
         <form id="authLoginForm" novalidate>
-            <div class="form-group"><label for="authUserSelect">Mitarbeiter</label><select id="authUserSelect">${opts}</select></div>
             ${pinField('authPin', 'PIN (6 Ziffern)', true)}
             <div id="authMessage" class="auth-message"></div>
             <button type="submit" class="main-action-button" id="authLoginBtn">Anmelden</button>
@@ -372,13 +396,12 @@ async function showLoginPage(message, kind) {
     document.getElementById('authLoginForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         if (authBusy) return;
-        const userId = document.getElementById('authUserSelect').value, pin = pinValue('authPin');
+        const pin = pinValue('authPin');
         if (pin.length !== 6) { authMsg('Bitte die 6-stellige PIN eingeben.'); pinEl.focus(); return; }
         authBusy = true; document.getElementById('authLoginBtn').disabled = true; authMsg('');
         try {
-            const r = await postToServer('authLogin', { userId, pin, deviceId: SYNC_DEVICE_ID });
+            const r = await postToServer('authLogin', { pin, deviceId: SYNC_DEVICE_ID });
             if (r.authDisabled) { authDisabled = true; setAuthSession(null); finishAuth(); return; }
-            localStorage.setItem('frachtTracker_lastUserId', userId);
             setAuthSession({ token: r.token, user: r.user, expires: r.expires });
             finishAuth();
         } catch (err) {
@@ -421,7 +444,6 @@ async function showInvitePage(invite) {
         try {
             const r = await postToServer('authAccept', { invite, pin: p1, deviceId: SYNC_DEVICE_ID });
             setAuthSession({ token: r.token, user: r.user, expires: r.expires });
-            localStorage.setItem('frachtTracker_lastUserId', r.user.id);
             // Einladungs-Token aus der Adresse nehmen (Neuladen soll nicht wieder die Einladungsseite zeigen)
             try { const u = new URL(location.href); u.searchParams.delete('einladung'); history.replaceState(history.state, '', u.pathname + u.search + u.hash); } catch (err) { /* ignorieren */ }
             finishAuth();
@@ -777,6 +799,7 @@ async function pullRemoteChanges() {
         }
         syncPollFailures = 0; syncPollDelay = SYNC_POLL_INTERVAL_MS;
         if (!hasPending()) showSyncOk();
+        if (!carrierMapLoaded) loadCarrierMap();      // Spediteur-Zuordnung beim Start nicht bekommen → jetzt nachholen
     } catch (error) {
         console.warn("Abruf der Änderungen fehlgeschlagen:", error.message);
         syncPollFailures++;

@@ -5,9 +5,9 @@
 // App-Version (zentral). Bei jeder veröffentlichten Änderung hochzählen und in CHANGELOG.md, index.html (<title>),
 // sw.js (Cache-Name) und backend/README.md nachziehen – tests/versioncheck.js prüft, dass alle Stellen übereinstimmen.
 // APP_BACKEND_VERSION = Version von backend/Code.gs, zu der diese App gehört (nur Anzeige im Menü).
-const APP_VERSION = '9.6';
-const APP_VERSION_DATE = '2026-11-10';
-const APP_BACKEND_VERSION = '2.9';
+const APP_VERSION = '9.7';
+const APP_VERSION_DATE = '2026-11-11';
+const APP_BACKEND_VERSION = '2.10';
 
 // Bibliotheken defensiv einbinden: Fehlt eine Lib (z. B. Datei nicht geladen),
 // darf nur die jeweilige Funktion (PDF / QR-Code) ausfallen – nicht die ganze App.
@@ -170,6 +170,7 @@ const suspicionDeclineBtnEl = document.getElementById('suspicionDeclineBtn');
         // (oder die Einladungsseite bei ?einladung=…) und kehrt erst nach erfolgreicher Anmeldung zurück.
         await ensureLoggedIn();
         const initialShipments = await loadDataFromServer();
+        loadCarrierMap();                                  // Spediteur-Zuordnung (VVL-Import) im Hintergrund vom Server holen
         // LKW-Status: kommt normalerweise schon mit loadChanges (loadDataFromServer). Nur falls nicht (altes Server-Skript), extra laden –
         // über applyServerLkwStatus, damit eine noch unbestätigte eigene Änderung (z. B. offline deaktiviert) nicht überschrieben wird.
         if (!lkwStatusFetched) {
@@ -299,8 +300,8 @@ const suspicionDeclineBtnEl = document.getElementById('suspicionDeclineBtn');
 const LKWSTATUSKEY = 'frachtLkwStatusV1';
     const SUFFIX_LENGTH = 4;
     // Name des angemeldeten Mitarbeiters (Anmeldung mit PIN, s. Abschnitt ANMELDUNG) – landet in Scans, Archiv und PDF.
-    // Solange das Server-Skript noch keine Anmeldung kennt (AUTH_ENABLED = false / altes Skript), gilt der bisherige Standardname.
-    const MITARBEITER_NAME_DEFAULT = "Zakaria Bisbiss";
+    // Solange das Server-Skript keine Anmeldung verlangt (AUTH_ENABLED = false / altes Skript), bleibt der Name leer.
+    const MITARBEITER_NAME_DEFAULT = "";
     let MITARBEITER_NAME = MITARBEITER_NAME_DEFAULT;
     const RAC_NUMMER = "DE/RA/00889-07";
     // Firmenbezeichnung des reglementierten Beauftragten im Sicherungsnachweis (PDF) – zusammen mit RAC_NUMMER die Kennung nach DVO (EU) 2015/1998 Nr. 6.3.2.6 a)
@@ -320,103 +321,11 @@ const LKWSTATUSKEY = 'frachtLkwStatusV1';
     // VCK-Kombi ist nur über die Auswahl-Leiste der Packstücktabelle (Desktop) erreichbar.
     const KOMBI_CAPABLE_STATUSES = ['XRY', 'VCK'];
     
-    // AKTUALISIERTE LISTE BASIEREND AUF Kundennummerliste VW.xlsx (Stand: 16.10.2025)
-    const KUNDENNR_CARRIER_MAP = {
-        "294": "DSV",
-        "334": "DHL",
-        "341": "DWF",
-        "355201": "Kühne + Nagel",
-        "360": "Maersk",
-        "381": "DSV",
-        "524": "DSV",
-        "541": "Kühne + Nagel",
-        "595": "DSV",
-        "602201": "DSV",
-        "603": "DSV",
-        "607": "Maersk",
-        "608": "WWS Freight",
-        "613": "DSV",
-        "615": "Kühne + Nagel",
-        "631": "Maersk",
-        "637": "DSV",
-        "726": "DHL",
-        "730": "UPS",
-        "730201": "UPS",
-        "758001": "DHL",
-        "758204": "Geodis",
-        "7589911": "Geodis",
-        "7589983": "Geodis",
-        "7589984": "Geodis",
-        "7589988": "Geodis",
-        "7650201": "DHL",
-        "772201": "DHL",
-        "7960032": "DHL",
-        "7960041": "DHL",
-        "796022": "DHL",
-        "796201": "DHL",
-        "796203": "DHL",
-        "796204": "DHL",
-        "796206": "DHL",
-        "796207": "DHL",
-        "796208": "DHL",
-        "801": "WWS Freight",
-        "802": "DSV",
-        "804": "DHL",
-        "811205": "DB Schenker",
-        "813": "DSV",
-        "815": "DHL",
-        "817": "DSV",
-        "819202": "DHL",
-        "824": "Kühne + Nagel",
-        "862": "DSV",
-        "865": "DHL",
-        "868": "WWS Freight",
-        "875201": "Maersk",
-        "897": "DSV",
-        "9380011": "DHL",
-        "938203": "DHL",
-        "945": "DSV",
-        "959201": "DHL",
-        "959202": "DHL",
-        "959203": "DHL",
-        "981": "DHL",
-        "981299": "DHL",
-        "985202": "Kühne + Nagel",
-        "996001": "DB Schenker",
-        "9969726": "DB Schenker",
-        "9969729": "DB Schenker",
-        "9974021": "Kühne + Nagel",
-        "9974024": "Kühne + Nagel",
-        "9974029": "Kühne + Nagel",
-        "9974051": "Kühne + Nagel",
-        "9974054": "Kühne + Nagel",
-        "9974071": "Kühne + Nagel",
-        "9974074": "Kühne + Nagel",
-        "9974079": "Kühne + Nagel",
-        "9974101": "Kühne + Nagel",
-        "9974104": "Kühne + Nagel",
-        "9974109": "Kühne + Nagel",
-        "9974141": "Kühne + Nagel",
-        "9974144": "Kühne + Nagel",
-        "9974149": "Kühne + Nagel",
-        "9974221": "Kühne + Nagel",
-        "9974224": "Kühne + Nagel",
-        "9974229": "Kühne + Nagel",
-        "9974251": "Kühne + Nagel",
-        "9974261": "Kühne + Nagel",
-        "9974264": "Kühne + Nagel",
-        "9974269": "Kühne + Nagel",
-        "9975001": "Kühne + Nagel",
-        "9975006": "Kühne + Nagel",
-        "998": "DSV",
-        "9994951": "DB Schenker",
-        "9994954": "DB Schenker",
-        "9994959": "DB Schenker",
-        "9994991": "DB Schenker",
-        "9994994": "DB Schenker",
-        "9994999": "DB Schenker",
-        "285201": "WWS Freight"
-    };
+    // Zuordnung Kundennummer → Spediteur für den VVL-Import (07-import-erfassen.js). Steht seit 9.7 nicht mehr im Code, sondern
+    // im Blatt „kundennr_carrier“ des Google Sheets (Kundennr | Spediteur); die App holt sie mit loadCarrierMap vom Server
+    // (loadCarrierMap() in 02-sync-anmeldung.js) und hält den letzten Stand für den Start ohne Netz im localStorage.
+    const CARRIER_MAP_KEY = 'frachtTracker_kundennrCarrier';
+    let kundennrCarrierMap = (() => { try { const m = JSON.parse(localStorage.getItem(CARRIER_MAP_KEY) || '{}'); return (m && typeof m === 'object' && !Array.isArray(m)) ? m : {}; } catch (e) { return {}; } })();
 
 // ... (Weiter im Code)
 

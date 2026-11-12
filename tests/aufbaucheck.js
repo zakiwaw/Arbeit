@@ -63,6 +63,20 @@ const known = Array.from(/const KNOWN_ACTIONS_ = \[([\s\S]*?)\];/.exec(gas)[1].m
 const cases = Array.from(gas.matchAll(/case "([A-Za-z]+)":/g)).map(m => m[1]);
 const noCase = known.filter(a => !cases.includes(a));
 ok(known.length > 10 && noCase.length === 0, `Code.gs: jede bekannte Aktion hat einen case in doPost (fehlt: ${noCase.join(', ') || '–'})`);
+ok(!known.includes('authUsers') && !/function authUsers\b/.test(gas), 'Code.gs: öffentliche Aktion authUsers gibt es nicht mehr (2.10, Anmeldung nur mit PIN)');
+
+// Keine persönlichen Daten und keine feste Kundennummern-Zuordnung im Repo (9.7 / 2.10)
+const allJs = jsFiles.map(f => read('js/' + f)).join('\n');
+ok(/const MITARBEITER_NAME_DEFAULT = "";/.test(read('js/01-start.js')), 'js/01-start.js: Standard-Mitarbeitername ist leer');
+ok(!/KUNDENNR_CARRIER_MAP/.test(allJs) && !/["']\d{3,7}["']\s*:\s*["'][A-Za-zÄÖÜ]/.test(allJs), 'js/: keine feste Zuordnung Kundennummer → Spediteur (kommt vom Server, Blatt kundennr_carrier)');
+ok(!/BOOTSTRAP_ADMIN\s*=/.test(gas) && /getProperty\('BOOTSTRAP_ADMIN_NAME'\)/.test(gas) && /getProperty\('BOOTSTRAP_ADMIN_EMAIL'\)/.test(gas), 'Code.gs: Haupt-Administrator nur aus den Skript-Eigenschaften BOOTSTRAP_ADMIN_NAME/BOOTSTRAP_ADMIN_EMAIL');
+// E-Mail-Adressen nur als neutrale Platzhalter (example.com, name@firma.de als Eingabehilfe); Bibliotheken unter assets/vendor ausgenommen
+const textFiles = ['index.html', 'README.md', 'CHANGELOG.md', 'sw.js', 'backend/Code.gs', 'backend/README.md', 'backend/ANLEITUNG-Drive-Import.md', 'backend/PROMPT-MAN-Ladeliste.md', 'tests/README.md']
+  .concat(jsFiles.map(f => 'js/' + f), fs.readdirSync(path.join(ROOT, 'tests')).filter(f => f.endsWith('.js')).map(f => 'tests/' + f));
+const realMails = [];
+textFiles.forEach(f => (read(f).match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g) || [])
+  .filter(m => !/@example\.com$/i.test(m) && m.toLowerCase() !== 'name@firma.de').forEach(m => realMails.push(`${f}: ${m}`)));
+ok(realMails.length === 0, `keine echten E-Mail-Adressen in Code, Tests und Doku (gefunden: ${realMails.join(', ') || '–'})`);
 
 console.log(fails ? `SOME FAILED (${fails} von ${count})` : `ALL GOOD (${count})`);
 process.exit(fails ? 1 : 0);
