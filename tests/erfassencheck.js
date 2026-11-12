@@ -163,6 +163,18 @@ async function referencePayload(page, mode, text) {
     assert(carrierReq && carrierReq.auth, 'Spediteur-Zuordnung beim Start vom Server geholt (loadCarrierMap, mit Sitzungs-Token)');
     assert(k1.freightForwarder === 'Spediteur A' && !k2.freightForwarder, `Spediteur aus der Server-Zuordnung übernommen, unbekannte Kundennummer ohne Spediteur (${k1.freightForwarder} / ${k2.freightForwarder})`);
     assert(await page.evaluate(() => JSON.parse(localStorage.getItem('frachtTracker_kundennrCarrier') || '{}')['9974021']) === 'Spediteur A', 'Zuordnung für den Start ohne Netz gespeichert');
+    {   // Antwort auf loadCarrierMap beim Start verloren (Netz weg) → der nächste erfolgreiche Abgleich holt die Zuordnung nach
+        const be2 = makeBackend(sampleData(), {}); be2.carrierMap = { '9974021': 'Spediteur B' }; be2.dropNext = { loadCarrierMap: 1 };
+        const pg = await openApp(browser, be2); await wait(800);
+        const before = await pg.evaluate(() => kundennrCarrierMap['9974021'] || '');
+        await pg.evaluate(() => window.dispatchEvent(new Event('online'))); await wait(1200);
+        const n = be2.requests.filter(r => r.action === 'loadCarrierMap').length;
+        const after = await pg.evaluate(() => kundennrCarrierMap['9974021']);
+        assert(before !== 'Spediteur B' && n === 2 && after === 'Spediteur B', `Zuordnung beim Start nicht bekommen → beim nächsten Abgleich nachgeholt (${n} Anfragen, ${before || '–'} → ${after})`);
+        await pg.evaluate(() => window.dispatchEvent(new Event('online'))); await wait(800);
+        assert(be2.requests.filter(r => r.action === 'loadCarrierMap').length === 2, 'Danach keine weiteren Anfragen bei jedem Abgleich');
+        await pg.close();
+    }
     const p2 = k1.scannedItems.find(i => i.rawInput === '873227448');
     assert(p2 && p2.sendnr === '8255015' && p2.grossWeight === '42 KG' && p2.dimensions === '2060x1135x745 MM' && k1.scannedItems[0].sendnr === '8255014', 'VVL-Positionen mit Sendungs-Nr., Gewicht und Maßen (MM)');
     // Standard-Modus: einfache Blöcke

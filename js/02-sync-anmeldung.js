@@ -181,9 +181,12 @@ async function postToServer(action, payload, authOverride) {
 
 // Kundennummer → Spediteur für den VVL-Import (Blatt „kundennr_carrier“ im Sheet, Code.gs 2.10 – bis 9.6 fest im Code).
 // Läuft im Hintergrund nach dem Start bzw. nach einer Anmeldung; ohne Netz oder mit älterem Server-Skript bleibt der zuletzt
-// gespeicherte Stand (localStorage, siehe CARRIER_MAP_KEY in 01-start.js).
-let carrierMapLoaded = false;
+// gespeicherte Stand (localStorage, siehe CARRIER_MAP_KEY in 01-start.js). Schlägt das Laden fehl (z. B. kein Netz beim Start),
+// holt der nächste erfolgreiche Abgleich (pullRemoteChanges) die Zuordnung nach – damit sie wie früher für den VVL-Import da ist.
+let carrierMapLoaded = false, carrierMapLoading = false;
 async function loadCarrierMap() {
+    if (carrierMapLoading) return;
+    carrierMapLoading = true;
     try {
         const r = await postToServer('loadCarrierMap');
         const m = r && r.map;
@@ -194,7 +197,7 @@ async function loadCarrierMap() {
     } catch (e) {
         if (isUnknownActionError(e)) carrierMapLoaded = true;   // Server-Skript vor 2.10: nicht bei jeder Anmeldung erneut fragen
         console.warn('Spediteur-Zuordnung konnte nicht geladen werden – nutze den zuletzt gespeicherten Stand.', e);
-    }
+    } finally { carrierMapLoading = false; }
 }
 
 // ===================================================================
@@ -796,6 +799,7 @@ async function pullRemoteChanges() {
         }
         syncPollFailures = 0; syncPollDelay = SYNC_POLL_INTERVAL_MS;
         if (!hasPending()) showSyncOk();
+        if (!carrierMapLoaded) loadCarrierMap();      // Spediteur-Zuordnung beim Start nicht bekommen → jetzt nachholen
     } catch (error) {
         console.warn("Abruf der Änderungen fehlgeschlagen:", error.message);
         syncPollFailures++;

@@ -14,7 +14,7 @@ Persönliche Daten aus dem Repo entfernt. **Code.gs 2.10 bereitstellen und die S
   (fehlt eine: klarer Fehler wie bei `SPREADSHEET_ID`). Ungenutzte Mailadresse in `sendPdfEmail` entfernt.
 - Kundennummer → Spediteur: neues Blatt `kundennr_carrier` (Kundennr | Spediteur), Aktion `loadCarrierMap`. Das Blatt wird beim ersten
   Abruf angelegt und einmalig mit allen 94 Einträgen 1:1 aus der bisherigen App-Liste gefüllt (Kundennummerliste VW.xlsx, Stand
-  16.10.2025); danach wird es im Sheet gepflegt. Die App holt die Zuordnung nach dem Start und hält sie für den Start ohne Netz im Speicher.
+  16.10.2025); danach wird es im Sheet gepflegt. Die App holt die Zuordnung nach dem Start (klappt das nicht, beim nächsten Abgleich) und hält sie für den Start ohne Netz im Speicher.
 - Anmeldung nur mit PIN: Anmeldeseite zeigt nur noch das PIN-Feld, `authLogin` findet den Nutzer über den PIN-Hash. PIN bei
   mehreren aktiven Nutzern → Anmeldung schlägt fehl (`PIN_AMBIGUOUS`). Einladung/PIN-Reset lehnen eine schon vergebene PIN ab
   (`PIN_TAKEN`). Aktion `authUsers` entfernt. Hash, Sperre (5 Versuche, 15 Minuten, Spalten failed/lockedUntil), Sitzungen und Token
