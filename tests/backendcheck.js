@@ -459,4 +459,43 @@ p = api.parseStandardText_('\uFEFFTitelzeile\n\nUSA\n 123 \n\n\n\nChina\n456\n78
 ok(p.orders.length === 2 && p.orders[0].orderId === 'USA' && p.orders[0].hus.join() === '123' && p.orders[1].hus.join() === '456,789' && p.ignored.length === 0, 'parseStandardText_: BOM, Titelzeile ohne Packstücke, mehrere Leerzeilen');
 p = api.parseStandardText_('');
 ok(p.orders.length === 0, 'parseStandardText_: leer → keine Aufträge');
+// 9) Bestand aus Code.gs 2.9 läuft unverändert weiter (2.10 ändert nur die Namensauswahl): Ein Nutzer, wie 2.9 ihn im Blatt
+//    _users gespeichert hat (Hash unabhängig nachgerechnet: HMAC-SHA256(salt + ':' + PIN, AUTH_SECRET)), meldet sich mit seiner PIN
+//    an; Token-Aufbau und -Signatur, Sitzungsliste, Abmelden, Verlängern und die Sperre (Zähler, Meldungen, 15 Minuten) wie in 2.9.
+{
+  const e2 = require('./gas-env')();
+  Object.assign(e2.props, { SPREADSHEET_ID: 'test-tabelle', BOOTSTRAP_ADMIN_NAME: 'Mitarbeiter 1', BOOTSTRAP_ADMIN_EMAIL: 'admin@example.com', AUTH_SECRET: 'a'.repeat(128) });
+  const hmac = (d, k) => crypto.createHmac('sha256', k).update(d, 'utf8').digest('hex');
+  const salt = 'b'.repeat(32), hash = hmac(salt + ':482913', e2.props.AUTH_SECRET);
+  const cols = ['id', 'name', 'email', 'role', 'pinHash', 'salt', 'active', 'createdAt', 'invite', 'inviteExpires', 'failed', 'lockedUntil', 'lastLogin', 'gen', 'sessions'];
+  e2.api.doPost({ postData: { contents: JSON.stringify({ action: 'authLogin', payload: {} }) } });   // legt _users an (mit Administrator)
+  const sh = e2.sheets['_users'];
+  ok(JSON.stringify(sh.rows[0]) === JSON.stringify(cols), 'Blatt _users: Spalten wie in 2.9');
+  sh.rows.splice(1, sh.rows.length - 1, ['u-alt', 'Mitarbeiter 1', 'admin@example.com', 'admin', hash, salt, true, 1, '', 0, 0, 0, 0, 3, '']);
+  delete e2.cache['fracht_users'];
+  const row = () => sh.rows[1];
+  let q = e2.call('authLogin', { pin: '482913', deviceId: 'dev-alt' });
+  ok(q.status === 'success' && q.user.id === 'u-alt' && row()[4] === hash && row()[5] === salt, 'PIN-Hash aus 2.9 wird erkannt, Hash und Salt bleiben unverändert');
+  const [body, sig] = q.token.split('.'), data = JSON.parse(Buffer.from(body, 'base64url').toString());
+  ok(sig === hmac(body, e2.props.AUTH_SECRET) && JSON.stringify(Object.keys(data)) === '["u","g","s","e"]' && data.u === 'u-alt' && data.g === 3, 'Token wie bisher: Base64(JSON {u,g,s,e}) + "." + HMAC-SHA256');
+  ok(Math.abs(data.e - Date.now() - 2 * 3600e3) < 5000 && q.expires === data.e, 'Sitzungsdauer wie bisher (2 h ohne Verlängerung)');
+  ok(JSON.parse(row()[14]).some(x => x.s === data.s && x.d === 'dev-alt'), 'Sitzung in der Spalte sessions eingetragen');
+  ok(e2.call('loadChanges', { sinceVersion: 0 }, q.token).status === 'success', 'Token öffnet die Daten-Aktionen');
+  const ref = e2.call('authRefresh', {}, q.token);
+  ok(ref.status === 'success' && JSON.parse(Buffer.from(ref.token.split('.')[0], 'base64url').toString()).s === data.s, 'Verlängern: gleiche Sitzung, neues Token');
+  ok(e2.call('authLogout', {}, ref.token).status === 'success' && e2.call('loadChanges', { sinceVersion: 0 }, q.token).code === 'AUTH_REQUIRED', 'Abmelden beendet die Sitzung');
+  // Sperre: Ablauf und Meldungen wörtlich wie in 2.9 (ein Nutzer)
+  const msgs = [];
+  for (let i = 0; i < 5; i++) msgs.push(e2.call('authLogin', { pin: '000001' }).message);
+  ok(JSON.stringify(msgs) === JSON.stringify(['PIN falsch – noch 4 Versuch(e).', 'PIN falsch – noch 3 Versuch(e).', 'PIN falsch – noch 2 Versuch(e).', 'PIN falsch – noch 1 Versuch(e).', 'Zu viele Fehlversuche – Zugang für 15 Minuten gesperrt.']), 'Fehlversuche: Meldungen wie in 2.9');
+  ok(Number(row()[10]) === 0 && Math.abs(Number(row()[11]) - Date.now() - 15 * 60000) < 5000, 'Sperre: failed = 0, lockedUntil = jetzt + 15 Min (wie 2.9)');
+  q = e2.call('authLogin', { pin: '482913' });
+  ok(q.code === 'LOCKED' && q.message === 'Zu viele Fehlversuche – gesperrt für 15 Min.' && !q.token, 'Während der Sperre: auch die richtige PIN abgelehnt, Meldung wie 2.9');
+  row()[11] = Date.now() - 1; delete e2.cache['fracht_users'];
+  e2.call('authLogin', { pin: '000001' });
+  ok(Number(row()[10]) === 1, 'Nach Ablauf der Sperre zählt der nächste Fehlversuch wieder ab 1');
+  q = e2.call('authLogin', { pin: '482913' });
+  ok(q.status === 'success' && Number(row()[10]) === 0 && Number(row()[11]) === 0 && Number(row()[12]) > 0, 'Erfolgreiche Anmeldung: failed / lockedUntil zurückgesetzt, lastLogin gesetzt (wie 2.9)');
+}
+
 console.log(fails ? `SOME FAILED (${fails} von ${oks + fails})` : `ALL GOOD (${oks})`); process.exit(fails ? 1 : 0);
