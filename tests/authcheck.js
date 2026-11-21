@@ -1,7 +1,7 @@
 // Anmeldung (nur PIN, 9.7): Anmeldeseite vor dem Laden, Einladungslink, Token an jeder Anfrage, Anmeldung bei abgelaufener Sitzung,
 // Administrator-Seite „Mitarbeiter“, Abmelden, Name des Angemeldeten in Scans, altes Skript ohne Anmeldung.
 // Start: node tests/authcheck.js  (Server auf :8000, Chrome siehe tests/README.md)
-const { launch, makeBackend, openApp, sampleData, scan, assert, finish, TEST_TOKEN } = require('./helpers');
+const { launch, makeBackend, openApp, sampleData, scan, assert, finish, TEST_TOKEN, TEST_USER, MA2_TOKEN, MA2_USER } = require('./helpers');
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
 (async () => {
@@ -16,6 +16,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     be = makeBackend(sampleData(), {});
     page = await openApp(browser, be, { loggedOut: true }); await wait(400);
     assert(await authOpen(page), 'Ohne Sitzung: Anmeldeseite sichtbar');
+    assert(await page.evaluate(() => getComputedStyle(document.getElementById('resetDataButton').parentElement).display === 'none'), 'Ohne Anmeldung ist „Alles Zurücksetzen“ ausgeblendet');
     assert(await page.evaluate(() => !document.getElementById('loadingOverlay').classList.contains('visible')), 'Lade-Spinner ist hinter der Anmeldeseite ausgeblendet');
     assert(!be.actions.includes('loadChanges') && !be.actions.includes('loadLkwStatus'), `Vor der Anmeldung keine Daten-Aktion (${be.actions.join(',')})`);
     const form = await page.evaluate(() => ({ selects: document.querySelectorAll('#authContent select').length, inputs: Array.from(document.querySelectorAll('#authContent input')).map(i => i.id), text: document.getElementById('authContent').innerText }));
@@ -51,6 +52,14 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     // Menü: normaler Mitarbeiter sieht „Abmelden“, aber nicht „Mitarbeiter“
     const menu = await page.evaluate(() => ({ user: document.getElementById('authUserLine').textContent, admin: document.getElementById('manageUsersItem').classList.contains('hidden'), logout: document.getElementById('logoutItem').classList.contains('hidden') }));
     assert(menu.user === 'Angemeldet: Mitarbeiter 2' && menu.admin === true && menu.logout === false, `Menü für Mitarbeiter (${JSON.stringify(menu)})`);
+    await page.evaluate(() => document.getElementById('menu-toggle-btn').click());
+    assert(await page.evaluate(() => getComputedStyle(document.getElementById('resetDataButton').parentElement).display === 'none'), 'Mitarbeiter sieht „Alles Zurücksetzen“ auch im geöffneten Menü nicht');
+    const employeeClick = await page.evaluate(() => {
+      let asked = false; const previous = window.confirm; window.confirm = () => { asked = true; return true; };
+      document.getElementById('resetDataButton').click(); window.confirm = previous; return asked;
+    });
+    await wait(200);
+    assert(!employeeClick && !be.actions.includes('clearAllData'), 'Auch ein künstlicher Klick durch einen Mitarbeiter startet kein Zurücksetzen');
     assert(page.__errors.length === 0, `Keine JS-Fehler (${page.__errors.join(' | ')})`);
     const ma2Session = await page.evaluate(() => JSON.parse(localStorage.getItem('frachtTracker_session')));
     await page.close();
@@ -111,6 +120,13 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     const adminMenu = await page.evaluate(() => ({ user: document.getElementById('authUserLine').textContent, admin: document.getElementById('manageUsersItem').classList.contains('hidden') }));
     assert(adminMenu.user === 'Angemeldet: Mitarbeiter 1 (Administrator)' && adminMenu.admin === false, `Menü für Administrator (${JSON.stringify(adminMenu)})`);
     await page.evaluate(() => document.getElementById('menu-toggle-btn').click()); await wait(200);
+    assert(await page.evaluate(() => getComputedStyle(document.getElementById('resetDataButton').parentElement).display !== 'none'), 'Administrator sieht „Alles Zurücksetzen“ im Menü');
+    const cancelledPrompt = await page.evaluate(() => {
+      let message = ''; const previous = window.confirm; window.confirm = text => { message = text; return false; };
+      document.getElementById('resetDataButton').click(); window.confirm = previous; return message;
+    });
+    assert(/alle Sendungsdaten/i.test(cancelledPrompt) && /gelöscht/i.test(cancelledPrompt) && /vorher.*Backup/i.test(cancelledPrompt) && !be.actions.includes('clearAllData'),
+      'Warnung nennt Löschung und vorheriges Backup; Abbrechen sendet keine Anfrage');
     await page.evaluate(() => document.getElementById('manageUsersButton').click()); await wait(700);
     const pg = await page.evaluate(() => ({ title: document.getElementById('pageTitle').textContent, hidden: document.getElementById('pageView').classList.contains('hidden'), rows: Array.from(document.querySelectorAll('.admin-row .admin-name')).map(e => e.textContent), url: location.search }));
     assert(pg.title === 'Mitarbeiter' && !pg.hidden && pg.rows.length === 2 && /Mitarbeiter 1Administratoraktiv/.test(pg.rows[0]) && pg.url.includes('seite=mitarbeiter'), `Seite „Mitarbeiter“ mit Liste (${JSON.stringify(pg)})`);
@@ -153,6 +169,203 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     page = await openApp(browser, be, { session: { token: 'tok-ma2', user: { id: 'u-ma2', name: 'Mitarbeiter 2', role: 'user' }, expires: Date.now() + 3600e3 }, query: '?seite=mitarbeiter' }); await wait(500);
     assert(!(await authOpen(page)) && (await page.evaluate(() => document.getElementById('pageView').classList.contains('hidden'))), 'Mitarbeiter ohne Admin-Rolle: Seite wird nicht geöffnet');
     assert(!be.actions.includes('adminListUsers'), 'Kein Admin-Aufruf durch normalen Mitarbeiter');
+    await page.close();
+
+    // Einzel- und LKW-Löschung: Sichtbarkeit, direkte/künstliche Aufrufe und Rollenwechsel gegen das echte Code.gs.
+    {
+      const employee = { token: MA2_TOKEN, user: MA2_USER, expires: Date.now() + 3600e3 };
+      const admin = { token: TEST_TOKEN, user: TEST_USER, expires: Date.now() + 3600e3 };
+      const b = makeBackend(sampleData(), { 'MAN 1': true }, { gas: true });
+      const p = await openApp(browser, b, { session: employee, viewport: { width: 1400, height: 900, deviceScaleFactor: 1 } });
+      const localState = () => p.evaluate(() => ({ shipments: localStorage.getItem(LOCAL_STORAGE_KEY), pending: JSON.stringify(readPending()), status: localStorage.getItem(LKWSTATUSKEY) }));
+      const before = await localState(), serverBefore = JSON.stringify(b.gas.sheets.shipments.rows);
+      const list = await p.evaluate(() => {
+        const row = document.querySelector('#shipmentTableBody tr[data-basenumber="123"]');
+        window.__deleteConfirms = 0; window.confirm = () => { window.__deleteConfirms++; return true; };
+        const result = { del: getComputedStyle(row.querySelector('.main-delete-btn')).display, edit: getComputedStyle(row.querySelector('.edit-btn')).display, pdf: getComputedStyle(row.querySelector('.pdf-btn')).display };
+        row.querySelector('.main-delete-btn').click();
+        deleteShipment('123'); // direkter Funktionsaufruf darf nicht lokal löschen
+        showDetailView('123');
+        return result;
+      });
+      assert(list.del === 'none' && list.edit !== 'none' && list.pdf !== 'none', `Mitarbeiter: Listen-Löschen ausgeblendet, Bearbeiten und PDF bleiben (${JSON.stringify(list)})`);
+      const detail = await p.evaluate(() => {
+        const del = document.querySelector('#currentShipmentDetails .detail-actions .main-delete-btn');
+        const result = { del: getComputedStyle(del).display, edit: getComputedStyle(del.parentElement.querySelector('.edit-btn')).display };
+        del.click(); result.stillOpen = !document.getElementById('detailView').classList.contains('hidden');
+        return result;
+      });
+      assert(detail.del === 'none' && detail.edit !== 'none' && detail.stillOpen, `Mitarbeiter: Detail-Löschen ausgeblendet und künstlicher Klick schließt die Ansicht nicht (${JSON.stringify(detail)})`);
+      const roles = await p.evaluate(({ admin, employee }) => {
+        const del = document.querySelector('#currentShipmentDetails .detail-actions .main-delete-btn');
+        const display = () => getComputedStyle(del).display;
+        setAuthSession(admin); const asAdmin = display();
+        setAuthSession(null); const loggedOut = display();
+        setAuthSession(employee); const asEmployee = display();
+        return { asAdmin, loggedOut, asEmployee };
+      }, { admin, employee });
+      assert(roles.asAdmin !== 'none' && roles.loggedOut === 'none' && roles.asEmployee === 'none', `Rollenwechsel aktualisiert bestehende Knöpfe ohne Neuzeichnen (${JSON.stringify(roles)})`);
+      const detailRoleLoss = await p.evaluate(({ admin, employee }) => {
+        setAuthSession(admin); window.confirm = () => { setAuthSession(employee); return true; };
+        document.querySelector('#currentShipmentDetails .detail-actions .main-delete-btn').click();
+        window.confirm = () => { window.__deleteConfirms++; return true; };
+        return !document.getElementById('detailView').classList.contains('hidden');
+      }, { admin, employee });
+      assert(detailRoleLoss && JSON.stringify(await localState()) === JSON.stringify(before), 'Rollenverlust bei der Sendungs-Bestätigung verhindert Löschen und Navigieren');
+      await p.evaluate(() => { hideDetailView(); openPage({ id: 'anlieferung' }); });
+      const truckRow = await p.evaluate(() => {
+        const del = document.querySelector('#pageContent [data-lkw-delete="MAN 1"]');
+        const rename = document.querySelector('#pageContent [data-lkw-rename="MAN 1"]');
+        const result = { del: getComputedStyle(del).display, rename: getComputedStyle(rename).display };
+        del.click(); result.direct = deleteTruckFromPage('MAN 1');
+        return result;
+      });
+      assert(truckRow.del === 'none' && truckRow.rename !== 'none' && truckRow.direct === false, `Mitarbeiter: LKW-Zeilenwerkzeug versteckt, Umbenennen sichtbar, direkter Löschaufruf abgewiesen (${JSON.stringify(truckRow)})`);
+      const truckPage = await p.evaluate(() => {
+        openPage({ id: 'lkw', truckId: 'MAN 1' });
+        document.querySelector('#pageHeaderActions [data-lkw-menu]').click();
+        const del = document.querySelector('#pageHeaderActions [data-lkw-delete]');
+        const rename = document.querySelector('#pageHeaderActions [data-lkw-rename]');
+        const rowDel = document.querySelector('#pageContent tr[data-basenumber="9007000001"] .main-delete-btn');
+        const result = { del: getComputedStyle(del).display, rename: getComputedStyle(rename).display,
+          sep: getComputedStyle(document.querySelector('#pageHeaderActions .page-action-sep')).display, rowDel: getComputedStyle(rowDel).display };
+        del.click(); rowDel.click();
+        return result;
+      });
+      assert(truckPage.del === 'none' && truckPage.sep === 'none' && truckPage.rowDel === 'none' && truckPage.rename !== 'none',
+        `Mitarbeiter: LKW-Menü- und Seitenlisten-Löschen ausgeblendet, Umbenennen verfügbar (${JSON.stringify(truckPage)})`);
+      const truckRoles = await p.evaluate(({ admin, employee }) => {
+        const del = document.querySelector('#pageHeaderActions [data-lkw-delete]'), sep = document.querySelector('#pageHeaderActions .page-action-sep');
+        setAuthSession(admin); const asAdmin = [getComputedStyle(del).display, getComputedStyle(sep).display];
+        setAuthSession(employee); const asEmployee = [getComputedStyle(del).display, getComputedStyle(sep).display];
+        return { asAdmin, asEmployee };
+      }, { admin, employee });
+      assert(truckRoles.asAdmin.every(s => s !== 'none') && truckRoles.asEmployee.every(s => s === 'none'),
+        `Rollenwechsel aktualisiert auch bestehendes LKW-Menü und Trennlinie (${JSON.stringify(truckRoles)})`);
+      await wait(300);
+      assert((await p.evaluate(() => window.__deleteConfirms)) === 0 && JSON.stringify(await localState()) === JSON.stringify(before) &&
+        JSON.stringify(b.gas.sheets.shipments.rows) === serverBefore && !b.actions.some(a => /^deleteShipments?$/.test(a)),
+        'Künstliche Klicks und direkte Löschaufrufe: keine Rückfrage, keine lokalen Änderungen, keine Warteschlangen- oder Server-Löschung');
+      const roleLoss = await p.evaluate(({ admin, employee }) => {
+        setAuthSession(admin);
+        window.confirm = () => { setAuthSession(employee); return true; };
+        const result = deleteTruckFromPage('MAN 1');
+        window.confirm = () => { window.__deleteConfirms++; return true; };
+        return result;
+      }, { admin, employee });
+      assert(roleLoss === false && JSON.stringify(await localState()) === JSON.stringify(before), 'Rollenverlust während der LKW-Bestätigung verhindert die lokale Löschung');
+
+      // Nach den abgewiesenen Klicks muss eine erlaubte Mitarbeiter-Änderung synchronisierbar bleiben.
+      const renameOpen = await p.evaluate(() => {
+        document.querySelector('#pageHeaderActions [data-lkw-menu]').click();
+        document.querySelector('#pageHeaderActions [data-lkw-rename]').click();
+        return document.getElementById('lkwRenameModal').classList.contains('visible');
+      });
+      assert(renameOpen, 'Mitarbeiter kann den LKW weiterhin umbenennen');
+      await p.evaluate(() => { document.getElementById('lkwRenameName').value = 'Test-LKW'; document.getElementById('saveLkwRenameButton').click(); });
+      await p.waitForFunction(() => !hasPending() && !syncInFlight, { timeout: 8000 });
+      const renamed = b.gas.shipmentRows(), pendingAfterRename = await p.evaluate(() => readPending());
+      assert(['9007000001', '9007000002'].every(id => renamed[id].shipment.truckName === 'Test-LKW') && b.actions.includes('saveShipments') &&
+        pendingAfterRename.order.length === 0 && !b.actions.some(a => /^deleteShipments?$/.test(a)),
+        'Mitarbeiter-Umbenennung erreicht den Server nach den Löschversuchen, ohne blockierte Warteschlange');
+
+      // Dieselben Bedienelemente sind nach dem Rollenwechsel zum Administrator wieder nutzbar.
+      const adminList = await p.evaluate(admin => {
+        setAuthSession(admin); showHome(); renderTable();
+        const del = document.querySelector('#shipmentTableBody tr[data-basenumber="123"] .main-delete-btn');
+        const display = getComputedStyle(del).display; del.click(); return display;
+      }, admin);
+      await p.waitForFunction(() => !hasPending() && !syncInFlight, { timeout: 8000 });
+      assert(adminList !== 'none' && b.gas.shipmentRows()['123'].flag === true && !(await p.evaluate(() => loadShipments()['123'])),
+        'Administrator kann eine einzelne Sendung sichtbar und erfolgreich löschen');
+      const adminTruck = await p.evaluate(() => {
+        openPage({ id: 'lkw', truckId: 'MAN 1' }); document.querySelector('#pageHeaderActions [data-lkw-menu]').click();
+        const del = document.querySelector('#pageHeaderActions [data-lkw-delete]'), display = getComputedStyle(del).display;
+        del.click(); return display;
+      });
+      await p.waitForFunction(() => !hasPending() && !syncInFlight && !lkwStatusPending(), { timeout: 8000 });
+      assert(adminTruck !== 'none' && ['9007000001', '9007000002'].every(id => b.gas.shipmentRows()[id].flag === true) &&
+        (await p.evaluate(() => readPending().order.length)) === 0, 'Administrator kann den LKW mit seinen Sendungen löschen und synchronisieren');
+      assert(p.__errors.length === 0, `Keine JS-Fehler bei Lösch-Rechten (${p.__errors.join(' | ')})`);
+      await p.close();
+
+      // Handy-Menü: langer Druck führt für Mitarbeiter direkt zum Umbenennen, für Administratoren bleibt Löschen möglich.
+      for (const [session, label] of [[employee, 'Mitarbeiter'], [admin, 'Administrator']]) {
+        const mb = makeBackend(sampleData(), {}, { gas: true });
+        const mp = await openApp(browser, mb, { session });
+        const hiddenOnMobile = await mp.evaluate(() => {
+          const rowDel = document.querySelector('#shipmentTableBody tr[data-basenumber="123"] .main-delete-btn');
+          openPage({ id: 'lkw', truckId: 'MAN 1' }); document.querySelector('#pageHeaderActions [data-lkw-menu]').click();
+          return { row: getComputedStyle(rowDel).display, truck: getComputedStyle(document.querySelector('#pageHeaderActions [data-lkw-delete]')).display };
+        });
+        assert(label === 'Mitarbeiter' ? hiddenOnMobile.row === 'none' && hiddenOnMobile.truck === 'none' : hiddenOnMobile.row !== 'none' && hiddenOnMobile.truck !== 'none',
+          `${label}: Löschknöpfe auf dem Handy rollenabhängig (${JSON.stringify(hiddenOnMobile)})`);
+        if (label === 'Administrator') {
+          const beforeLong = JSON.stringify(mb.gas.sheets.shipments.rows);
+          await mp.evaluate(employee => {
+            window.__roleLossConfirms = 0;
+            window.confirm = () => { if (++window.__roleLossConfirms === 2) setAuthSession(employee); return true; };
+            openSideMenu();
+            document.querySelector('#lkw-menu-container .lkw-menu-item[data-truckid="MAN 1"]').dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+          }, employee);
+          await mp.waitForFunction(() => window.__roleLossConfirms === 2, { timeout: 8000 });
+          assert(JSON.stringify(mb.gas.sheets.shipments.rows) === beforeLong && (await mp.evaluate(() => !hasPending())) &&
+            !mb.actions.some(a => /^deleteShipments?$/.test(a)), 'Rollenverlust bei der letzten Long-Press-Bestätigung verhindert die Löschung');
+          await mp.evaluate(admin => setAuthSession(admin), admin);
+        }
+        await mp.evaluate(() => {
+          window.__longConfirms = 0; window.__longPrompts = 0;
+          window.confirm = () => { window.__longConfirms++; return true; };
+          window.prompt = () => { window.__longPrompts++; return 'MAN Test'; };
+          openSideMenu();
+          document.querySelector('#lkw-menu-container .lkw-menu-item[data-truckid="MAN 1"]').dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        });
+        await mp.waitForFunction(label => label === 'Mitarbeiter' ? window.__longPrompts === 1 : window.__longConfirms === 2, { timeout: 8000 }, label);
+        await mp.waitForFunction(() => !hasPending() && !syncInFlight && !lkwStatusPending(), { timeout: 8000 });
+        const calls = await mp.evaluate(() => ({ confirms: window.__longConfirms, prompts: window.__longPrompts, pending: readPending().order.length }));
+        const rows = mb.gas.shipmentRows();
+        if (label === 'Mitarbeiter') {
+          assert(calls.confirms === 0 && calls.prompts === 1 && calls.pending === 0 &&
+            ['9007000001', '9007000002'].every(id => rows[id].shipment.truckId === 'MAN Test') && !mb.actions.some(a => /^deleteShipments?$/.test(a)),
+            `Mitarbeiter langer Druck: direkt umbenannt und synchronisiert, keine Lösch-Auswahl (${JSON.stringify(calls)})`);
+        } else {
+          assert(calls.confirms === 2 && calls.prompts === 0 && calls.pending === 0 &&
+            ['9007000001', '9007000002'].every(id => rows[id].flag === true) && rows['123'].shipment,
+            `Administrator langer Druck: zwei Rückfragen, LKW gelöscht, Einzelsendung erhalten (${JSON.stringify(calls)})`);
+        }
+        assert(mp.__errors.length === 0, `${label}: keine JS-Fehler beim langen Druck (${mp.__errors.join(' | ')})`);
+        await mp.close();
+      }
+    }
+
+    // Zurücksetzen mit echtem Code.gs: Backup-Fehler erhält lokale und Server-Daten; Bestätigung danach sichert und löscht.
+    be = makeBackend(sampleData(), {}, { gas: true });
+    page = await openApp(browser, be);
+    const originalCopy = be.gas.sheets.shipments.copyTo;
+    const serverBefore = JSON.stringify(be.gas.sheets.shipments.rows);
+    const localBefore = await page.evaluate(() => localStorage.getItem(LOCAL_STORAGE_KEY));
+    be.gas.sheets.shipments.copyTo = () => { throw new Error('Test-Backupfehler'); };
+    await page.evaluate(() => {
+      window.__resetPrompt = ''; window.__resetAlert = '';
+      window.confirm = text => { window.__resetPrompt = text; return true; };
+      window.alert = text => { window.__resetAlert = text; };
+      document.getElementById('resetDataButton').click();
+    });
+    await wait(800);
+    const failedReset = await page.evaluate(() => ({ prompt: window.__resetPrompt, alert: window.__resetAlert,
+      status: document.getElementById('sheetStatus').textContent, local: localStorage.getItem(LOCAL_STORAGE_KEY) }));
+    assert(/alle Sendungsdaten/i.test(failedReset.prompt) && /vorher.*Backup/i.test(failedReset.prompt) && be.actions.includes('clearAllData'),
+      'Bestätigter Reset sendet die Anfrage nach ausdrücklicher Backup-Warnung');
+    assert(/Backup.*fehlgeschlagen/.test(failedReset.status) && /nicht gelöscht/.test(failedReset.alert) && failedReset.local === localBefore && JSON.stringify(be.gas.sheets.shipments.rows) === serverBefore,
+      'Backup-Fehler: Server meldet den Fehler; lokale Daten und Sendungsblatt bleiben erhalten');
+    be.gas.sheets.shipments.copyTo = originalCopy;
+    const reload = page.waitForNavigation({ waitUntil: 'load', timeout: 10000 });
+    await page.evaluate(() => document.getElementById('resetDataButton').click());
+    await reload; await wait(1200);
+    const backupName = Object.keys(be.gas.sheets).find(n => n.startsWith('shipments_backup_'));
+    assert(backupName && JSON.stringify(be.gas.sheets[backupName].rows) === serverBefore && Object.values(be.gas.shipmentRows()).every(row => row.flag === true),
+      'Administrator-Reset sichert das vollständige Blatt und markiert danach alle Sendungen als gelöscht');
+    assert(Object.keys(await page.evaluate(() => loadShipments())).length === 0, 'Nach erfolgreichem Reset startet die App ohne lokale Sendungen');
     await page.close();
 
     // 5) Abmelden: Sitzung weg, Server informiert, Anmeldeseite

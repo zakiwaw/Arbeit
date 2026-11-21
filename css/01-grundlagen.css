@@ -200,6 +200,10 @@ button {
 
 .hidden { display: none !important; }
 #mainView.hidden { display: none; }
+/* Einzel- und LKW-Löschaktionen nur für Administratoren; auch vor der Anmeldung ausgeblendet. */
+body:not(.is-admin) .main-delete-btn,
+body:not(.is-admin) [data-lkw-delete],
+body:not(.is-admin) .page-action-menu .page-action-sep { display: none !important; }
 
 
 /* ===================================================================

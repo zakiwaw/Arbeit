@@ -35,15 +35,17 @@ Aufträge übernommen.
 ## Versionen
 
 Die App-Version steht zentral in `js/01-start.js` (`APP_VERSION`, `APP_VERSION_DATE`, `APP_BACKEND_VERSION`) und wird in der
-App angezeigt: auf der Anmeldeseite, unten im Seitenmenü und am Desktop klein neben dem Titel („Version 9.7 · Stand … ·
-Server-Skript 2.10“). So sieht man auf jedem Gerät sofort, ob noch eine alte Version offen ist. Bei jeder veröffentlichten
+App angezeigt: auf der Anmeldeseite, unten im Seitenmenü und am Desktop klein neben dem Titel („Version 9.8 · Stand … ·
+Server-Skript 2.11“). So sieht man auf jedem Gerät sofort, ob noch eine alte Version offen ist. Bei jeder veröffentlichten
 Änderung: Version hochzählen und in `index.html` (`<title>`), `CHANGELOG.md` und `backend/README.md` nachziehen –
 `node tests/versioncheck.js` prüft, dass alle Stellen zusammenpassen. Das Server-Skript hat eine eigene Versionszählung
 (oben in `backend/Code.gs`).
 
-App 9.7 / Code.gs 2.10 entfernen persönliche Daten aus dem Repo: Anmeldung nur noch mit PIN (keine Namensliste), Haupt-Administrator
-nur in den Skript-Eigenschaften `BOOTSTRAP_ADMIN_NAME` / `BOOTSTRAP_ADMIN_EMAIL`, Zuordnung Kundennummer → Spediteur im Blatt
-`kundennr_carrier` statt im Frontend (beim ersten Abruf einmalig mit allen 94 Einträgen gefüllt, Stand 16.10.2025). **Code.gs 2.10 bereitstellen und beide Skript-Eigenschaften setzen, bevor App 9.7 live geht.**
+App 9.8 / Code.gs 2.11 schützen Sendungszeilen gegen Formel-Injektion und ausgewählte Ausgaben im LKW-Menü und Scan-Feedback
+gegen XSS. Sendungs- und LKW-Löschung sowie die alte Vollspeicherung sind Administratoren vorbehalten; vor „Alles Zurücksetzen“
+wird das Sendungsblatt im selben Spreadsheet gesichert. **Nach dem Merge Code.gs 2.11 als neue Version bereitstellen.** Seit 2.10 erfolgt
+die Anmeldung nur mit PIN; die Skript-Eigenschaften `BOOTSTRAP_ADMIN_NAME` / `BOOTSTRAP_ADMIN_EMAIL` müssen gesetzt sein.
+Die Zuordnung Kundennummer → Spediteur liegt im Blatt `kundennr_carrier`.
 
 ## Offline
 

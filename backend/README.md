@@ -5,17 +5,20 @@ Es liest und schreibt das Google Sheet mit der ID `<SPREADSHEET_ID>` (steht nich
 Skript-Eigenschaften des Apps-Script-Projekts, Schlüssel `SPREADSHEET_ID`; fehlt die Eigenschaft, meldet der Code
 einen klaren Fehler und greift auf keine andere Tabelle zu).
 
-Zusammengehörige Versionen: **App 9.7 ↔ Code.gs 2.10** (die App zeigt beides unten im Seitenmenü). 2.10 entfernt persönliche
-Daten aus dem Code: Der Haupt-Administrator steht nur noch in den Skript-Eigenschaften **`BOOTSTRAP_ADMIN_NAME`** und
+Zusammengehörige Versionen: **App 9.8 ↔ Code.gs 2.11** (die App zeigt beides unten im Seitenmenü). **Nach dem Merge
+Code.gs 2.11 als neue Version bereitstellen** (bestehende Web-App → neue Version, keine neue Bereitstellung; siehe
+`README.md` im Hauptordner). 2.11 schützt Sendungsnummern und Sendungszeilen gegen Formel-Injektion und beschränkt
+Sendungs- und LKW-Löschung sowie die alte Vollspeicherung auf Administratoren; vor dem Zurücksetzen wird das Sendungsblatt gesichert.
+
+Seit 2.10 steht der Haupt-Administrator nur in den Skript-Eigenschaften **`BOOTSTRAP_ADMIN_NAME`** und
 **`BOOTSTRAP_ADMIN_EMAIL`** (fehlt eine, meldet der Code einen klaren Fehler – wie bei `SPREADSHEET_ID`). Die Zuordnung
 Kundennummer → Spediteur für den VVL-Import liegt im Blatt **`kundennr_carrier`** (Spalten Kundennr | Spediteur, Zeile 1 =
 Überschriften; wird beim ersten Abruf angelegt und einmalig mit allen 94 Einträgen der bisherigen App-Liste gefüllt –
-Kundennummerliste VW.xlsx, Stand 16.10.2025; danach wird es nur noch im Sheet gepflegt) und kommt per `loadCarrierMap` in die App. Anmeldung nur noch mit PIN
-(siehe Version 2.2 unten). **Code.gs 2.10 muss bereitgestellt und die beiden Skript-Eigenschaften gesetzt sein, bevor App 9.7
-live geht** – App 9.7 schickt keine Nutzer-ID mehr, ein Skript 2.9 lehnt die Anmeldung ab. Der Mehrgeräte-Sync (Sendungs-
-Versionen, Konfliktprüfung, seit App 9.3 / Code.gs 2.9) ist unverändert
-(mit 2.8 speichert die App weiter wie 9.2, aber ohne Versionsprüfung, Namen und Protokoll). Bereitstellen siehe
-`README.md` im Hauptordner (bestehende Web-App → neue Version, keine neue Bereitstellung).
+Kundennummerliste VW.xlsx, Stand 16.10.2025; danach wird es nur noch im Sheet gepflegt) und kommt per `loadCarrierMap` in die App.
+Die Anmeldung erfolgt nur mit PIN (siehe Version 2.2 unten); die beiden Skript-Eigenschaften müssen gesetzt sein. Seit App 9.7
+wird keine Nutzer-ID mehr mitgeschickt, ein Skript 2.9 lehnt die Anmeldung ab. Der Mehrgeräte-Sync (Sendungs-Versionen,
+Konfliktprüfung, seit App 9.3 / Code.gs 2.9) ist unverändert (mit 2.8 speichert die App weiter wie 9.2, aber ohne
+Versionsprüfung, Namen und Protokoll).
 
 ## Version 2 – Mehrgeräte-Sync
 
@@ -30,9 +33,11 @@ V2 ändert das:
 | `saveShipments` | Gerät schickt **nur die geänderten Sendungen** plus den Serverstand, von dem es ausging. Der Server führt zusammen (3-Wege-Merge) und antwortet mit dem gemeinsamen Stand. Läuft unter `LockService`-Sperre. |
 | `loadChanges` | Gerät holt **nur die Änderungen seit Version X** (alle 3 s, beim Zurückkehren in den Vordergrund, bei „online“). „Nichts Neues“ wird aus dem Script-Cache beantwortet, ohne die Tabelle zu öffnen. Liefert auch den LKW-Status mit; archivierte Sendungen werden nicht ausgeliefert (siehe Archiv). |
 | `searchArchive` | Archivsuche (siehe Abschnitt Archiv). |
-| `deleteShipment` | Löschung als Markierung (Tombstone, Spalte E = TRUE), damit andere Geräte die Sendung nicht wiederbeleben. |
+| `deleteShipment`, `deleteShipments` | Nur Administratoren: Löschung als Markierung (Tombstone, Spalte E = TRUE), damit andere Geräte die Sendung nicht wiederbeleben. |
 | `loadCarrierMap` | Zuordnung Kundennummer → Spediteur aus dem Blatt `kundennr_carrier` (2.10) – `{ map: { "<Kundennr>": "<Spediteur>" } }`. |
-| `loadAllData`, `saveAllData`, `clearAllData`, `sendPdfEmail`, `saveLkwStatus`, `loadLkwStatus` | Wie bisher – `saveAllData` läuft jetzt ebenfalls durch den Merge, ein altes Gerät kann also nichts mehr überschreiben. |
+| `clearAllData` | Nur Administratoren: vor dem Zurücksetzen eine Kopie des Sendungsblatts anlegen; bei Backup-Fehler nichts löschen. |
+| `saveAllData` | Nur Administratoren: alte Vollspeicherung, läuft durch den Merge. App 9.8 nutzt sie nur als Rückfall gegen alte Server. |
+| `loadAllData`, `sendPdfEmail`, `saveLkwStatus`, `loadLkwStatus` | Wie bisher; `loadAllData` bleibt für angemeldete Nutzer lesbar. |
 | `authLogin`, `authAccept`, `authInviteInfo`, `authCheck`, `authLogout`, `admin*` | Anmeldung (siehe Version 2.2). |
 
 Nicht im Skript enthalten: `shipmentComplete` (Abschluss-Benachrichtigung) und `sendSummaryEmail`. Die App wertet die
@@ -161,6 +166,18 @@ Bei deutlich mehr Geräten `SYNC_POLL_INTERVAL_MS` in `js/02-sync-anmeldung.js` 
 `purgeDeletedRows()` im Skript-Editor manuell ausführen, um Lösch-Markierungen physisch aus dem Sheet zu entfernen.
 Archivierte Zeilen (`ARCHIV`) bleiben davon unberührt – sie werden nie automatisch gelöscht.
 
+## Version 2.11 – Sicherheitslücken schließen
+
+- `saveShipments`, `deleteShipment` und `deleteShipments` lehnen Sendungsnummern ab, die nach dem Trimmen mit `=`, `+`,
+  `-` oder `@` beginnen. Sendungszeilen einschließlich JSON-Fortsetzungen werden als Text formatiert. Da `setValues`
+  trotz Textformat Formeln auswerten kann, erhalten gefährliche Zellanfänge zusätzlich einen Sheets-Textmarker; beim Lesen
+  bleibt der ursprüngliche Text unverändert.
+- `clearAllData`, `saveAllData`, `deleteShipment` und `deleteShipments` sind nur für Administratoren erlaubt; andere
+  angemeldete Nutzer erhalten `FORBIDDEN`. `loadAllData` bleibt unverändert lesbar.
+- Vor `clearAllData` wird unter derselben Sperre das gesamte Blatt `shipments` einschließlich Archiv und Löschvermerken
+  in dasselbe Sheet kopiert. Das Backup heißt `shipments_backup_…` und trägt einen UTC-Zeitstempel; schlägt es fehl,
+  werden keine Sendungsdaten gelöscht. Das Backup bleibt als eigenes Tabellenblatt erhalten.
+
 ## Version 2.2 – Anmeldung mit PIN
 
 Die App ist öffentlich erreichbar (GitHub Pages) und das Skript ist für „Jeder“ freigegeben – bisher konnte also jeder, der die
@@ -195,5 +212,6 @@ Sitzung alle 10 Minuten beim Server (`authRefresh`). **30 Minuten ohne Bedienung
 nötig; das gilt auch, wenn der Browser zwischendurch geschlossen war (innerhalb von 30 Minuten geht es ohne PIN weiter).
 Ein nicht mehr verlängertes Token (Gerät aus) verfällt serverseitig nach `SESSION_HOURS` (2 h).
 
-Notschalter: `AUTH_ENABLED = false` in `Code.gs` (+ neue Version) schaltet die Anmeldung komplett ab – die App arbeitet
-dann wieder wie in 2.1.
+Notschalter: `AUTH_ENABLED = false` in `Code.gs` (+ neue Version) schaltet die Anmeldung ab. Ohne angemeldete
+Administrator-Rolle bleiben Administrator-Aktionen ab 2.11 gesperrt, einschließlich Sendungslöschungen, `clearAllData`
+und `saveAllData`; Lesen und normales Speichern bleiben möglich.

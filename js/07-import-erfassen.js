@@ -735,7 +735,7 @@ function handleLkwActionClick(target) {
     if (delTruck) {
         // aus dem ⋮-Menü der LKW-Seite heraus gelöscht → die nun leere Seite schließen (zurück zur Anlieferung / Startseite)
         const id = delTruck.dataset.lkwDelete;
-        if (!isBatchModeActive && deleteTruckFromPage(id) && currentPage && currentPage.id === 'lkw' && currentPage.truckId === id) closePage();
+        if (!isBatchModeActive && isAdmin() && deleteTruckFromPage(id) && currentPage && currentPage.id === 'lkw' && currentPage.truckId === id) closePage();
         return true;
     }
     const act = target.closest('[data-lkw-activate]');
@@ -790,7 +790,7 @@ function handlePageShipmentRowClick(event, row) {
     if (target.closest('button')) {
         if (target.classList.contains('edit-btn') && !isBatchModeActive) openEditModal(base);
         else if (target.classList.contains('pdf-btn')) openSecurityReport(base);
-        else if (target.classList.contains('main-delete-btn')) { if (confirm(`Sendung ${escapeHtml(base)} wirklich löschen?`)) deleteShipment(base); }
+        else if (target.classList.contains('main-delete-btn')) { if (isAdmin() && confirm(`Sendung ${escapeHtml(base)} wirklich löschen?`)) deleteShipment(base); }
         return;
     }
     const cell = target.closest('td');

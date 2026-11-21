@@ -647,12 +647,12 @@ function showBatchScanFeedback(scanNumber, isExpected, carrierInfo = null) {
     if (carrierInfo && (carrierInfo.carrier || carrierInfo.country)) {
         let parts = [];
         if (carrierInfo.carrier) {
-            parts.push(`Spediteur: ${carrierInfo.carrier}`);
+            parts.push(`Spediteur: ${escapeHtml(carrierInfo.carrier)}`);
         }
         if (carrierInfo.country) {
             // Füge <br> hinzu, wenn es bereits einen Spediteur gibt
             // oder wenn nur das Land angezeigt wird.
-            parts.push(`Land: ${carrierInfo.country}`);
+            parts.push(`Land: ${escapeHtml(carrierInfo.country)}`);
         }
         // Füge <br> nur dann ein, wenn sowohl Spediteur als auch Land vorhanden sind.
         carrierAndCountryHtml = parts.join('<br>'); 
@@ -1048,6 +1048,7 @@ function saveBatch() {
 
         // --- Sonstige Aktionen (Löschen, PDF, Edit Modal) ---
         function deleteShipment(baseNumber) {
+            if (!isAdmin()) return;
             const shipments = loadShipments();
             if (!shipments[baseNumber]) { focusShipmentInput(); return; }
             delete shipments[baseNumber];

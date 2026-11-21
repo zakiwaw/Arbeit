@@ -548,5 +548,64 @@ async function normalGeometry(page) {
       assert(ph.__errors.length === 0, `Keine JS-Fehler im Sheet „Offene HUs“ (${ph.__errors.join(' | ')})`);
       await ph.close();
     }
+
+    // ---- XSS-Schutz: LKW-ID/Anzeigename und Spediteur/Land bleiben Text, Attribute behalten ihren Originalwert ----
+    {
+      const bx = makeBackend(sampleData(), {}), px = await openApp(browser, bx);
+      const badId = 'VVL-<img src=x onerror="window.__truckXss=1">';
+      const badName = '<img src=x onerror=window.__truckXss=2>';
+      const badAttribute = 'MAN-Test" onmouseover="window.__truckXss=3';
+      const badCount = '<img src=x onerror=window.__truckXss=4>';
+      const normalId = 'MAN Normal & "1"';
+      await px.evaluate(({ badId, badName, badAttribute, badCount, normalId }) => {
+        window.__truckXss = 0;
+        const s = (truckId, truckName) => ({ truckId, truckName, scannedItems: [] });
+        const count = { truckId: 'TEST-ZAHL', isHuListOrder: true, totalPiecesExpected: badCount, scannedItems: [] };
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ A: s(badId, ''), B: s('TEST-ANZEIGE', badName), C: s(badAttribute, ''), D: s(normalId, ''), E: count }));
+        renderLkwMenu();
+        document.querySelectorAll('#lkw-menu-container li, #lkw-menu-container input').forEach(el => el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })));
+      }, { badId, badName, badAttribute, badCount, normalId });
+      await wait(400);
+      const truck = await px.evaluate(({ badId, badName, badAttribute, badCount, normalId }) => {
+        const c = document.getElementById('lkw-menu-container'), rows = [...c.querySelectorAll('li.lkw-menu-item')];
+        const row = id => rows.find(el => el.dataset.truckid === id);
+        return { images: c.querySelectorAll('img').length, ran: window.__truckXss,
+          idText: !!row(badId) && row(badId).textContent.includes(badId.slice(4)),
+          nameText: !!row('TEST-ANZEIGE') && row('TEST-ANZEIGE').textContent.includes(badName),
+          countText: !!row('TEST-ZAHL') && row('TEST-ZAHL').querySelector('small').textContent.includes(badCount),
+          attribute: !!row(badAttribute) && row(badAttribute).querySelector('input').dataset.truckid === badAttribute,
+          handlers: rows.some(el => el.hasAttribute('onmouseover') || el.querySelector('input').hasAttribute('onmouseover')),
+          normal: !!row(normalId) && row(normalId).textContent.includes(normalId) && row(normalId).querySelector('input').dataset.truckid === normalId };
+      }, { badId, badName, badAttribute, badCount, normalId });
+      assert(truck.idText && truck.nameText && truck.images === 0 && truck.ran === 0, `LKW-ID und Anzeigename mit img/onerror erscheinen nur als Text (${JSON.stringify(truck)})`);
+      assert(truck.countText && truck.images === 0 && truck.ran === 0, 'Manipulierte Stückzahl im LKW-Menü bleibt Text und führt keinen Code aus');
+      assert(truck.attribute && !truck.handlers, 'Anführungszeichen in data-truckid bleiben Daten und erzeugen keine Attribute');
+      assert(truck.normal, 'Normaler LKW-Name mit Sonderzeichen wird korrekt angezeigt und bleibt als Kennung erhalten');
+
+      await px.evaluate(normalId => {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ NORMAL: { truckId: normalId, scannedItems: [] } }));
+        renderLkwMenu(); document.querySelector('#lkw-menu-container .lkw-toggle').click();
+      }, normalId);
+      await wait(600);
+      assert(bx.lkwStatus[normalId] === false, 'LKW-Schalter funktioniert auch bei einer normalen Kennung mit Sonderzeichen');
+
+      const carrier = '<img src=x onerror=window.__feedbackXss=1>';
+      const country = '<img src=x onerror=window.__feedbackXss=2> & "Test"';
+      await px.evaluate(({ carrier, country }) => { window.__feedbackXss = 0; showBatchScanFeedback('HU-TEST', true, { carrier, country }); }, { carrier, country });
+      await wait(400);
+      const feedback = await px.evaluate(() => {
+        const el = document.getElementById('feedbackCarrier');
+        return { text: el.textContent, tags: [...el.children].map(child => child.tagName), ran: window.__feedbackXss };
+      });
+      assert(feedback.text === `Spediteur: ${carrier}Land: ${country}` && feedback.tags.join() === 'BR' && feedback.ran === 0,
+        'Spediteur und Land im Scan-Feedback sind Text, nur der vorgesehene Zeilenumbruch ist HTML');
+      const normalFeedback = await px.evaluate(() => {
+        showBatchScanFeedback('HU-TEST', true, { carrier: 'Spediteur A & B', country: 'Land "1"' });
+        const el = document.getElementById('feedbackCarrier'); return { text: el.textContent, breaks: el.querySelectorAll('br').length };
+      });
+      assert(normalFeedback.text === 'Spediteur: Spediteur A & BLand: Land "1"' && normalFeedback.breaks === 1, 'Normale Spediteur- und Landangaben bleiben unverändert lesbar');
+      assert(px.__errors.length === 0, `Keine JS-Fehler bei XSS-Prüfungen (${px.__errors.join(' | ')})`);
+      await px.close();
+    }
   } finally { await browser.close(); finish(); }
 })().catch(e => { console.error('ERR', e); process.exit(1); });

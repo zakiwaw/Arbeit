@@ -1,7 +1,9 @@
 // ===================================================
 // FRACHT TRACKER – Google Apps Script Backend
-// Version 2.10: mehrgeräte-sicher + Archiv + Anmeldung (PIN; Sitzung verlängert sich bei Bedienung) + Sammel-Löschung
+// Version 2.11: mehrgeräte-sicher + Archiv + Anmeldung (PIN; Sitzung verlängert sich bei Bedienung) + Sammel-Löschung
 //   + automatischer Import von Textdateien aus Google Drive.
+//   2.11: Sendungsnummern gegen Formel-Injektion prüfen, Sendungszeilen als Text schreiben; Löschaktionen nur für
+//        Administratoren, vor dem Zurücksetzen das Sendungsblatt sichern.
 //   2.10: Keine persönlichen Daten mehr im Code. Erster Administrator nur noch aus den Skript-Eigenschaften
 //        BOOTSTRAP_ADMIN_NAME und BOOTSTRAP_ADMIN_EMAIL (fehlt eine, klarer Fehler wie bei SPREADSHEET_ID).
 //        Anmeldung nur noch mit PIN: authLogin findet den Nutzer allein über den PIN-Hash; passt die PIN zu mehreren
@@ -51,7 +53,7 @@
 // ANMELDUNG (2.2): Jede Aktion außer den Anmelde-Aktionen braucht ein gültiges Sitzungs-Token (Feld "auth" im
 //   Anfragekörper), sonst antwortet der Server mit { status: 'error', code: 'AUTH_REQUIRED' }. Mitarbeiter stehen im
 //   Sheet "users"; der Administrator lädt sie per E-Mail ein, jeder wählt seine PIN selbst (Abschnitt ANMELDUNG unten).
-//   Notschalter: AUTH_ENABLED = false → alles wieder ohne Anmeldung wie in 2.1.
+//   Notschalter: AUTH_ENABLED = false → ohne Anmeldung; Administrator-Aktionen bleiben mangels Admin-Rolle gesperrt.
 //
 // AUFBAU DIESER DATEI (eine Datei, Abschnitte mit „// ===“-Kopf; im Editor mit Strg+F nach „// N.“ springen):
 //    1. EINSTELLUNGEN            Tabellen-ID (nur Skript-Eigenschaft), Blattnamen, Spalten, Sperre, Cache, Archiv-Regeln
@@ -305,7 +307,12 @@ function writeRows_(sheet, startRow, rows) {
   const width = rows.reduce(function (m, r) { return Math.max(m, r.length); }, 0);
   rows.forEach(function (r) { while (r.length < width) r.push(''); });
   ensureGrid_(sheet, startRow + rows.length - 1, width);
-  sheet.getRange(startRow, 1, rows.length, width).setValues(rows);
+  // setValues kann trotz Textformat Formeln ausführen. Der führende Apostroph ist ein Sheets-Textmarker
+  // und wird beim Lesen nicht mitgeliefert; ein vorhandener Apostroph bleibt durch den zweiten erhalten.
+  const literalRows = rows.map(function (r) { return r.map(function (v) {
+    return typeof v === 'string' && /^\s*[=+\-@']/.test(v) ? "'" + v : v;
+  }); });
+  sheet.getRange(startRow, 1, rows.length, width).setNumberFormat('@').setValues(literalRows);
 }
 
 // Index ohne JSON-Spalte (billig): baseNumber → { row, version, deleted }
@@ -393,6 +400,9 @@ function saveShipmentsMerged(payload, user) {
   const bases = (payload && payload.bases) || {};
   const versions = (payload && payload.versions && typeof payload.versions === 'object') ? payload.versions : null;
   const modifiedBy = String((user && user.name) || (payload && payload.modifiedBy) || '').trim().slice(0, 80);
+  Object.keys(incoming).forEach(function (base) {
+    if (/^[=+\-@]/.test(base.trim())) throw new Error('Ungültige Sendungsnummer: Sie darf nicht mit =, +, - oder @ beginnen.');
+  });
   const baseNumbers = orderedKeys_(payload && payload.order, Object.keys(incoming));
   if (baseNumbers.length === 0) return { status: 'success', version: getGlobalVersion_(), merged: {}, conflicts: [] };
 
@@ -700,6 +710,7 @@ function mergeNotes_(t, o, b) {
 function deleteShipmentRow(payload, user) {
   const base = payload && String(payload.baseNumber || '').trim();
   if (!base) throw new Error("deleteShipment: baseNumber fehlt.");
+  if (/^[=+\-@]/.test(base)) throw new Error('Ungültige Sendungsnummer: Sie darf nicht mit =, +, - oder @ beginnen.');
   const who = String((user && user.name) || (payload && payload.modifiedBy) || '').trim().slice(0, 80);
   return withLock_(function () {
     const sheet = getShipmentSheet_();
@@ -718,7 +729,11 @@ function deleteShipmentRow(payload, user) {
 function deleteShipmentRows(payload, user) {
   const raw = (payload && payload.baseNumbers) || [];
   const bases = [];
-  (Array.isArray(raw) ? raw : []).forEach(function (b) { b = String(b || '').trim(); if (b && bases.indexOf(b) === -1) bases.push(b); });
+  (Array.isArray(raw) ? raw : []).forEach(function (b) {
+    b = String(b || '').trim();
+    if (/^[=+\-@]/.test(b)) throw new Error('Ungültige Sendungsnummer: Sie darf nicht mit =, +, - oder @ beginnen.');
+    if (b && bases.indexOf(b) === -1) bases.push(b);
+  });
   if (!bases.length) throw new Error("deleteShipments: baseNumbers fehlen.");
   const who = String((user && user.name) || (payload && payload.modifiedBy) || '').trim().slice(0, 80);
   return withLock_(function () {
@@ -995,8 +1010,16 @@ function saveAllDataToSheet(shipmentsData) {
 function clearAllDataInSheet() {
   return withLock_(function () {
     const sheet = getShipmentSheet_();
-    const version = getGlobalVersion_() + 1;
     const now = new Date().toISOString();
+    try {
+      SpreadsheetApp.flush();
+      const name = 'shipments_backup_' + now.replace('T', '_').replace(/[:.]/g, '-') + '_' + Utilities.getUuid().slice(0, 8);
+      sheet.copyTo(ss_()).setName(name);
+      SpreadsheetApp.flush();
+    } catch (err) {
+      throw new Error('Backup der Sendungsdaten fehlgeschlagen – keine Daten gelöscht: ' + err.message);
+    }
+    const version = getGlobalVersion_() + 1;
     const lastRow = sheet.getLastRow();
     if (lastRow > 1) {
       const width = dataWidth_(sheet);
@@ -1591,7 +1614,8 @@ const PIN_LOCK_MINUTES = 15;                                            // … u
 const CACHE_KEY_USERS = 'fracht_users';
 const USERS_CACHE_TTL_S = 600;                                          // Nutzerliste im Script-Cache (wird bei jeder Änderung geleert)
 const PUBLIC_ACTIONS_ = { authLogin: 1, authAccept: 1, authInviteInfo: 1 };
-const ADMIN_ACTIONS_ = { adminListUsers: 1, adminInvite: 1, adminSetActive: 1, adminResetPin: 1 };
+const ADMIN_ACTIONS_ = { adminListUsers: 1, adminInvite: 1, adminSetActive: 1, adminResetPin: 1,
+  clearAllData: 1, saveAllData: 1, deleteShipment: 1, deleteShipments: 1 };
 const USER_COLS_ = ['id', 'name', 'email', 'role', 'pinHash', 'salt', 'active', 'createdAt', 'invite', 'inviteExpires', 'failed', 'lockedUntil', 'lastLogin', 'gen', 'sessions'];
 const MAX_SESSIONS_PER_USER = 10;
 

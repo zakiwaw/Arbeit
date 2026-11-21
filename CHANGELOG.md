@@ -4,6 +4,14 @@ Neueste zuerst. Datum = Veröffentlichung (bis einschließlich 9.2 auf dem Branc
 Zusammenführen von Pull Request #1 am 09.11.2026 auf `main`). App-Version siehe `js/01-start.js`
 (`APP_VERSION`), Server-Skript siehe Kopf von `backend/Code.gs`.
 
+## 2026-11-21 – App 9.8, Code.gs 2.11
+
+- Sendungsnummern gegen Formel-Injektion prüfen; Sendungszeilen und JSON-Fortsetzungen mit Textformat und Textmarker schützen.
+- Sendungs- und LKW-Löschung sowie alte Vollspeicherung nur für Administratoren; vor dem Zurücksetzen das Sendungsblatt sichern.
+  Löschknöpfe für Sendungen und LKW sind für Mitarbeiter ausgeblendet; Umbenennen bleibt möglich.
+- Ausgewählte Ausgaben im LKW-Menü und Scan-Feedback gegen XSS absichern. Versionskette und Tests aktualisiert.
+- Nach dem Merge **Code.gs 2.11 als neue Version bereitstellen**.
+
 ## 2026-11-11 – App 9.7, Code.gs 2.10
 
 Persönliche Daten aus dem Repo entfernt. **Code.gs 2.10 bereitstellen und die Skript-Eigenschaften `BOOTSTRAP_ADMIN_NAME` und

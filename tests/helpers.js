@@ -40,14 +40,14 @@ function sampleData() {
 // Öffentliche Aktionen: authLogin/authAccept/authInviteInfo; alles andere verlangt body.auth = gültiges Token,
 // sonst { status:'error', code:'AUTH_REQUIRED' } – wie das echte Skript. state.authDisabled = true → alles ohne Anmeldung (Skript 2.1).
 // loadCarrierMap (2.10) liefert state.carrierMap (Kundennummer → Spediteur; Standard: leer).
-// opts.gas = true (9.3): Sendungs-Aktionen (saveShipments, loadChanges, deleteShipment(s), searchArchive) laufen durch das ECHTE
-// backend/Code.gs in der Nachbildung tests/gas-env.js (Versionsprüfung, Merge, Konflikte, Protokoll) – state.gas ist diese Umgebung.
+// opts.gas = true (9.3): Sendungs-Aktionen (saveShipments, loadChanges, deleteShipment(s), searchArchive, clearAllData) laufen durch das ECHTE
+// backend/Code.gs in der Nachbildung tests/gas-env.js (Versionsprüfung, Merge, Konflikte, Protokoll, Backup) – state.gas ist diese Umgebung.
 // Zweites Gerät/Mitarbeiter: Sitzung { token: MA2_TOKEN, user: MA2_USER } (openApp opts.session).
 const TEST_TOKEN = 'tok-admin-test';
 const TEST_USER = { id: 'u-admin', name: 'Mitarbeiter 1', role: 'admin' };
 const MA2_TOKEN = 'tok-ma2-test';
 const MA2_USER = { id: 'u-ma2', name: 'Mitarbeiter 2', role: 'user' };
-const GAS_ACTIONS = ['saveShipments', 'loadChanges', 'deleteShipment', 'deleteShipments', 'searchArchive'];
+const GAS_ACTIONS = ['saveShipments', 'loadChanges', 'deleteShipment', 'deleteShipments', 'searchArchive', 'clearAllData'];
 function attachGas(state, initial) {
   const env = require('./gas-env')();
   env.props.SPREADSHEET_ID = 'test-tabelle';
