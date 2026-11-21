@@ -641,21 +641,23 @@ function showOfflineWaiting() {
 // dort (z. B. Umbenennen auf eine ungültige Nummer), wird der lokale Stand auf den Serverstand (Snapshot) zurückgesetzt.
 // DELETE-Vermerk weggeworfen: war die Nummer auf dem Server (z. B. FORBIDDEN), kommt die Sendung lokal aus dem Snapshot
 // zurück; war sie nie dort, bleibt sie lokal gelöscht – ohne Server-Aufruf.
-function dropRejectedPending(base) {
+// shipments: optional der bereits geladene Stand (dann wird NICHT in den Speicher geschrieben – der Aufrufer tut das)
+function dropRejectedPending(base, shipments) {
     const pending = readPending();
     const snap = readSnapshot();
-    const shipments = loadShipments();
+    const local = shipments || loadShipments();
     delete pending.changed[base];
     delete pending.deleted[base];
     writePending(pending);
     if (Object.prototype.hasOwnProperty.call(snap, base)) {
         // war schon auf dem Server → lokaler Stand = Serverstand (Ausgangsstand)
-        try { shipments[base] = JSON.parse(snap[base]); } catch (e) { delete shipments[base]; }
+        try { local[base] = JSON.parse(snap[base]); } catch (e) { delete local[base]; }
     } else {
         // war nie auf dem Server → lokal gibt es sie nicht mehr (Anlegen/Umbenennen/Löschen ohne Serverstand)
-        delete shipments[base];
+        delete local[base];
     }
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(shipments));
+    if (!shipments) localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(local));
+    return local;
 }
 function droppedMessage(base, kind, reason) {
     if (reason === 'forbidden') return `Sendungsnummer ${base} wurde nicht gelöscht – Löschen ist nur für Administratoren erlaubt.`;
@@ -743,12 +745,14 @@ async function sendDeletes(delBases) {
 // skipped = Nummern, die der Server überspringt (2.12: ungültige Sendungsnummer) – die wirft die App weg (s. o.).
 async function sendChanges(changedBases) {
     const dropped = [];
+    const localEarly = loadShipments();
     changedBases = changedBases.filter(b => {
         if (!isInvalidBase(b)) return true;              // ungültige Nummern kommen gar nicht erst in den Aufruf …
-        dropRejectedPending(b);               // … sondern werden sofort weggeräumt (auch gegen alte Server)
+        dropRejectedPending(b, localEarly);   // … sondern werden sofort weggeräumt (auch gegen alte Server)
         dropped.push({ base: b, text: droppedMessage(b, 'change', 'invalid') });
         return false;
     });
+    if (dropped.length) localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(localEarly));
     const local = loadShipments();
     const snap = readSnapshot();
     const toSend = {}, bases = {}, versions = {}, sentJson = {}, order = [];
@@ -780,14 +784,18 @@ async function sendChanges(changedBases) {
     changedBases.forEach(b => { if (!toSend[b]) delete p.changed[b]; });
     writeSnapshot(snapNow); writePending(p);
     // Vom Server übersprungene Nummern (2.12) endgültig wegräumen – nur diese, alle übrigen sind gespeichert.
+    // Gearbeitet wird auf `after` (mit den zusammengeführten Server-Ständen); geschrieben wird unten EINMAL.
     (Array.isArray(r.skipped) ? r.skipped : []).forEach(sk => {
         const b = String((sk && sk.base) || '');
         if (!b) return;
-        dropRejectedPending(b);
+        dropRejectedPending(b, after);
         dropped.push({ base: b, text: droppedMessage(b, 'change', 'invalid') });
     });
     { let k = false; Object.keys(merged).forEach(b => { if (archiveKnownBases.delete(b)) k = true; }); if (k) saveArchiveKnownBases(); } // gespeichert = (wieder) aktiv
-    if (touched || dropped.length) { localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(loadShipments())); refreshViewsAfterRemoteChange(); }
+    // WICHTIG: `after` (mit den zusammengeführten Server-Ständen) schreiben, nicht neu aus dem Speicher lesen – sonst ginge
+    // der übernommene Server-Stand (z. B. ein Scan eines anderen Geräts) verloren.
+    if (touched || dropped.length) localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(after));
+    if (touched || dropped.length) refreshViewsAfterRemoteChange();
     if (Array.isArray(r.conflicts) && r.conflicts.length) showConflicts(r.conflicts);
     // Hinweis: die Server-Version wird bewusst NUR beim Abruf (pullRemoteChanges) weitergeschaltet,
     // sonst würden zwischenzeitliche Änderungen anderer Geräte übersprungen.
