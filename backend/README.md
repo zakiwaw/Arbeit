@@ -5,10 +5,12 @@ Es liest und schreibt das Google Sheet mit der ID `<SPREADSHEET_ID>` (steht nich
 Skript-Eigenschaften des Apps-Script-Projekts, Schlüssel `SPREADSHEET_ID`; fehlt die Eigenschaft, meldet der Code
 einen klaren Fehler und greift auf keine andere Tabelle zu).
 
-Zusammengehörige Versionen: **App 9.8 ↔ Code.gs 2.11** (die App zeigt beides unten im Seitenmenü). **Nach dem Merge
-Code.gs 2.11 als neue Version bereitstellen** (bestehende Web-App → neue Version, keine neue Bereitstellung; siehe
-`README.md` im Hauptordner). 2.11 schützt Sendungsnummern und Sendungszeilen gegen Formel-Injektion und beschränkt
-Sendungs- und LKW-Löschung sowie die alte Vollspeicherung auf Administratoren; vor dem Zurücksetzen wird das Sendungsblatt gesichert.
+Zusammengehörige Versionen: **App 9.9 ↔ Code.gs 2.12** (die App zeigt beides unten im Seitenmenü). **Nach dem Merge
+Code.gs 2.12 als neue Version bereitstellen** (bestehende Web-App → neue Version, keine neue Bereitstellung; siehe
+`README.md` im Hauptordner). 2.12 überspringt ungültige Sendungsnummern je Nummer (Antwort `skipped`) und nimmt Löschvermerke
+immer an, statt den ganzen Aufruf abzulehnen – eine abgelehnte Nummer blockiert damit keine Warteschlange mehr. Weiter aus 2.11:
+Sendungszeilen sind gegen Formel-Injektion geschützt, Sendungs- und LKW-Löschung sowie die alte Vollspeicherung gelten nur für
+Administratoren; vor dem Zurücksetzen wird das Sendungsblatt gesichert.
 
 Seit 2.10 steht der Haupt-Administrator nur in den Skript-Eigenschaften **`BOOTSTRAP_ADMIN_NAME`** und
 **`BOOTSTRAP_ADMIN_EMAIL`** (fehlt eine, meldet der Code einen klaren Fehler – wie bei `SPREADSHEET_ID`). Die Zuordnung
@@ -36,7 +38,7 @@ V2 ändert das:
 | `deleteShipment`, `deleteShipments` | Nur Administratoren: Löschung als Markierung (Tombstone, Spalte E = TRUE), damit andere Geräte die Sendung nicht wiederbeleben. |
 | `loadCarrierMap` | Zuordnung Kundennummer → Spediteur aus dem Blatt `kundennr_carrier` (2.10) – `{ map: { "<Kundennr>": "<Spediteur>" } }`. |
 | `clearAllData` | Nur Administratoren: vor dem Zurücksetzen eine Kopie des Sendungsblatts anlegen; bei Backup-Fehler nichts löschen. |
-| `saveAllData` | Nur Administratoren: alte Vollspeicherung, läuft durch den Merge. App 9.8 nutzt sie nur als Rückfall gegen alte Server. |
+| `saveAllData` | Nur Administratoren: alte Vollspeicherung, läuft durch den Merge. App 9.9 nutzt sie nur als Rückfall gegen alte Server. |
 | `loadAllData`, `sendPdfEmail`, `saveLkwStatus`, `loadLkwStatus` | Wie bisher; `loadAllData` bleibt für angemeldete Nutzer lesbar. |
 | `authLogin`, `authAccept`, `authInviteInfo`, `authCheck`, `authLogout`, `admin*` | Anmeldung (siehe Version 2.2). |
 
@@ -165,6 +167,27 @@ Bei deutlich mehr Geräten `SYNC_POLL_INTERVAL_MS` in `js/02-sync-anmeldung.js` 
 
 `purgeDeletedRows()` im Skript-Editor manuell ausführen, um Lösch-Markierungen physisch aus dem Sheet zu entfernen.
 Archivierte Zeilen (`ARCHIV`) bleiben davon unberührt – sie werden nie automatisch gelöscht.
+
+## Version 2.12 – eine abgelehnte Nummer blockiert nicht mehr alles
+
+Bis 2.11 lehnte der Server einen ganzen `saveShipments`-Aufruf ab, sobald eine einzige Sendungsnummer ungültig war (beginnt nach
+dem Trimmen mit `=`, `+`, `-` oder `@`). Die App schickt ihre Warteschlange der Reihe nach; der Eintrag blieb deshalb für immer
+stehen und dahinter ging nichts mehr durch. 2.12 prüft **je Nummer**:
+
+- `saveShipments` überspringt ungültige Nummern und speichert die übrigen normal. Die Antwort nennt sie in
+  `skipped: [{ base, reason }]`, damit die App genau diese Einträge aus der Warteschlange nehmen kann.
+- `deleteShipment` / `deleteShipments` nehmen einen Löschvermerk für eine vorhandene Zeile immer an (sie wird als Text
+  geschrieben: Textformat + Textmarker aus `writeRows_`, damit nie eine Formel entsteht). Eine Nummer, die es in der Tabelle
+  nicht gibt, gilt als erledigt, ohne dass etwas geschrieben wird. Ungültige Nummern werden übersprungen und in `skipped`
+  gemeldet. Es wird kein Fehler mehr geworfen.
+- Die Sicherheitsprüfung für das **Speichern** bleibt bestehen: Eine ungültige Nummer wird nie als Sendung gespeichert.
+- Ein Gerät mit einer bis 2.11 blockierten Warteschlange heilt sich beim nächsten Sync selbst: Der Server überspringt den
+  schlechten Eintrag (bzw. nimmt den Löschvermerk an), die App (ab 9.9) wirft ihn weg, der Rest läuft durch – ohne dass Daten
+  auf dem Gerät gelöscht werden.
+- Eine Löschung durch einen Mitarbeiter (kein Administrator) liefert unverändert `FORBIDDEN`; die App 9.9 wirft nur diesen
+  einen Vermerk weg und synchronisiert die übrigen Sendungen weiter.
+- Der automatische Import aus Google Drive überspringt Auftragsnummern, die mit `=`, `+`, `-` oder `@` beginnen, und nennt sie
+  im Import-Protokoll unter „ignoriert“ – sonst könnten diese Sendungen nie wieder gespeichert werden.
 
 ## Version 2.11 – Sicherheitslücken schließen
 

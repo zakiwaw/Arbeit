@@ -579,6 +579,7 @@ async function flushPendingChanges() {
 
     syncInFlight = true;
     setSyncIndicator('busy', 'Wird synchronisiert …');
+    const dropped = [];   // [{ base, text }] – endgültig abgelehnte Einträge (9.9)
     try {
         if (serverIsLegacy) {
             // Altes Backend: kompletter Datensatz wie früher
@@ -596,12 +597,15 @@ async function flushPendingChanges() {
                     if (last && last.kind === kind) last.bases.push(b); else groups.push({ kind, bases: [b] });
                 });
             });
+            // Endgültig abgelehnte Einträge (ungültige Nummer, FORBIDDEN beim Löschen) verlassen hier die Warteschlange –
+            // gesammelt, damit der Nutzer eine Meldung mit den betroffenen Nummern bekommt und der Rest normal weiterläuft.
             for (const g of groups) {
-                if (g.kind === 'delete') await sendDeletes(g.bases);
-                else await sendChanges(g.bases);
+                if (g.kind === 'delete') dropped.push(...await sendDeletes(g.bases));
+                else dropped.push(...await sendChanges(g.bases));
             }
         }
         if (!hasPending()) showSyncOk();
+        showDroppedChanges(dropped);   // orange Meldung, kein roter Banner: der Rest ist synchronisiert
     } catch (error) {
         syncLastErrorAt = Date.now();
         console.warn("Server-Synchronisierung fehlgeschlagen:", error.message);
@@ -627,32 +631,124 @@ function showOfflineWaiting() {
     setSyncIndicator('error', `Offline – ${n === 1 ? '1 Änderung wartet' : n + ' Änderungen warten'} (werden gesendet, sobald Netz da ist)`);
 }
 
+// ---- Endgültig abgelehnte Einträge (9.9) ---------------------------------------------------------------------------
+// Bis 9.8 kippte ein einziger abgelehnter Eintrag die ganze Warteschlange: der Sync brach ab, der Eintrag blieb stehen und
+// wurde bei jedem Speichern erneut versucht – nichts ging mehr durch. Jetzt verlässt NUR dieser Eintrag die Warteschlange.
+// Endgültig (wegwerfen): ungültige Sendungsnummer (=, +, - oder @ am Anfang; Regel wie backend/Code.gs) und FORBIDDEN beim
+// Löschen (nur Administratoren). Vorübergehend (weiter versuchen): kein Netz, „Server ist gerade beschäftigt (Sperre)“,
+// HTTP-/Netzfehler – alles andere wird also unverändert erneut geschickt.
+// CHANGE weggeworfen: war die Sendung nie auf dem Server (kein Ausgangsstand), wird sie auch lokal entfernt; war sie schon
+// dort (z. B. Umbenennen auf eine ungültige Nummer), wird der lokale Stand auf den Serverstand (Snapshot) zurückgesetzt.
+// DELETE-Vermerk weggeworfen: war die Nummer auf dem Server (z. B. FORBIDDEN), kommt die Sendung lokal aus dem Snapshot
+// zurück; war sie nie dort, bleibt sie lokal gelöscht – ohne Server-Aufruf.
+function dropRejectedPending(base) {
+    const pending = readPending();
+    const snap = readSnapshot();
+    const shipments = loadShipments();
+    delete pending.changed[base];
+    delete pending.deleted[base];
+    writePending(pending);
+    if (Object.prototype.hasOwnProperty.call(snap, base)) {
+        // war schon auf dem Server → lokaler Stand = Serverstand (Ausgangsstand)
+        try { shipments[base] = JSON.parse(snap[base]); } catch (e) { delete shipments[base]; }
+    } else {
+        // war nie auf dem Server → lokal gibt es sie nicht mehr (Anlegen/Umbenennen/Löschen ohne Serverstand)
+        delete shipments[base];
+    }
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(shipments));
+}
+function droppedMessage(base, kind, reason) {
+    if (reason === 'forbidden') return `Sendungsnummer ${base} wurde nicht gelöscht – Löschen ist nur für Administratoren erlaubt.`;
+    if (kind === 'delete') return `Sendungsnummer ${base} wurde lokal entfernt, weil sie ungültig ist.`;
+    return `Sendungsnummer ${base} wurde nicht gespeichert, weil sie ungültig ist.`;
+}
+// Sammel-Meldung nach dem Senden: eine orange Zeile mit den betroffenen Nummern – ausdrücklich NICHT der rote Banner
+// „Server nicht erreichbar“, denn die anderen Sendungen sind normal synchronisiert.
+function showDroppedChanges(dropped) {
+    if (!dropped || !dropped.length) return;
+    if (typeof refreshViewsAfterRemoteChange === 'function') refreshViewsAfterRemoteChange();   // lokal Zurückgesetztes sofort zeigen
+    const texts = Array.from(new Set(dropped.map(d => d.text)));
+    const extra = texts.length > 2 ? ` (+${texts.length - 2} weitere Nummer(n))` : '';
+    displayError(texts.slice(0, 2).join(' ') + extra + ' Die anderen Sendungen wurden normal synchronisiert.', 'orange');
+}
+
 // Löschungen (Tombstones), damit kein anderes Gerät die Sendung wiederbelebt – möglichst alle in EINEM Aufruf
 // (Server-Skript ab 2.4), sonst einzeln wie bisher. Bestätigte Einträge verlassen die Warteschlange sofort.
+// 9.9: Ein ungültiger Vermerk für eine Nummer, die nie auf dem Server war, wird nur lokal erledigt (kein Aufruf).
+// Antwortet der Server mit FORBIDDEN (Mitarbeiter, kein Administrator), wird der Vermerk weggeworfen – aber nur der
+// betroffene; alle anderen Löschungen und Änderungen laufen weiter.
 async function sendDeletes(delBases) {
-    delBases = delBases.slice();
-    if (delBases.length > 1 && serverHasBatchDelete) {
+    const dropped = [];
+    const snap0 = readSnapshot();
+    const invalidKnown = [];   // ungültige Nummern, die auf dem Server liegen: Löschvermerk einzeln (wenige Ausnahmen)
+    const normal = [];
+    delBases.forEach(b => {
+        if (!isInvalidBase(b)) { normal.push(b); return; }
+        if (Object.prototype.hasOwnProperty.call(snap0, b)) { invalidKnown.push(b); return; }
+        // nie auf dem Server → nur lokal erledigen, ohne Aufruf (der Server hätte nichts zu löschen)
+        const p = readPending(); delete p.deleted[b]; writePending(p);
+        dropped.push({ base: b, text: droppedMessage(b, 'delete', 'invalid') });
+    });
+    for (const b of invalidKnown) {
         try {
-            await postToServer('deleteShipments', { baseNumbers: delBases, modifiedBy: currentUserName() });
-            const p = readPending(); const s = readSnapshot();
-            delBases.forEach(b => { delete p.deleted[b]; delete s[b]; });
-            writePending(p); writeSnapshot(s);
-            delBases = [];
+            await postToServer('deleteShipment', { baseNumber: b, modifiedBy: currentUserName() });
+            const p = readPending(); delete p.deleted[b]; writePending(p);
+            const sn = readSnapshot(); delete sn[b]; writeSnapshot(sn);
         } catch (e) {
-            if (!isUnknownActionError(e)) throw e;
-            serverHasBatchDelete = false;   // älteres Server-Skript → einzeln
+            // 2.12 nimmt den Vermerk an; ein noch bereitgestelltes älteres Skript lehnt ihn ab → wegwerfen statt blockieren.
+            if (e && (e.code === 'FORBIDDEN' || /Ungültige Sendungsnummer/i.test(e.message || ''))) {
+                dropRejectedPending(b);
+                dropped.push({ base: b, text: droppedMessage(b, 'delete', e.code === 'FORBIDDEN' ? 'forbidden' : 'invalid') });
+            } else throw e;   // vorübergehend (Netz, Sperre, HTTP) → bleibt in der Warteschlange
         }
     }
-    for (const b of delBases) {
-        await postToServer('deleteShipment', { baseNumber: b, modifiedBy: currentUserName() });
-        const p = readPending(); delete p.deleted[b]; writePending(p);
-        const s = readSnapshot(); delete s[b]; writeSnapshot(s);
+    let bases = normal;
+    if (bases.length > 1 && serverHasBatchDelete) {
+        try {
+            await postToServer('deleteShipments', { baseNumbers: bases, modifiedBy: currentUserName() });
+            const p = readPending(); const sn = readSnapshot();
+            bases.forEach(b => { delete p.deleted[b]; delete sn[b]; });
+            writePending(p); writeSnapshot(sn);
+            bases = [];
+        } catch (e) {
+            if (isUnknownActionError(e)) {
+                serverHasBatchDelete = false;   // älteres Server-Skript → einzeln
+            } else if (e && e.code === 'FORBIDDEN') {
+                bases.forEach(b => { dropRejectedPending(b); dropped.push({ base: b, text: droppedMessage(b, 'delete', 'forbidden') }); });
+                bases = [];
+            } else {
+                throw e;                        // vorübergehend (Netz, Sperre, HTTP) → bleibt in der Warteschlange
+            }
+        }
     }
+    for (const b of bases) {
+        try {
+            await postToServer('deleteShipment', { baseNumber: b, modifiedBy: currentUserName() });
+            const p = readPending(); delete p.deleted[b]; writePending(p);
+            const sn = readSnapshot(); delete sn[b]; writeSnapshot(sn);
+        } catch (e) {
+            if (e && e.code === 'FORBIDDEN') {   // endgültig: nur dieser eine Vermerk fällt weg
+                dropRejectedPending(b);
+                dropped.push({ base: b, text: droppedMessage(b, 'delete', 'forbidden') });
+                continue;
+            }
+            throw e;                             // vorübergehend → restliche Vermerke bleiben stehen
+        }
+    }
+    return dropped;
 }
 
 // Geänderte Sendungen (9.3): je Sendung Stand + Ausgangsstand (3-Wege-Merge) + Version, auf der er beruht (versions)
-// + Name (modifiedBy) + Reihenfolge (order). Antwort: merged = jetzt gültiger Stand, conflicts = was nicht zusammenpasste.
+// + Name (modifiedBy) + Reihenfolge (order). Antwort: merged = jetzt gültiger Stand, conflicts = was nicht zusammenpasste,
+// skipped = Nummern, die der Server überspringt (2.12: ungültige Sendungsnummer) – die wirft die App weg (s. o.).
 async function sendChanges(changedBases) {
+    const dropped = [];
+    changedBases = changedBases.filter(b => {
+        if (!isInvalidBase(b)) return true;              // ungültige Nummern kommen gar nicht erst in den Aufruf …
+        dropRejectedPending(b);               // … sondern werden sofort weggeräumt (auch gegen alte Server)
+        dropped.push({ base: b, text: droppedMessage(b, 'change', 'invalid') });
+        return false;
+    });
     const local = loadShipments();
     const snap = readSnapshot();
     const toSend = {}, bases = {}, versions = {}, sentJson = {}, order = [];
@@ -664,7 +760,7 @@ async function sendChanges(changedBases) {
         versions[b] = baseVersionOf(snap[b]);
         order.push(b);
     });
-    if (order.length === 0) { const p = readPending(); changedBases.forEach(b => { delete p.changed[b]; }); writePending(p); return; }
+    if (order.length === 0) { const p = readPending(); changedBases.forEach(b => { delete p.changed[b]; }); writePending(p); return dropped; }
     const r = await postToServer('saveShipments', { shipments: toSend, bases, versions, modifiedBy: currentUserName(), order, deviceId: SYNC_DEVICE_ID });
 
     // Zusammengeführten Stand übernehmen (enthält ggf. Scans anderer Geräte, Version, Name, Protokoll)
@@ -683,11 +779,19 @@ async function sendChanges(changedBases) {
     });
     changedBases.forEach(b => { if (!toSend[b]) delete p.changed[b]; });
     writeSnapshot(snapNow); writePending(p);
+    // Vom Server übersprungene Nummern (2.12) endgültig wegräumen – nur diese, alle übrigen sind gespeichert.
+    (Array.isArray(r.skipped) ? r.skipped : []).forEach(sk => {
+        const b = String((sk && sk.base) || '');
+        if (!b) return;
+        dropRejectedPending(b);
+        dropped.push({ base: b, text: droppedMessage(b, 'change', 'invalid') });
+    });
     { let k = false; Object.keys(merged).forEach(b => { if (archiveKnownBases.delete(b)) k = true; }); if (k) saveArchiveKnownBases(); } // gespeichert = (wieder) aktiv
-    if (touched) { localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(after)); refreshViewsAfterRemoteChange(); }
+    if (touched || dropped.length) { localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(loadShipments())); refreshViewsAfterRemoteChange(); }
     if (Array.isArray(r.conflicts) && r.conflicts.length) showConflicts(r.conflicts);
     // Hinweis: die Server-Version wird bewusst NUR beim Abruf (pullRemoteChanges) weitergeschaltet,
     // sonst würden zwischenzeitliche Änderungen anderer Geräte übersprungen.
+    return dropped;
 }
 
 // Konflikt anzeigen: Welche Sendung, wer gleichzeitig geändert hat, was jetzt gilt. Nichts wird still verworfen –

@@ -35,15 +35,19 @@ Aufträge übernommen.
 ## Versionen
 
 Die App-Version steht zentral in `js/01-start.js` (`APP_VERSION`, `APP_VERSION_DATE`, `APP_BACKEND_VERSION`) und wird in der
-App angezeigt: auf der Anmeldeseite, unten im Seitenmenü und am Desktop klein neben dem Titel („Version 9.8 · Stand … ·
-Server-Skript 2.11“). So sieht man auf jedem Gerät sofort, ob noch eine alte Version offen ist. Bei jeder veröffentlichten
+App angezeigt: auf der Anmeldeseite, unten im Seitenmenü und am Desktop klein neben dem Titel („Version 9.9 · Stand … ·
+Server-Skript 2.12“). So sieht man auf jedem Gerät sofort, ob noch eine alte Version offen ist. Bei jeder veröffentlichten
 Änderung: Version hochzählen und in `index.html` (`<title>`), `CHANGELOG.md` und `backend/README.md` nachziehen –
 `node tests/versioncheck.js` prüft, dass alle Stellen zusammenpassen. Das Server-Skript hat eine eigene Versionszählung
 (oben in `backend/Code.gs`).
 
-App 9.8 / Code.gs 2.11 schützen Sendungszeilen gegen Formel-Injektion und ausgewählte Ausgaben im LKW-Menü und Scan-Feedback
-gegen XSS. Sendungs- und LKW-Löschung sowie die alte Vollspeicherung sind Administratoren vorbehalten; vor „Alles Zurücksetzen“
-wird das Sendungsblatt im selben Spreadsheet gesichert. **Nach dem Merge Code.gs 2.11 als neue Version bereitstellen.** Seit 2.10 erfolgt
+App 9.9 / Code.gs 2.12 beheben die Sync-Blockade durch eine abgelehnte Sendungsnummer: Nummern mit `=`, `+`, `-` oder `@` am
+Anfang lehnt die App schon bei der Eingabe ab, und der Server überspringt eine ungültige Nummer einzeln, statt den ganzen
+Aufruf abzulehnen – die übrigen Sendungen synchronisieren normal, ein Löschvermerk für eine unbekannte Nummer gilt als erledigt.
+Aus 9.8 gilt weiter: Sendungszeilen sind gegen Formel-Injektion geschützt (Textformat und Textmarker), ausgewählte Ausgaben im
+LKW-Menü und Scan-Feedback gegen XSS; Sendungs- und LKW-Löschung sowie die alte Vollspeicherung sind Administratoren
+vorbehalten, vor „Alles Zurücksetzen“ wird das Sendungsblatt gesichert. **Nach dem Merge Code.gs 2.12 als neue Version
+bereitstellen.** Seit 2.10 erfolgt
 die Anmeldung nur mit PIN; die Skript-Eigenschaften `BOOTSTRAP_ADMIN_NAME` / `BOOTSTRAP_ADMIN_EMAIL` müssen gesetzt sein.
 Die Zuordnung Kundennummer → Spediteur liegt im Blatt `kundennr_carrier`.
 

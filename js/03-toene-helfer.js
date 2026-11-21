@@ -386,7 +386,15 @@ function fitTextToContainer(element, container, initialFontSize, minFontSize, pa
 
             return { baseNumber, suffix, isValidFormat, raw, isSuffixFormat }; // <-- NEUES FELD ZURÜCKGEBEN
         }
-        function findShipmentByNoteContent(searchText) {
+// Ungültige Sendungsnummern (dieselbe Regel wie backend/Code.gs): Beginnen sie nach dem Trimmen mit =, +, - oder @, könnte
+// das Tabellenblatt sie als Formel lesen. Ab 9.9 kommen solche Nummern gar nicht erst in die App (Anlegen, Umbenennen,
+// Import); der Server überspringt sie zusätzlich einzeln, statt den ganzen Sync abzulehnen.
+// Geprüft wird immer die Sendungsnummer (base), nicht die rohe Eingabe – bei „…+0001“ zählt der Teil davor.
+const INVALID_BASE_MESSAGE = 'Ungültige Sendungsnummer: Sie darf nicht mit =, +, - oder @ beginnen.';
+function isInvalidBase(base) {
+    return /^[=+\-@]/.test(String(base == null ? '' : base).trim());
+}
+function findShipmentByNoteContent(searchText) {
             const shipments = loadShipments();
             const upperSearchText = searchText.trim().toUpperCase();
             if (!upperSearchText) return null;

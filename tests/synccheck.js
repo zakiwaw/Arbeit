@@ -9,7 +9,7 @@ const STORE = 'frachtSicherungMobile_V8_18_Refactored', LKW = 'frachtLkwStatusV1
 const localShipments = page => page.evaluate((k) => JSON.parse(localStorage.getItem(k) || '{}'), STORE);
 const localLkw = page => page.evaluate((k) => JSON.parse(localStorage.getItem(k) || '{}'), LKW);
 const lkwPending = page => page.evaluate((k) => localStorage.getItem(k + '_lkwStatusPending') === '1', STORE);
-const syncPending = page => page.evaluate((k) => JSON.parse(localStorage.getItem(k + '_syncPending') || '{"changed":{},"deleted":{}}'), STORE);
+const syncPending = page => page.evaluate((k) => JSON.parse(localStorage.getItem(k + '_syncPending') || '{"changed":{},"deleted":{}}'), STORE).then(p => Object.assign({ order: [] }, p));
 const overlay = page => page.evaluate(() => ({ visible: document.getElementById('loadingOverlay').classList.contains('visible'), text: document.getElementById('loadingText').textContent }));
 const clickToggle = (page, truckId) => page.evaluate((id) => { const t = document.querySelector(`.lkw-toggle[data-truckid="${id}"]`); if (!t) return false; t.click(); return true; }, truckId);
 const toggleChecked = (page, truckId) => page.evaluate((id) => document.querySelector(`.lkw-toggle[data-truckid="${id}"]`)?.checked, truckId);
@@ -269,15 +269,216 @@ async function waitOverlayGone(page, maxMs = 8000) { return waitFor(async () => 
     await newShipment(pageA, 'Q1', 1); await newShipment(pageA, 'Q2', 1);
     assert(await clickDelete(pageA, 'Q1'), 'Q1 gelöscht (ohne Netz)'); await wait(400);
     pA = await syncPending(pageA);
-    assert(pA.deleted.Q1 === true && !pA.changed.Q1 && pA.changed.Q2 === true && pA.order.join() === 'Q1,Q2', `Warteschlange: ${JSON.stringify(pA)}`);
+    assert(pA.deleted.Q1 === true && !pA.changed.Q1 && pA.changed.Q2 === true && pA.order.indexOf('Q1') >= 0 && pA.order.indexOf('Q1') < pA.order.indexOf('Q2'),
+      `Warteschlange: Q1 (Löschung) steht vor Q2 (Anlegen): ${JSON.stringify(pA)}`);
     const n0 = be.actions.length;
     await netBack(pageA, 'u-admin');
     assert(await waitFor(async () => !(await syncPending(pageA)).order.length, 8000), 'Nach „online“ alles gesendet');
+    // Beide Einträge gehen raus (Q1 als Löschvermerk, Q2 als Anlegen); die Löschung steht in der Warteschlange vor Q2.
     const seq = be.actions.slice(n0).filter(a => /^(deleteShipment|deleteShipments|saveShipments)$/.test(a));
-    assert(seq.join() === 'deleteShipments,saveShipments' || seq.join() === 'deleteShipment,saveShipments', `Reihenfolge eingehalten: ${seq.join(' → ')}`);
+    assert(seq.some(a => /^deleteShipment/.test(a)) && seq.lastIndexOf('saveShipments') > seq.findIndex(a => /^deleteShipment/.test(a)),
+      `Löschvermerk vor dem Speichern der Änderung gesendet (${seq.join(' → ')})`);
     assert(serverRow('Q2') && serverRow('Q2').shipment.version === 1 && (!serverRow('Q1') || serverRow('Q1').flag === true), 'Server: Q2 angelegt, Q1 nicht (mehr) vorhanden');
     assert(pageA.__errors.length === 0 && pageB.__errors.length === 0, `Keine JS-Fehler auf beiden Geräten (${pageA.__errors.concat(pageB.__errors).join(' | ')})`);
     await pageA.close(); await pageB.close();
+
+    // ================= 9.9: ungültige Sendungsnummer blockiert die Warteschlange nicht mehr =================
+    // Live nachgestellt am 21.11.2026: „=USERS01“ gescannt → Server (2.11) lehnt ab, App versucht endlos, nichts synchronisiert
+    // mehr. Jetzt: Eingabe wird sofort abgelehnt; kommt so ein Eintrag trotzdem in die Warteschlange (alte Fassung auf dem
+    // Gerät), wird nur dieser Eintrag weggeworfen – der Rest geht durch, ohne roten Banner.
+    const indicatorCls = pg => pg.evaluate(() => document.getElementById('syncIndicator').className);
+    const msgOf = pg => pg.evaluate(() => ({ text: document.getElementById('errorDisplay').textContent, color: document.getElementById('errorDisplay').style.color }));
+    // pageA/pageB sind const → für die neuen Szenarien eigene Variablen
+    let pgA = null, pgB = null;
+    // ---------- 16) Eingabe: ungültige Nummer wird gar nicht erst angelegt (Scanfeld + „Hinzufügen“) ----------
+    be = makeBackend(sampleData(), {}, { gas: true });
+    pgA = await openApp(browser, be, {}); await wait(800);   // neues Gerät (eigener Speicher je Seitenaufruf)
+    const pend0 = JSON.stringify(await syncPending(pgA));   // Gerät ist neu → Warteschlange muss leer bleiben
+    const sendsInput = be.requests.filter(r => r.action === 'saveShipments').length;
+    await scan(pgA, '=USERS01', 600);
+    let storeA = await localShipments(pgA);
+    assert(!storeA['=USERS01'], 'Scan „=USERS01“: keine Sendung angelegt');
+    assert(await pgA.evaluate(() => !document.getElementById('newTotalSection').classList.contains('visible')), 'Keine Stückzahl-Abfrage für eine ungültige Nummer (auch kein „Hinzufügen“-Weg)');
+    let m16 = await msgOf(pgA);
+    assert(m16.text === 'Ungültige Sendungsnummer: Sie darf nicht mit =, +, - oder @ beginnen.', `Klare Meldung bei der Eingabe („${m16.text}“)`);
+    assert(JSON.stringify(await syncPending(pgA)) === pend0 && be.requests.filter(r => r.action === 'saveShipments').length === sendsInput, 'Kein Eintrag in der Warteschlange, nichts gespeichert');
+    await scan(pgA, '@ABC', 400); await scan(pgA, '-77', 400); await scan(pgA, '+1', 400);
+    storeA = await localShipments(pgA);
+    assert(!storeA['@ABC'] && !storeA['-77'] && !storeA['+1'], 'Auch @ABC, -77 und +1 werden nicht angelegt');
+    await scan(pgA, 'GUT123', 600);   // gültige, neue Nummer: Stückzahl-Abfrage wie bisher
+    assert(await pgA.evaluate(() => document.getElementById('newTotalSection').classList.contains('visible')), 'Gültige Nummer → normale Stückzahl-Abfrage');
+    await pgA.evaluate(() => { document.getElementById('newTotalInput').value = '1'; document.getElementById('confirmNewTotalBtn').click(); }); await wait(700);
+    storeA = await localShipments(pgA);
+    assert(!!storeA.GUT123 && storeA.GUT123.hawb === 'GUT123', 'Gültige Nummer GUT123 wird normal angelegt (wie bisher)');
+    assert(await waitFor(async () => { const r = serverRow('GUT123'); return r && r.shipment && r.shipment.version === 1; }, 6000), 'GUT123 geht normal zum Server');
+    assert(pgA.__errors.length === 0, `Keine JS-Fehler (${pgA.__errors.join(' | ')})`);
+    await pgA.close();
+
+    // ---------- 17) Blockierte Warteschlange (ALTER Eintrag =USERS01 + gültige 123) → 123 geht durch, =USERS01 fällt weg ----------
+    // wie auf einem Gerät mit App 9.8: der Eintrag liegt schon in der Warteschlange (ohne Netz erfasst), die App startet damit.
+    // „Neu laden“ geht hier nicht (die Tests leeren dabei den Speicher) → Warteschlange im laufenden Betrieb füllen und
+    // das Senden mit dem Browser-Ereignis „online“ anstoßen.
+    be = makeBackend(sampleData(), {}, { gas: true });
+    pgA = await openApp(browser, be, {}); await wait(800);
+    await pgA.evaluate((STORE) => {
+        const st = JSON.parse(localStorage.getItem(STORE) || '{}');
+        const now = new Date().toISOString();
+        st['=USERS01'] = { hawb: '=USERS01', lastModified: now, totalPiecesExpected: null, scannedItems: [{ rawInput: '=USERS01', status: 'XRY', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null }], mitarbeiter: 'Mitarbeiter 1' };
+        st['123'].lastModified = now;
+        localStorage.setItem(STORE, JSON.stringify(st));
+        const p = JSON.parse(localStorage.getItem(STORE + '_syncPending') || '{"changed":{},"deleted":{},"order":[]}');
+        p.changed['=USERS01'] = true; p.changed['123'] = true; p.order = ['=USERS01', '123'];
+        localStorage.setItem(STORE + '_syncPending', JSON.stringify(p));
+        window.dispatchEvent(new Event('online'));   // → pollNow() → flushPendingChanges()
+    }, STORE);
+    assert(await waitFor(async () => !(await syncPending(pgA)).order.length, 10000), `Warteschlange läuft leer (${JSON.stringify(await syncPending(pgA))})`);
+    storeA = await localShipments(pgA);
+    assert(!storeA['=USERS01'], 'Ungültiger CHANGE ohne Serverstand: lokal entfernt');
+    assert(!!serverRow('123') && serverRow('123').shipment.version === 1 && (await syncPending(pgA)).order.length === 0, `Gültige Sendung 123 war schon auf dem Server und bleibt dort (v${((serverRow('123') || {}).shipment || {}).version})`);
+    const banner17 = await msgOf(pgA);
+    assert(!/Server nicht erreichbar/.test(banner17.text) && banner17.color !== 'red' && !/is-error/.test(await indicatorCls(pgA)), `Kein roter Banner „Server nicht erreichbar“ (${JSON.stringify(banner17)})`);
+    assert(banner17.text.includes('Sendungsnummer =USERS01 wurde nicht gespeichert, weil sie ungültig ist.') && banner17.text.includes('Die anderen Sendungen wurden normal synchronisiert.'),
+      `Meldung mit der betroffenen Nummer („${banner17.text}“)`);
+    assert(pgA.__errors.length === 0, `Keine JS-Fehler (${pgA.__errors.join(' | ')})`);
+    await pgA.close();
+
+    // ---------- 18) Umbenennen auf eine ungültige Nummer: lokaler Stand wird auf den Serverstand zurückgesetzt ----------
+    be = makeBackend(sampleData(), {});   // Stub speichert ungeprüft – so bleibt der Stand „auf dem Server“ erhalten
+    pgA = await openApp(browser, be, {}); await wait(700);
+    await pgA.evaluate((STORE) => {   // Umbenennen: Server kennt „123“, lokal heißt die Sendung jetzt „=UMB“
+        const st = JSON.parse(localStorage.getItem(STORE) || '{}');
+        const s = st['123'];
+        st['=UMB'] = Object.assign({}, s, { hawb: '=UMB', lastModified: new Date().toISOString() });
+        delete st['123'];
+        localStorage.setItem(STORE, JSON.stringify(st));
+        const p = JSON.parse(localStorage.getItem(STORE + '_syncPending') || '{"changed":{},"deleted":{},"order":[]}');
+        delete p.changed['123']; p.changed['=UMB'] = true; p.order = ['=UMB'];
+        localStorage.setItem(STORE + '_syncPending', JSON.stringify(p));
+        window.dispatchEvent(new Event('online'));
+    }, STORE);
+    assert(await waitFor(async () => !(await syncPending(pgA)).order.length, 10000), 'Umbenennen auf eine ungültige Nummer: Eintrag fällt aus der Warteschlange');
+    storeA = await localShipments(pgA);
+    assert(!storeA['=UMB'] && !!storeA['123'], `Lokaler Stand auf den Serverstand zurückgesetzt (123 wieder da, =UMB weg: ${Object.keys(storeA).join(',')})`);
+    const t18 = await msgOf(pgA);
+    assert(t18.text.includes('Sendungsnummer =UMB wurde nicht gespeichert, weil sie ungültig ist.') && !/Server nicht erreichbar/.test(t18.text), `Meldung ohne roten Banner („${t18.text}“)`);
+    assert(pgA.__errors.length === 0, `Keine JS-Fehler (${pgA.__errors.join(' | ')})`);
+    await pgA.close();
+
+    // ---------- 19) DELETE-Vermerk mit ungültiger Nummer, die es nie auf dem Server gab → nur lokal erledigt, kein Aufruf ----------
+    be = makeBackend(sampleData(), {}, { gas: true });
+    pgA = await openApp(browser, be, {}); await wait(800);
+    const delReqs0 = be.requests.length;
+    await pgA.evaluate((STORE) => {
+        const p = JSON.parse(localStorage.getItem(STORE + '_syncPending') || '{"changed":{},"deleted":{},"order":[]}');
+        p.deleted['=GONE'] = true; p.order = ['=GONE'];
+        localStorage.setItem(STORE + '_syncPending', JSON.stringify(p));
+        window.dispatchEvent(new Event('online'));
+    }, STORE);
+    assert(await waitFor(async () => !(await syncPending(pgA)).order.length, 8000), 'Löschvermerk für eine nie vorhandene ungültige Nummer: lokal erledigt');
+    assert(!be.requests.slice(delReqs0).some(r => r.action === 'deleteShipments' || r.action === 'deleteShipment'), 'Dafür wurde kein Server-Aufruf gemacht');
+    assert(!Object.keys(be.gas.shipmentRows()).includes('=GONE'), 'Keine Zeile für die ungültige Nummer angelegt');
+    assert(pgA.__errors.length === 0, `Keine JS-Fehler (${pgA.__errors.join(' | ')})`);
+    await pgA.close();
+
+    // ---------- 20) DELETE-Vermerk für eine ungültige Nummer, die auf dem Server liegt → Server nimmt ihn an ----------
+    // Rettung für ein Gerät mit der Sendung aus 2.11: Löschen hilft jetzt, statt denselben Fehler zu bekommen.
+    be = makeBackend(sampleData(), {}, { gas: true });
+    pgA = await openApp(browser, be, {}); await wait(800);
+    // Zeile existiert schon (vor 2.11 angelegt; 2.12 würde sie beim Speichern überspringen) → direkt ins Blatt schreiben
+    const gvRow = be.gas.call('loadChanges', { sinceVersion: 0 }, be.gasTokens['u-admin']).version + 1;
+    be.gas.sheets.shipments.rows.push(['=ALTBESTAND', JSON.stringify({ hawb: '=ALTBESTAND', scannedItems: [] }), gvRow, new Date().toISOString(), '']);
+    be.gas.sheets._meta.rows[0][0] = gvRow; delete be.gas.cache['fracht_version'];
+    await pgA.evaluate((STORE) => {
+        // Ausgangsstand wie beim Server (Sendung bekannt) – sonst gilt der Vermerk als „nie auf dem Server“ und wird lokal erledigt
+        const st = JSON.parse(localStorage.getItem(STORE) || '{}');
+        st['=ALTBESTAND'] = { hawb: '=ALTBESTAND', scannedItems: [] };
+        localStorage.setItem(STORE, JSON.stringify(st));
+        const snap = JSON.parse(localStorage.getItem(STORE + '_syncSnapshot') || '{}');
+        snap['=ALTBESTAND'] = JSON.stringify(st['=ALTBESTAND']);
+        localStorage.setItem(STORE + '_syncSnapshot', JSON.stringify(snap));
+        const p = JSON.parse(localStorage.getItem(STORE + '_syncPending') || '{"changed":{},"deleted":{},"order":[]}');
+        p.deleted['=ALTBESTAND'] = true; p.order = ['=ALTBESTAND'];
+        localStorage.setItem(STORE + '_syncPending', JSON.stringify(p));
+        window.dispatchEvent(new Event('online'));
+    }, STORE);
+    assert(await waitFor(async () => (serverRow('=ALTBESTAND') || {}).flag === true, 6000), `Server nimmt den Löschvermerk für die vorhandene (ungültige) Nummer an (${JSON.stringify((serverRow('=ALTBESTAND') || {}).flag)})`);
+    assert(await waitFor(async () => !(await syncPending(pgA)).order.length, 8000), 'Danach ist der Vermerk aus der Warteschlange');
+    assert(pgA.__errors.length === 0, `Keine JS-Fehler (${pgA.__errors.join(' | ')})`);
+    await pgA.close();
+
+    // ---------- 21) FORBIDDEN beim Löschen (Mitarbeiter): nur dieser Vermerk fällt weg, die Änderung geht durch ----------
+    be = makeBackend(sampleData(), {}, { gas: true });
+    pgA = await openApp(browser, be, { session: { token: MA2_TOKEN, user: MA2_USER, expires: Date.now() + 3600e3 } }); await wait(800);
+    await pgA.evaluate((STORE) => {   // Mitarbeiter hat gelöscht (nur Admin) und parallel gescannt
+        const st = JSON.parse(localStorage.getItem(STORE) || '{}');
+        delete st['9007000002'];
+        st['9007000001'].scannedItems.push({ rawInput: 'HU1001', status: 'XRY', timestamp: new Date().toISOString(), isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null });
+        localStorage.setItem(STORE, JSON.stringify(st));
+        const p = JSON.parse(localStorage.getItem(STORE + '_syncPending') || '{"changed":{},"deleted":{},"order":[]}');
+        p.deleted['9007000002'] = true; p.changed['9007000001'] = true;
+        p.order = ['9007000002', '9007000001'];
+        localStorage.setItem(STORE + '_syncPending', JSON.stringify(p));
+        window.dispatchEvent(new Event('online'));
+    }, STORE);
+    assert(await waitFor(async () => !(await syncPending(pgA)).order.length, 10000), `FORBIDDEN: Warteschlange läuft leer (${JSON.stringify(await syncPending(pgA))})`);
+    storeA = await localShipments(pgA);
+    assert(!!storeA['9007000002'] && storeA['9007000002'].hawb === '9007000002', 'FORBIDDEN-Löschung: Sendung kommt lokal aus dem Serverstand zurück');
+    assert((serverRow('9007000002') || {}).flag !== true && !!(serverRow('9007000002') || {}).shipment, 'Server: Sendung ist nicht gelöscht');
+    assert(serverRow('9007000001').shipment.scannedItems.some(i => i.rawInput === 'HU1001' && i.status === 'XRY'), 'Die Änderung an der anderen Sendung wurde normal synchronisiert');
+    const t21 = await msgOf(pgA);
+    assert(t21.text.includes('Sendungsnummer 9007000002 wurde nicht gelöscht – Löschen ist nur für Administratoren erlaubt.') && !/Server nicht erreichbar/.test(t21.text), `Meldung zum weggeworfenen Vermerk („${t21.text}“)`);
+    assert(pgA.__errors.length === 0, `Keine JS-Fehler (${pgA.__errors.join(' | ')})`);
+    await pgA.close();
+
+    // ---------- 22) Vorübergehende Fehler werden NICHT weggeworfen: „Sperre“ und offline werden weiter versucht ----------
+    be = makeBackend(sampleData(), {}, { gas: true });
+    pgB = await openApp(browser, be, {}); await wait(800);
+    be.failNext.saveShipments = 2;                       // Server meldet „beschäftigt (Sperre)“ → vorübergehend
+    await setStatus(pgB, 'XRY'); await scan(pgB, 'HU1002', 400);
+    assert((await syncPending(pgB)).changed['9007000001'] === true, 'Sperre: Änderung bleibt in der Warteschlange (nicht weggeworfen)');
+    assert(await waitFor(async () => ((serverRow('9007000001') || {}).shipment || {}).scannedItems && serverRow('9007000001').shipment.scannedItems.some(i => i.rawInput === 'HU1002' && i.status === 'XRY'), 12000), 'Sperre: wird weiter versucht und kommt durch');
+    assert(!(await syncPending(pgB)).changed['9007000001'], 'Danach aus der Warteschlange entfernt (bestätigt)');
+    be.offline = true; await pgB.setOfflineMode(true);
+    await setStatus(pgB, 'XRY'); await scan(pgB, 'HU1003', 500);
+    assert((await syncPending(pgB)).changed['9007000001'] === true, 'Offline: Änderung bleibt in der Warteschlange');
+    assert(await waitFor(async () => /Offline – 1 Änderung wartet/.test(await indicator(pgB)), 8000), `Offline: Sync-Punkt sagt es (${await indicator(pgB)})`);
+    be.offline = false; await pgB.setOfflineMode(false);
+    assert(await waitFor(async () => !(await syncPending(pgB)).order.length, 10000), 'Netz zurück: wird nachgeschickt');
+    assert(serverRow('9007000001').shipment.scannedItems.some(i => i.rawInput === 'HU1003' && i.status === 'XRY'), 'Offline-Scan ist auf dem Server angekommen');
+    assert(pgB.__errors.length === 0, `Keine JS-Fehler (${pgB.__errors.join(' | ')})`);
+    await pgB.close();
+
+    // ---------- 23) Antwort „skipped“ des Servers (2.12): die genannte Nummer fällt weg, statt ewig wiederholt zu werden ----------
+    // Der Abruf filtert ungültige Nummern schon vorher weg; überspringt der Server trotzdem eine (z. B. strengere Regel oder
+    // Vermerk eines anderen Geräts), muss die App sie aus der Warteschlange nehmen – sonst stünde die Warteschlange wieder.
+    be = makeBackend(sampleData(), {}, {});   // Stub; die Antwort für saveShipments wird unten nachgestellt
+    pgA = await openApp(browser, be, {}); await wait(800);
+    await pgA.evaluate((STORE) => {
+        const st = JSON.parse(localStorage.getItem(STORE) || '{}');
+        const now = new Date().toISOString();
+        st['555'] = { hawb: '555', lastModified: now, totalPiecesExpected: 1, scannedItems: [{ rawInput: '555', status: 'XRY', timestamp: now, isCombination: false, notes: [], isCancelled: false, cancelledTimestamp: null }] };
+        localStorage.setItem(STORE, JSON.stringify(st));
+        const p = JSON.parse(localStorage.getItem(STORE + '_syncPending') || '{"changed":{},"deleted":{},"order":[]}');
+        p.changed['555'] = true; p.order = ['555'];
+        localStorage.setItem(STORE + '_syncPending', JSON.stringify(p));
+        // Server (2.12) überspringt „555“ und meldet das in skipped – so tun als käme genau diese Antwort
+        window.__origPostToServer = postToServer;
+        window.postToServer = async function (action, payload) {
+            if (action === 'saveShipments') return { status: 'success', version: 1, merged: {}, conflicts: [], skipped: [{ base: '555', reason: 'Ungültige Sendungsnummer: Sie darf nicht mit =, +, - oder @ beginnen.' }] };
+            return window.__origPostToServer(action, payload);
+        };
+        window.dispatchEvent(new Event('online'));
+    }, STORE);
+    assert(await waitFor(async () => !(await syncPending(pgA)).order.length, 8000), `skipped: Nummer verlässt die Warteschlange (${JSON.stringify(await syncPending(pgA))})`);
+    await wait(3500);   // ein bis zwei Abrufe abwarten: nichts darf wieder auftauchen
+    assert((await syncPending(pgA)).order.length === 0, 'skipped: bleibt draußen (kein ewiger Neuversuch)');
+    storeA = await localShipments(pgA);
+    assert(!storeA['555'], 'skipped: Sendung ohne Serverstand lokal entfernt');
+    const t23 = await msgOf(pgA);
+    assert(t23.text.includes('Sendungsnummer 555 wurde nicht gespeichert, weil sie ungültig ist.') && !/Server nicht erreichbar/.test(t23.text) && t23.color !== 'red',
+      `skipped: Meldung ohne roten Banner („${t23.text}“)`);
+    assert(pgA.__errors.length === 0, `Keine JS-Fehler (${pgA.__errors.join(' | ')})`);
+    await pgA.close();
   } catch (e) {
     console.log('Testlauf abgebrochen: ' + (e && e.stack || e)); fails++;
   }

@@ -252,7 +252,8 @@ document.addEventListener('change', (event) => {
                 return;
             }
             const r = importMultiOrdersPayload(currentValue);
-            alert(`Multi-Import abgeschlossen:\n- Verarbeitete Aufträge: ${r.processedOrders.length}\n- Neue HUs hinzugefügt: ${r.addedCount}`);
+            alert(`Multi-Import abgeschlossen:\n- Verarbeitete Aufträge: ${r.processedOrders.length}\n- Neue HUs hinzugefügt: ${r.addedCount}`
+                + (r.rejected && r.rejected.length ? `\n\n${INVALID_BASE_MESSAGE}\nNicht übernommen: ${r.rejected.join(', ')}` : ''));
             location.reload();
             return;
         } 
@@ -262,7 +263,8 @@ else if (currentValue.startsWith('FRT_VVL_V1')) {
         return;
     }
     const r = importVvlPayload(currentValue);
-    alert(`Import der Vorverladeliste(n) [${r.processedVVLs.join(', ')}] abgeschlossen:\n\n- ${r.addedPositionsCount} neue Positionen importiert.\n- ${r.newOrders} neue Aufträge angelegt.\n- ${r.updatedOrders} Aufträge aktualisiert.`);
+    alert(`Import der Vorverladeliste(n) [${r.processedVVLs.join(', ')}] abgeschlossen:\n\n- ${r.addedPositionsCount} neue Positionen importiert.\n- ${r.newOrders} neue Aufträge angelegt.\n- ${r.updatedOrders} Aufträge aktualisiert.`
+        + (r.rejected && r.rejected.length ? `\n\n${INVALID_BASE_MESSAGE}\nNicht übernommen: ${r.rejected.join(', ')}` : ''));
     location.reload();
     return;
 }

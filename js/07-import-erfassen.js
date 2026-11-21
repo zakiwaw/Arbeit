@@ -10,6 +10,7 @@
                         const shipments = loadShipments();
             const now = new Date().toISOString();
             let addedCount = 0, duplicateCount = 0, processedOrders = [];
+            const rejectedOrderNumbers = [];   // 9.9: ungültige Rechnungsnummern (nicht importiert)
             
             // --- START NEUE LOGIK FÜR FESTE MAN-NUMMERN ---
             // --- NEU (ERSETZEN MIT) ---
@@ -40,6 +41,9 @@ const manTruckId = 'MAN ' + newManNumber;
             
             const metaParts = metaAndOrder.split('|');
             let orderNumber = metaParts[0];
+
+            // 9.9: Rechnungsnummern mit =, +, - oder @ am Anfang werden nicht importiert (der Server würde sie ablehnen).
+            if (isInvalidBase(orderNumber)) { rejectedOrderNumbers.push(orderNumber); return; }
 
             // --- START: AUTOMATISCHE UMBENENNUNG FÜR NACHLIEFERUNGEN ---
             if (orderNumber.toUpperCase().includes('NACHLIEFERUNG')) {
@@ -88,7 +92,7 @@ const manTruckId = 'MAN ' + newManNumber;
                 }
             });
             saveShipments(shipments);
-            return { processedOrders, addedCount, truckId: manTruckId };
+            return { processedOrders, addedCount, truckId: manTruckId, rejected: rejectedOrderNumbers };
     }
 
     // Vorverladeliste aus dem QR-Inhalt „FRT_VVL_V1;;;Kundennr|VVL|||VSE:Sendungsnr|Gewicht|Maße~~~…“ anlegen/ergänzen.
@@ -101,6 +105,7 @@ const manTruckId = 'MAN ' + newManNumber;
     let newOrders = new Set();
     let updatedOrders = new Set();
     let processedVVLs = new Set();
+    const rejectedOrderNumbers = [];   // 9.9: ungültige Kundennummern (nicht importiert)
 
 
 
@@ -109,6 +114,8 @@ const manTruckId = 'MAN ' + newManNumber;
         if (!meta || !huData) return;
 
         const [originalKundennr, vorverladelisteNr] = meta.split('|');
+        // 9.9: Kundennummern mit =, +, - oder @ am Anfang werden nicht importiert (der Server würde sie ablehnen).
+        if (isInvalidBase(originalKundennr)) { rejectedOrderNumbers.push(originalKundennr); return; }
         let kundennr = originalKundennr;
 
         // --- START NEU: Verhindert das Überschreiben bestehender LKWs ---
@@ -244,7 +251,7 @@ const manTruckId = 'MAN ' + newManNumber;
     });
 
     saveShipments(shipments);
-    return { processedVVLs: [...processedVVLs], addedPositionsCount, newOrders: newOrders.size, updatedOrders: updatedOrders.size };
+    return { processedVVLs: [...processedVVLs], addedPositionsCount, newOrders: newOrders.size, updatedOrders: updatedOrders.size, rejected: rejectedOrderNumbers };
     }
 
 // ---- Seite „Aufträge erfassen“ (ehem. externer „Multi-Auftrag QR-Code Generator“) ----------------------------------
@@ -397,6 +404,9 @@ function handleErfassenPageClick(event) {
 function erfCreateDirect() {
     const r = erfState.result; if (!r || !r.orders) return;
     if (isBatchModeActive) { erfState.notice = { kind: 'error', text: 'Bitte zuerst den Batch-Modus beenden.' }; renderErfassenPage(); return; }
+    // 9.9: Aufträge mit ungültiger Nummer (=, +, - oder @ am Anfang) gar nicht erst anlegen – sie gehören nicht in die Warteschlange.
+    const badOrder = r.orders.find(o => isInvalidBase(o.orderId));
+    if (badOrder) { erfState.notice = { kind: 'error', text: `${INVALID_BASE_MESSAGE} (betroffen: ${badOrder.orderId})` }; renderErfassenPage(); return; }
     const n = r.orders.length, hus = r.orders.reduce((a, o) => a + o.hus.length, 0);
     const what = erfState.mode === 'vvl' ? `Vorverladeliste ${r.orders[0].parentVvl}: ${pluralize(n, 'Kundenauftrag', 'Kundenaufträge')}` : `${pluralize(n, 'Auftrag', 'Aufträge')} als neuer MAN-LKW`;
     if (!confirm(`${what} mit ${pluralize(hus, 'Packstück', 'Packstücken')} jetzt anlegen?`)) return;
@@ -405,9 +415,11 @@ function erfCreateDirect() {
         if (erfState.mode === 'vvl') {
             const res = importVvlPayload(r.payload);
             text = `Vorverladeliste ${res.processedVVLs.join(', ')} angelegt: ${res.newOrders} neue Aufträge, ${res.updatedOrders} ergänzt, ${res.addedPositionsCount} Positionen.`;
+            if (res.rejected && res.rejected.length) text += ` Nicht übernommen (ungültige Nummer): ${res.rejected.join(', ')}.`;
         } else {
             const res = importMultiOrdersPayload(r.payload);
             text = `${truckShortName(res.truckId)} angelegt: ${pluralize(res.processedOrders.length, 'Auftrag', 'Aufträge')}, ${pluralize(res.addedCount, 'Packstück', 'Packstücke')}.`;
+            if (res.rejected && res.rejected.length) text += ` Nicht übernommen (ungültige Nummer): ${res.rejected.join(', ')}.`;
         }
         renderTable(); renderLkwMenu(); refreshHomeViews();
         erfState.text = ''; erfState.result = null; erfState.showQr = false; erfState.notice = { kind: 'ok', text };

@@ -5,9 +5,9 @@
 // App-Version (zentral). Bei jeder veröffentlichten Änderung hochzählen und in CHANGELOG.md, index.html (<title>),
 // sw.js (Cache-Name) und backend/README.md nachziehen – tests/versioncheck.js prüft, dass alle Stellen übereinstimmen.
 // APP_BACKEND_VERSION = Version von backend/Code.gs, zu der diese App gehört (nur Anzeige im Menü).
-const APP_VERSION = '9.8';
+const APP_VERSION = '9.9';
 const APP_VERSION_DATE = '2026-11-21';
-const APP_BACKEND_VERSION = '2.11';
+const APP_BACKEND_VERSION = '2.12';
 
 // Bibliotheken defensiv einbinden: Fehlt eine Lib (z. B. Datei nicht geladen),
 // darf nur die jeweilige Funktion (PDF / QR-Code) ausfallen – nicht die ganze App.
@@ -212,6 +212,11 @@ const suspicionDeclineBtnEl = document.getElementById('suspicionDeclineBtn');
 
     if (!mainOrderNumber || !huListText) {
         alert("Bitte Auftragsnummer und mindestens eine HU-Nummer eingeben.");
+        return { success: false };
+    }
+    // 9.9: Nummern mit =, +, - oder @ am Anfang nie anlegen (der Server würde sie beim Speichern ablehnen).
+    if (isInvalidBase(mainOrderNumber)) {
+        displayError(INVALID_BASE_MESSAGE);
         return { success: false };
     }
 

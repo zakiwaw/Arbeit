@@ -47,9 +47,12 @@ r = call('saveShipments', { shipments: { 'D1': { hawb: 'D1', scannedItems: [] },
 ok(r.status === 'success' && Object.keys(r.merged).length === 3, 'Drei Sendungen angelegt');
 const vBefore = r.version;
 r = call('deleteShipments', { baseNumbers: ['D1', 'D2', 'D2', 'NIE-DA', ''] }, adminTok);
-ok(r.status === 'success' && r.deleted === 3 && r.version === vBefore + 3, `deleteShipments: 3 Löschvermerke (D1, D2, NIE-DA – doppelt/leer ignoriert), Version +3 (${JSON.stringify(r)})`);
+// 2.12: eine unbekannte Nummer (NIE-DA) gilt als erledigt, ohne dass etwas geschrieben wird – kein Löschvermerk für Nummern,
+// die es nie gab; D1/D2 werden gelöscht (doppelte und leere Angaben ignoriert), Version +2.
+ok(r.status === 'success' && r.deleted === 2 && r.version === vBefore + 2 && (r.skipped || []).length === 0, `deleteShipments: D1, D2 gelöscht, NIE-DA nie vorhanden → erledigt ohne Schreiben, Version +2 (${JSON.stringify(r)})`);
+ok(!Object.keys(shipmentRows()).includes('NIE-DA'), 'Löschen einer nicht vorhandenen Nummer legt keine Zeile an');
 r = call('loadChanges', { sinceVersion: vBefore }, adminTok);
-ok(r.status === 'success' && r.deleted.sort().join(',') === 'D1,D2,NIE-DA' && !r.changed.D1 && !r.changed.D2, `loadChanges seit vorher: D1, D2, NIE-DA gelöscht (${JSON.stringify(r.deleted)})`);
+ok(r.status === 'success' && r.deleted.sort().join(',') === 'D1,D2' && !r.changed.D1 && !r.changed.D2, `loadChanges seit vorher: D1, D2 gelöscht (${JSON.stringify(r.deleted)})`);
 r = call('loadChanges', { sinceVersion: 0 }, adminTok);
 ok(r.status === 'success' && !r.changed.D1 && !r.changed.D2 && r.changed.D3, 'Komplettabruf: D1/D2 weg, D3 bleibt');
 ok(call('deleteShipments', { baseNumbers: [] }, adminTok).status === 'error', 'deleteShipments ohne Nummern → Fehler');
@@ -542,22 +545,59 @@ ok(p.orders.length === 0, 'parseStandardText_: leer → keine Aufträge');
     ok(denied.code === 'FORBIDDEN' && noAuth.shipmentRows().TEST.shipment.hawb === 'TEST', `${action}: ohne Anmeldung mangels Administrator-Rolle gesperrt`);
   });
 
+  // 2.12: nicht mehr der ganze Aufruf wird abgelehnt – eine ungültige Nummer wird JE NUMMER übersprungen und in "skipped"
+  // gemeldet, die gültigen Sendungen desselben Aufrufs werden normal gespeichert. Als Sendung gespeichert wird sie nie.
   ['=', '+', '-', '@'].forEach(prefix => {
-    const bad = ' \t' + prefix + '1', before = dataState();
-    const incoming = { '000123': { hawb: '000123', scannedItems: [], note: 'ändern' }, [bad]: shipment(bad) };
-    q = sec.call('saveShipments', { shipments: incoming, order: ['000123', bad] }, employee);
-    ok(q.status === 'error' && /Ungültige Sendungsnummer/.test(q.message) && dataState() === before,
-      `saveShipments: ${prefix} nach Leerraum abgelehnt, auch gültige vorherige Sendung nicht geschrieben`);
+    const bad = ' \t' + prefix + '1';   // nach Leerraum: die Regel prüft den getrimmten Wert, gemeldet wird der Schlüssel wie geschickt
+    const good = '000123', goodVersion = sec.shipmentRows()[good].shipment.version;
+    q = sec.call('saveShipments', { shipments: { [good]: { hawb: good, scannedItems: [], note: `ändern ${prefix}` }, [bad]: shipment(bad) }, order: [good, bad] }, employee);
+    const sk = (q.skipped || [])[0] || {};
+    ok(q.status === 'success' && sk.base === bad && /Ungültige Sendungsnummer/.test(sk.reason), `saveShipments: „${prefix}1“ nach Leerraum in skipped gemeldet (${JSON.stringify(q.skipped)})`);
+    ok(!!(q.merged || {})[good] && sec.shipmentRows()[good].shipment.version === goodVersion + 1 && sec.shipmentRows()[good].shipment.note === `ändern ${prefix}`,
+      `saveShipments: gültige Sendung „${good}“ im selben Aufruf trotzdem gespeichert (Sendungs-Version ${goodVersion} → ${sec.shipmentRows()[good].shipment.version})`);
+    ok(!sec.shipmentRows()[bad] && !Object.keys(sec.shipmentRows()).some(b => /^[=+\-@]/.test(b.trim())), `saveShipments: ungültige Nummer „${prefix}1“ nie als Sendung gespeichert`);
+
+    const beforeDel = dataState();
     q = sec.call('deleteShipment', { baseNumber: bad }, admin);
-    ok(q.status === 'error' && /Ungültige Sendungsnummer/.test(q.message) && dataState() === before,
-      `deleteShipment: ${prefix} nach Leerraum abgelehnt, nichts geschrieben`);
-    q = sec.call('deleteShipments', { baseNumbers: ['000123', bad] }, admin);
-    ok(q.status === 'error' && /Ungültige Sendungsnummer/.test(q.message) && dataState() === before,
-      `deleteShipments: ${prefix} nach Leerraum abgelehnt, auch gültige vorherige Nummer nicht gelöscht`);
+    ok(q.status === 'success' && q.version === sec.sheets._meta.rows[0][0] && dataState() === beforeDel,
+      `deleteShipment: „${prefix}1“ (nie vorhanden) gilt als erledigt – kein Fehler, nichts geschrieben`);
+
+    // Sammel-Löschung: ein ungültiger Vermerk blockiert die gültigen nicht mehr (früher: ganzer Aufruf abgelehnt)
+    sec.call('saveShipments', { shipments: { [`DEL${prefix === '@' ? 'AT' : prefix === '-' ? 'MI' : prefix === '+' ? 'PL' : 'GL'}`]: shipment('x') } }, admin);
+    const delBase = `DEL${prefix === '@' ? 'AT' : prefix === '-' ? 'MI' : prefix === '+' ? 'PL' : 'GL'}`;
+    q = sec.call('deleteShipments', { baseNumbers: [delBase, bad] }, admin);
+    ok(q.status === 'success' && q.deleted === 1 && sec.shipmentRows()[delBase].flag === true && (q.skipped || [])[0] && q.skipped[0].base === bad.trim(),
+      `deleteShipments: „${prefix}1“ übersprungen (skipped), gültige Nummer ${delBase} trotzdem gelöscht (${JSON.stringify(q)})`);
   });
-  const legacyState = dataState();
-  q = sec.call('saveAllData', { '000123': shipment('000123'), '=1+1': shipment('=1+1') }, admin);
-  ok(q.status === 'error' && /Ungültige Sendungsnummer/.test(q.message) && dataState() === legacyState, 'Alte Vollspeicherung prüft vor dem Schreiben ebenfalls alle Nummern');
+  // Löschen einer Nummer, die es in der Tabelle nicht gibt, ist erledigt – ohne Löschvermerk in der Tabelle
+  const rowsBeforeGhost = JSON.stringify(sec.sheets.shipments.rows);
+  q = sec.call('deleteShipments', { baseNumbers: ['GIBT-ES-NICHT'] }, admin);
+  ok(q.status === 'success' && q.deleted === 0 && JSON.stringify(sec.sheets.shipments.rows) === rowsBeforeGhost,
+    `deleteShipments: nicht vorhandene Nummer → erledigt (deleted 0), keine Zeile geschrieben (${JSON.stringify(q)})`);
+  q = sec.call('deleteShipment', { baseNumber: 'GIBT-ES-AUCH-NICHT' }, admin);
+  ok(q.status === 'success' && q.deleted === 0 && JSON.stringify(sec.sheets.shipments.rows) === rowsBeforeGhost, 'deleteShipment: nicht vorhandene Nummer → erledigt, nichts geschrieben');
+  ok(sec.call('deleteShipments', { baseNumbers: [] }, admin).status === 'error' && sec.call('deleteShipment', { baseNumber: '' }, admin).status === 'error', 'Ohne Nummern bleibt ein Fehler (nichts zu tun)');
+  // Drive-Import: eine Auftragsnummer mit = am Anfang wird nie als Sendung gespeichert (übersprungen, im Protokoll genannt)
+  {
+    const envImp = require('./gas-env')();
+    Object.assign(envImp.props, { SPREADSHEET_ID: 'test-tabelle', BOOTSTRAP_ADMIN_NAME: 'Mitarbeiter 1', BOOTSTRAP_ADMIN_EMAIL: 'admin@example.com' });
+    envImp.call('authLogin', {}); const invImp = /einladung=([0-9a-f]+)/.exec(envImp.mails[0].body)[1];
+    envImp.call('authAccept', { invite: invImp, pin: '482913', deviceId: 'dev-imp' });
+    const folderImp = envImp.drive.createFolder('HYDAC TXT');
+    // erster Block: Auftragsnummer „=ABC“ (ungültig) – zweiter Block: gültiger Auftrag
+    folderImp.addFile('HYDAC_2026-11-21_06-00_Scan.txt', ['=ABC', '8118740144', '', 'Kanada', '8118736972', ''].join('\n'), new Date(2026, 10, 21, 6, 2));
+    const runImp = envImp.api.runDriveImport();
+    const impRows = envImp.shipmentRows();
+    const impLog = Object.keys(envImp.sheets).filter(n => /import/i.test(n))
+      .map(n => envImp.sheets[n].rows || []).reduce((a, b) => a.concat(b), []);
+    ok(runImp.ok === 1 && !Object.keys(impRows).some(b => /^[=+\-@]/.test(b.trim())) && !!impRows['KANADA 21.11.'],
+      `Drive-Import: ungültige Auftragsnummer wird nicht gespeichert, gültiger Auftrag kommt durch (${JSON.stringify(runImp)})`);
+    ok(impLog.some(r => String((r && r[3]) || '').includes('ignoriert') && String(r[3]).includes('=ABC')),
+      `Drive-Import: übersprungene Nummer steht im Protokoll („ignoriert“) (${JSON.stringify(impLog.map(r => String(r[3]).slice(0, 90)))})`);
+  }
+  // Alte Vollspeicherung (saveAllData) läuft durch denselben Weg: ungültige Nummer wird übersprungen, gültige gespeichert
+  q = sec.call('saveAllData', { LEGACY: shipment('LEGACY'), '=1+1': shipment('=1+1') }, admin);
+  ok(q.status === 'success' && !!sec.shipmentRows().LEGACY && !sec.shipmentRows()['=1+1'], 'Alte Vollspeicherung: ungültige Nummer übersprungen, gültige gespeichert (kein Abbruch)');
   ok(sec.call('saveAllData', { LEGACY: shipment('LEGACY') }, admin).status === 'success', 'Administrator darf gültige alte Vollspeicherung ausführen');
   ok(sec.call('deleteShipment', { baseNumber: 'TEMP1' }, admin).status === 'success' && sec.shipmentRows().TEMP1.flag === true, 'Administrator darf eine Sendung löschen');
   ok(sec.call('deleteShipments', { baseNumbers: ['TEMP2', 'TEMP3'] }, admin).status === 'success' && sec.shipmentRows().TEMP2.flag === true && sec.shipmentRows().TEMP3.flag === true, 'Administrator darf mehrere Sendungen löschen');
