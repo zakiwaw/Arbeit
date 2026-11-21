@@ -26,6 +26,8 @@ node tests/erfassencheck.js   # Seite „Aufträge erfassen“: Parser = Origina
 node tests/regress.js         # Grundfunktionen: Scan, Batch, Startseite, Unterseiten, Info-Filter
 node tests/synccheck.js       # Sync: Löschen/Deaktivieren bei schnellem Bedienen, langsamen/gestörten Antworten – nichts kommt zurück; Spinner mit Text;
                               # ab 9.3 zusätzlich zwei Geräte gegen das echte Code.gs (makeBackend(…, { gas: true })): Offline-Warteschlange, Versionen, Konflikte, Protokoll
+                              # ab 9.9: ungültige Sendungsnummer wird bei der Eingabe abgelehnt und verlässt (falls schon in der Warteschlange) nur
+                              # ihren eigenen Eintrag; FORBIDDEN beim Löschen ebenso; Sperre/offline bleiben in der Warteschlange
 node tests/desktopcheck.js    # Desktop-Layout (≥ 992 px): Tabellen, Sendungsdetails, Packstück-Tabelle, Auswahl-Leiste
 node tests/versioncheck.js    # Versionsangaben passen zusammen (js/01-start.js, sw.js, index.html, Code.gs, READMEs, CHANGELOG) – ohne Chrome
 node tests/aufbaucheck.js     # Aufteilung passt: js/- und css/-Teile vollständig + in Reihenfolge in index.html, Skripte am Ende, sw.js lädt alles vor, Code.gs-Abschnitte – ohne Chrome

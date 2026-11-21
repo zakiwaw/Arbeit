@@ -41,6 +41,6 @@ if (fs.existsSync(path.join(root, 'sw.js'))) {
 ok(!/AKfycb[\w-]{20,}/.test(read('README.md')), 'README.md enthält keine Web-App-URL/Token');
 const readme = read('README.md');
 ok(readme.includes(`„Version ${appVersion} · Stand`) && readme.includes(`Server-Skript ${backendVersion}“`) && readme.includes(`App ${appVersion} / Code.gs ${backendVersion}`), `README.md nennt App ${appVersion} / Code.gs ${backendVersion}`);
-// Zielstand dieser Auslieferung (21.11.2026): App 9.8 / Code.gs 2.11 – Sicherheitslücken H3, M1 und H2 schließen.
-ok(appVersion === '9.8' && backendVersion === '2.11', `Auslieferung: App ${appVersion} ↔ Code.gs ${backendVersion} (erwartet 9.8 / 2.11)`);
+// Zielstand dieser Auslieferung (21.11.2026): App 9.9 / Code.gs 2.12 – Sync-Blockade durch ungültige Sendungsnummern beheben.
+ok(appVersion === '9.9' && backendVersion === '2.12', `Auslieferung: App ${appVersion} ↔ Code.gs ${backendVersion} (erwartet 9.9 / 2.12)`);
 console.log(fails ? `SOME FAILED (${fails} von ${oks + fails})` : `ALL GOOD (${oks})`); process.exit(fails ? 1 : 0);

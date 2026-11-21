@@ -1,7 +1,10 @@
 // ===================================================
 // FRACHT TRACKER – Google Apps Script Backend
-// Version 2.11: mehrgeräte-sicher + Archiv + Anmeldung (PIN; Sitzung verlängert sich bei Bedienung) + Sammel-Löschung
+// Version 2.12: mehrgeräte-sicher + Archiv + Anmeldung (PIN; Sitzung verlängert sich bei Bedienung) + Sammel-Löschung
 //   + automatischer Import von Textdateien aus Google Drive.
+//   2.12: Ungültige Sendungsnummern werden JE NUMMER übersprungen (Antwort "skipped") statt den ganzen Aufruf abzulehnen;
+//        Löschvermerke werden immer angenommen (unbekannte Nummer = erledigt, nichts geschrieben) – eine abgelehnte Nummer
+//        blockiert damit nicht mehr die ganze Warteschlange eines Geräts.
 //   2.11: Sendungsnummern gegen Formel-Injektion prüfen, Sendungszeilen als Text schreiben; Löschaktionen nur für
 //        Administratoren, vor dem Zurücksetzen das Sendungsblatt sichern.
 //   2.10: Keine persönlichen Daten mehr im Code. Erster Administrator nur noch aus den Skript-Eigenschaften
@@ -302,6 +305,13 @@ function buildRow_(base, json, version, now, deleted, width, modifiedBy) {
   for (let i = 1; i < parts.length; i++) values[COL_JSON_EXTRA - 2 + i] = parts[i];
   return values;
 }
+// Ungültige Sendungsnummer (2.12): beginnt nach dem Trimmen mit =, +, - oder @ → setValues/Sheets könnte sie als Formel
+// lesen. Geprüft wird je Nummer; eine ungültige Nummer überspringt nur ihren eigenen Eintrag (siehe saveShipmentsMerged).
+const INVALID_BASE_PATTERN_ = /^[=+\-@]/;
+const INVALID_BASE_REASON_ = 'Ungültige Sendungsnummer: Sie darf nicht mit =, +, - oder @ beginnen.';
+function isInvalidShipmentBase_(base) {
+  return INVALID_BASE_PATTERN_.test(String(base == null ? '' : base).trim());
+}
 function writeRows_(sheet, startRow, rows) {
   if (!rows.length) return;
   const width = rows.reduce(function (m, r) { return Math.max(m, r.length); }, 0);
@@ -385,8 +395,10 @@ function deepEqual_(a, b) { return JSON.stringify(a === undefined ? null : a) ==
 //              Angabe (ältere App), wird wie bisher ohne Versionsprüfung zusammengeführt.
 //   modifiedBy = Name des Mitarbeiters (Anzeige); angemeldeter Benutzer (Sitzung) hat Vorrang.
 //   order    = Reihenfolge, in der das Gerät die Änderungen gemacht hat (Offline-Warteschlange); fehlt sie, Schlüsselreihenfolge.
-// Antwort: { status, version, merged: { base: shipmentObj }, conflicts: [ … ] }
+// Antwort: { status, version, merged: { base: shipmentObj }, conflicts: [ … ], skipped: [ { base, reason } ] }
 //   merged    = zusammengeführter Stand, den das Gerät übernimmt (mit version, lastModifiedBy, changes)
+//   skipped   = je Nummer übersprungen, die nicht gespeichert werden darf (2.12: beginnt mit =, +, - oder @). Die übrigen
+//               Nummern desselben Aufrufs werden normal gespeichert – ein Eintrag blockiert nicht mehr die ganze Warteschlange.
 //   conflicts = nur Sendungen, bei denen die Version nicht passte UND etwas nicht von beiden Seiten behalten werden konnte:
 //               { base, serverVersion, clientVersion, newVersion, serverBy, lost: [{ what, mine, now }], overridden: [{ what, theirs, now }] }
 //               lost = eigene Eingabe nicht übernommen (jetzt gilt now), overridden = Eingabe des anderen Geräts überschrieben.
@@ -400,11 +412,14 @@ function saveShipmentsMerged(payload, user) {
   const bases = (payload && payload.bases) || {};
   const versions = (payload && payload.versions && typeof payload.versions === 'object') ? payload.versions : null;
   const modifiedBy = String((user && user.name) || (payload && payload.modifiedBy) || '').trim().slice(0, 80);
+  const skipped = [];
+  const validIncoming = {};
   Object.keys(incoming).forEach(function (base) {
-    if (/^[=+\-@]/.test(base.trim())) throw new Error('Ungültige Sendungsnummer: Sie darf nicht mit =, +, - oder @ beginnen.');
+    if (isInvalidShipmentBase_(base)) { skipped.push({ base: base, reason: INVALID_BASE_REASON_ }); return; }
+    validIncoming[base] = incoming[base];
   });
-  const baseNumbers = orderedKeys_(payload && payload.order, Object.keys(incoming));
-  if (baseNumbers.length === 0) return { status: 'success', version: getGlobalVersion_(), merged: {}, conflicts: [] };
+  const baseNumbers = orderedKeys_(payload && payload.order, Object.keys(validIncoming));
+  if (baseNumbers.length === 0) return { status: 'success', version: getGlobalVersion_(), merged: {}, conflicts: [], skipped: skipped };
 
   return withLock_(function () {
     const sheet = getShipmentSheet_();
@@ -417,7 +432,7 @@ function saveShipmentsMerged(payload, user) {
     let version = getGlobalVersion_();
 
     baseNumbers.forEach(function (base) {
-      const ours = incoming[base];
+      const ours = validIncoming[base];
       if (!ours || typeof ours !== 'object') return;
       const current = index[base];
       // Eine archivierte Zeile zählt als aktueller Serverstand; sie wird zusammengeführt und OHNE Markierung
@@ -465,7 +480,7 @@ function saveShipmentsMerged(payload, user) {
 
     if (appendRows.length > 0) writeRows_(sheet, sheet.getLastRow() + 1, appendRows);
     setGlobalVersion_(version); // zuletzt, damit Leser nie eine Version ohne die zugehörigen Zeilen sehen
-    return { status: 'success', version: version, merged: merged, conflicts: conflicts };
+    return { status: 'success', version: version, merged: merged, conflicts: conflicts, skipped: skipped };
   });
 }
 
@@ -704,53 +719,60 @@ function mergeNotes_(t, o, b) {
 }
 
 // ===================================================
-// 5. LÖSCHEN (Aktionen deleteShipment / deleteShipments) – Löschvermerk statt Zeile entfernen, damit andere Geräte die Sendung nicht wiederbeleben
+// 5. LÖSCHEN (Aktion deleteShipment) – Löschvermerk statt Zeile entfernen, damit andere Geräte die Sendung nicht wiederbeleben
 // payload: { baseNumber }
+// 2.12: Löschvermerke werden IMMER angenommen – ein abgelehnter Vermerk blockierte sonst die Warteschlange des Geräts für immer
+// (dieselbe Bauart wie die ungültige Sendungsnummer). Eine unbekannte Nummer gilt als erledigt, ohne dass etwas geschrieben wird;
+// eine vorhandene Zeile wird als Text geschrieben (writeRows_: Apostroph-Schutz + Textformat), damit nie eine Formel entsteht.
 // ===================================================
 function deleteShipmentRow(payload, user) {
   const base = payload && String(payload.baseNumber || '').trim();
   if (!base) throw new Error("deleteShipment: baseNumber fehlt.");
-  if (/^[=+\-@]/.test(base)) throw new Error('Ungültige Sendungsnummer: Sie darf nicht mit =, +, - oder @ beginnen.');
   const who = String((user && user.name) || (payload && payload.modifiedBy) || '').trim().slice(0, 80);
   return withLock_(function () {
     const sheet = getShipmentSheet_();
     const index = readIndex_(sheet);
+    if (!index[base]) return { status: 'success', version: getGlobalVersion_(), deleted: 0 };   // nie auf dem Server → erledigt
     const version = getGlobalVersion_() + 1;
     const now = new Date().toISOString();
     const row = buildRow_(base, '', version, now, true, dataWidth_(sheet), who);
-    writeRows_(sheet, index[base] ? index[base].row : sheet.getLastRow() + 1, [row]);
+    writeRows_(sheet, index[base].row, [row]);
     setGlobalVersion_(version);
-    return { status: 'success', version: version };
+    return { status: 'success', version: version, deleted: 1 };
   });
 }
 
 // V2.4: mehrere Löschvermerke in EINEM Aufruf (LKW löschen = alle seine Aufträge; schnell hintereinander gelöschte Sendungen).
-// payload: { baseNumbers: [base, …] } – unbekannte Nummern bekommen ebenfalls einen Löschvermerk (schadet nicht, verhindert Wiederbelebung).
+// payload: { baseNumbers: [base, …] }
+// 2.12: jede Nummer wird einzeln verbucht. Vorhandene Zeile → Löschvermerk (als Text, s. o.); unbekannte Nummer → erledigt,
+// nichts geschrieben (kein Löschvermerk für Nummern, die es nie gab); ungültige Nummer (=, +, - oder @ am Anfang) → übersprungen
+// und in "skipped" gemeldet. Kein Fehlerwurf mehr: ein einzelner Vermerk blockiert nicht mehr die ganze Warteschlange.
 function deleteShipmentRows(payload, user) {
   const raw = (payload && payload.baseNumbers) || [];
-  const bases = [];
+  const bases = [], skipped = [];
   (Array.isArray(raw) ? raw : []).forEach(function (b) {
     b = String(b || '').trim();
-    if (/^[=+\-@]/.test(b)) throw new Error('Ungültige Sendungsnummer: Sie darf nicht mit =, +, - oder @ beginnen.');
-    if (b && bases.indexOf(b) === -1) bases.push(b);
+    if (!b) return;
+    if (isInvalidShipmentBase_(b)) { skipped.push({ base: b, reason: INVALID_BASE_REASON_ }); return; }
+    if (bases.indexOf(b) === -1) bases.push(b);
   });
-  if (!bases.length) throw new Error("deleteShipments: baseNumbers fehlen.");
+  if (!bases.length && !skipped.length) throw new Error("deleteShipments: baseNumbers fehlen.");
   const who = String((user && user.name) || (payload && payload.modifiedBy) || '').trim().slice(0, 80);
   return withLock_(function () {
     const sheet = getShipmentSheet_();
     const index = readIndex_(sheet);
     const now = new Date().toISOString();
     const width = dataWidth_(sheet);
-    const appendRows = [];
+    const rows = [];
     let version = getGlobalVersion_();
     bases.forEach(function (base) {
+      if (!index[base]) return;                                    // nie auf dem Server → erledigt, nichts schreiben
       version += 1;
-      const row = buildRow_(base, '', version, now, true, width, who);
-      if (index[base]) writeRows_(sheet, index[base].row, [row]); else appendRows.push(row);
+      rows.push({ row: index[base].row, values: buildRow_(base, '', version, now, true, width, who) });
     });
-    if (appendRows.length > 0) writeRows_(sheet, sheet.getLastRow() + 1, appendRows);
-    setGlobalVersion_(version);
-    return { status: 'success', version: version, deleted: bases.length };
+    rows.forEach(function (r) { writeRows_(sheet, r.row, [r.values]); });
+    if (rows.length > 0) setGlobalVersion_(version);
+    return { status: 'success', version: version, deleted: rows.length, skipped: skipped };
   });
 }
 
@@ -1317,6 +1339,14 @@ function importTextFile_(cfg, fileName, text, createdAt) {
   if (!clean.trim()) throw new Error('Datei ist leer (wird vielleicht noch geschrieben).');   // nicht endgültig → später erneut
   const isMan = cfg.format === 'man';
   const parsed = isMan ? parseManText_(clean) : parseStandardText_(clean);
+  // 2.12: Auftragsnummern mit =, +, - oder @ am Anfang werden nie als Sendung gespeichert – sie werden übersprungen und im
+  // Protokoll („ignoriert“) genannt. Sonst könnte die App sie wegen derselben Regel nie wieder speichern.
+  parsed.ignored = parsed.ignored || [];
+  parsed.orders = parsed.orders.filter(function (o) {
+    if (!isInvalidShipmentBase_(o.orderId)) return true;
+    parsed.ignored.push(String(o.orderId));
+    return false;
+  });
   if (parsed.orders.length === 0) {
     const err = new Error(isMan
       ? 'Keine Aufträge erkannt – erwartet (MAN Fracht): je Auftrag Zeile 1 „Spediteur, Land“, Zeile 2 Rechnung, Zeile 3 PLSO, danach „Pos HU|Verpackung|Maße|Gewicht“, Aufträge durch Leerzeilen getrennt.'

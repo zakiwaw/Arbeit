@@ -4,6 +4,32 @@ Neueste zuerst. Datum = Veröffentlichung (bis einschließlich 9.2 auf dem Branc
 Zusammenführen von Pull Request #1 am 09.11.2026 auf `main`). App-Version siehe `js/01-start.js`
 (`APP_VERSION`), Server-Skript siehe Kopf von `backend/Code.gs`.
 
+## 2026-11-21 – App 9.9, Code.gs 2.12
+
+Behebt die dauerhafte Sync-Blockade: Eine Sendungsnummer, die nach dem Trimmen mit `=`, `+`, `-` oder `@` beginnt, lehnte der
+Server (2.11) ab – die App versuchte den Eintrag endlos erneut und synchronisierte danach nichts mehr (dauerhaft „Server nicht
+erreichbar“). Dasselbe galt für einen abgelehnten Löschvermerk (z. B. `FORBIDDEN` für Mitarbeiter).
+
+- Eingabe (9.9): Nummern mit `=`, `+`, `-` oder `@` am Anfang werden gar nicht erst angelegt/umbenannt/importiert (Scanfeld +
+  „Hinzufügen“, manuelles Anlegen, Umbenennen, MAN-/VVL-Import, „Aufträge erfassen“). Klare Meldung „Ungültige Sendungsnummer:
+  Sie darf nicht mit =, +, - oder @ beginnen.“, kein Eintrag in der Warteschlange; gültige Nummern verhalten sich unverändert.
+  Der Drive-Import im Server-Skript überspringt solche Auftragsnummern und nennt sie im Protokoll („ignoriert“).
+- Warteschlange (9.9): Lehnt der Server eine Gruppe endgültig ab (ungültige Nummer, `FORBIDDEN` beim Löschen), verlassen nur die
+  betroffenen Einträge die Warteschlange, der Rest synchronisiert normal. Kein roter Banner „Server nicht erreichbar“, sondern
+  eine Meldung mit der betroffenen Nummer („… Die anderen Sendungen wurden normal synchronisiert.“). Vorübergehende Fehler (kein
+  Netz, „Sperre“, HTTP-/Netzfehler) werden unverändert weiter versucht. Weggeworfene Änderung ohne Serverstand → lokal entfernt;
+  mit Serverstand → auf den Serverstand (Snapshot) zurückgesetzt. Weggeworfener Löschvermerk ohne Serverstand → nur lokal weg;
+  mit Serverstand → Server nimmt ihn an.
+- Server (2.12): `saveShipments` überspringt ungültige Nummern einzeln und meldet sie in `skipped: [{ base, reason }]`; die
+  übrigen Sendungen werden normal gespeichert (kein Abbruch mehr). `deleteShipment` / `deleteShipments` nehmen einen Löschvermerk
+  für eine vorhandene Zeile an (Text, kein Formelrisiko), behandeln eine unbekannte Nummer als erledigt (nichts wird geschrieben)
+  und werfen keinen Fehler mehr. Die Sicherheitsprüfung für das Speichern bleibt: Eine ungültige Nummer wird nie als Sendung
+  gespeichert. Ein blockiertes Gerät heilt sich beim nächsten Sync selbst, ohne Datenlöschung.
+- Tests: Eingabe-Ablehnung, Wegwerfen eines ungültigen CHANGE-/DELETE-Eintrags, `FORBIDDEN`-Delete wird weggeworfen,
+  vorübergehende Fehler (offline, Sperre) werden weiter versucht, Server überspringt ungültige Nummern (`skipped`), Löschen
+  einer nicht vorhandenen Nummer ist erledigt. Versionskette auf App 9.9 / Code.gs 2.12 angehoben.
+- Nach dem Merge **Code.gs 2.12 als neue Version bereitstellen**.
+
 ## 2026-11-21 – App 9.8, Code.gs 2.11
 
 - Sendungsnummern gegen Formel-Injektion prüfen; Sendungszeilen und JSON-Fortsetzungen mit Textformat und Textmarker schützen.

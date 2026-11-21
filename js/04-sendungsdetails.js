@@ -366,7 +366,8 @@ function huAddValidateRows() {
         const hu = input.value.trim().toUpperCase().replace(/\s+/g, '');
         let msg = '';
         if (hu) {
-            if (!/^[0-9A-Z-]+$/.test(hu)) msg = 'Nur Ziffern, Großbuchstaben und Bindestrich';
+            if (isInvalidBase(hu)) msg = 'Darf nicht mit =, +, - oder @ beginnen';
+            else if (!/^[0-9A-Z-]+$/.test(hu)) msg = 'Nur Ziffern, Großbuchstaben und Bindestrich';
             else if (seen[hu]) msg = 'Doppelt in dieser Liste';
             else {
                 for (const b in shipments) {
@@ -642,12 +643,14 @@ function saveOrderAddFromModal() {
     const fail = msg => { err.textContent = msg; err.classList.remove('hidden'); };
 
     if (!number) return fail('Bitte die Rechnungsnummer eingeben.');
+    if (isInvalidBase(number)) return fail(INVALID_BASE_MESSAGE);   // 9.9: =, +, - oder @ am Anfang → nie anlegen
     if (!/^[0-9A-Z-]+$/.test(number)) return fail('Rechnungsnummer darf nur Ziffern, Großbuchstaben und Bindestrich enthalten.');
     if (dim.error) return fail(dim.error);
     const dimensions = dim.value;
     if (!forwarder) return fail('Bitte den Spediteur eingeben.');
     if (!country) return fail('Bitte das Land eingeben.');
     if (!hu) return fail('Bitte die erste HU-Nummer eingeben (oder scannen).');
+    if (isInvalidBase(hu)) return fail(INVALID_BASE_MESSAGE);
     if (!/^[0-9A-Z-]+$/.test(hu)) return fail('HU-Nummer darf nur Ziffern, Großbuchstaben und Bindestrich enthalten.');
     if (hu === number) return fail('HU-Nummer und Rechnungsnummer dürfen nicht gleich sein.');
     let grossWeight = null;
@@ -703,6 +706,7 @@ function saveHuEditFromModal() {
     const fail = msg => { err.textContent = msg; err.classList.remove('hidden'); };
 
     if (!newHu) return fail('Bitte eine HU-Nummer eingeben.');
+    if (isInvalidBase(newHu)) return fail(INVALID_BASE_MESSAGE);   // 9.9: =, +, - oder @ am Anfang → nie anlegen
     if (!/^[0-9A-Z-]+$/.test(newHu)) return fail('HU-Nummer darf nur Ziffern, Großbuchstaben und Bindestrich enthalten.');
     if (dim.error) return fail(dim.error);
     const dimensions = dim.value;

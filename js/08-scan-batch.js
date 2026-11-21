@@ -87,8 +87,16 @@ function hideDetailView() {
 function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFromCheckbox) {
     const statusesThatTriggerWE = STATUSES_THAT_TRIGGER_WE;
 
-    const { baseNumber, suffix, isValidFormat, raw: processedRawInput, isSuffixFormat } = processShipmentNumber(rawInputToSave);
+    const parsedInput = processShipmentNumber(rawInputToSave);
+    const { baseNumber, suffix, isValidFormat, raw: processedRawInput, isSuffixFormat } = parsedInput;
     if (!isValidFormat) { return { success: false, waitingForTotal: false, message: `Ungültiges Format: ${escapeHtml(rawInputToSave)}` }; }
+    // 9.9: =, +, - oder @ am Anfang → gar nicht erst anlegen; sonst würde der Server die Sendung ablehnen (Warteschlange).
+    if (isInvalidBase(baseNumber)) { return { success: false, waitingForTotal: false, message: INVALID_BASE_MESSAGE }; }
+    return processAndSaveSingleScanForValidInput(rawInputToSave, statusToUse, isCombinationFromCheckbox, statusesThatTriggerWE, parsedInput);
+}
+// Alles ab hier setzt eine gültige Sendungsnummer voraus (siehe processAndSaveSingleScan oben).
+function processAndSaveSingleScanForValidInput(rawInputToSave, statusToUse, isCombinationFromCheckbox, statusesThatTriggerWE, parsedInput) {
+    const { baseNumber, suffix, raw: processedRawInput, isSuffixFormat } = parsedInput;
 
     // --- START DER AKTUALISIERTEN SOUND-LOGIK ---
     if (unexpectedHuSoundToggleEl && unexpectedHuSoundToggleEl.checked) {
@@ -353,6 +361,13 @@ function processAndSaveSingleScan(rawInputToSave, statusToUse, isCombinationFrom
 
             const shipments = loadShipments();
             const { baseNumber, rawInput, status, isCombination, note, timestamp } = pendingScanDataForNewShipment;
+            if (isInvalidBase(baseNumber)) {   // 9.9: nie als Sendung anlegen
+                pendingScanDataForNewShipment = null;
+                toggleMainInputControls(true);
+                displayError(INVALID_BASE_MESSAGE);
+                focusShipmentInput();
+                return;
+            }
             
             shipments[baseNumber] = {
                 hawb: baseNumber,
@@ -693,12 +708,14 @@ function addToBatch() {
     if (!rawInputFromField) { focusShipmentInput(); return; }
 
     const upperRawInput = rawInputFromField.toUpperCase();
-    const { isValidFormat, raw: processedRawInput } = processShipmentNumber(upperRawInput);
+    const { isValidFormat, raw: processedRawInput, baseNumber: batchBase } = processShipmentNumber(upperRawInput);
     if (!isValidFormat) {
         displayError(`Ungültiges Format für Batch-Eingabe: ${escapeHtml(rawInputFromField)}`);
         focusShipmentInput();
         return;
     }
+    // 9.9: =, +, - oder @ am Anfang → nicht in den Batch (der Server würde die Sendung ablehnen)
+    if (isInvalidBase(batchBase)) { displayError(INVALID_BASE_MESSAGE); focusShipmentInput(); return; }
 
         const scanTimestamp = new Date().toISOString();
     const isCurrentHuExpected = isHuExpected(processedRawInput);
@@ -952,6 +969,9 @@ function saveBatch() {
         const { baseNumber, isValidFormat, raw: processedRawInput, isSuffixFormat } = processShipmentNumber(rawInputFromBatch);
         if (!isValidFormat) {
             errorCount++; errorMessages.push(`Ungültiges Format: ${escapeHtml(rawInputFromBatch)}`); return;
+        }
+        if (isInvalidBase(baseNumber)) {   // 9.9: ungültige Nummer nie als Sendung anlegen
+            errorCount++; errorMessages.push(INVALID_BASE_MESSAGE); return;
         }
         if (!shipmentsWorkingCopy[baseNumber]) {
             newBaseShipments.add(baseNumber);
