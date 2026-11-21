@@ -284,9 +284,11 @@ function setAuthSession(sess) {
 // Menüeinträge: Name des Angemeldeten, „Mitarbeiter“ nur für Administratoren, „Abmelden“ nur mit Sitzung
 function updateAuthMenu() {
     const u = currentUser();
+    document.body.classList.toggle('is-admin', isAdmin());
     const line = document.getElementById('authUserLine');
     if (line) { line.textContent = u ? `Angemeldet: ${u.name}${u.role === 'admin' ? ' (Administrator)' : ''}` : ''; line.classList.toggle('hidden', !u); }
     const mi = document.getElementById('manageUsersItem'); if (mi) mi.classList.toggle('hidden', !isAdmin());
+    if (resetDataButtonEl) resetDataButtonEl.parentElement.classList.toggle('hidden', !isAdmin());
     const li = document.getElementById('logoutItem'); if (li) li.classList.toggle('hidden', !u);
 }
 // Wird aus postToServer gerufen, sobald der Server ein Token ablehnt: Sitzung verwerfen, Anmeldeseite zeigen.

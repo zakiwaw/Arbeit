@@ -401,11 +401,12 @@ function saveLkwRenameFromModal() {
 // LKW löschen = alle seine Aufträge löschen (wie das Papierkorb-Symbol je Sendung, nur für den ganzen LKW) – mit Rückfrage.
 // Läuft über saveShipments → Löschvermerke → auf allen Geräten weg. Bereits archivierte Aufträge bleiben im Archiv suchbar.
 function deleteTruckFromPage(truckId) {
+    if (!isAdmin()) return false;
     const shipments = loadShipments();
     const t = collectTrucks(shipments, loadLkwStatus()).find(x => x.truckId === truckId);
     if (!t || !t.bases.length) { displayError(`LKW ${escapeHtml(truckId)} nicht mehr gefunden.`); renderTable(); return false; }
     const what = `${pluralize(t.bases.length, 'Auftrag', 'Aufträge')} mit ${t.hus} HUs`;
-    if (!confirm(`LKW „${t.name}“ löschen?\n\n${what} werden mit allen Scans auf allen Geräten entfernt. Das lässt sich nicht rückgängig machen.`)) return false;
+    if (!confirm(`LKW „${t.name}“ löschen?\n\n${what} werden mit allen Scans auf allen Geräten entfernt. Das lässt sich nicht rückgängig machen.`) || !isAdmin()) return false;
     t.bases.forEach(b => { delete shipments[b]; });
     const status = loadLkwStatus();
     if (truckId in status) { delete status[truckId]; saveLkwStatus(status); }   // sonst gälte ein später neu importierter LKW gleicher Kennung als deaktiviert

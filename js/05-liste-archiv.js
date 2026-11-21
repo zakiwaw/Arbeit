@@ -553,20 +553,20 @@ Object.values(shipments).forEach(s => {
             : '';
 
         // Wir fügen hier die Klasse 'lkw-longpress-target' und data-truckid hinzu
-        html += `<li class="lkw-menu-item lkw-longpress-target" data-truckid="${truckId}">
+        html += `<li class="lkw-menu-item lkw-longpress-target" data-truckid="${escapeHtml(truckId)}">
             
             <div style="display: flex; align-items: center; flex-grow: 1; min-width: 0; padding-right: 15px; overflow: hidden; pointer-events: none;">
-                <span style="flex-shrink: 0; white-space: pre;">${prefix}</span>
+                <span style="flex-shrink: 0; white-space: pre;">${escapeHtml(prefix)}</span>
                 ${scrollingText ? `
                 <div style="flex-grow: 1; overflow: hidden; min-width: 0; position: relative; margin-left: 2px;">
-                    <span style="display: inline-block; white-space: nowrap; ${animationStyle}">${scrollingText}</span>
+                    <span style="display: inline-block; white-space: nowrap; ${animationStyle}">${escapeHtml(scrollingText)}</span>
                 </div>
                 ` : ''}
-                <small style="flex-shrink: 0; margin-left: 5px;">(${info.count})</small>
+                <small style="flex-shrink: 0; margin-left: 5px;">(${escapeHtml(info.count)})</small>
             </div>
 
             <label class="batch-toggle-switch" style="flex-shrink: 0; margin-bottom: 0;" onclick="event.stopPropagation()">
-                <input type="checkbox" class="lkw-toggle" data-truckid="${truckId}" ${isActive ? 'checked' : ''}>
+                <input type="checkbox" class="lkw-toggle" data-truckid="${escapeHtml(truckId)}" ${isActive ? 'checked' : ''}>
                 <span class="batch-slider"></span>
             </label>
             
@@ -603,14 +603,16 @@ Object.values(shipments).forEach(s => {
                 // Was passieren soll, wenn lange gedrückt wird:
                 if (window.navigator && window.navigator.vibrate) navigator.vibrate(50); // Leichtes Vibrieren auf Android
 
-                const action = confirm(`Möchtest du den LKW löschen?\n\n[OK] = LKW & alle Scans löschen\n[Abbrechen] = LKW umbenennen`);
+                // Mitarbeiter können den LKW weiterhin umbenennen, erhalten aber keine Lösch-Auswahl.
+                const action = isAdmin() && confirm(`Möchtest du den LKW löschen?\n\n[OK] = LKW & alle Scans löschen\n[Abbrechen] = LKW umbenennen`);
                 
                 let currentShipments = loadShipments();
 
                 if (action) {
+                    if (!isAdmin()) return;
                     // LÖSCHEN
                     const finalConfirm = confirm(`ACHTUNG: Willst du wirklich ALLE Sendungen für diesen LKW aus dem System entfernen?`);
-                    if (finalConfirm) {
+                    if (finalConfirm && isAdmin()) {
                         for (let baseNumber in currentShipments) {
                             if (currentShipments[baseNumber].truckId === targetTruckId) {
                                 delete currentShipments[baseNumber];

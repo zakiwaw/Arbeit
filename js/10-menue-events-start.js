@@ -44,7 +44,7 @@ tableBodyEl.addEventListener('click', (event) => {
         } else if (target.classList.contains('pdf-btn')) {
             openSecurityReport(baseNumber);
         } else if (target.classList.contains('main-delete-btn')) {
-            if (confirm(`Sendung ${escapeHtml(baseNumber)} wirklich löschen?`)) {
+            if (isAdmin() && confirm(`Sendung ${escapeHtml(baseNumber)} wirklich löschen?`)) {
                 deleteShipment(baseNumber);
             }
         }
@@ -102,7 +102,7 @@ document.addEventListener('click', (event) => {
             else openSecurityReport(base);
         }
         else if (btn.classList.contains('main-delete-btn')) {
-            if (confirm(`Sendung ${escapeHtml(base)} wirklich löschen?`)) { deleteShipment(base); goBackFromDetail(); }
+            if (isAdmin() && confirm(`Sendung ${escapeHtml(base)} wirklich löschen?`) && isAdmin()) { deleteShipment(base); goBackFromDetail(); }
         }
     }
     // Packstücktabelle: Auswahl-Kästchen und Leiste („Alle“, Zähler, Übernehmen, Aufheben)
@@ -618,9 +618,11 @@ if (huEditFormEl) {
     menuToggleBtnEl.addEventListener('click', (e) => { e.stopPropagation(); sideMenuEl.classList.contains('open') ? closeSideMenu() : openSideMenu(); });
     
     menuOverlayEl.addEventListener('click', closeSideMenu);
-    resetDataButtonEl.addEventListener('click', async () => {
+    resetDataButtonEl.addEventListener('click', async (e) => {
+        e.preventDefault();
+        if (!isAdmin()) return;
         removeActiveInlineNoteEditor();
-        if (confirm("WARNUNG!\n\n M\u00F6schtest du wirklich ALLE erfassten Sendungsdaten auf diesem Ger\u00E4t UND auf dem Server unwiderruflich L\u00F6schen?")) {
+        if (confirm("WARNUNG!\n\nAlle Sendungsdaten auf diesem Gerät UND auf dem Server werden gelöscht. Vorher wird auf dem Server ein Backup angelegt.\n\nWirklich alle Daten löschen?")) {
             showLoader(); 
             sheetStatusEl.textContent = 'Lösche Daten auf dem Server...';
             sheetStatusEl.style.color = 'orange';
@@ -633,7 +635,7 @@ if (huEditFormEl) {
                 console.error("Fehler beim Zurücksetzen der Daten:", error);
                 sheetStatusEl.textContent = `Fehler: ${error.message}`;
                 sheetStatusEl.style.color = 'red';
-                alert("Die Daten konnten auf dem Server nicht gelöscht werden. Bitte prüfen Sie Ihre Verbindung.");
+                alert(`Die Daten konnten auf dem Server nicht gelöscht werden.\n\n${error.message}`);
                 hideLoader();
             }
         } else {

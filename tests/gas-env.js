@@ -3,28 +3,50 @@
 // Verwendung: const env = require('./gas-env')(); env.call('loadChanges', { sinceVersion: 0 }, token); env.api.runDriveImport();
 const fs = require('fs'), crypto = require('crypto'), path = require('path');
 
-module.exports = function createGasEnv() {
-  const src = fs.readFileSync(path.join(__dirname, '..', 'backend', 'Code.gs'), 'utf8');
+module.exports = function createGasEnv(options = {}) {
+  let src = fs.readFileSync(path.join(__dirname, '..', 'backend', 'Code.gs'), 'utf8');
+  if (options.authEnabled === false) src = src.replace('const AUTH_ENABLED = true;', 'const AUTH_ENABLED = false;');
   const mails = [], log = [];
   class Range { constructor(sh, r, c, nr, nc) { Object.assign(this, { sh, r, c, nr, nc }); }
-    setNumberFormat() { return this; }
-    getValues() { const out = []; for (let i = 0; i < this.nr; i++) { const row = []; for (let j = 0; j < this.nc; j++) row.push((this.sh.rows[this.r - 1 + i] || [])[this.c - 1 + j] ?? ''); out.push(row); } return out; }
-    setValues(v) { for (let i = 0; i < v.length; i++) { const ri = this.r - 1 + i; while (this.sh.rows.length <= ri) this.sh.rows.push([]); for (let j = 0; j < v[i].length; j++) this.sh.rows[ri][this.c - 1 + j] = v[i][j]; } return this; }
+    setNumberFormat(format) {
+      for (let i = 0; i < this.nr; i++) { const ri = this.r - 1 + i; if (!this.sh.formats[ri]) this.sh.formats[ri] = [];
+        for (let j = 0; j < this.nc; j++) this.sh.formats[ri][this.c - 1 + j] = format; }
+      return this;
+    }
+    getNumberFormat() { return (this.sh.formats[this.r - 1] || [])[this.c - 1] || ''; }
+    getFormula() { return (this.sh.formulas[this.r - 1] || [])[this.c - 1] || ''; }
+    getValues() { const out = []; for (let i = 0; i < this.nr; i++) { const row = []; for (let j = 0; j < this.nc; j++) {
+      const ri = this.r - 1 + i, ci = this.c - 1 + j;
+      row.push((this.sh.formulas[ri] || [])[ci] ? '[Formelwert]' : ((this.sh.rows[ri] || [])[ci] ?? ''));
+    } out.push(row); } return out; }
+    setValues(v) { for (let i = 0; i < v.length; i++) { const ri = this.r - 1 + i; while (this.sh.rows.length <= ri) this.sh.rows.push([]);
+      if (!this.sh.formulas[ri]) this.sh.formulas[ri] = [];
+      for (let j = 0; j < v[i].length; j++) { const ci = this.c - 1 + j, value = v[i][j];
+        // setValues kann auch bei Textformat eine Formel ausführen; ein führender Apostroph schützt den Wert und wird beim Lesen entfernt.
+        const literal = typeof value === 'string' && value.startsWith("'");
+        this.sh.rows[ri][ci] = literal ? value.slice(1) : value;
+        this.sh.formulas[ri][ci] = !literal && typeof value === 'string' && /^\s*[=+\-@]/.test(value) ? value : '';
+      }
+    } return this; }
     getValue() { return this.getValues()[0][0]; } setValue(v) { return this.setValues([[v]]); } clearContent() { return this; } }
-  class Sheet { constructor(n) { this.name = n; this.rows = []; } getName() { return this.name; } getLastRow() { return this.rows.length; } getMaxRows() { return Math.max(this.rows.length, 1000); } getMaxColumns() { return 26; }
+  class Sheet { constructor(n) { this.name = n; this.rows = []; this.formats = []; this.formulas = []; } getName() { return this.name; } getLastRow() { return this.rows.length; } getMaxRows() { return Math.max(this.rows.length, 1000); } getMaxColumns() { return 26; }
     getRange(r, c, nr = 1, nc = 1) { if (typeof r === 'string') { const m = /^([A-Z]+)(\d+)$/.exec(r); return new Range(this, Number(m[2]), m[1].charCodeAt(0) - 64, 1, 1); } return new Range(this, r, c, nr, nc); }
     appendRow(values) { this.rows.push(values.slice()); return this; }
+    copyTo(ss) { const copy = ss.insertSheet('Kopie von ' + this.name);
+      copy.rows = this.rows.map(r => r.slice()); copy.formats = this.formats.map(r => r && r.slice()); copy.formulas = this.formulas.map(r => r && r.slice()); return copy; }
+    setName(n) { if (sheets[n] && sheets[n] !== this) throw new Error('Blattname bereits vergeben'); delete sheets[this.name]; this.name = n; sheets[n] = this; return this; }
     setFrozenRows() {} hideSheet() { this.hidden = true; } getLastColumn() { return 26; } deleteRows() {} insertRowsAfter() {} }
   const sheets = { shipments: new Sheet('shipments'), lkw_status: new Sheet('lkw_status') };
   sheets.shipments.rows.push(['baseNumber', 'json', 'version', 'updatedAt', 'deleted']); // wie das echte Blatt: Zeile 1 = Überschriften, Daten ab Zeile 2
-  const SpreadsheetApp = { openById: () => ({ getSheetByName: n => sheets[n] || null, insertSheet: n => (sheets[n] = new Sheet(n)) }), flush() {} };
+  const SpreadsheetApp = { openById: () => ({ getSheetByName: n => sheets[n] || null, insertSheet: n => (sheets[n] = new Sheet(n)) }),
+    flush() { if (env.flushFail) { env.flushFail = false; throw new Error('Test-Flush fehlgeschlagen'); } } };
   const cache = {}; const CacheService = { getScriptCache: () => ({ get: k => cache[k] ?? null, put: (k, v) => { cache[k] = v; }, remove: k => { delete cache[k]; }, getAll: ks => { const o = {}; ks.forEach(k => { if (cache[k] != null) o[k] = cache[k]; }); return o; }, putAll: o => Object.assign(cache, o), removeAll: ks => ks.forEach(k => delete cache[k]) }) };
   const lockState = { held: 0, nested: 0 }; // nested = Versuch, die Sperre erneut zu nehmen, während sie gehalten wird (in Apps Script ein Hänger)
   const LockService = { getScriptLock: () => ({ tryLock: () => { if (lockState.held) { lockState.nested++; return false; } lockState.held = 1; return true; }, waitLock() {}, releaseLock() { lockState.held = 0; } }) };
   const props = {}; const PropertiesService = { getScriptProperties: () => ({ getProperty: k => props[k] ?? null, setProperty: (k, v) => { props[k] = v; }, deleteProperty: k => { delete props[k]; }, getKeys: () => Object.keys(props) }) };
   const Utilities = { getUuid: () => crypto.randomUUID(), computeHmacSha256Signature: (d, k) => Array.from(crypto.createHmac('sha256', k).update(d, 'utf8').digest()).map(b => b > 127 ? b - 256 : b),
     base64EncodeWebSafe: s => Buffer.from(s, 'utf8').toString('base64url'), base64DecodeWebSafe: s => Buffer.from(s, 'base64url'), newBlob: b => ({ getDataAsString: () => Buffer.from(b).toString('utf8') }) };
-  const env = { mailFail: false };
+  const env = { mailFail: false, flushFail: false };
   const MailApp = { sendEmail: o => { if (env.mailFail) throw new Error('Mail-Quota'); mails.push(o); } };
   const ContentService = { createTextOutput: t => ({ text: t, setMimeType() { return this; } }), MimeType: { JSON: 'json' } };
   const Logger = { log: m => log.push(String(m)) };

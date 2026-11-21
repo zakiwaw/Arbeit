@@ -446,8 +446,8 @@ props.SPREADSHEET_ID = 'test-tabelle';
   r = call('saveShipments', { shipments: { O2: S([], { hawb: 'O2' }), O1: S([], { hawb: 'O1' }) }, bases: {}, versions: { O1: 0, O2: 0 }, order: ['O1', 'O2'] }, ma2Tok);
   rows = shipmentRows();
   ok(rows.O1.version < rows.O2.version, `order: O1 vor O2 geschrieben (Zeilen-Versionen ${rows.O1.version} < ${rows.O2.version})`);
-  r = call('deleteShipments', { baseNumbers: ['O1', 'O2'] }, ma2Tok);
-  ok(shipmentRows().O1.modifiedBy === 'Mitarbeiter 2' && shipmentRows().O1.flag === true, 'Löschvermerk: Name in Spalte F');
+  r = call('deleteShipments', { baseNumbers: ['O1', 'O2'] }, adminTok);
+  ok(shipmentRows().O1.modifiedBy === 'Mitarbeiter 1' && shipmentRows().O1.flag === true, 'Löschvermerk: Name des Administrators in Spalte F');
   // k) Status-Kurzform: Dunkelalarm offen/erledigt, HU-Auftrag fertig
   ok(api.shipmentStatusLabel_(S([item('X', 'Dunkelalarm', '2026-11-10T08:00:00.000Z')])) === 'Dunkelalarm · WE 0/3 · Sich. 0/3', 'Status: offener Dunkelalarm');
   ok(api.shipmentStatusLabel_(S([item('X', 'Dunkelalarm', '2026-11-10T08:00:00.000Z'), item('X', 'ETD', '2026-11-10T08:01:00.000Z')])) === 'Offen · WE 0/3 · Sich. 1/3', 'Status: Dunkelalarm durch spätere Sicherung erledigt');
@@ -496,6 +496,129 @@ ok(p.orders.length === 0, 'parseStandardText_: leer → keine Aufträge');
   ok(Number(row()[10]) === 1, 'Nach Ablauf der Sperre zählt der nächste Fehlversuch wieder ab 1');
   q = e2.call('authLogin', { pin: '482913' });
   ok(q.status === 'success' && Number(row()[10]) === 0 && Number(row()[11]) === 0 && Number(row()[12]) > 0, 'Erfolgreiche Anmeldung: failed / lockedUntil zurückgesetzt, lastLogin gesetzt (wie 2.9)');
+}
+
+// 12) Sicherheit 2.11: Formel-Injektion, Admin-Aktionen und vollständiges Backup vor dem Zurücksetzen
+{
+  // setValues wertet ein führendes = auch bei Textformat aus. Der Textmarker wird beim Lesen nicht mitgeliefert.
+  const probe = require('./gas-env')().sheets.shipments.getRange(2, 1);
+  probe.setNumberFormat('@').setValue('=1+1');
+  ok(probe.getFormula() === '=1+1' && probe.getValue() !== '=1+1', 'Testmodell erkennt eine Formel auch bei Textformat');
+  probe.setValue("'=1+1");
+  ok(probe.getFormula() === '' && probe.getValue() === '=1+1', 'Testmodell: Textmarker verhindert die Formel und wird beim Lesen entfernt');
+
+  const sec = require('./gas-env')();
+  Object.assign(sec.props, { SPREADSHEET_ID: 'test-tabelle', BOOTSTRAP_ADMIN_NAME: 'Mitarbeiter 1', BOOTSTRAP_ADMIN_EMAIL: 'admin@example.com' });
+  sec.call('authLogin', {});
+  let invite = /einladung=([0-9a-f]+)/.exec(sec.mails[0].body)[1];
+  const admin = sec.call('authAccept', { invite, pin: '482913', deviceId: 'test-admin' }).token;
+  sec.call('adminInvite', { name: 'Mitarbeiter 2', email: 'mitarbeiter2@example.com' }, admin);
+  invite = /einladung=([0-9a-f]+)/.exec(sec.mails[1].body)[1];
+  const employee = sec.call('authAccept', { invite, pin: '778812', deviceId: 'test-mitarbeiter' }).token;
+  const sh = sec.sheets.shipments;
+  const shipment = base => ({ hawb: base, scannedItems: [] });
+  let q = sec.call('saveShipments', { shipments: { '000123': shipment('000123'), TEMP1: shipment('TEMP1'), TEMP2: shipment('TEMP2'), TEMP3: shipment('TEMP3'), ARCHIV: shipment('ARCHIV') } }, employee);
+  ok(q.status === 'success' && sec.call('loadChanges', { sinceVersion: 0 }, employee).changed['000123'].hawb === '000123', 'Normale Sendungsnummer mit führenden Nullen funktioniert für Mitarbeiter');
+  const dataState = () => JSON.stringify({ rows: sh.rows, formats: sh.formats, meta: sec.sheets._meta.rows });
+  const forbiddenState = dataState();
+  [
+    ['clearAllData', {}], ['saveAllData', { NEU: shipment('NEU') }],
+    ['deleteShipment', { baseNumber: '000123' }], ['deleteShipments', { baseNumbers: ['000123', 'TEMP1'] }]
+  ].forEach(([action, payload]) => {
+    const denied = sec.call(action, payload, employee);
+    ok(denied.status === 'error' && denied.code === 'FORBIDDEN' && denied.message === 'Nur für Administratoren.' && dataState() === forbiddenState,
+      `${action}: Mitarbeiter erhält FORBIDDEN, keine Sendungsdaten geändert`);
+  });
+  ok(!Object.keys(sec.sheets).some(n => n.startsWith('shipments_backup_')), 'Verbotenes Zurücksetzen legt kein Backup an');
+  ok(sec.call('loadAllData', {}, employee).data['000123'].hawb === '000123', 'loadAllData bleibt für Mitarbeiter lesbar');
+
+  // Der Notschalter kennt keine Administrator-Rolle: normale Aktionen gehen weiter, Admin-Aktionen bleiben gesperrt.
+  const noAuth = require('./gas-env')({ authEnabled: false });
+  noAuth.props.SPREADSHEET_ID = 'test-tabelle';
+  const noAuthSaved = noAuth.call('saveShipments', { shipments: { TEST: shipment('TEST') } });
+  ok(noAuthSaved.status === 'success' && noAuth.call('loadAllData', {}).data.TEST.hawb === 'TEST', 'Ohne Anmeldung: normales Speichern und Lesen bleiben möglich');
+  [['clearAllData', {}], ['saveAllData', {}], ['deleteShipment', { baseNumber: 'TEST' }], ['deleteShipments', { baseNumbers: ['TEST'] }]].forEach(([action, payload]) => {
+    const denied = noAuth.call(action, payload);
+    ok(denied.code === 'FORBIDDEN' && noAuth.shipmentRows().TEST.shipment.hawb === 'TEST', `${action}: ohne Anmeldung mangels Administrator-Rolle gesperrt`);
+  });
+
+  ['=', '+', '-', '@'].forEach(prefix => {
+    const bad = ' \t' + prefix + '1', before = dataState();
+    const incoming = { '000123': { hawb: '000123', scannedItems: [], note: 'ändern' }, [bad]: shipment(bad) };
+    q = sec.call('saveShipments', { shipments: incoming, order: ['000123', bad] }, employee);
+    ok(q.status === 'error' && /Ungültige Sendungsnummer/.test(q.message) && dataState() === before,
+      `saveShipments: ${prefix} nach Leerraum abgelehnt, auch gültige vorherige Sendung nicht geschrieben`);
+    q = sec.call('deleteShipment', { baseNumber: bad }, admin);
+    ok(q.status === 'error' && /Ungültige Sendungsnummer/.test(q.message) && dataState() === before,
+      `deleteShipment: ${prefix} nach Leerraum abgelehnt, nichts geschrieben`);
+    q = sec.call('deleteShipments', { baseNumbers: ['000123', bad] }, admin);
+    ok(q.status === 'error' && /Ungültige Sendungsnummer/.test(q.message) && dataState() === before,
+      `deleteShipments: ${prefix} nach Leerraum abgelehnt, auch gültige vorherige Nummer nicht gelöscht`);
+  });
+  const legacyState = dataState();
+  q = sec.call('saveAllData', { '000123': shipment('000123'), '=1+1': shipment('=1+1') }, admin);
+  ok(q.status === 'error' && /Ungültige Sendungsnummer/.test(q.message) && dataState() === legacyState, 'Alte Vollspeicherung prüft vor dem Schreiben ebenfalls alle Nummern');
+  ok(sec.call('saveAllData', { LEGACY: shipment('LEGACY') }, admin).status === 'success', 'Administrator darf gültige alte Vollspeicherung ausführen');
+  ok(sec.call('deleteShipment', { baseNumber: 'TEMP1' }, admin).status === 'success' && sec.shipmentRows().TEMP1.flag === true, 'Administrator darf eine Sendung löschen');
+  ok(sec.call('deleteShipments', { baseNumbers: ['TEMP2', 'TEMP3'] }, admin).status === 'success' && sec.shipmentRows().TEMP2.flag === true && sec.shipmentRows().TEMP3.flag === true, 'Administrator darf mehrere Sendungen löschen');
+
+  const jsonStart = '{"hawb":"LANG","scannedItems":[],"note":"';
+  const note = 'x'.repeat(45000 - jsonStart.length) + '=1+1';
+  q = sec.call('saveShipments', { shipments: { LANG: { hawb: 'LANG', scannedItems: [], note } } }, employee);
+  const longRow = sh.rows.findIndex(row => row[0] === 'LANG') + 1, continuation = sh.getRange(longRow, 7);
+  ok(q.status === 'success' && continuation.getValue().startsWith('=1+1') && continuation.getNumberFormat() === '@' && continuation.getFormula() === '',
+    'JSON-Fortsetzung mit führendem = bleibt formatierter Text und wird nicht als Formel gespeichert');
+  ok(sec.call('loadChanges', { sinceVersion: 0 }, employee).changed.LANG.note === note, 'Große Sendung mit = in der Fortsetzung vollständig gelesen');
+  [['LANGPLUS', '+1'], ['LANGMINUS', '-1'], ['LANGAT', '@TEXT'], ['LANGQUOTE', "'Text"], ['LANGSPACE', '  =1+1']].forEach(([base, start]) => {
+    const head = `{"hawb":"${base}","scannedItems":[],"note":"`;
+    const longNote = 'x'.repeat(45000 - head.length) + start + ' Ende';
+    const saved = sec.call('saveShipments', { shipments: { [base]: { hawb: base, scannedItems: [], note: longNote } } }, employee);
+    const row = sh.rows.findIndex(r => r[0] === base) + 1, cell = sh.getRange(row, 7);
+    const loaded = sec.call('loadChanges', { sinceVersion: 0 }, employee);
+    ok(saved.status === 'success' && cell.getNumberFormat() === '@' && cell.getFormula() === '' && cell.getValue().startsWith(start) && loaded.changed[base].note === longNote,
+      `JSON-Fortsetzung ${base}: Anfang ${JSON.stringify(start)} bleibt vollständig als Text erhalten`);
+  });
+
+  sh.rows.find(row => row[0] === 'ARCHIV')[4] = 'ARCHIV';
+  const beforeRows = JSON.stringify(sh.rows), beforeClear = dataState(), versionBefore = sec.sheets._meta.rows[0][0];
+  const originalCopy = sh.copyTo;
+  sh.copyTo = function () { throw new Error('Test-Backupfehler'); };
+  q = sec.call('clearAllData', {}, admin);
+  ok(q.status === 'error' && /Backup.*fehlgeschlagen/.test(q.message) && dataState() === beforeClear && !sec.lockState.held,
+    'Fehler beim Kopieren: keine Löschung, keine neue Version, Sperre freigegeben');
+  sh.copyTo = function (ss) { const copy = originalCopy.call(this, ss); copy.setName = function () { throw new Error('Test-Namensfehler'); }; return copy; };
+  q = sec.call('clearAllData', {}, admin);
+  ok(q.status === 'error' && /Backup.*fehlgeschlagen/.test(q.message) && dataState() === beforeClear,
+    'Fehler beim Benennen des Backups: keine Löschung, keine neue Version');
+  delete sec.sheets['Kopie von shipments'];
+  sh.copyTo = function (ss) { const copy = originalCopy.call(this, ss); sec.flushFail = true; return copy; };
+  q = sec.call('clearAllData', {}, admin);
+  ok(q.status === 'error' && /Backup.*fehlgeschlagen/.test(q.message) && dataState() === beforeClear && !sec.lockState.held,
+    'Fehler beim Abschließen des Backups: keine Löschung, keine neue Version');
+
+  let copiedBeforeDelete = false;
+  sh.copyTo = function (ss) {
+    const copy = originalCopy.call(this, ss);
+    copiedBeforeDelete = sec.lockState.held === 1 && JSON.stringify(this.rows) === beforeRows && JSON.stringify(copy.rows) === beforeRows;
+    return copy;
+  };
+  const backupsBefore = Object.keys(sec.sheets).filter(n => n.startsWith('shipments_backup_'));
+  q = sec.call('clearAllData', {}, admin);
+  const backupNames = Object.keys(sec.sheets).filter(n => n.startsWith('shipments_backup_'));
+  const backupName = backupNames.find(n => !backupsBefore.includes(n)), backup = sec.sheets[backupName];
+  ok(q.status === 'success' && copiedBeforeDelete && backup && /^shipments_backup_\d{4}-\d\d-\d\d_\d\d-\d\d-\d\d-\d{3}Z_[\da-f]{8}$/.test(backupName),
+    'Administrator setzt zurück: Backup mit UTC-Zeitstempel unter Sperre vor der Löschung angelegt');
+  ok(backup && JSON.stringify(backup.rows) === beforeRows && backup.getRange(longRow, 7).getNumberFormat() === '@' && backup.getRange(longRow, 7).getValue().startsWith('=1+1'),
+    'Backup enthält das vollständige Blatt einschließlich Archiv, Löschvermerken und JSON-Fortsetzung');
+  ok(sh.rows.slice(1).every(row => row[4] === true && row[1] === '') && q.version === versionBefore + 1,
+    'Erst nach dem Backup sind alle Sendungen als gelöscht markiert');
+  q = sec.call('loadChanges', { sinceVersion: versionBefore }, employee);
+  ok(q.status === 'success' && q.deleted.includes('000123') && q.deleted.includes('ARCHIV') && q.deleted.includes('LANG'),
+    'Andere Geräte erhalten die Löschvermerke für aktive und archivierte Sendungen');
+  sh.copyTo = originalCopy;
+  q = sec.call('clearAllData', {}, admin);
+  ok(q.status === 'success' && Object.keys(sec.sheets).filter(n => n.startsWith('shipments_backup_')).length === backupNames.length + 1,
+    'Wiederholtes Zurücksetzen legt ein eigenes Backup ohne Namenskollision an');
 }
 
 console.log(fails ? `SOME FAILED (${fails} von ${oks + fails})` : `ALL GOOD (${oks})`); process.exit(fails ? 1 : 0);
